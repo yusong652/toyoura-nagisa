@@ -57,8 +57,10 @@ def _get_git_visible_files(search_dir: Path) -> Set[Path]:
     """
     try:
         # Get tracked files
+        # Use -c core.quotePath=false to output non-ASCII filenames correctly
+        # Without this, git outputs Chinese filenames as octal escape sequences
         tracked_result = subprocess.run(
-            ["git", "ls-files"],
+            ["git", "-c", "core.quotePath=false", "ls-files"],
             cwd=search_dir,
             capture_output=True,
             text=True,
@@ -67,7 +69,7 @@ def _get_git_visible_files(search_dir: Path) -> Set[Path]:
 
         # Get untracked files (respecting .gitignore)
         untracked_result = subprocess.run(
-            ["git", "ls-files", "--others", "--exclude-standard"],
+            ["git", "-c", "core.quotePath=false", "ls-files", "--others", "--exclude-standard"],
             cwd=search_dir,
             capture_output=True,
             text=True,
@@ -164,36 +166,12 @@ async def glob(
         search_dir = workspace_root
 
     try:
-        # Normalize pattern: if it's an absolute path, convert to relative
-        # This handles cases where LLM generates absolute paths like "C:/workspace/src/*.py"
+        # Auto-add **/ prefix for patterns without path separators
+        # This allows "*letter*" to match files in all subdirectories, not just root
+        # GitWildMatch's * doesn't match /, so "*letter*" only matches root-level files
         normalized_pattern = pattern
-        if Path(pattern.split('*')[0].rstrip('/')).is_absolute():
-            # Extract the path portion before wildcards
-            try:
-                # Try to make pattern relative to search_dir
-                pattern_base = pattern.split('*')[0].rstrip('/')
-                pattern_base_path = Path(normalize_path_separators(pattern_base))
-
-                # Check if pattern is under search_dir
-                try:
-                    rel_base = pattern_base_path.relative_to(search_dir)
-                    # Reconstruct pattern with relative path
-                    # Replace the absolute base with relative base
-                    normalized_pattern = pattern.replace(
-                        pattern_base,
-                        path_to_llm_format(rel_base) if str(rel_base) != '.' else ''
-                    )
-                    # Clean up leading slashes
-                    normalized_pattern = normalized_pattern.lstrip('/')
-                except ValueError:
-                    # Pattern is outside search_dir, return error
-                    return error_response(
-                        f"Pattern path is outside search directory. "
-                        f"Pattern: {pattern}, Search directory: {path_to_llm_format(search_dir)}"
-                    )
-            except Exception:
-                # If normalization fails, use original pattern
-                pass
+        if '/' not in normalized_pattern and '**' not in normalized_pattern:
+            normalized_pattern = f"**/{normalized_pattern}"
 
         # Get git-visible files (respecting .gitignore)
         git_visible_files = _get_git_visible_files(search_dir)

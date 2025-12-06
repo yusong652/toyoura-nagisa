@@ -91,12 +91,19 @@ def _run_git_grep(
     Returns:
         CompletedProcess result from git grep
     """
-    cmd = ["git", "grep"]
+    # Use -c core.quotePath=false to output non-ASCII filenames correctly
+    # Without this, git outputs Chinese filenames as octal escape sequences like \350\265\236...
+    # which LLM cannot understand and causes hallucinations
+    cmd = ["git", "-c", "core.quotePath=false", "grep"]
+
+    # Use extended regex (-E) to support | (OR), +, ?, etc.
+    # Without this, patterns like "foo|bar" won't work as expected
+    cmd.append("-E")
 
     # Include untracked files (useful for workspace directories like pfc_workspace/)
     if include_untracked:
         cmd.append("--untracked")
-    
+
     # Pattern matching flags
     if case_insensitive:
         cmd.append("-i")
@@ -268,11 +275,11 @@ async def grep(
 
   Usage:
   - ALWAYS use Grep for search tasks. NEVER invoke `grep` or `rg` as a Bash command. The Grep tool has been optimized for correct permissions and access.
-  - Supports full regex syntax (e.g., "log.*Error", "function\\s+\\w+")
+  - Supports extended regex syntax including | (OR), +, ?, etc. (e.g., "foo|bar", "log.*Error", "function\\s+\\w+")
   - Filter files with glob parameter (e.g., "*.js", "**/*.tsx") or type parameter (e.g., "js", "py", "rust")
   - Output modes: "content" shows matching lines, "files_with_matches" shows only file paths (default), "count" shows match counts
   - Use Task tool for open-ended searches requiring multiple rounds
-  - Pattern syntax: Uses git grep (not grep) - literal braces need escaping (use `interface\\{\\}` to find `interface{}` in Go code)
+  - Pattern syntax: Uses git grep with extended regex (-E) - literal braces need escaping (use `interface\\{\\}` to find `interface{}` in Go code)
 """
 
     # Handle Pydantic FieldInfo objects when invoked programmatically
