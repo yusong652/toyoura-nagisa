@@ -105,12 +105,26 @@ Usage notes:
 
         # Format result based on execution status
         if result.status == "success":
+            response_text = result.text  # Already stripped in AgentResult.text property
+
+            # Fallback: SubAgent returned empty response
+            # This happens when SubAgent thinks task is done but doesn't provide output
+            if not response_text:
+                return error_response(
+                    f"SubAgent '{config.display_name}' completed but returned empty response. "
+                    f"Please retry with a more explicit prompt that asks the SubAgent to "
+                    f"summarize findings or provide a detailed response.",
+                    subagent_type=subagent_type,
+                    iterations_used=result.iterations_used,
+                    execution_time_seconds=result.execution_time_seconds,
+                )
+
             return success_response(
                 message=f"SubAgent '{config.display_name}' completed successfully",
                 llm_content={
                     "parts": [{
                         "type": "text",
-                        "text": result.text
+                        "text": response_text
                     }]
                 },
                 subagent_type=subagent_type,
