@@ -165,10 +165,12 @@ function getToolDescription(toolName: string, input: Record<string, unknown>): s
 
 // SubAgent Tool Item (nested under invoke_agent)
 // Displayed with additional indentation and dimmer styling
+// Shows BlinkingCircle when executing, checkmark when parent invoke_agent completed
 const SubagentToolItemDisplay: React.FC<{
   toolName: string;
   toolInput: Record<string, unknown>;
-}> = ({ toolName, toolInput }) => {
+  parentCompleted: boolean;  // When invoke_agent has result, all SubAgent tools are done
+}> = ({ toolName, toolInput, parentCompleted }) => {
   const description = getToolDescription(toolName, toolInput);
   // Additional indent for nested tools (2 spaces)
   const SUBAGENT_INDENT = 2;
@@ -176,7 +178,11 @@ const SubagentToolItemDisplay: React.FC<{
   return (
     <Box paddingX={1} paddingLeft={STATUS_INDICATOR_WIDTH + SUBAGENT_INDENT}>
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-        <BlinkingCircle color={theme.text.muted} />
+        {parentCompleted ? (
+          <Text color={theme.text.muted}>{TOOL_STATUS.SUCCESS}</Text>
+        ) : (
+          <BlinkingCircle color={theme.text.muted} />
+        )}
       </Box>
       <Text wrap="truncate" dimColor>
         <Text bold color={theme.text.muted}>
@@ -228,6 +234,7 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
           key={tool.toolCallId}
           toolName={tool.toolName}
           toolInput={tool.toolInput}
+          parentCompleted={hasResult}
         />
       ))}
     </Box>
