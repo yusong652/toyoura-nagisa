@@ -472,9 +472,18 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
                 })
             message_dict["tool_calls"] = tool_calls_list
 
-        # Add content field - omit if empty and tool_calls present
-        if message.content or not has_tool_calls:
-            message_dict["content"] = message.content
+        # Add content field - omit if whitespace-only when tool_calls present
+        # API may return newlines as default response, treat whitespace-only as empty
+        # to avoid few-shot effect where LLM learns to return empty responses
+        content_text = message.content
+        has_meaningful_content = content_text and content_text.strip()
+
+        if has_meaningful_content:
+            message_dict["content"] = content_text
+        elif not has_tool_calls:
+            # No tool calls and no meaningful content - keep empty string for API compatibility
+            message_dict["content"] = ""
+        # Else: has tool_calls but only whitespace content - omit content field
 
         return message_dict
 
