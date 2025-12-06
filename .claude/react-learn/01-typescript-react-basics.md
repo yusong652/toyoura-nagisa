@@ -8,6 +8,7 @@
 ### 1. 类型系统
 
 #### interface vs type
+
 - **interface**: 定义对象结构，编译时验证，运行时消失
 - **type**: 类型别名，适合联合类型、基础类型别名
 - 两者都是**编译时约束**，帮助在写代码时发现类型错误
@@ -24,12 +25,14 @@ type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
 ```
 
 #### import type
+
 - `import type { X }` 编译后完全删除
 - 意图明确，避免循环依赖，打包更小
 
 ### 2. React 组件定义
 
 #### 现代写法（推荐）
+
 ```typescript
 // 不需要 React.FC，让 TypeScript 自动推断
 export const App = () => {
@@ -38,20 +41,23 @@ export const App = () => {
 ```
 
 #### 旧写法（不推荐）
+
 ```typescript
 // React.FC 已不推荐使用
 export const App: React.FC = () => { ... };
 ```
 
-### 3. Context 系统
+### 3. Context 系统基础
 
 #### createContext
+
 ```typescript
 const MyContext = createContext<T>(defaultValue);
 // <T> 指定类型，defaultValue 是后备值
 ```
 
 #### Provider
+
 - Provider 是 Context 对象的属性，用于向下传递数据
 - value 属性的类型必须符合 createContext<T> 中的 T
 
@@ -62,22 +68,26 @@ const MyContext = createContext<T>(defaultValue);
 ```
 
 #### 数据流
+
 - **单向数据流**：外层向内层传递
 - 同层组件不能直接通信，必须通过共同父组件或 Context
 
 ### 4. useState Hook
 
 #### 基本语法
+
 ```typescript
 const [state, setState] = useState<T>(defaultValue);
 //     ↑ 当前值  ↑ 修改函数        ↑ 类型可省略（自动推断）
 ```
 
 #### 类型推断
+
 - 能推断就不写：`useState(false)` → boolean
 - 需要声明：`useState<string | null>(null)` → 默认值不能表达完整类型
 
 #### 数组解构 vs 对象解构
+
 ```typescript
 // 数组解构 - 按位置，名字自由
 const [count, setCount] = useState(0);
@@ -112,30 +122,11 @@ export function useChatStream() {
 
 命名只是约定，功能完全相同。
 
-## 代码改进
-
-### 已完成的重构
-
-1. **移除 React.FC** (`App.tsx`)
-   - 移除 `import React from 'react'`
-   - 移除 `: React.FC` 类型注解
-
-2. **简化 StreamingContext** (`StreamingContext.tsx`)
-   - 移除 `StreamingContextValue` interface
-   - 直接使用 `StreamingState` 枚举
-   - 添加运行时安全检查
-
-3. **更新 AppStateContext**
-   - `streamingState` 从嵌套对象改为枚举值
-
-4. **修复 AppContainer**
-   - 移除未使用的 `thinkingContent`
-
 ## Gemini CLI Context 架构参考
 
 Gemini CLI 使用多 Context 按职责分离：
 
-```
+```text
 AppContext        - 应用级别
 ConfigContext     - 配置
 SettingsContext   - 用户设置
@@ -146,18 +137,10 @@ StreamingContext  - 流式状态
 ```
 
 **设计原则**：
+
 - 状态和操作分离
 - 不同功能域分离
 - 每个 Context 有明确职责
-
-## 下一步学习
-
-- [ ] useEffect - 副作用处理
-- [ ] useCallback - 函数缓存
-- [ ] useMemo - 计算结果缓存
-- [ ] useRef - 持久化引用
-- [ ] 组件生命周期
-- [ ] MainLayout 组件组合
 
 ## 关键理解
 
