@@ -194,13 +194,16 @@ class ConfirmationStrategy:
         tool_args: Dict
     ) -> ConfirmationInfo:
         """Build confirmation info for SubAgent invocation."""
-        agent_type = tool_args.get("agent_type", "unknown")
-        instruction = tool_args.get("instruction", "")
-        # Truncate long instructions
-        if len(instruction) > 100:
-            instruction = instruction[:100] + "..."
-        command = f"Invoke SubAgent: {agent_type}"
-        description = f"Task: {instruction}" if instruction else None
+        # Parameter names match invoke_agent tool definition
+        subagent_type = tool_args.get("subagent_type", "unknown")
+        prompt = tool_args.get("prompt", "")
+        task_description = tool_args.get("description", "")
+        # Truncate long prompts
+        if len(prompt) > 100:
+            prompt = prompt[:100] + "..."
+        command = f"Invoke SubAgent: {subagent_type}"
+        # Prefer task description over prompt for display
+        description = f"Task: {task_description}" if task_description else (f"Prompt: {prompt}" if prompt else None)
 
         return ConfirmationInfo(
             tool_name=tool_name,
