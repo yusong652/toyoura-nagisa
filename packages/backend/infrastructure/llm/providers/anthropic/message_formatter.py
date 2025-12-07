@@ -2,9 +2,10 @@
 Message formatting utilities for Anthropic Claude API.
 
 Handles conversion between internal message formats and Anthropic API compatible formats,
-including multimodal content processing and role mapping.
+including multimodal content processing, role mapping, and prompt caching support.
 """
 
+import copy
 import base64
 from typing import List, Dict, Any, Optional, Union
 
@@ -343,4 +344,54 @@ class MessageFormatter(BaseMessageFormatter):
             "role": "user",
             "content": [tool_result_block]
         }
+
+    @staticmethod
+    def add_cache_control_to_messages(
+        messages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Add cache_control to the last content block of the last message.
+
+        Enables incremental caching of conversation history for Anthropic's
+        prompt caching feature. The system automatically finds the longest
+        matching cached prefix up to this breakpoint.
+
+        See: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+
+        Args:
+            messages: List of messages in Anthropic API format
+
+        Returns:
+            Deep copy of messages with cache_control added to last block
+        """
+        if not messages:
+            return messages
+
+        # Deep copy to avoid modifying the original messages
+        cached_messages = copy.deepcopy(messages)
+        last_message = cached_messages[-1]
+
+        # Get the content (should be a list of content blocks)
+        content = last_message.get("content")
+        if not content:
+            return cached_messages
+
+        # Handle string content (convert to list format with cache_control)
+        if isinstance(content, str):
+            last_message["content"] = [
+                {
+                    "type": "text",
+                    "text": content,
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ]
+            return cached_messages
+
+        # Handle list content - add cache_control to the last block
+        if isinstance(content, list) and len(content) > 0:
+            last_block = content[-1]
+            if isinstance(last_block, dict):
+                last_block["cache_control"] = {"type": "ephemeral"}
+
+        return cached_messages
 

@@ -4,6 +4,7 @@ Anthropic Client Configuration Module
 This module contains all Anthropic-specific configuration settings,
 including safety settings, model parameters, and other Anthropic-specific options.
 """
+import copy
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
@@ -115,48 +116,66 @@ class AnthropicClientConfig(BaseModel):
     )
     
     def get_api_call_kwargs(
-        self, 
-        system_prompt: str, 
-        messages: List[Dict[str, Any]], 
+        self,
+        system_prompt: str,
+        messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Get API call parameters for Anthropic messages.create
-        
+
         Args:
             system_prompt: System prompt
             messages: Formatted messages for Anthropic API
             tools: Optional tool schemas
-            
+
         Returns:
             Dict[str, Any]: API call parameters
         """
+        # Format system prompt with cache_control for prompt caching
+        # See: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+        system_with_cache = [
+            {
+                "type": "text",
+                "text": system_prompt,
+                "cache_control": {"type": "ephemeral"}
+            }
+        ]
+
+        # Add cache_control to the last message for conversation caching
+        from .message_formatter import MessageFormatter
+        cached_messages = MessageFormatter.add_cache_control_to_messages(messages)
+
         kwargs = {
             "model": self.model_settings.model,
             "max_tokens": self.model_settings.max_tokens,
-            "messages": messages,
-            "system": system_prompt,
+            "messages": cached_messages,
+            "system": system_with_cache,
             "temperature": self.model_settings.temperature,
         }
-        
+
         # Add optional parameters
         if self.model_settings.top_p is not None:
             kwargs["top_p"] = self.model_settings.top_p
         if self.model_settings.top_k is not None:
             kwargs["top_k"] = self.model_settings.top_k
-        
-        # Add tools if provided
+
+        # Add tools with cache_control on the last tool for prompt caching
+        # This caches all tool definitions as a single prefix
         if tools and len(tools) > 0:
-            kwargs["tools"] = tools
-        
+            # Deep copy to avoid modifying the original tools list
+            cached_tools = copy.deepcopy(tools)
+            cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
+            kwargs["tools"] = cached_tools
+
         # Add thinking configuration for supported models
-        if (self.model_settings.supports_thinking() and 
+        if (self.model_settings.supports_thinking() and
             self.model_settings.enable_thinking):
             kwargs["thinking"] = {
                 "type": "enabled",
                 "budget_tokens": self.model_settings.thinking_budget_tokens
             }
-        
+
         return kwargs
 
 
