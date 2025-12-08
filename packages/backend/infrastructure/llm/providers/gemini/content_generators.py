@@ -188,14 +188,14 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
             # Format message using MessageFormatter
             contents = GeminiMessageFormatter.format_messages([user_message])
             
-            if debug:
-                GeminiDebugger.print_debug_request(contents, search_config)
-                print(f"[WebSearch] Note: max_uses={max_uses} parameter ignored for Gemini (API limitation)")
-            
             # Get model from configuration
             llm_settings = get_llm_settings()
             gemini_config = llm_settings.get_gemini_config()
             model = gemini_config.model
+
+            if debug:
+                GeminiDebugger.print_request(contents, search_config, model)
+                print(f"[WebSearch] Note: max_uses={max_uses} parameter ignored for Gemini (API limitation)")
             
             # Call the model with the query (async version)
             response = await client.aio.models.generate_content(
@@ -207,7 +207,7 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
             # Use base class debug method
             BaseWebSearchGenerator.debug_search_complete(debug)
             if debug:
-                GeminiDebugger.print_debug_response(response)
+                GeminiDebugger.print_response(response)
             
             # Check for candidates
             if response.candidates:
@@ -308,7 +308,7 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
 
             if debug:
                 print("[text_to_image] Gemini API call configuration:")
-                GeminiDebugger.print_debug_request(contents, prompt_config)
+                GeminiDebugger.print_request(contents, prompt_config, model)
 
             # Use async non-streaming for better performance
             response = await client.aio.models.generate_content(
@@ -319,7 +319,7 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
 
             if debug:
                 print("[text_to_image] Gemini API response:")
-                GeminiDebugger.print_debug_response(response)
+                GeminiDebugger.print_response(response)
 
             # Extract response text
             prompt_text = GeminiResponseProcessor.extract_text_content(response)
@@ -420,7 +420,7 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
 
             if debug:
                 print("[image_to_video] Gemini API call configuration:")
-                GeminiDebugger.print_debug_request(contents, prompt_config)
+                GeminiDebugger.print_request(contents, prompt_config, model)
 
             # Use async non-streaming for better performance
             response = await client.aio.models.generate_content(
@@ -431,7 +431,7 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
 
             if debug:
                 print("[image_to_video] Gemini API response:")
-                GeminiDebugger.print_debug_response(response)
+                GeminiDebugger.print_response(response)
 
             # Extract response text
             prompt_text = GeminiResponseProcessor.extract_text_content(response)

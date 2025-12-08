@@ -157,7 +157,7 @@ class GeminiDebugger:
             elif isinstance(o, list):
                 return [convert(i) for i in o]
             elif hasattr(o, '__dict__'):
-                return f"<{type(o).__name__}>"
+                return GeminiDebugger._convert_sdk_object(o)
             else:
                 return o
 
@@ -166,13 +166,52 @@ class GeminiDebugger:
         except Exception as e:
             print(f"(JSON failed: {e})\n{obj}")
 
-    # Aliases for backward compatibility
     @staticmethod
-    def print_debug_request(contents: List[Dict[str, Any]], config, model: str = None) -> None:
-        """Alias for print_request (backward compatibility)."""
-        GeminiDebugger.print_request(contents, config, model or "unknown")
+    def _convert_sdk_object(obj: Any) -> Any:
+        """Convert Gemini SDK objects to readable format."""
+        type_name = type(obj).__name__
 
-    @staticmethod
-    def print_debug_response(response) -> None:
-        """Alias for print_response (backward compatibility)."""
-        GeminiDebugger.print_response(response)
+        # Handle Part objects
+        if type_name == "Part":
+            if hasattr(obj, 'text') and obj.text:
+                return {"text": GeminiDebugger._truncate(obj.text, 150, "text")}
+            elif hasattr(obj, 'function_call') and obj.function_call:
+                fc = obj.function_call
+                name = getattr(fc, 'name', 'unknown')
+                args = getattr(fc, 'args', {})
+                args_str = str(args) if args else "{}"
+                return {
+                    "function_call": name,
+                    "args": GeminiDebugger._truncate(args_str, 150, "args")
+                }
+            elif hasattr(obj, 'function_response') and obj.function_response:
+                fr = obj.function_response
+                name = getattr(fr, 'name', 'unknown')
+                response = getattr(fr, 'response', {})
+                response_str = str(response) if response else "{}"
+                return {
+                    "function_response": name,
+                    "response": GeminiDebugger._truncate(response_str, 150, "response")
+                }
+            elif hasattr(obj, 'inline_data') and obj.inline_data:
+                return {"inline_data": "[binary data]"}
+            return "<Part: empty>"
+
+        # Handle Content objects
+        if type_name == "Content":
+            result = {}
+            if hasattr(obj, 'role'):
+                result['role'] = obj.role
+            if hasattr(obj, 'parts') and obj.parts:
+                result['parts'] = [GeminiDebugger._convert_sdk_object(p) for p in obj.parts]
+            return result if result else f"<Content: empty>"
+
+        # Fallback: try model_dump() for pydantic objects
+        if hasattr(obj, 'model_dump'):
+            try:
+                return obj.model_dump()
+            except Exception:
+                pass
+
+        return f"<{type_name}>"
+
