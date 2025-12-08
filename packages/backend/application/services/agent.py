@@ -365,8 +365,8 @@ class Agent:
                     await self._handle_stream_iteration_limit(tool_calls)
                     return response
                 else:
-                    # SubAgent: Execute pending tools, then request summary
-                    return await self._handle_subagent_iteration_limit(tool_calls, iteration)
+                    # SubAgent: Return immediately without executing pending tools
+                    return await self._handle_subagent_iteration_limit(tool_calls)
 
             # === Execute tools ===
             if self.is_main_agent:
@@ -590,78 +590,25 @@ class Agent:
             except Exception as e:
                 print(f"[Agent.stream] Failed to save iteration limit result: {e}")
 
-    async def _handle_subagent_iteration_limit(self, tool_calls: list, iteration: int) -> Any:
-        """Handle iteration limit for SubAgent: execute tools then request summary.
+    async def _handle_subagent_iteration_limit(self, tool_calls: list) -> Any:
+        """Handle iteration limit for SubAgent.
 
-        Unlike MainAgent which just injects a stop message, SubAgent needs to:
-        1. Execute the pending tool calls (they contain valuable information)
-        2. Inject a "summarize your findings" instruction
-        3. Make one final LLM call to get a text summary
+        Since we already warned the LLM 4 times before reaching the limit,
+        if it still tries to call tools, we just return immediately without
+        executing them. No point in executing tools we won't use.
         """
-        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+        print(f"[SubAgent] Reached iteration limit ({self.config.max_iterations}), "
+              f"skipping {len(tool_calls)} pending tool calls")
 
-        print(f"[SubAgent] Reached iteration limit ({self.config.max_iterations}), executing final tools and requesting summary")
-
-        # Step 1: Execute pending tool calls
-        for tool_call in tool_calls:
-            self._emit_activity("tool_call_start", {
-                "tool": tool_call.get("name", "unknown"),
-                "args": tool_call.get("arguments", {}),
-            })
-
-            if self._parent_tool_call_id:
-                await WebSocketNotificationService.send_subagent_tool_use(
-                    session_id=self._notification_session_id,
-                    parent_tool_call_id=self._parent_tool_call_id,
-                    tool_call_id=tool_call.get("id", ""),
-                    tool_name=tool_call.get("name", "unknown"),
-                    tool_input=tool_call.get("arguments", {}),
-                )
-
-        tool_executor = ToolExecutor(
-            tool_manager=self.llm_client.tool_manager,
-            session_id=self.session_id,
-            notification_session_id=self._notification_session_id,
-            send_tool_result_notifications=False,
-        )
-        execution_result = await tool_executor.execute_all(
-            tool_calls=tool_calls,
-            message_id=f"agent_{self.session_id}_{iteration}_final",
-            agent_profile=self.config.tool_profile,
-        )
-
-        # Save results to context
-        await tool_executor.save_results_to_context(
-            tool_calls, execution_result.results, self._context_manager,
-            inject_reminders=False
-        )
-
-        for tool_call, result in zip(tool_calls, execution_result.results):
-            self._emit_activity("tool_call_end", {
-                "tool": tool_call.get("name", "unknown"),
-                "status": result.get("status", "unknown") if result else "rejected",
-            })
-
-        # Step 2: Format tool results as text summary (no additional LLM call)
-        tool_summaries = []
-        for tool_call, result in zip(tool_calls, execution_result.results):
-            tool_name = tool_call.get("name", "unknown")
-            if result:
-                status = result.get("status", "unknown")
-                message = result.get("message", "")
-                tool_summaries.append(f"- {tool_name}: [{status}] {message[:200]}")
-            else:
-                tool_summaries.append(f"- {tool_name}: [rejected]")
+        # List the tools that were NOT executed
+        pending_tools = [tc.get("name", "unknown") for tc in tool_calls]
 
         summary_text = (
             f"SubAgent reached iteration limit ({self.config.max_iterations} iterations).\n\n"
-            f"Final tool executions before stopping:\n"
-            f"{chr(10).join(tool_summaries)}\n\n"
-            f"Note: The task may be incomplete. Consider breaking it into smaller sub-tasks "
-            f"or providing more specific instructions."
+            f"Pending tool calls (NOT executed): {', '.join(pending_tools)}\n\n"
+            f"Note: The LLM was warned multiple times before reaching the limit. "
+            f"Consider breaking the task into smaller sub-tasks or providing more specific instructions."
         )
-
-        print(f"[SubAgent] Iteration limit reached, returning formatted tool results")
 
         # Return special marker dict for caller to handle
         return {"_iteration_limit_text": summary_text}
