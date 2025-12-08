@@ -12,6 +12,8 @@ class OpenAIConfig(BaseSettings):
     """OpenAI Configuration"""
     openai_api_key: str = Field(default="", description="OpenAI API Key")
     model: str = Field(default="gpt-4o-2024-08-06", description="Model name")
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="gpt-5-mini-2025-08-07", description="Secondary model for SubAgent")
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")

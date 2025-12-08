@@ -303,6 +303,7 @@ class LLMFactory:
         Currently supports:
         - gemini: Uses secondary_model from GeminiConfig
         - anthropic: Uses secondary_model from AnthropicConfig
+        - openai: Uses secondary_model from OpenAIConfig
 
         Args:
             app: Optional FastAPI app instance for context injection.
@@ -321,6 +322,8 @@ class LLMFactory:
             return self._create_secondary_gemini_client(llm_settings, app, **kwargs)
         elif provider == "anthropic":
             return self._create_secondary_anthropic_client(llm_settings, app, **kwargs)
+        elif provider in ["openai", "gpt"]:
+            return self._create_secondary_openai_client(llm_settings, app, **kwargs)
         else:
             logger.warning(f"Secondary model not supported for provider '{provider}', using primary client")
             return self.create_client(app=app, **kwargs)
@@ -388,6 +391,38 @@ class LLMFactory:
 
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         client = AnthropicClient(**client_config)
+        self._instances[cache_key] = client
+        return client
+
+    def _create_secondary_openai_client(self, llm_settings: Any, app: Optional[Any], **kwargs) -> LLMClientBase:
+        """Create secondary OpenAI client with lighter model (e.g., GPT-5-mini)."""
+        openai_config = llm_settings.get_openai_config()
+        secondary_model = openai_config.secondary_model
+
+        cache_key = f"openai:secondary:{secondary_model}"
+        if cache_key in self._instances:
+            logger.debug(f"Reusing cached secondary OpenAI client ({secondary_model})")
+            return self._instances[cache_key]
+
+        logger.info(f"Creating secondary OpenAI client with model: {secondary_model}")
+
+        client_config = {
+            "api_key": openai_config.openai_api_key,
+            "extra_config": {
+                "model": secondary_model,
+                "temperature": openai_config.temperature,
+                "top_p": openai_config.top_p,
+                "top_k": openai_config.top_k,
+                "max_tokens": openai_config.max_tokens,
+                "debug": llm_settings.debug,
+            }
+        }
+
+        if app:
+            client_config["extra_config"]["app"] = app
+
+        from backend.infrastructure.llm.providers.openai import OpenAIClient
+        client = OpenAIClient(**client_config)
         self._instances[cache_key] = client
         return client
 
