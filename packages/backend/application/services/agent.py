@@ -190,7 +190,21 @@ class Agent:
                 final_message = processor.format_response_for_storage(final_response)
                 streaming_message_id = getattr(self._context_manager, 'streaming_message_id', None)
             else:
-                # SubAgent: extract text content
+                # SubAgent: check for iteration limit marker first
+                if isinstance(final_response, dict) and "_iteration_limit_text" in final_response:
+                    # Iteration limit reached - use pre-formatted text
+                    response_text = final_response["_iteration_limit_text"]
+                    return AgentResult(
+                        status="max_iterations",
+                        message=AssistantMessage(
+                            role="assistant",
+                            content=[{"type": "text", "text": response_text}]
+                        ),
+                        iterations_used=self.config.max_iterations,
+                        execution_time_seconds=time.time() - start_time,
+                    )
+
+                # SubAgent: extract text content from LLM response
                 response_text = processor.extract_text_content(final_response)
                 final_message = AssistantMessage(
                     role="assistant",
@@ -628,20 +642,29 @@ class Agent:
                 "status": result.get("status", "unknown") if result else "rejected",
             })
 
-        # Step 2: Inject summary request as a user message
-        from backend.infrastructure.monitoring.status_monitor import StatusMonitor
-        summary_instruction = StatusMonitor.get_iteration_limit_summary_instruction()
-        self._context_manager.add_user_text(summary_instruction)
+        # Step 2: Format tool results as text summary (no additional LLM call)
+        tool_summaries = []
+        for tool_call, result in zip(tool_calls, execution_result.results):
+            tool_name = tool_call.get("name", "unknown")
+            if result:
+                status = result.get("status", "unknown")
+                message = result.get("message", "")
+                tool_summaries.append(f"- {tool_name}: [{status}] {message[:200]}")
+            else:
+                tool_summaries.append(f"- {tool_name}: [rejected]")
 
-        # Step 3: Make final LLM call for summary (no tools)
-        print(f"[SubAgent] Requesting final summary from LLM")
-        final_response = await self.llm_client.call_api_with_context(
-            context=self._context_manager.build_context(),
-            tools=None,  # No tools - force text response
-            debug=self.llm_client.debug,
+        summary_text = (
+            f"SubAgent reached iteration limit ({self.config.max_iterations} iterations).\n\n"
+            f"Final tool executions before stopping:\n"
+            f"{chr(10).join(tool_summaries)}\n\n"
+            f"Note: The task may be incomplete. Consider breaking it into smaller sub-tasks "
+            f"or providing more specific instructions."
         )
 
-        return final_response
+        print(f"[SubAgent] Iteration limit reached, returning formatted tool results")
+
+        # Return special marker dict for caller to handle
+        return {"_iteration_limit_text": summary_text}
 
     def _emit_activity(self, event_type: str, data: Dict[str, Any]) -> None:
         """Emit activity event if callback is registered."""

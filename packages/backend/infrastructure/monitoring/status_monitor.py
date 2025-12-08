@@ -26,10 +26,7 @@ from .monitors import (
     TodoMonitor,
     IterationMonitor,
 )
-from .monitors.iteration_monitor import (
-    get_iteration_limit_tool_message,
-    get_iteration_limit_summary_instruction,
-)
+from .monitors.iteration_monitor import get_iteration_limit_tool_message
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +46,8 @@ class StatusMonitor:
     - Explicit parameters: agent_profile passed as method argument, not instance state
     """
 
-    # Re-export iteration limit message functions for backward compatibility
+    # Re-export iteration limit message function for backward compatibility
     get_iteration_limit_tool_message = staticmethod(get_iteration_limit_tool_message)
-    get_iteration_limit_summary_instruction = staticmethod(get_iteration_limit_summary_instruction)
 
     def __init__(self, session_id: str):
         """

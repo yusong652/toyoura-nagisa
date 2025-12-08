@@ -121,19 +121,3 @@ def get_iteration_limit_tool_message(max_iterations: int) -> str:
         f"The task may be incomplete. You can provide a summary of what was accomplished.\n\n"
         f"Note: This is a safety mechanism to prevent infinite loops."
     )
-
-
-def get_iteration_limit_summary_instruction() -> str:
-    """
-    Get the instruction to request summary when SubAgent reaches iteration limit.
-
-    Used by SubAgent to ask LLM for a final summary after executing pending tools.
-
-    Returns:
-        str: Instruction to inject as user message
-    """
-    return (
-        "You have reached the iteration limit. Based on all the tool results above, "
-        "please provide a comprehensive summary of your findings. "
-        "Do NOT call any more tools - just summarize what you found."
-    )
