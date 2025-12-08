@@ -16,7 +16,7 @@ The monitor is session-scoped and provides unified reminder API.
 """
 
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from .monitors import (
     InterruptMonitor,
@@ -24,12 +24,14 @@ from .monitors import (
     BashMonitor,
     PfcMonitor,
     TodoMonitor,
+    IterationMonitor,
+)
+from .monitors.iteration_monitor import (
+    get_iteration_limit_tool_message,
+    get_iteration_limit_summary_instruction,
 )
 
 logger = logging.getLogger(__name__)
-
-# Warning threshold: start warning when remaining iterations <= this value
-ITERATION_WARNING_THRESHOLD = 4
 
 
 class StatusMonitor:
@@ -47,45 +49,9 @@ class StatusMonitor:
     - Explicit parameters: agent_profile passed as method argument, not instance state
     """
 
-    # -------------------------------------------------------------------------
-    # Iteration Limit Messages (static, no session state needed)
-    # -------------------------------------------------------------------------
-
-    @staticmethod
-    def get_iteration_limit_tool_message(max_iterations: int) -> str:
-        """
-        Get the message to inject as tool result when iteration limit is reached.
-
-        Used by MainAgent to inform LLM that tool execution was stopped.
-
-        Args:
-            max_iterations: The iteration limit that was reached
-
-        Returns:
-            str: Message to inject as tool result content
-        """
-        return (
-            f"Tool execution stopped: Reached iteration limit "
-            f"({max_iterations} iterations).\n\n"
-            f"The task may be incomplete. You can provide a summary of what was accomplished.\n\n"
-            f"Note: This is a safety mechanism to prevent infinite loops."
-        )
-
-    @staticmethod
-    def get_iteration_limit_summary_instruction() -> str:
-        """
-        Get the instruction to request summary when SubAgent reaches iteration limit.
-
-        Used by SubAgent to ask LLM for a final summary after executing pending tools.
-
-        Returns:
-            str: Instruction to inject as user message
-        """
-        return (
-            "You have reached the iteration limit. Based on all the tool results above, "
-            "please provide a comprehensive summary of your findings. "
-            "Do NOT call any more tools - just summarize what you found."
-        )
+    # Re-export iteration limit message functions for backward compatibility
+    get_iteration_limit_tool_message = staticmethod(get_iteration_limit_tool_message)
+    get_iteration_limit_summary_instruction = staticmethod(get_iteration_limit_summary_instruction)
 
     def __init__(self, session_id: str):
         """
@@ -104,62 +70,31 @@ class StatusMonitor:
         self.bash_monitor = BashMonitor(session_id)
         self.pfc_monitor = PfcMonitor(session_id)
         self.todo_monitor = TodoMonitor(session_id)
-
-        # Iteration tracking (reset per agent run)
-        self._current_iteration: int = 0
-        self._max_iterations: int = 0
+        self.iteration_monitor = IterationMonitor(session_id)
 
     # -------------------------------------------------------------------------
-    # Iteration Tracking
+    # Iteration Monitor Delegation
     # -------------------------------------------------------------------------
 
     def set_iteration_context(self, current: int, max_iterations: int) -> None:
         """
         Set current iteration context for warning generation.
 
-        Should be called at the start of each agent loop iteration.
+        Delegates to IterationMonitor.
 
         Args:
             current: Current iteration number (0-indexed)
             max_iterations: Maximum allowed iterations
         """
-        self._current_iteration = current
-        self._max_iterations = max_iterations
+        self.iteration_monitor.set_context(current, max_iterations)
 
     def reset_iteration_context(self) -> None:
-        """Reset iteration context when agent run completes."""
-        self._current_iteration = 0
-        self._max_iterations = 0
-
-    def get_iteration_warning(self) -> Optional[str]:
         """
-        Get iteration warning reminder if approaching limit.
+        Reset iteration context when agent run completes.
 
-        Returns:
-            Optional[str]: Warning message if remaining iterations <= threshold, None otherwise
+        Delegates to IterationMonitor.
         """
-        if self._max_iterations <= 0:
-            return None
-
-        remaining = self._max_iterations - self._current_iteration
-        if remaining > ITERATION_WARNING_THRESHOLD:
-            return None
-
-        if remaining <= 1:
-            return (
-                f"URGENT: This is your LAST iteration (iteration {self._current_iteration + 1}/{self._max_iterations}). "
-                f"You MUST provide a final summary NOW. Do NOT call any more tools."
-            )
-        elif remaining <= 2:
-            return (
-                f"WARNING: Only {remaining} iterations remaining ({self._current_iteration + 1}/{self._max_iterations}). "
-                f"Please wrap up your current task and prepare to summarize your findings."
-            )
-        else:
-            return (
-                f"Note: {remaining} iterations remaining ({self._current_iteration + 1}/{self._max_iterations}). "
-                f"Consider planning your remaining steps carefully."
-            )
+        self.iteration_monitor.reset()
 
     # -------------------------------------------------------------------------
     # Interrupt Monitor Delegation
@@ -247,9 +182,8 @@ class StatusMonitor:
         self.queue_monitor.check_queue = check_queue
 
         # Iteration warning (should be first for maximum visibility)
-        iteration_warning = self.get_iteration_warning()
-        if iteration_warning:
-            reminders.append(iteration_warning)
+        iteration_reminders = await self.iteration_monitor.get_reminders()
+        reminders.extend(iteration_reminders)
 
         # Interrupt status
         interrupt_reminders = await self.interrupt_monitor.get_reminders()
