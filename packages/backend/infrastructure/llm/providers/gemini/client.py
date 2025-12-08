@@ -258,14 +258,15 @@ class GeminiClient(LLMClientBase):
                 config_dict.update(kwargs)
                 config = types.GenerateContentConfig(**config_dict)
 
+        model = self.gemini_config.model_settings.model
+
         if debug:
-            print(f"[DEBUG] Streaming API call with {len(context_contents)} context items")
-            GeminiDebugger.print_debug_request(context_contents, config)
+            GeminiDebugger.print_request(context_contents, config, model)
 
         try:
             # Use streaming API
             stream_generator = self.client.aio.models.generate_content_stream(
-                model=self.gemini_config.model_settings.model,
+                model=model,
                 contents=cast(Any, context_contents),
                 config=config,
             )

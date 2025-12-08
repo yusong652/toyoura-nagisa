@@ -165,3 +165,14 @@ class GeminiDebugger:
             print(json.dumps(convert(obj), indent=2, ensure_ascii=False, default=str))
         except Exception as e:
             print(f"(JSON failed: {e})\n{obj}")
+
+    # Aliases for backward compatibility
+    @staticmethod
+    def print_debug_request(contents: List[Dict[str, Any]], config, model: str = None) -> None:
+        """Alias for print_request (backward compatibility)."""
+        GeminiDebugger.print_request(contents, config, model or "unknown")
+
+    @staticmethod
+    def print_debug_response(response) -> None:
+        """Alias for print_response (backward compatibility)."""
+        GeminiDebugger.print_response(response)
