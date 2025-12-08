@@ -293,15 +293,79 @@ class LLMFactory:
         
         return ":".join(key_parts)
     
+    def create_secondary_client(self, app: Optional[Any] = None, **kwargs) -> LLMClientBase:
+        """
+        Create or retrieve a secondary LLM client instance for SubAgents.
+
+        This client uses a lighter/cheaper model (e.g., gemini-2.5-flash instead of gemini-3-pro)
+        to reduce RPM consumption on the primary model.
+
+        Currently supports:
+        - gemini: Uses secondary_model from GeminiConfig
+
+        Args:
+            app: Optional FastAPI app instance for context injection.
+            **kwargs: Arguments to pass to the client constructor
+
+        Returns:
+            An LLM client instance configured with the secondary model
+
+        Raises:
+            ValueError: If secondary model is not supported for the current provider
+        """
+        llm_settings = get_llm_settings()
+        provider = llm_settings.provider
+
+        # Currently only Gemini supports secondary model
+        if provider != "gemini":
+            logger.warning(f"Secondary model not supported for provider '{provider}', using primary client")
+            return self.create_client(app=app, **kwargs)
+
+        gemini_config = llm_settings.get_gemini_config()
+        secondary_model = gemini_config.secondary_model
+
+        # Generate cache key for secondary client
+        cache_key = f"gemini:secondary:{secondary_model}"
+
+        # Return cached instance if available
+        if cache_key in self._instances:
+            logger.debug(f"Reusing cached secondary Gemini client ({secondary_model})")
+            return self._instances[cache_key]
+
+        # Create new secondary client with the secondary model
+        logger.info(f"Creating secondary Gemini client with model: {secondary_model}")
+
+        client_config = {
+            "api_key": gemini_config.google_api_key,
+            "extra_config": {
+                "model": secondary_model,  # Use secondary model
+                "temperature": gemini_config.temperature,
+                "top_p": gemini_config.top_p,
+                "top_k": gemini_config.top_k,
+                "max_output_tokens": gemini_config.max_output_tokens,
+                "web_search_max_uses": gemini_config.web_search_max_uses,
+                "debug": llm_settings.debug,
+            }
+        }
+
+        if app:
+            client_config["extra_config"]["app"] = app
+
+        from backend.infrastructure.llm.providers.gemini import GeminiClient
+        client = GeminiClient(**client_config)
+        self._instances[cache_key] = client
+
+        return client
+
     def clear_cache(self):
         """Clear all cached client instances."""
         self._instances.clear()
         logger.info("Cleared LLM client instance cache")
-    
+
     def get_cached_instances(self) -> Dict[str, LLMClientBase]:
         """
         Get all cached client instances.
-        
+
         Returns:
             Dictionary of cached instances
         """

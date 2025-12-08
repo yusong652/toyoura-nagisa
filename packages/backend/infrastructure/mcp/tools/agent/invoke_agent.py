@@ -73,13 +73,13 @@ Usage notes:
         # Import here to avoid circular dependencies
         from backend.domain.models.agent_profiles import get_subagent_config
         from backend.application.services.agent_service import AgentService
-        from backend.shared.utils.app_context import get_llm_client
+        from backend.shared.utils.app_context import get_secondary_llm_client
 
         # Get SubAgent configuration
         config = get_subagent_config(subagent_type)
 
-        # Create AgentService with shared LLM client
-        llm_client = get_llm_client()
+        # Create AgentService with secondary LLM client (lighter model to reduce RPM)
+        llm_client = get_secondary_llm_client()
         agent_service = AgentService(llm_client)
 
         # Get tool_call_id from request_context.meta (passed by tool_manager)

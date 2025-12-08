@@ -49,6 +49,11 @@ async def lifespan(app: FastAPI):
         print(f"[INIT] LLM Factory initialized successfully")
         print(f"[INIT] LLM Client initialized: {type(llm_client).__name__}")
 
+        # Initialize Secondary LLM Client for SubAgents (lighter model to reduce RPM)
+        secondary_llm_client = llm_factory.create_secondary_client()
+        app.state.secondary_llm_client = secondary_llm_client
+        print(f"[INIT] Secondary LLM Client initialized: {type(secondary_llm_client).__name__}")
+
         # Initialize MCP server and client
         app.state.mcp = mcp
         mcp.app = app  # type: ignore # Set app reference for MCP tools to access FastAPI state

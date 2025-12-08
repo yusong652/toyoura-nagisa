@@ -74,6 +74,32 @@ def get_llm_client():
     return app.state.llm_client
 
 
+def get_secondary_llm_client():
+    """
+    Get secondary LLM client from app state (for SubAgents).
+
+    The secondary client uses a lighter/cheaper model (e.g., gemini-2.5-flash)
+    to reduce RPM consumption on the primary model.
+
+    Falls back to primary client if secondary is not configured.
+
+    Returns:
+        LLMClientBase: Secondary LLM client instance from app state
+
+    Raises:
+        RuntimeError: If app is not initialized
+    """
+    app = get_app()
+    if not app:
+        raise RuntimeError("FastAPI app not initialized")
+
+    # Fall back to primary client if secondary not available
+    if not hasattr(app.state, 'secondary_llm_client'):
+        return get_llm_client()
+
+    return app.state.secondary_llm_client
+
+
 def get_mcp_client():
     """
     Get MCP client from app state.
