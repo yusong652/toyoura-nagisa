@@ -531,15 +531,11 @@ class Agent:
         """Handle iteration limit reached in streaming mode."""
         from backend.infrastructure.mcp.utils.tool_result import success_response
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+        from backend.infrastructure.monitoring.status_monitor import StatusMonitor
 
         print(f"[Agent.stream] Reached iteration limit ({self.config.max_iterations})")
 
-        stop_message = (
-            f"Tool execution stopped: Reached iteration limit "
-            f"({self.config.max_iterations} iterations).\n\n"
-            f"The task may be incomplete. You can provide a summary of what was accomplished.\n\n"
-            f"Note: This is a safety mechanism to prevent infinite loops."
-        )
+        stop_message = StatusMonitor.get_iteration_limit_tool_message(self.config.max_iterations)
 
         message_service = MessageService()
         for i, tool_call in enumerate(tool_calls):
@@ -628,11 +624,8 @@ class Agent:
             })
 
         # Step 2: Inject summary request as a user message
-        summary_instruction = (
-            "You have reached the iteration limit. Based on all the tool results above, "
-            "please provide a comprehensive summary of your findings. "
-            "Do NOT call any more tools - just summarize what you found."
-        )
+        from backend.infrastructure.monitoring.status_monitor import StatusMonitor
+        summary_instruction = StatusMonitor.get_iteration_limit_summary_instruction()
         self._context_manager.add_user_text(summary_instruction)
 
         # Step 3: Make final LLM call for summary (no tools)

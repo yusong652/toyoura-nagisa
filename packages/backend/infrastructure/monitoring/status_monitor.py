@@ -44,6 +44,46 @@ class StatusMonitor:
     - Explicit parameters: agent_profile passed as method argument, not instance state
     """
 
+    # -------------------------------------------------------------------------
+    # Iteration Limit Messages (static, no session state needed)
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_iteration_limit_tool_message(max_iterations: int) -> str:
+        """
+        Get the message to inject as tool result when iteration limit is reached.
+
+        Used by MainAgent to inform LLM that tool execution was stopped.
+
+        Args:
+            max_iterations: The iteration limit that was reached
+
+        Returns:
+            str: Message to inject as tool result content
+        """
+        return (
+            f"Tool execution stopped: Reached iteration limit "
+            f"({max_iterations} iterations).\n\n"
+            f"The task may be incomplete. You can provide a summary of what was accomplished.\n\n"
+            f"Note: This is a safety mechanism to prevent infinite loops."
+        )
+
+    @staticmethod
+    def get_iteration_limit_summary_instruction() -> str:
+        """
+        Get the instruction to request summary when SubAgent reaches iteration limit.
+
+        Used by SubAgent to ask LLM for a final summary after executing pending tools.
+
+        Returns:
+            str: Instruction to inject as user message
+        """
+        return (
+            "You have reached the iteration limit. Based on all the tool results above, "
+            "please provide a comprehensive summary of your findings. "
+            "Do NOT call any more tools - just summarize what you found."
+        )
+
     def __init__(self, session_id: str):
         """
         Initialize status monitor coordinator for a session.
