@@ -295,6 +295,8 @@ async def grep(
         glob = None
     if isinstance(type, FieldInfo):
         type = None
+    if isinstance(output_mode, FieldInfo):
+        output_mode = "files_with_matches"
     if isinstance(case_insensitive, FieldInfo):
         case_insensitive = False
     if isinstance(show_line_numbers, FieldInfo):
