@@ -441,9 +441,10 @@ class Agent:
                 )
 
                 # Save results to context only (no database persistence for SubAgent)
+                # inject_reminders=True to include iteration warnings in last tool result
                 await tool_executor.save_results_to_context(
                     tool_calls, execution_result.results, self._context_manager,
-                    inject_reminders=False
+                    inject_reminders=True
                 )
 
                 # Emit tool_call_end activities
