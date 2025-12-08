@@ -24,29 +24,33 @@ class GeminiDebugger:
     """
 
     @staticmethod
-    def print_debug_request(contents: List[Dict[str, Any]], config) -> None:
+    def print_debug_request(contents: List[Dict[str, Any]], config, model: str = None) -> None:
         """
         Print formatted debug information for Gemini API requests.
-        
+
         Args:
             contents: Formatted message contents for Gemini API
             config: GenerateContentConfig object
+            model: Model name being used
         """
-        print("\n========== Gemini API 请求消息格式 ==========")
-        
+        print("\n========== Gemini API Request ==========")
+        if model:
+            print(f"🤖 Model: {model}")
+
         # 使用model_dump()获取config的字典表示
         config_dict = config.model_dump()
-        
+
         # 创建简化的config用于调试
         debug_config = GeminiDebugger._create_debug_config(config_dict)
-        
+
         payload = {
+            "model": model,
             "contents": contents,
             "config": debug_config
         }
-        
+
         payload_to_print = GeminiDebugger._censor_payload_for_logging(payload)
-        
+
         # 使用简化的payload打印，避免过长的description影响调试
         print("\n📝 Simplified Payload (truncated descriptions):")
         GeminiDebugger._print_simplified_payload(payload_to_print)

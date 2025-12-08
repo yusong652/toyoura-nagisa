@@ -135,42 +135,48 @@ class GeminiClient(LLMClientBase):
                 config_dict.update(kwargs)
                 config = types.GenerateContentConfig(**config_dict)
 
+        model = self.gemini_config.model_settings.model
+
         if debug:
-            print(f"[DEBUG] API call with {len(context_contents)} context items")
-            GeminiDebugger.print_debug_request(context_contents, config)
+            print(f"[DEBUG] API call with {len(context_contents)} context items, model: {model}")
+            GeminiDebugger.print_debug_request(context_contents, config, model=model)
 
         try:
             # Direct async API call with preserved context
             response = await self.client.aio.models.generate_content(
-                model=self.gemini_config.model_settings.model,
+                model=model,
                 contents=cast(Any, context_contents),
                 config=config,
             )
 
             # Validate response structure
             if not hasattr(response, 'candidates') or not response.candidates:
-                raise Exception("Gemini API returned empty response (no candidates)")
+                if debug:
+                    print(f"[DEBUG] Empty response - full response object: {response}")
+                raise Exception(f"Gemini API returned empty response (no candidates). Model: {model}")
 
             # Check for valid content with parts
             candidate = response.candidates[0]
             if not hasattr(candidate, 'content') or not candidate.content:
-                # Check for finish_reason to provide better error message
                 finish_reason = getattr(candidate, 'finish_reason', None)
-                if finish_reason:
-                    raise Exception(f"Gemini API returned empty content (finish_reason: {finish_reason})")
-                raise Exception("Gemini API returned empty content")
+                if debug:
+                    print(f"[DEBUG] Empty content - candidate: {candidate}")
+                raise Exception(f"Gemini API returned empty content (model: {model}, finish_reason: {finish_reason})")
 
             if not hasattr(candidate.content, 'parts') or not candidate.content.parts:
                 # This often happens with API rate limits or safety filters
                 finish_reason = getattr(candidate, 'finish_reason', None)
                 safety_ratings = getattr(candidate, 'safety_ratings', None)
-                error_details = []
-                if finish_reason:
-                    error_details.append(f"finish_reason: {finish_reason}")
-                if safety_ratings:
-                    error_details.append(f"safety_ratings: {safety_ratings}")
-                detail_str = f" ({', '.join(error_details)})" if error_details else ""
-                raise Exception(f"Gemini API returned response with empty parts{detail_str}. This may indicate API rate limiting or content filtering.")
+                if debug:
+                    print(f"[DEBUG] Empty parts - model: {model}")
+                    print(f"[DEBUG] finish_reason: {finish_reason}")
+                    print(f"[DEBUG] safety_ratings: {safety_ratings}")
+                    print(f"[DEBUG] candidate.content: {candidate.content}")
+                    print(f"[DEBUG] Full candidate: {candidate}")
+                raise Exception(
+                    f"Gemini API returned empty parts. "
+                    f"Model: {model}, finish_reason: {finish_reason}, safety_ratings: {safety_ratings}"
+                )
 
             if debug:
                 print(f"[DEBUG] API call successful, response received")
