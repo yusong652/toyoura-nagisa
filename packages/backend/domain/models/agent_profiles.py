@@ -255,7 +255,7 @@ class SubAgentConfig:
     display_name: str
     description: str
     tools: tuple                 # Explicit tool list (no invoke_agent!)
-    max_iterations: int = 10
+    max_iterations: int = 30  # Default for SubAgents (higher than before to handle complex tasks)
     streaming_enabled: bool = False
     enable_memory: bool = False
 
@@ -270,7 +270,7 @@ PFC_EXPLORER = SubAgentConfig(
     display_name="PFC Explorer",
     description="PFC documentation query and syntax validation agent",
     tools=tuple(SUBAGENT_PFC_TOOLS),
-    max_iterations=10,
+    max_iterations=30,  # Increased from 10 to allow complex multi-tool tasks
     streaming_enabled=False,
     enable_memory=False,
 )
