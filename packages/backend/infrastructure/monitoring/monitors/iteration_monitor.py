@@ -96,7 +96,8 @@ class IterationMonitor(BaseMonitor):
         if not warning:
             return []
 
-        return [warning]
+        reminder_block = f"<system-reminder>\n{warning}\n</system-reminder>"
+        return [reminder_block]
 
 
 # Static utility methods for iteration limit messages
