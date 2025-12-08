@@ -138,11 +138,9 @@ class GeminiClient(LLMClientBase):
         model = self.gemini_config.model_settings.model
 
         if debug:
-            print(f"[DEBUG] API call with {len(context_contents)} context items, model: {model}")
-            GeminiDebugger.print_debug_request(context_contents, config, model=model)
+            GeminiDebugger.print_request(context_contents, config, model)
 
         try:
-            # Direct async API call with preserved context
             response = await self.client.aio.models.generate_content(
                 model=model,
                 contents=cast(Any, context_contents),
@@ -152,43 +150,33 @@ class GeminiClient(LLMClientBase):
             # Validate response structure
             if not hasattr(response, 'candidates') or not response.candidates:
                 if debug:
-                    print(f"[DEBUG] Empty response - full response object: {response}")
-                raise Exception(f"Gemini API returned empty response (no candidates). Model: {model}")
+                    GeminiDebugger.print_error("No candidates", model, response=response)
+                raise Exception(f"Empty response (no candidates). Model: {model}")
 
-            # Check for valid content with parts
             candidate = response.candidates[0]
             if not hasattr(candidate, 'content') or not candidate.content:
-                finish_reason = getattr(candidate, 'finish_reason', None)
                 if debug:
-                    print(f"[DEBUG] Empty content - candidate: {candidate}")
-                raise Exception(f"Gemini API returned empty content (model: {model}, finish_reason: {finish_reason})")
+                    GeminiDebugger.print_error("Empty content", model, candidate=candidate)
+                raise Exception(f"Empty content. Model: {model}, finish_reason: {getattr(candidate, 'finish_reason', None)}")
 
             if not hasattr(candidate.content, 'parts') or not candidate.content.parts:
-                # This often happens with API rate limits or safety filters
-                finish_reason = getattr(candidate, 'finish_reason', None)
-                safety_ratings = getattr(candidate, 'safety_ratings', None)
                 if debug:
-                    print(f"[DEBUG] Empty parts - model: {model}")
-                    print(f"[DEBUG] finish_reason: {finish_reason}")
-                    print(f"[DEBUG] safety_ratings: {safety_ratings}")
-                    print(f"[DEBUG] candidate.content: {candidate.content}")
-                    print(f"[DEBUG] Full candidate: {candidate}")
+                    GeminiDebugger.print_error("Empty parts", model, candidate=candidate)
                 raise Exception(
-                    f"Gemini API returned empty parts. "
-                    f"Model: {model}, finish_reason: {finish_reason}, safety_ratings: {safety_ratings}"
+                    f"Empty parts. Model: {model}, "
+                    f"finish_reason: {getattr(candidate, 'finish_reason', None)}, "
+                    f"safety_ratings: {getattr(candidate, 'safety_ratings', None)}"
                 )
 
             if debug:
-                print(f"[DEBUG] API call successful, response received")
-                GeminiDebugger.print_debug_response(response)
+                GeminiDebugger.print_response(response)
 
             return response
 
         except Exception as e:
-            error_message = f"Gemini API call failed: {str(e)}"
-            if debug:
-                print(f"[DEBUG] {error_message}")
-            raise Exception(error_message)
+            if debug and "Empty" not in str(e):
+                print(f"[DEBUG] API error: {e}")
+            raise Exception(f"Gemini API failed: {e}")
 
     # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
