@@ -37,22 +37,32 @@ class TodoMonitor(BaseMonitor):
     Note: This monitor requires agent_profile for workspace resolution.
     """
 
-    # Class-level storage for conversation turn counts per session
-    _conversation_counts = {}
+    # Class-level storage for activity counts per session
+    # Tracks both conversation turns and tool iterations
+    _activity_counts = {}
     _last_reminder_counts = {}
 
-    # Configurable reminder interval (default: every 3 turns like Claude Code)
-    # Can be overridden via configuration
+    # Configurable reminder interval (default: every 3 activities)
+    # Activities include: user messages + tool call iterations
     DEFAULT_REMINDER_INTERVAL = 3
+
+    def _ensure_session_initialized(self) -> None:
+        """Ensure session tracking is initialized."""
+        if self.session_id not in self._activity_counts:
+            self._activity_counts[self.session_id] = 0
+            self._last_reminder_counts[self.session_id] = 0
 
     def track_conversation_turn(self) -> None:
         """Track a conversation turn (user message) for this session."""
-        if self.session_id not in self._conversation_counts:
-            self._conversation_counts[self.session_id] = 0
-            self._last_reminder_counts[self.session_id] = 0
+        self._ensure_session_initialized()
+        self._activity_counts[self.session_id] += 1
+        logger.debug(f"Session {self.session_id[:8]} conversation turn, activity count: {self._activity_counts[self.session_id]}")
 
-        self._conversation_counts[self.session_id] += 1
-        logger.debug(f"Session {self.session_id[:8]} conversation turn: {self._conversation_counts[self.session_id]}")
+    def track_iteration(self) -> None:
+        """Track a tool call iteration for this session."""
+        self._ensure_session_initialized()
+        self._activity_counts[self.session_id] += 1
+        logger.debug(f"Session {self.session_id[:8]} iteration, activity count: {self._activity_counts[self.session_id]}")
 
     def get_reminder_interval(self) -> int:
         """Get the configured reminder interval or use default."""
@@ -65,16 +75,16 @@ class TodoMonitor(BaseMonitor):
         """
         Check if we should show a periodic todo reminder.
 
-        Returns true every N conversation turns to inject todo state.
+        Returns true every N activities (conversation turns + iterations).
         """
-        if self.session_id not in self._conversation_counts:
+        if self.session_id not in self._activity_counts:
             return False
 
-        current_count = self._conversation_counts[self.session_id]
+        current_count = self._activity_counts[self.session_id]
         last_reminder = self._last_reminder_counts.get(self.session_id, 0)
         interval = self.get_reminder_interval()
 
-        # Show reminder if we've had INTERVAL turns since last reminder
+        # Show reminder if we've had INTERVAL activities since last reminder
         if current_count - last_reminder >= interval:
             self._last_reminder_counts[self.session_id] = current_count
             return True

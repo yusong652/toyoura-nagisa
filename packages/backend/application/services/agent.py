@@ -96,6 +96,10 @@ class Agent:
         # enable_memory: use provided value or fall back to config default
         self._enable_memory = enable_memory if enable_memory is not None else config.enable_memory
 
+        # Instance attributes initialized during execution
+        self._status_monitor = None
+        self._context_manager = None
+
     @property
     def is_main_agent(self) -> bool:
         """Whether this agent is a MainAgent (with persistent session)."""
@@ -263,6 +267,10 @@ class Agent:
                 )
 
         finally:
+            # Reset iteration context to prevent stale warnings in next conversation turn
+            if self._status_monitor:
+                self._status_monitor.reset_iteration_context()
+
             # SubAgent: emit completed activity
             if not self.is_main_agent:
                 self._emit_activity("completed", {"elapsed": time.time() - start_time})
@@ -288,7 +296,6 @@ class Agent:
         if self.is_main_agent:
             self._streaming_processor = StreamingProcessor(self.llm_client, self.session_id)
             self._status_monitor = get_status_monitor(self.session_id)
-            self._status_monitor.todo_monitor.track_conversation_turn()
         else:
             # SubAgent also needs status monitor for iteration warnings
             self._status_monitor = get_status_monitor(self.session_id)
@@ -453,6 +460,10 @@ class Agent:
                         "tool": tool_call.get("name", "unknown"),
                         "status": result.get("status", "unknown") if result else "rejected",
                     })
+
+            # Track tool iteration for periodic todo reminders (MainAgent only)
+            if self.is_main_agent:
+                self._status_monitor.todo_monitor.track_iteration()
 
             # Continue to next iteration
             iteration += 1
