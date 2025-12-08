@@ -125,7 +125,7 @@ class GeminiResponseProcessor(BaseResponseProcessor):
             return ""
         
         text_parts = []
-        if hasattr(candidate.content, 'parts'):
+        if hasattr(candidate.content, 'parts') and candidate.content.parts:
             for part in candidate.content.parts:
                 if hasattr(part, 'text') and part.text:
                     # Only extract non-thinking text parts
@@ -154,7 +154,7 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         if not hasattr(candidate, 'content') or not candidate.content:
             return tool_calls
 
-        if hasattr(candidate.content, 'parts'):
+        if hasattr(candidate.content, 'parts') and candidate.content.parts:
             import uuid
             for part in candidate.content.parts:
                 if hasattr(part, 'function_call') and part.function_call:
@@ -261,7 +261,7 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         thought_signature = None
 
         # Process all parts from the response
-        if hasattr(candidate.content, 'parts'):
+        if hasattr(candidate.content, 'parts') and candidate.content.parts:
             for part in candidate.content.parts:
                 if hasattr(part, 'text') and part.text:
                     # Categorize text content
@@ -340,7 +340,7 @@ class GeminiResponseProcessor(BaseResponseProcessor):
             candidate = response.candidates[0]
 
             # Extract part-level thinking (only location where thinking content exists)
-            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') and candidate.content.parts:
                 for part in candidate.content.parts:
                     if hasattr(part, 'text') and part.text and getattr(part, 'thought', False):
                         thinking_parts.append(str(part.text))

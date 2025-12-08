@@ -149,7 +149,28 @@ class GeminiClient(LLMClientBase):
 
             # Validate response structure
             if not hasattr(response, 'candidates') or not response.candidates:
-                raise Exception("Gemini API returned empty response")
+                raise Exception("Gemini API returned empty response (no candidates)")
+
+            # Check for valid content with parts
+            candidate = response.candidates[0]
+            if not hasattr(candidate, 'content') or not candidate.content:
+                # Check for finish_reason to provide better error message
+                finish_reason = getattr(candidate, 'finish_reason', None)
+                if finish_reason:
+                    raise Exception(f"Gemini API returned empty content (finish_reason: {finish_reason})")
+                raise Exception("Gemini API returned empty content")
+
+            if not hasattr(candidate.content, 'parts') or not candidate.content.parts:
+                # This often happens with API rate limits or safety filters
+                finish_reason = getattr(candidate, 'finish_reason', None)
+                safety_ratings = getattr(candidate, 'safety_ratings', None)
+                error_details = []
+                if finish_reason:
+                    error_details.append(f"finish_reason: {finish_reason}")
+                if safety_ratings:
+                    error_details.append(f"safety_ratings: {safety_ratings}")
+                detail_str = f" ({', '.join(error_details)})" if error_details else ""
+                raise Exception(f"Gemini API returned response with empty parts{detail_str}. This may indicate API rate limiting or content filtering.")
 
             if debug:
                 print(f"[DEBUG] API call successful, response received")
