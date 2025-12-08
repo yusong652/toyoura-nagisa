@@ -55,6 +55,8 @@ class AnthropicConfig(BaseSettings):
     """Anthropic Configuration"""
     anthropic_api_key: str = Field(default="", description="Anthropic API Key")
     model: str = Field(default="claude-3-5-sonnet-20241022", description="模型名称")
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="claude-haiku-4-5-20251001", description="Secondary model for SubAgent")
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="采样温度")
     max_tokens: int = Field(default=4096, ge=1, description="最大输出token数")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")

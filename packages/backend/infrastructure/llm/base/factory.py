@@ -297,11 +297,12 @@ class LLMFactory:
         """
         Create or retrieve a secondary LLM client instance for SubAgents.
 
-        This client uses a lighter/cheaper model (e.g., gemini-2.5-flash instead of gemini-3-pro)
-        to reduce RPM consumption on the primary model.
+        This client uses a lighter/cheaper model (e.g., gemini-2.5-flash instead of gemini-3-pro,
+        or claude-haiku instead of claude-sonnet) to reduce RPM consumption on the primary model.
 
         Currently supports:
         - gemini: Uses secondary_model from GeminiConfig
+        - anthropic: Uses secondary_model from AnthropicConfig
 
         Args:
             app: Optional FastAPI app instance for context injection.
@@ -316,29 +317,30 @@ class LLMFactory:
         llm_settings = get_llm_settings()
         provider = llm_settings.provider
 
-        # Currently only Gemini supports secondary model
-        if provider != "gemini":
+        if provider == "gemini":
+            return self._create_secondary_gemini_client(llm_settings, app, **kwargs)
+        elif provider == "anthropic":
+            return self._create_secondary_anthropic_client(llm_settings, app, **kwargs)
+        else:
             logger.warning(f"Secondary model not supported for provider '{provider}', using primary client")
             return self.create_client(app=app, **kwargs)
 
+    def _create_secondary_gemini_client(self, llm_settings: Any, app: Optional[Any], **kwargs) -> LLMClientBase:
+        """Create secondary Gemini client with lighter model."""
         gemini_config = llm_settings.get_gemini_config()
         secondary_model = gemini_config.secondary_model
 
-        # Generate cache key for secondary client
         cache_key = f"gemini:secondary:{secondary_model}"
-
-        # Return cached instance if available
         if cache_key in self._instances:
             logger.debug(f"Reusing cached secondary Gemini client ({secondary_model})")
             return self._instances[cache_key]
 
-        # Create new secondary client with the secondary model
         logger.info(f"Creating secondary Gemini client with model: {secondary_model}")
 
         client_config = {
             "api_key": gemini_config.google_api_key,
             "extra_config": {
-                "model": secondary_model,  # Use secondary model
+                "model": secondary_model,
                 "temperature": gemini_config.temperature,
                 "top_p": gemini_config.top_p,
                 "top_k": gemini_config.top_k,
@@ -354,7 +356,39 @@ class LLMFactory:
         from backend.infrastructure.llm.providers.gemini import GeminiClient
         client = GeminiClient(**client_config)
         self._instances[cache_key] = client
+        return client
 
+    def _create_secondary_anthropic_client(self, llm_settings: Any, app: Optional[Any], **kwargs) -> LLMClientBase:
+        """Create secondary Anthropic client with lighter model (e.g., Haiku)."""
+        anthropic_config = llm_settings.get_anthropic_config()
+        secondary_model = anthropic_config.secondary_model
+
+        cache_key = f"anthropic:secondary:{secondary_model}"
+        if cache_key in self._instances:
+            logger.debug(f"Reusing cached secondary Anthropic client ({secondary_model})")
+            return self._instances[cache_key]
+
+        logger.info(f"Creating secondary Anthropic client with model: {secondary_model}")
+
+        client_config = {
+            "api_key": anthropic_config.anthropic_api_key,
+            "extra_config": {
+                "model": secondary_model,
+                "temperature": anthropic_config.temperature,
+                "max_tokens": anthropic_config.max_tokens,
+                "top_p": anthropic_config.top_p,
+                "top_k": anthropic_config.top_k,
+                "web_search_max_uses": anthropic_config.web_search_max_uses,
+                "debug": llm_settings.debug,
+            }
+        }
+
+        if app:
+            client_config["extra_config"]["app"] = app
+
+        from backend.infrastructure.llm.providers.anthropic import AnthropicClient
+        client = AnthropicClient(**client_config)
+        self._instances[cache_key] = client
         return client
 
     def clear_cache(self):
