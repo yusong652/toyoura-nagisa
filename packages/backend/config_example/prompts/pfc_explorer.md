@@ -112,6 +112,7 @@ Always return:
 - Return only verified syntax from documentation
 - Be concise - parent agent needs actionable information
 - **Always use absolute paths** for all file operations
+- **NEVER guess filenames** - always use `glob` or `bash ls` to list directory contents before reading files
 
 ## Final Response
 
