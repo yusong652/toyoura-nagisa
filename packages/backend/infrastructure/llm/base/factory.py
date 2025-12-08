@@ -306,6 +306,7 @@ class LLMFactory:
         - openai: Uses secondary_model from OpenAIConfig
         - zhipu: Uses secondary_model from ZhipuConfig
         - kimi: Uses secondary_model from KimiConfig
+        - openrouter: Uses secondary_model from OpenRouterConfig
 
         Args:
             app: Optional FastAPI app instance for context injection.
@@ -330,6 +331,8 @@ class LLMFactory:
             return self._create_secondary_zhipu_client(llm_settings, app, **kwargs)
         elif provider == "kimi":
             return self._create_secondary_kimi_client(llm_settings, app, **kwargs)
+        elif provider == "openrouter":
+            return self._create_secondary_openrouter_client(llm_settings, app, **kwargs)
         else:
             logger.warning(f"Secondary model not supported for provider '{provider}', using primary client")
             return self.create_client(app=app, **kwargs)
@@ -491,6 +494,37 @@ class LLMFactory:
 
         from backend.infrastructure.llm.providers.kimi import KimiClient
         client = KimiClient(**client_config)
+        self._instances[cache_key] = client
+        return client
+
+    def _create_secondary_openrouter_client(self, llm_settings: Any, app: Optional[Any], **kwargs) -> LLMClientBase:
+        """Create secondary OpenRouter client with lighter model (e.g., google/gemini-2.5-flash)."""
+        openrouter_config = llm_settings.get_openrouter_config()
+        secondary_model = openrouter_config.secondary_model
+
+        cache_key = f"openrouter:secondary:{secondary_model}"
+        if cache_key in self._instances:
+            logger.debug(f"Reusing cached secondary OpenRouter client ({secondary_model})")
+            return self._instances[cache_key]
+
+        logger.info(f"Creating secondary OpenRouter client with model: {secondary_model}")
+
+        client_config = {
+            "api_key": openrouter_config.openrouter_api_key,
+            "extra_config": {
+                "model": secondary_model,
+                "temperature": openrouter_config.temperature,
+                "top_p": openrouter_config.top_p,
+                "max_tokens": openrouter_config.max_tokens,
+                "debug": llm_settings.debug,
+            }
+        }
+
+        if app:
+            client_config["extra_config"]["app"] = app
+
+        from backend.infrastructure.llm.providers.openrouter import OpenRouterClient
+        client = OpenRouterClient(**client_config)
         self._instances[cache_key] = client
         return client
 

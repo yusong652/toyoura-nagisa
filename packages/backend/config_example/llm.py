@@ -161,6 +161,8 @@ class OpenRouterConfig(BaseSettings):
     #   - openai/gpt-4-turbo: GPT-4 Turbo
     #   - google/gemini-pro: Gemini Pro
     #   - moonshotai/kimi-k2-thinking: Kimi K2 Thinking
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="google/gemini-2.5-flash", description="Secondary model for SubAgent")
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="采样温度")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
     max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")
