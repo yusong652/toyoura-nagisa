@@ -548,7 +548,7 @@ class Agent:
 
     async def _handle_stream_iteration_limit(self, tool_calls: list) -> None:
         """Handle iteration limit reached in streaming mode."""
-        from backend.infrastructure.mcp.utils.tool_result import success_response
+        from backend.infrastructure.mcp.utils.tool_result import error_response
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
         from backend.infrastructure.monitoring.status_monitor import StatusMonitor
 
@@ -560,7 +560,7 @@ class Agent:
         for i, tool_call in enumerate(tool_calls):
             is_last_tool = (i == len(tool_calls) - 1)
 
-            limit_result = success_response(
+            limit_result = error_response(
                 stop_message,
                 llm_content={"parts": [{"type": "text", "text": stop_message}]}
             )
@@ -606,7 +606,7 @@ class Agent:
         summary_text = (
             f"SubAgent reached iteration limit ({self.config.max_iterations} iterations).\n\n"
             f"Pending tool calls (NOT executed): {', '.join(pending_tools)}\n\n"
-            f"Note: The LLM was warned multiple times before reaching the limit. "
+            f"Note: The subagent was warned multiple times before reaching the limit. "
             f"Consider breaking the task into smaller sub-tasks or providing more specific instructions."
         )
 
