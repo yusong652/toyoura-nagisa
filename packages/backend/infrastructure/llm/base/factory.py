@@ -304,6 +304,7 @@ class LLMFactory:
         - gemini: Uses secondary_model from GeminiConfig
         - anthropic: Uses secondary_model from AnthropicConfig
         - openai: Uses secondary_model from OpenAIConfig
+        - zhipu: Uses secondary_model from ZhipuConfig
 
         Args:
             app: Optional FastAPI app instance for context injection.
@@ -324,6 +325,8 @@ class LLMFactory:
             return self._create_secondary_anthropic_client(llm_settings, app, **kwargs)
         elif provider in ["openai", "gpt"]:
             return self._create_secondary_openai_client(llm_settings, app, **kwargs)
+        elif provider == "zhipu":
+            return self._create_secondary_zhipu_client(llm_settings, app, **kwargs)
         else:
             logger.warning(f"Secondary model not supported for provider '{provider}', using primary client")
             return self.create_client(app=app, **kwargs)
@@ -423,6 +426,37 @@ class LLMFactory:
 
         from backend.infrastructure.llm.providers.openai import OpenAIClient
         client = OpenAIClient(**client_config)
+        self._instances[cache_key] = client
+        return client
+
+    def _create_secondary_zhipu_client(self, llm_settings: Any, app: Optional[Any], **kwargs) -> LLMClientBase:
+        """Create secondary Zhipu client with lighter model (e.g., GLM-4.5)."""
+        zhipu_config = llm_settings.get_zhipu_config()
+        secondary_model = zhipu_config.secondary_model
+
+        cache_key = f"zhipu:secondary:{secondary_model}"
+        if cache_key in self._instances:
+            logger.debug(f"Reusing cached secondary Zhipu client ({secondary_model})")
+            return self._instances[cache_key]
+
+        logger.info(f"Creating secondary Zhipu client with model: {secondary_model}")
+
+        client_config = {
+            "api_key": zhipu_config.zhipu_api_key,
+            "extra_config": {
+                "model": secondary_model,
+                "temperature": zhipu_config.temperature,
+                "top_p": zhipu_config.top_p,
+                "max_tokens": zhipu_config.max_tokens,
+                "debug": llm_settings.debug,
+            }
+        }
+
+        if app:
+            client_config["extra_config"]["app"] = app
+
+        from backend.infrastructure.llm.providers.zhipu import ZhipuClient
+        client = ZhipuClient(**client_config)
         self._instances[cache_key] = client
         return client
 

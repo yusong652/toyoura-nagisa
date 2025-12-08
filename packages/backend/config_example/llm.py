@@ -136,6 +136,8 @@ class ZhipuConfig(BaseSettings):
     #   - glm-4-flash: GLM-4 Flash model (fastest)
     #   - glm-4-long: GLM-4 Long model (supports up to 1M tokens)
     # Note: GLM models support thinking mode (reasoning_content field)
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="glm-4.5", description="Secondary model for SubAgent")
     temperature: float = Field(default=0.6, ge=0.0, le=1.0, description="采样温度 (推荐，与 top_p 二选一)")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率 (与 temperature 二选一)")
     max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")
