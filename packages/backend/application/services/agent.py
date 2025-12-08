@@ -344,7 +344,10 @@ class Agent:
             if iteration >= self.config.max_iterations:
                 if self.is_main_agent:
                     await self._handle_stream_iteration_limit(tool_calls)
-                return response
+                    return response
+                else:
+                    # SubAgent: Execute pending tools, then request summary
+                    return await self._handle_subagent_iteration_limit(tool_calls, iteration)
 
             # === Execute tools ===
             if self.is_main_agent:
@@ -571,6 +574,76 @@ class Agent:
                 )
             except Exception as e:
                 print(f"[Agent.stream] Failed to save iteration limit result: {e}")
+
+    async def _handle_subagent_iteration_limit(self, tool_calls: list, iteration: int) -> Any:
+        """Handle iteration limit for SubAgent: execute tools then request summary.
+
+        Unlike MainAgent which just injects a stop message, SubAgent needs to:
+        1. Execute the pending tool calls (they contain valuable information)
+        2. Inject a "summarize your findings" instruction
+        3. Make one final LLM call to get a text summary
+        """
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+
+        print(f"[SubAgent] Reached iteration limit ({self.config.max_iterations}), executing final tools and requesting summary")
+
+        # Step 1: Execute pending tool calls
+        for tool_call in tool_calls:
+            self._emit_activity("tool_call_start", {
+                "tool": tool_call.get("name", "unknown"),
+                "args": tool_call.get("arguments", {}),
+            })
+
+            if self._parent_tool_call_id:
+                await WebSocketNotificationService.send_subagent_tool_use(
+                    session_id=self._notification_session_id,
+                    parent_tool_call_id=self._parent_tool_call_id,
+                    tool_call_id=tool_call.get("id", ""),
+                    tool_name=tool_call.get("name", "unknown"),
+                    tool_input=tool_call.get("arguments", {}),
+                )
+
+        tool_executor = ToolExecutor(
+            tool_manager=self.llm_client.tool_manager,
+            session_id=self.session_id,
+            notification_session_id=self._notification_session_id,
+            send_tool_result_notifications=False,
+        )
+        execution_result = await tool_executor.execute_all(
+            tool_calls=tool_calls,
+            message_id=f"agent_{self.session_id}_{iteration}_final",
+            agent_profile=self.config.tool_profile,
+        )
+
+        # Save results to context
+        await tool_executor.save_results_to_context(
+            tool_calls, execution_result.results, self._context_manager,
+            inject_reminders=False
+        )
+
+        for tool_call, result in zip(tool_calls, execution_result.results):
+            self._emit_activity("tool_call_end", {
+                "tool": tool_call.get("name", "unknown"),
+                "status": result.get("status", "unknown") if result else "rejected",
+            })
+
+        # Step 2: Inject summary request as a user message
+        summary_instruction = (
+            "You have reached the iteration limit. Based on all the tool results above, "
+            "please provide a comprehensive summary of your findings. "
+            "Do NOT call any more tools - just summarize what you found."
+        )
+        self._context_manager.add_user_text(summary_instruction)
+
+        # Step 3: Make final LLM call for summary (no tools)
+        print(f"[SubAgent] Requesting final summary from LLM")
+        final_response = await self.llm_client.call_api_with_context(
+            context=self._context_manager.build_context(),
+            tools=None,  # No tools - force text response
+            debug=self.llm_client.debug,
+        )
+
+        return final_response
 
     def _emit_activity(self, event_type: str, data: Dict[str, Any]) -> None:
         """Emit activity event if callback is registered."""
