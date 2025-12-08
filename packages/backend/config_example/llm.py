@@ -113,6 +113,8 @@ class KimiConfig(BaseSettings):
     #   - moonshotai/kimi-k2-0905: Standard K2 via OpenRouter
     # Note: K2 Thinking models expose reasoning_content field with intermediate thinking steps
     # Kimi excels at long-context understanding (up to 200K tokens)
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="kimi-k2-0905-preview", description="Secondary model for SubAgent")
     temperature: float = Field(default=0.6, ge=0.0, le=1.0, description="采样温度 (推荐 0.6)")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
     max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")
