@@ -275,9 +275,14 @@ class Agent:
             self._streaming_processor = StreamingProcessor(self.llm_client, self.session_id)
             self._status_monitor = get_status_monitor(self.session_id)
             self._status_monitor.todo_monitor.track_conversation_turn()
+        else:
+            # SubAgent also needs status monitor for iteration warnings
+            self._status_monitor = get_status_monitor(self.session_id)
 
         iteration = 0
         while True:
+            # Set iteration context for warning reminders
+            self._status_monitor.set_iteration_context(iteration, self.config.max_iterations)
             # Get tool schemas and build API config
             tool_schemas = await self.llm_client.tool_manager.get_function_call_schemas(
                 self.session_id, self._context_manager.agent_profile

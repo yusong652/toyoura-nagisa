@@ -16,7 +16,7 @@ The monitor is session-scoped and provides unified reminder API.
 """
 
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from .monitors import (
     InterruptMonitor,
@@ -27,6 +27,9 @@ from .monitors import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Warning threshold: start warning when remaining iterations <= this value
+ITERATION_WARNING_THRESHOLD = 4
 
 
 class StatusMonitor:
@@ -101,6 +104,62 @@ class StatusMonitor:
         self.bash_monitor = BashMonitor(session_id)
         self.pfc_monitor = PfcMonitor(session_id)
         self.todo_monitor = TodoMonitor(session_id)
+
+        # Iteration tracking (reset per agent run)
+        self._current_iteration: int = 0
+        self._max_iterations: int = 0
+
+    # -------------------------------------------------------------------------
+    # Iteration Tracking
+    # -------------------------------------------------------------------------
+
+    def set_iteration_context(self, current: int, max_iterations: int) -> None:
+        """
+        Set current iteration context for warning generation.
+
+        Should be called at the start of each agent loop iteration.
+
+        Args:
+            current: Current iteration number (0-indexed)
+            max_iterations: Maximum allowed iterations
+        """
+        self._current_iteration = current
+        self._max_iterations = max_iterations
+
+    def reset_iteration_context(self) -> None:
+        """Reset iteration context when agent run completes."""
+        self._current_iteration = 0
+        self._max_iterations = 0
+
+    def get_iteration_warning(self) -> Optional[str]:
+        """
+        Get iteration warning reminder if approaching limit.
+
+        Returns:
+            Optional[str]: Warning message if remaining iterations <= threshold, None otherwise
+        """
+        if self._max_iterations <= 0:
+            return None
+
+        remaining = self._max_iterations - self._current_iteration
+        if remaining > ITERATION_WARNING_THRESHOLD:
+            return None
+
+        if remaining <= 1:
+            return (
+                f"URGENT: This is your LAST iteration (iteration {self._current_iteration + 1}/{self._max_iterations}). "
+                f"You MUST provide a final summary NOW. Do NOT call any more tools."
+            )
+        elif remaining <= 2:
+            return (
+                f"WARNING: Only {remaining} iterations remaining ({self._current_iteration + 1}/{self._max_iterations}). "
+                f"Please wrap up your current task and prepare to summarize your findings."
+            )
+        else:
+            return (
+                f"Note: {remaining} iterations remaining ({self._current_iteration + 1}/{self._max_iterations}). "
+                f"Consider planning your remaining steps carefully."
+            )
 
     # -------------------------------------------------------------------------
     # Interrupt Monitor Delegation
@@ -187,7 +246,12 @@ class StatusMonitor:
         # Set queue checking flag
         self.queue_monitor.check_queue = check_queue
 
-        # Interrupt status (should be first for visibility)
+        # Iteration warning (should be first for maximum visibility)
+        iteration_warning = self.get_iteration_warning()
+        if iteration_warning:
+            reminders.append(iteration_warning)
+
+        # Interrupt status
         interrupt_reminders = await self.interrupt_monitor.get_reminders()
         reminders.extend(interrupt_reminders)
 
