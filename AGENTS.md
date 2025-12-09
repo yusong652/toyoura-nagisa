@@ -1,19 +1,73 @@
-# Repository Guidelines
+# AGENTS.md
 
-## Project Structure & Module Organization
-toyoura-nagisa is split into service-focused folders. `backend/` holds the FastAPI app using a layered structure (`application/`, `domain/`, `infrastructure/`, `presentation/`, `shared/`). Place backend tests in `backend/tests/` beside the feature they verify. `frontend/` delivers the React + Vite client (UI in `src/`, static assets in `public/`). `pfc-server/` is an optional companion for ITASCA PFC integration. Reference material lives in `docs/` and `examples/`; automation scripts and adapters sit in `scripts/` and `workspace/`.
+Updated guidance for Codex when working on **toyoura-nagisa**. This project is now PFC-first; other standalone agent experiments are legacy and should not drive new work.
 
-## Build, Test, and Development Commands
-Install backend dependencies with `uv sync` and run the API locally via `uv run python backend/run.py`. Frontend dependencies install with `npm run install:frontend`; start both tiers together with `npm run dev`, or run them separately using `npm run start:backend` and `npm run start:frontend`. Validate updates with `uv run pytest backend/tests` (optionally `--cov backend`), `npm run lint` from `frontend/`, and `npm run build`.
+## Project Snapshot
+- PFC-focused AI agent platform: documentation-driven, script-only workflow for ITASCA PFC (Particle Flow Code).
+- Core philosophy: **Script is Context**—PFC operations are versioned Python scripts that become long-term context.
+- Clean Architecture backend (FastAPI + UV) with pluggable multi-LLM stack (Gemini, Claude, OpenAI, local), MCP tool system, and ChromaDB-based long-term memory.
+- Frontends: React 19 + Vite web app (Live2D/voice/TTS), Ink/React terminal CLI; shared TypeScript core SDK for WebSocket/API.
 
-## Coding Style & Naming Conventions
-Python targets 3.10+, sticks to 4-space indentation, and relies heavily on type hints. Use Ruff for static checks (`npm run lint:backend`) and formatting (`npm run format:backend`). Follow snake_case for modules and functions, while classes remain PascalCase. Frontend code is TypeScript-first: keep React components in PascalCase files (`NagisaAvatar.tsx`) and hooks/utilities in camelCase. Resolve ESLint warnings before commit.
+## Repository & Architecture
+```
+packages/
+  backend/       # FastAPI, Clean Architecture layers (presentation/application/domain/infrastructure/shared/tests)
+  web/           # React UI (src/, public/)
+  cli/           # Terminal UI (Ink)
+  core/          # Shared TS SDK (session/connection/api clients)
+  memory_db/     # Qdrant/Chroma persistence helpers
+  pfc_workspace/ # PFC session artifacts, scripts, checkpoints (workspace data)
+services/
+  pfc-server/    # Standalone WebSocket server running inside PFC Python env
+memory_db/, data/ # Runtime storage (conversation + memory)
+docs/, examples/, scripts/ # Reference and helper assets
+```
 
-## Testing Guidelines
-Prefer pytest for backend logic, covering new tool flows, memory behaviors, and error branches. Use descriptive test names (`test_<feature>_<condition>`) and reuse fixtures when mocking provider responses. Capture WebSocket behaviours with async client tests where possible. For UI changes, linting is the minimum gate; add targeted Jest or Vite smoke checks when you touch rendering logic, and describe any manual PFC validation in the PR.
+**Backend highlights**
+- **Agent system** (`packages/backend/application/services/agent.py`): orchestrates LLM streaming + tool loop; profile-driven tool loading.
+- **LLM abstraction** (`infrastructure/llm/`): unified streaming client + provider adapters.
+- **MCP tool system** (`infrastructure/mcp/`): FastMCP server, standardized `ToolResult`, categories: builtin, coding, lifestyle (legacy), pfc, agent.
+- **PFC integration**: WebSocket client (`infrastructure/pfc/websocket_client.py`), PFC tools under `infrastructure/mcp/tools/pfc/`.
+- **Monitoring** (`infrastructure/monitoring/`): iteration/todo/bash/PFC status monitors.
+- **Memory** (`infrastructure/memory/`, `memory_db/`): ChromaDB-powered semantic + session memory.
 
-## Commit & Pull Request Guidelines
-The git history follows Conventional Commits (`feat:`, `fix:`, `refactor:`). Keep subjects under 70 characters and include issue references in the body when relevant. PRs should ship a concise summary, a checklist of verification commands, screenshots or recordings for UI updates, and a note about new configuration flags. Request reviews from maintainers responsible for touched layers.
+**Frontend highlights**
+- React Live2D chat UI with voice input + TTS, geolocation, and streaming WebSocket handling.
+- CLI frontend for terminal-first chat; shared logic lives in `packages/core`.
 
-## Security & Configuration Tips
-Copy settings from `backend/config_example/` into `backend/config/` and store provider keys via environment variables or local `.env` files—never commit secrets. Confirm Live2D assets and memory snapshots stay out of version control, and rotate exposed API keys immediately.
+**PFC server (external dependency)**
+- Lives at `services/pfc-server/`; runs inside the PFC GUI Python environment with `websockets==9.1`.
+- Handles main-thread execution, task queueing, script execution with output capture, and task status queries over `ws://localhost:9001`.
+
+## Agent Model & PFC Workflow
+- Primary profile: **PFC Expert** (keep this path first-class). Other standalone agents are legacy; avoid expanding them.
+- SubAgent: **PFC Explorer** (read-only) for documentation/file lookup without polluting main context.
+- Tool categories to know:
+  - `pfc_query_command`, `pfc_query_python_api` → get syntax/examples.
+  - `pfc_execute_task` → run Python script (test vs production via `run_in_background`), `pfc_check_task_status`/`pfc_list_tasks` → monitor.
+  - Coding tools (`read`, `write`, `edit`, `bash`, `glob`, `grep`) remain for code changes; lifestyle tools exist but treat as secondary.
+- Standard PFC flow: **Query → Test (small scale) → Production (background) → Monitor**. Always emit scripts that call `itasca.command(...)` rather than ad-hoc CLI strings.
+
+## Development Commands
+- Install: `npm install` (root workspaces), `uv sync` (Python deps under `packages/backend`).
+- Run backend: `npm run dev:backend` (uv FastAPI) or `uv run python packages/backend/run.py`.
+- Run frontend: `npm run dev:web`; run both: `npm run dev:all`. CLI: `npm run dev:cli`.
+- Tests: `uv run pytest` (backend, includes `packages/backend/tests` and `tests/`), `npm run test:web` (Vite), lint: `npm run lint:web`, build: `npm run build` or `npm run build:all`.
+- PFC server: in PFC Python console install `websockets==9.1`, then `exec(open(r'<repo>/services/pfc-server/start_server.py', encoding='utf-8').read())`.
+
+## Coding Standards
+- Python 3.10+, 4-space indent, aggressive type hints. Follow Clean Architecture boundaries: presentation → application → domain → infrastructure only.
+- Use Ruff for checks/formatting when available; keep modules snake_case, classes PascalCase.
+- TypeScript/React: components PascalCase, hooks/utilities camelCase. React 19 + Vite + MUI + PIXI Live2D.
+- Keep system prompts/config in `packages/backend/config/`; copy from `config_example/` before running.
+- Maintain standardized tool responses via `success_response`/`error_response` helpers.
+
+## Testing & Quality
+- Prefer `pytest` with descriptive names (`test_<feature>_<condition>`); cover tool flows, memory behavior, PFC task orchestration, and error paths.
+- Frontend at minimum lint; add focused tests for rendering/interaction when touching UI logic.
+- PFC integration tests require a running PFC server; document any manual runs in PR/notes.
+
+## Security & Ops Notes
+- Never commit secrets; keep API keys in env or untracked config. Ensure Live2D assets/memory snapshots stay out of VCS.
+- pfc-server uses older websockets; do not mix its environment with the main UV workspace.
+- Long-running/background work should use task IDs + status polling; avoid blocking calls in tools or handlers.
