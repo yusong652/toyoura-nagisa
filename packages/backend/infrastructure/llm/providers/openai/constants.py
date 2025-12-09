@@ -17,12 +17,12 @@ DEFAULT_FREQUENCY_PENALTY = 0.0
 DEFAULT_PRESENCE_PENALTY = 0.0
 
 # Timeout and retry settings
-DEFAULT_TIMEOUT = 30.0
+DEFAULT_TIMEOUT = 120.0  # Increased for complex SubAgent tasks
 DEFAULT_MAX_RETRIES = 3
 
 # Tool calling settings
 MAX_TOOL_ITERATIONS = 10
-TOOL_CALL_TIMEOUT = 30.0
+TOOL_CALL_TIMEOUT = 120.0  # Increased for complex SubAgent tasks
 
 # Content generation settings
 TITLE_GENERATION_TEMPERATURE = 1.0

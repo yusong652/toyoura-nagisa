@@ -1,19 +1,16 @@
 """
 Agent domain models for the agent execution system.
 
-This module defines the core data structures for agent execution results
-and activity tracking.
+This module defines the core data structures for agent execution results.
 
 Key models:
     - AgentResult: Execution result with status and data
-    - AgentActivity: Activity events for progress tracking
 
 Note: Agent configuration is now defined in agent_profiles.py
 (ProfileConfig for MainAgent, SubAgentConfig for SubAgent).
 """
 
-import time
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -95,60 +92,3 @@ class AgentResult(BaseModel):
             # Strip whitespace - empty/whitespace-only responses have no meaning
             return text.strip() if text else ""
         return ""
-
-
-class AgentActivity(BaseModel):
-    """
-    Agent activity event for progress tracking.
-
-    Emitted during agent execution to allow parent agents and
-    frontends to monitor progress in real-time.
-
-    Attributes:
-        agent_name: Name of the agent emitting the event
-        event_type: Type of activity event
-        data: Event-specific data
-        timestamp: Unix timestamp of the event
-
-    Event Types:
-        - "started": Agent execution started
-        - "thinking": Agent is processing/reasoning
-        - "tool_call_start": Starting a tool call
-        - "tool_call_end": Tool call completed
-        - "llm_response": LLM response received
-        - "completed": Agent execution finished
-        - "error": Error occurred
-
-    Example:
-        AgentActivity(
-            agent_name="pfc_explorer",
-            event_type="tool_call_start",
-            data={"tool": "pfc_query_command", "args": {"command": "ball create"}}
-        )
-    """
-
-    agent_name: str = Field(
-        description="Name of the agent emitting this event"
-    )
-
-    event_type: Literal[
-        "started",
-        "thinking",
-        "tool_call_start",
-        "tool_call_end",
-        "llm_response",
-        "completed",
-        "error"
-    ] = Field(
-        description="Type of activity event"
-    )
-
-    data: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Event-specific data payload"
-    )
-
-    timestamp: float = Field(
-        default_factory=time.time,
-        description="Unix timestamp when event occurred"
-    )

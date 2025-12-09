@@ -298,11 +298,15 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
         raise RuntimeError("Session ID not found in context - backend configuration error")
 
     try:
-        # Get agent_profile from context_manager (set by chat_service before tool execution)
+        # Get agent_profile from context_manager (set by Agent before tool execution)
         from backend.shared.utils.app_context import get_llm_client
         llm_client = get_llm_client()
         context_manager = llm_client.get_or_create_context_manager(session_id)
         agent_profile = getattr(context_manager, 'agent_profile', 'general')
+
+        # Determine persistent flag based on agent_profile
+        # SubAgents (pfc_explorer) use in-memory storage, MainAgents use local file storage
+        persistent = agent_profile != 'pfc_explorer'
 
         # Get workspace directory based on agent profile
         workspace = await get_workspace_for_profile(agent_profile, session_id)
@@ -327,10 +331,11 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
             logger.info(f"All {len(todos_dict)} todos completed - auto-clearing shared workspace list")
             todos_dict = []
 
-        # Save todos to workspace-level shared file (cross-session persistence)
-        # Note: session_id is still passed for tracking which session made the update
+        # Save todos to workspace (persistent) or memory (non-persistent)
+        # MainAgent: persistent=True -> local file storage
+        # SubAgent: persistent=False -> in-memory storage
         storage = get_todo_storage()
-        storage.save_todos(workspace, session_id, todos_dict)
+        storage.save_todos(workspace, session_id, todos_dict, persistent=persistent)
 
         # Build summary
         status_counts = {}

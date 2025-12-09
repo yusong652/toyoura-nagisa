@@ -11,10 +11,10 @@ Responsibilities:
 - Separation of concerns: presentation layer doesn't know Agent internals
 """
 
-from typing import Callable, Optional
+from typing import Optional
 
 from backend.application.services.agent import Agent
-from backend.domain.models.agent import AgentActivity, AgentResult
+from backend.domain.models.agent import AgentResult
 from backend.domain.models.agent_profiles import (
     SubAgentConfig,
     get_profile_config,
@@ -44,7 +44,6 @@ class AgentService:
         result = await service.run_subagent(
             config=PFC_EXPLORER,
             instruction="Find ball syntax",
-            on_activity=progress_callback
         )
     """
 
@@ -93,7 +92,6 @@ class AgentService:
         config: SubAgentConfig,
         instruction: str,
         context: Optional[str] = None,
-        on_activity: Optional[Callable[[AgentActivity], None]] = None,
         notification_session_id: Optional[str] = None,
         parent_tool_call_id: Optional[str] = None,
     ) -> AgentResult:
@@ -107,7 +105,6 @@ class AgentService:
             config: SubAgentConfig for the SubAgent
             instruction: Task instruction to execute (string)
             context: Optional additional context to prepend
-            on_activity: Optional callback for activity events
             notification_session_id: Session ID for WebSocket notifications.
                                     If provided, confirmation requests will be routed
                                     to this session (typically MainAgent's session).
@@ -128,7 +125,6 @@ class AgentService:
         agent = Agent(
             config=config,
             llm_client=self._llm_client,
-            on_activity=on_activity,
             notification_session_id=notification_session_id,
             parent_tool_call_id=parent_tool_call_id,
         )

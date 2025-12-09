@@ -135,54 +135,48 @@ class GeminiClient(LLMClientBase):
                 config_dict.update(kwargs)
                 config = types.GenerateContentConfig(**config_dict)
 
+        model = self.gemini_config.model_settings.model
+
         if debug:
-            print(f"[DEBUG] API call with {len(context_contents)} context items")
-            GeminiDebugger.print_debug_request(context_contents, config)
+            GeminiDebugger.print_request(context_contents, config, model)
 
         try:
-            # Direct async API call with preserved context
             response = await self.client.aio.models.generate_content(
-                model=self.gemini_config.model_settings.model,
+                model=model,
                 contents=cast(Any, context_contents),
                 config=config,
             )
 
             # Validate response structure
             if not hasattr(response, 'candidates') or not response.candidates:
-                raise Exception("Gemini API returned empty response (no candidates)")
+                if debug:
+                    GeminiDebugger.print_error("No candidates", model, response=response)
+                raise Exception(f"Empty response (no candidates). Model: {model}")
 
-            # Check for valid content with parts
             candidate = response.candidates[0]
             if not hasattr(candidate, 'content') or not candidate.content:
-                # Check for finish_reason to provide better error message
-                finish_reason = getattr(candidate, 'finish_reason', None)
-                if finish_reason:
-                    raise Exception(f"Gemini API returned empty content (finish_reason: {finish_reason})")
-                raise Exception("Gemini API returned empty content")
+                if debug:
+                    GeminiDebugger.print_error("Empty content", model, candidate=candidate)
+                raise Exception(f"Empty content. Model: {model}, finish_reason: {getattr(candidate, 'finish_reason', None)}")
 
             if not hasattr(candidate.content, 'parts') or not candidate.content.parts:
-                # This often happens with API rate limits or safety filters
-                finish_reason = getattr(candidate, 'finish_reason', None)
-                safety_ratings = getattr(candidate, 'safety_ratings', None)
-                error_details = []
-                if finish_reason:
-                    error_details.append(f"finish_reason: {finish_reason}")
-                if safety_ratings:
-                    error_details.append(f"safety_ratings: {safety_ratings}")
-                detail_str = f" ({', '.join(error_details)})" if error_details else ""
-                raise Exception(f"Gemini API returned response with empty parts{detail_str}. This may indicate API rate limiting or content filtering.")
+                if debug:
+                    GeminiDebugger.print_error("Empty parts", model, candidate=candidate)
+                raise Exception(
+                    f"Empty parts. Model: {model}, "
+                    f"finish_reason: {getattr(candidate, 'finish_reason', None)}, "
+                    f"safety_ratings: {getattr(candidate, 'safety_ratings', None)}"
+                )
 
             if debug:
-                print(f"[DEBUG] API call successful, response received")
-                GeminiDebugger.print_debug_response(response)
+                GeminiDebugger.print_response(response)
 
             return response
 
         except Exception as e:
-            error_message = f"Gemini API call failed: {str(e)}"
-            if debug:
-                print(f"[DEBUG] {error_message}")
-            raise Exception(error_message)
+            if debug and "Empty" not in str(e):
+                print(f"[DEBUG] API error: {e}")
+            raise Exception(f"Gemini API failed: {e}")
 
     # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
@@ -264,14 +258,15 @@ class GeminiClient(LLMClientBase):
                 config_dict.update(kwargs)
                 config = types.GenerateContentConfig(**config_dict)
 
+        model = self.gemini_config.model_settings.model
+
         if debug:
-            print(f"[DEBUG] Streaming API call with {len(context_contents)} context items")
-            GeminiDebugger.print_debug_request(context_contents, config)
+            GeminiDebugger.print_request(context_contents, config, model)
 
         try:
             # Use streaming API
             stream_generator = self.client.aio.models.generate_content_stream(
-                model=self.gemini_config.model_settings.model,
+                model=model,
                 contents=cast(Any, context_contents),
                 config=config,
             )

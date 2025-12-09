@@ -24,7 +24,7 @@ __all__ = ["invoke_agent", "register_invoke_agent_tool"]
 
 # Available SubAgent types (matches SubAgentConfig names in agent_profiles.py)
 AVAILABLE_SUBAGENTS = {
-    "pfc_explorer": "PFC documentation query and syntax validation agent",
+    "pfc_explorer": "PFC documentation query agent (read-only)",
 }
 
 
@@ -48,7 +48,7 @@ async def invoke_agent(
 The invoke_agent tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
 
 Available agent types and the tools they have access to:
-- pfc_explorer: PFC documentation query and syntax validation agent. Use this when you need to query PFC command syntax, find Python API usage examples, or validate PFC script patterns. (Tools: write, read, edit, bash, glob, grep, pfc_query_command, pfc_query_python_api, pfc_execute_task, pfc_check_task_status, pfc_list_tasks)
+- pfc_explorer: PFC documentation query agent (read-only). Use this when you need to query PFC command syntax, find Python API usage examples, or search workspace files for context. This agent cannot execute scripts or modify files. (Tools: read, glob, grep, bash, bash_output, pfc_query_command, pfc_query_python_api, web_search, todo_write)
 
 When using the invoke_agent tool, you must specify a subagent_type parameter to select which agent type to use.
 
@@ -73,13 +73,13 @@ Usage notes:
         # Import here to avoid circular dependencies
         from backend.domain.models.agent_profiles import get_subagent_config
         from backend.application.services.agent_service import AgentService
-        from backend.shared.utils.app_context import get_llm_client
+        from backend.shared.utils.app_context import get_secondary_llm_client
 
         # Get SubAgent configuration
         config = get_subagent_config(subagent_type)
 
-        # Create AgentService with shared LLM client
-        llm_client = get_llm_client()
+        # Create AgentService with secondary LLM client (lighter model to reduce RPM)
+        llm_client = get_secondary_llm_client()
         agent_service = AgentService(llm_client)
 
         # Get tool_call_id from request_context.meta (passed by tool_manager)
@@ -89,16 +89,11 @@ Usage notes:
         if req_ctx and hasattr(req_ctx, 'meta') and req_ctx.meta:
             parent_tool_call_id = getattr(req_ctx.meta, 'tool_call_id', "") or ""
 
-        # Activity tracking (optional - for future WebSocket integration)
-        def track_activity(activity):
-            logger.debug(f"[SubAgent:{subagent_type}] {activity.event_type}: {activity.data}")
-
         # Execute SubAgent (pass MainAgent's session_id for confirmation routing)
         logger.info(f"[invoke_agent] Starting SubAgent '{subagent_type}' ({description}) for session {session_id[:8]}")
         result = await agent_service.run_subagent(
             config=config,
             instruction=prompt,
-            on_activity=track_activity,
             notification_session_id=session_id,  # Route confirmations to MainAgent's WebSocket
             parent_tool_call_id=parent_tool_call_id,  # For frontend to associate SubAgent tools
         )

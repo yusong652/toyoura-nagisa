@@ -54,11 +54,19 @@ pfc_list_tasks()
 ### Tool Usage Best Practices
 
 **Before editing**:
-```
+
 - Always read files first to understand current content
 - Use edit for modifications, write only for new files
 - Verify paths are absolute with {workspace_root} prefix
-```
+
+**File reading rules**:
+
+- **Maximum 5 parallel file reads** per tool call batch
+- **Never guess filenames** - use `glob` or `bash ls` to verify first
+- If read fails (file not found), use recovery tools before retrying:
+  1. `glob("*keyword*")` to find similar files
+  2. `bash("ls -la target_dir")` to list directory contents
+  3. Then read with correct path
 
 **Multi-tool execution**:
 
@@ -67,12 +75,15 @@ pfc_list_tasks()
 **Rule**: Call tools "in parallel" if you can determine all parameters NOW.
 
 ```python
-# CORRECT: Parallel (independent)
-[read("a.py"), read("b.py"), grep("pattern")]
+# CORRECT: Parallel reads (max 5, verified paths)
+[read("a.py"), read("b.py"), read("c.py"), grep("pattern")]
+
+# INCORRECT: Too many parallel reads
+[read("f1.py"), read("f2.py"), ..., read("f10.py")]  # Max 5!
 
 # INCORRECT: Must wait (params unknown)
-Round 1: read("config.py")
-Round 2: edit("config.py", ...)  # Need content first
+Round 1: glob("**/*.py")
+Round 2: read(...)  # Need glob results first
 ```
 
 **Never use placeholders.** If params unknown, wait for results.

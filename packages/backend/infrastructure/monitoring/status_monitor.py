@@ -24,7 +24,9 @@ from .monitors import (
     BashMonitor,
     PfcMonitor,
     TodoMonitor,
+    IterationMonitor,
 )
+from .monitors.iteration_monitor import get_iteration_limit_tool_message
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,9 @@ class StatusMonitor:
     - Explicit parameters: agent_profile passed as method argument, not instance state
     """
 
+    # Re-export iteration limit message function for backward compatibility
+    get_iteration_limit_tool_message = staticmethod(get_iteration_limit_tool_message)
+
     def __init__(self, session_id: str):
         """
         Initialize status monitor coordinator for a session.
@@ -61,6 +66,31 @@ class StatusMonitor:
         self.bash_monitor = BashMonitor(session_id)
         self.pfc_monitor = PfcMonitor(session_id)
         self.todo_monitor = TodoMonitor(session_id)
+        self.iteration_monitor = IterationMonitor(session_id)
+
+    # -------------------------------------------------------------------------
+    # Iteration Monitor Delegation
+    # -------------------------------------------------------------------------
+
+    def set_iteration_context(self, current: int, max_iterations: int) -> None:
+        """
+        Set current iteration context for warning generation.
+
+        Delegates to IterationMonitor.
+
+        Args:
+            current: Current iteration number (0-indexed)
+            max_iterations: Maximum allowed iterations
+        """
+        self.iteration_monitor.set_context(current, max_iterations)
+
+    def reset_iteration_context(self) -> None:
+        """
+        Reset iteration context when agent run completes.
+
+        Delegates to IterationMonitor.
+        """
+        self.iteration_monitor.reset()
 
     # -------------------------------------------------------------------------
     # Interrupt Monitor Delegation
@@ -147,7 +177,11 @@ class StatusMonitor:
         # Set queue checking flag
         self.queue_monitor.check_queue = check_queue
 
-        # Interrupt status (should be first for visibility)
+        # Iteration warning (should be first for maximum visibility)
+        iteration_reminders = await self.iteration_monitor.get_reminders()
+        reminders.extend(iteration_reminders)
+
+        # Interrupt status
         interrupt_reminders = await self.interrupt_monitor.get_reminders()
         reminders.extend(interrupt_reminders)
 

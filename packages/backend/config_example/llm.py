@@ -12,6 +12,8 @@ class OpenAIConfig(BaseSettings):
     """OpenAI Configuration"""
     openai_api_key: str = Field(default="", description="OpenAI API Key")
     model: str = Field(default="gpt-4o-2024-08-06", description="Model name")
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="gpt-5-mini-2025-08-07", description="Secondary model for SubAgent")
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
@@ -29,6 +31,8 @@ class GeminiConfig(BaseSettings):
     """Gemini Configuration"""
     google_api_key: str = Field(default="", description="Google API Key")
     model: str = Field(default="gemini-2.5-flash", description="Model name")
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="gemini-2.5-flash", description="Secondary model for SubAgent")
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
@@ -53,6 +57,8 @@ class AnthropicConfig(BaseSettings):
     """Anthropic Configuration"""
     anthropic_api_key: str = Field(default="", description="Anthropic API Key")
     model: str = Field(default="claude-3-5-sonnet-20241022", description="模型名称")
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="claude-haiku-4-5-20251001", description="Secondary model for SubAgent")
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="采样温度")
     max_tokens: int = Field(default=4096, ge=1, description="最大输出token数")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
@@ -107,6 +113,8 @@ class KimiConfig(BaseSettings):
     #   - moonshotai/kimi-k2-0905: Standard K2 via OpenRouter
     # Note: K2 Thinking models expose reasoning_content field with intermediate thinking steps
     # Kimi excels at long-context understanding (up to 200K tokens)
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="kimi-k2-0905-preview", description="Secondary model for SubAgent")
     temperature: float = Field(default=0.6, ge=0.0, le=1.0, description="采样温度 (推荐 0.6)")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
     max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")
@@ -130,6 +138,8 @@ class ZhipuConfig(BaseSettings):
     #   - glm-4-flash: GLM-4 Flash model (fastest)
     #   - glm-4-long: GLM-4 Long model (supports up to 1M tokens)
     # Note: GLM models support thinking mode (reasoning_content field)
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="glm-4.5", description="Secondary model for SubAgent")
     temperature: float = Field(default=0.6, ge=0.0, le=1.0, description="采样温度 (推荐，与 top_p 二选一)")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率 (与 temperature 二选一)")
     max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")
@@ -151,6 +161,8 @@ class OpenRouterConfig(BaseSettings):
     #   - openai/gpt-4-turbo: GPT-4 Turbo
     #   - google/gemini-pro: Gemini Pro
     #   - moonshotai/kimi-k2-thinking: Kimi K2 Thinking
+    # Secondary model for SubAgents to reduce primary model RPM consumption
+    secondary_model: str = Field(default="google/gemini-2.5-flash", description="Secondary model for SubAgent")
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="采样温度")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
     max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")

@@ -7,7 +7,7 @@ name = "toyoura-nagisa"
 version = "0.1.0"
 description = "Toyoura Nagisa - LLM-Driven PFC Simulation Assistant"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [
     { name = "yusong", email = "yusong.han.652@gmail.com" }

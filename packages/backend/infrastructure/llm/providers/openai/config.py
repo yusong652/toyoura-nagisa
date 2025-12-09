@@ -41,7 +41,7 @@ class OpenAIClientConfig:
     """Complete OpenAI client configuration"""
     model_settings: OpenAIModelSettings = field(default_factory=OpenAIModelSettings)
     debug: bool = False
-    timeout: float = 30.0
+    timeout: float = 120.0  # Increased for complex SubAgent tasks
     max_retries: int = 3
     
     def get_api_call_kwargs(
@@ -118,7 +118,7 @@ def get_openai_client_config(**overrides) -> OpenAIClientConfig:
     config_dict = {
         'model_settings': model_settings,
         'debug': overrides.get('debug', llm_settings.debug),
-        'timeout': overrides.get('timeout', 30.0),
+        'timeout': overrides.get('timeout', 120.0),
         'max_retries': overrides.get('max_retries', 3)
     }
 

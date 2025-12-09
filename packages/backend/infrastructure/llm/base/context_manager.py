@@ -220,6 +220,10 @@ class BaseContextManager(ABC):
         Args:
             user_message: New user message to add
         """
+        # Track conversation turn for periodic todo reminders
+        # Must happen BEFORE get_all_reminders() to ensure correct count
+        self._status_monitor.todo_monitor.track_conversation_turn()
+
         # Check if previous response was interrupted (determines merge behavior)
         needs_merge = False
         if self._status_monitor.was_last_response_interrupted():

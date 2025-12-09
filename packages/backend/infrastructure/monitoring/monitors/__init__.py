@@ -7,6 +7,7 @@ This package provides modular monitors for various background tasks and system s
 - PfcMonitor: PFC simulation task tracking
 - InterruptMonitor: User interrupt status management
 - QueueMonitor: Queue message handling
+- IterationMonitor: Agent loop iteration tracking
 """
 
 from .base_monitor import BaseMonitor
@@ -15,6 +16,7 @@ from .bash_monitor import BashMonitor
 from .pfc_monitor import PfcMonitor
 from .interrupt_monitor import InterruptMonitor
 from .queue_monitor import QueueMonitor
+from .iteration_monitor import IterationMonitor
 
 __all__ = [
     "BaseMonitor",
@@ -23,4 +25,5 @@ __all__ = [
     "PfcMonitor",
     "InterruptMonitor",
     "QueueMonitor",
+    "IterationMonitor",
 ]

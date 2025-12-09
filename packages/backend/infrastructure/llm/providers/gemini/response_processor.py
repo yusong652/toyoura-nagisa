@@ -110,20 +110,20 @@ class GeminiResponseProcessor(BaseResponseProcessor):
     def extract_text_content(response) -> str:
         """
         Extract text content from Gemini API response.
-        
+
         Args:
             response: Raw Gemini API response object
-            
+
         Returns:
             str: Extracted text content
         """
         if not hasattr(response, 'candidates') or not response.candidates:
             return ""
-        
+
         candidate = response.candidates[0]
         if not hasattr(candidate, 'content') or not candidate.content:
             return ""
-        
+
         text_parts = []
         if hasattr(candidate.content, 'parts') and candidate.content.parts:
             for part in candidate.content.parts:
@@ -131,7 +131,7 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     # Only extract non-thinking text parts
                     if not getattr(part, 'thought', False):
                         text_parts.append(part.text)
-        
+
         return ''.join(text_parts).strip()
     
     @staticmethod

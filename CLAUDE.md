@@ -105,6 +105,33 @@ class LLMClientBase(ABC):
 
 **API**: `/api/profiles` endpoint (`backend/presentation/api/profiles.py:41`)
 
+### SubAgent System
+
+MainAgent can delegate specialized tasks to lightweight SubAgents via the `invoke_agent` tool.
+
+**Available SubAgents**:
+
+| SubAgent | Tools | Max Iterations | Purpose |
+|----------|-------|----------------|---------|
+| **PFC Explorer** | 9 read-only | 20 | Documentation search, codebase exploration |
+
+**PFC Explorer Tools**: `read`, `glob`, `grep`, `bash`, `bash_output`, `pfc_query_command`, `pfc_query_python_api`, `web_search`, `todo_write`
+
+**Architecture**:
+- **Non-Streaming**: SubAgents use synchronous API calls for efficiency
+- **Memory Isolation**: SubAgent todos stored in memory (`_memory_todos`), not persisted to disk
+- **Context Separation**: SubAgent exploration doesn't consume MainAgent's context window
+- **Read-Only**: SubAgents cannot execute simulations or modify files (no `pfc_execute_task`, `write`, `edit`)
+
+**Storage Mode** (determined by `agent_profile`):
+- MainAgent (`general`, `coding`, `pfc_expert`): `persistent=True` → local file (`workspace/todos.json`)
+- SubAgent (`pfc_explorer`): `persistent=False` → in-memory storage
+
+**Implementation**:
+- Tool: `backend/infrastructure/mcp/tools/agent/invoke_agent.py`
+- Config: `backend/domain/models/agent_profiles.py` (`PFC_EXPLORER`, `SUBAGENT_PFC_EXPLORER_TOOLS`)
+- Prompt: `backend/config/prompts/pfc_explorer.md`
+
 ### MCP Tool System
 
 **Unified Tool Response Format** (`backend/infrastructure/mcp/utils/tool_result.py:27`):
@@ -290,9 +317,17 @@ toyoura-nagisa/
 │   │   │   │   ├── builtin/
 │   │   │   │   ├── coding/
 │   │   │   │   ├── lifestyle/
-│   │   │   │   └── pfc/           # PFC simulation tools
+│   │   │   │   ├── pfc/           # PFC simulation tools
+│   │   │   │   └── agent/         # SubAgent invocation (invoke_agent)
 │   │   │   └── utils/
 │   │   │       └── tool_result.py # Unified tool response format
+│   │   ├── monitoring/            # Status monitoring system
+│   │   │   ├── status_monitor.py  # Unified coordinator
+│   │   │   └── monitors/          # Specialized monitors
+│   │   │       ├── iteration_monitor.py  # Iteration limit warnings
+│   │   │       ├── todo_monitor.py       # Todo reminders
+│   │   │       ├── bash_monitor.py       # Background bash processes
+│   │   │       └── pfc_monitor.py        # PFC task tracking
 │   │   ├── file_mention/          # File mention processing
 │   │   │   └── file_mention_processor.py  # Safe file reading and injection
 │   │   ├── pfc/
@@ -304,6 +339,8 @@ toyoura-nagisa/
 │   │   │   └── notification_service.py   # WebSocket notifications
 │   │   └── tts/                   # Text-to-speech engines
 │   ├── config/                     # Configuration management
+│   │   └── prompts/               # Agent system prompts
+│   │       └── pfc_explorer.md    # SubAgent prompt template
 │   ├── shared/                     # Common utilities and exceptions
 │   │   ├── memory_db/                  # ChromaDB persistence
 │   │   └── workspace/                  # Development workspace

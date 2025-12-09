@@ -1,9 +1,8 @@
-"""grep tool – powerful search tool built on git grep."""
+"""grep tool – powerful content search using pure Python regex."""
 
-import subprocess
-import shutil
+import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 
 from pydantic import Field
 from pydantic.fields import FieldInfo
@@ -12,7 +11,9 @@ from fastmcp.server.context import Context  # type: ignore
 
 from ..utils.path_security import (
     validate_path_in_workspace,
-    get_workspace_root_async
+    get_workspace_root_async,
+    is_safe_symlink,
+    check_parent_symlinks
 )
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
@@ -23,197 +24,204 @@ __all__ = ["grep", "register_grep_tool"]
 # Constants
 # -----------------------------------------------------------------------------
 
-SEARCH_TIMEOUT_SECONDS = 30
+MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB max file size
+MAX_RESULTS_DEFAULT = 100
 
 # File extension mappings for type filtering
-FILE_TYPE_MAP = {
-    "js": "*.js",
-    "ts": "*.ts", 
-    "py": "*.py",
-    "python": "*.py",
-    "java": "*.java",
-    "cpp": "*.cpp",
-    "c": "*.c",
-    "rust": "*.rs",
-    "go": "*.go",
-    "php": "*.php",
-    "rb": "*.rb",
-    "ruby": "*.rb",
-    "cs": "*.cs",
-    "csharp": "*.cs",
-    "sh": "*.sh",
-    "bash": "*.sh",
-    "json": "*.json",
-    "yaml": "*.yaml",
-    "yml": "*.yml",
-    "xml": "*.xml",
-    "html": "*.html",
-    "css": "*.css",
-    "scss": "*.scss",
-    "less": "*.less",
-    "md": "*.md",
-    "markdown": "*.md",
-    "txt": "*.txt",
+FILE_TYPE_EXTENSIONS = {
+    "js": [".js"],
+    "ts": [".ts"],
+    "tsx": [".tsx"],
+    "py": [".py"],
+    "python": [".py"],
+    "java": [".java"],
+    "cpp": [".cpp", ".cc", ".cxx"],
+    "c": [".c", ".h"],
+    "rust": [".rs"],
+    "go": [".go"],
+    "php": [".php"],
+    "rb": [".rb"],
+    "ruby": [".rb"],
+    "cs": [".cs"],
+    "csharp": [".cs"],
+    "sh": [".sh"],
+    "bash": [".sh", ".bash"],
+    "json": [".json"],
+    "yaml": [".yaml", ".yml"],
+    "yml": [".yml", ".yaml"],
+    "xml": [".xml"],
+    "html": [".html", ".htm"],
+    "css": [".css"],
+    "scss": [".scss"],
+    "less": [".less"],
+    "md": [".md"],
+    "markdown": [".md"],
+    "txt": [".txt"],
+}
+
+# Binary file extensions to skip
+BINARY_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".zip", ".tar", ".gz", ".rar", ".7z",
+    ".exe", ".dll", ".so", ".dylib",
+    ".pyc", ".pyo", ".class",
+    ".mp3", ".mp4", ".avi", ".mov", ".wav",
+    ".ttf", ".otf", ".woff", ".woff2",
+    ".sqlite", ".db",
 }
 
 # -----------------------------------------------------------------------------
 # Helper functions
 # -----------------------------------------------------------------------------
 
-def _run_git_grep(
-    pattern: str,
-    search_path: Path,
-    glob_pattern: Optional[str] = None,
-    file_type: Optional[str] = None,
-    output_mode: str = "files_with_matches",
-    case_insensitive: bool = False,
-    show_line_numbers: bool = False,
-    context_after: Optional[int] = None,
-    context_before: Optional[int] = None,
-    context_both: Optional[int] = None,
-    include_untracked: bool = True,
-) -> subprocess.CompletedProcess:
-    """Run git grep with specified parameters.
 
-    Args:
-        pattern: Search pattern
-        search_path: Directory or file to search
-        glob_pattern: Glob pattern to filter files
-        file_type: File type filter
-        output_mode: Output mode (content/files_with_matches/count)
-        case_insensitive: Whether to ignore case
-        show_line_numbers: Whether to show line numbers
-        context_after: Lines to show after match
-        context_before: Lines to show before match
-        context_both: Lines to show before and after match
-        include_untracked: Whether to search untracked files (default: True)
+def _expand_braces(pattern: str) -> List[str]:
+    """Expand brace patterns like {a,b,c} into multiple patterns."""
+    match = re.search(r'\{([^{}]+)\}', pattern)
+    if not match:
+        return [pattern]
 
-    Returns:
-        CompletedProcess result from git grep
-    """
-    # Use -c core.quotePath=false to output non-ASCII filenames correctly
-    # Without this, git outputs Chinese filenames as octal escape sequences like \350\265\236...
-    # which LLM cannot understand and causes hallucinations
-    cmd = ["git", "-c", "core.quotePath=false", "grep"]
+    alternatives = match.group(1).split(',')
+    prefix = pattern[:match.start()]
+    suffix = pattern[match.end():]
 
-    # Use extended regex (-E) to support | (OR), +, ?, etc.
-    # Without this, patterns like "foo|bar" won't work as expected
-    cmd.append("-E")
+    expanded = []
+    for alt in alternatives:
+        expanded.extend(_expand_braces(prefix + alt.strip() + suffix))
 
-    # Include untracked files (useful for workspace directories like pfc_workspace/)
-    if include_untracked:
-        cmd.append("--untracked")
+    return expanded
 
-    # Pattern matching flags
-    if case_insensitive:
-        cmd.append("-i")
-    
-    # Output mode
-    if output_mode == "files_with_matches":
-        cmd.append("-l")  # Only file names
-    elif output_mode == "count":
-        cmd.append("-c")  # Count matches
-    # For "content" mode, no special flag needed
-    
-    # Line numbers (only for content mode)
-    if show_line_numbers and output_mode == "content":
-        cmd.append("-n")
-    
-    # Context lines (only for content mode)
-    if output_mode == "content":
-        if context_both is not None and context_both > 0:
-            cmd.extend(["-C", str(context_both)])
-        else:
-            if context_after is not None and context_after > 0:
-                cmd.extend(["-A", str(context_after)])
-            if context_before is not None and context_before > 0:
-                cmd.extend(["-B", str(context_before)])
-    
-    # Add pattern
-    cmd.append(pattern)
-    
-    # Add pathspec separator
-    cmd.append("--")
-    
-    # File filtering - git grep uses pathspecs after --
-    # Build pathspec relative to git root
-    git_root_result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        text=True,
-        cwd=search_path if search_path.is_dir() else search_path.parent,
-        timeout=5
-    )
-    if git_root_result.returncode != 0:
-        raise Exception("Not in a git repository")
 
-    git_root = Path(git_root_result.stdout.strip())
+def _should_skip_file(file_path: Path) -> bool:
+    """Check if file should be skipped (binary, too large, etc.)."""
+    # Skip binary files by extension
+    if file_path.suffix.lower() in BINARY_EXTENSIONS:
+        return True
 
-    # Calculate relative path from git root to search path
+    # Skip files that are too large
     try:
-        relative_search_path = search_path.relative_to(git_root)
-        base_pathspec = str(relative_search_path)
+        if file_path.stat().st_size > MAX_FILE_SIZE_BYTES:
+            return True
+    except OSError:
+        return True
+
+    return False
+
+
+def _matches_glob_pattern(file_path: Path, search_dir: Path, glob_patterns: List[str]) -> bool:
+    """Check if file matches any of the glob patterns."""
+    if not glob_patterns:
+        return True
+
+    try:
+        rel_path = file_path.relative_to(search_dir)
     except ValueError:
-        # search_path is not relative to git_root, use as-is
-        base_pathspec = ""
+        return False
 
-    # Construct final pathspec
-    if glob_pattern:
-        # Combine base path with glob pattern
-        if base_pathspec:
-            cmd.append(f"{base_pathspec}/{glob_pattern}")
-        else:
-            cmd.append(glob_pattern)
-    elif file_type and file_type in FILE_TYPE_MAP:
-        # Combine base path with file type pattern
-        if base_pathspec:
-            cmd.append(f"{base_pathspec}/{FILE_TYPE_MAP[file_type]}")
-        else:
-            cmd.append(FILE_TYPE_MAP[file_type])
-    else:
-        # Search in the specified path only
-        if base_pathspec:
-            cmd.append(base_pathspec)
-        else:
-            # Search all files in git root if no path specified
-            cmd.append("*")
+    for pattern in glob_patterns:
+        if rel_path.match(pattern):
+            return True
 
-    # Execute git grep from git root
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=SEARCH_TIMEOUT_SECONDS,
-            cwd=git_root
-        )
-        return result
-    except subprocess.TimeoutExpired:
-        raise TimeoutError(f"Search timed out after {SEARCH_TIMEOUT_SECONDS} seconds")
+    return False
 
-def _process_output(
-    output: str, 
-    head_limit: Optional[int] = None
-) -> List[str]:
-    """Process git grep output and apply head limit.
-    
-    Args:
-        output: Raw output from git grep
-        head_limit: Maximum lines to return
-        
-    Returns:
-        List of output lines
+
+def _matches_file_type(file_path: Path, file_type: Optional[str]) -> bool:
+    """Check if file matches the specified file type."""
+    if not file_type:
+        return True
+
+    extensions = FILE_TYPE_EXTENSIONS.get(file_type.lower(), [])
+    if not extensions:
+        return True  # Unknown type, allow all
+
+    return file_path.suffix.lower() in extensions
+
+
+def _get_context_lines(
+    lines: List[str],
+    match_indices: Set[int],
+    context_before: int,
+    context_after: int
+) -> List[tuple]:
+    """Get lines with context around matches.
+
+    Returns list of (line_number, line_content, is_match) tuples.
     """
-    if not output.strip():
-        return []
-    
-    lines = output.strip().split('\n')
-    
-    # Apply head limit if specified
-    if head_limit:
-        lines = lines[:head_limit]
-    
-    return lines
+    result = []
+    shown_indices = set()
+
+    for match_idx in sorted(match_indices):
+        start = max(0, match_idx - context_before)
+        end = min(len(lines), match_idx + context_after + 1)
+
+        for i in range(start, end):
+            if i not in shown_indices:
+                shown_indices.add(i)
+                is_match = i in match_indices
+                result.append((i + 1, lines[i], is_match))  # 1-indexed
+
+    # Sort by line number
+    result.sort(key=lambda x: x[0])
+    return result
+
+
+def _search_file(
+    file_path: Path,
+    regex: re.Pattern,
+    output_mode: str,
+    show_line_numbers: bool,
+    context_before: int,
+    context_after: int,
+) -> Optional[Dict[str, Any]]:
+    """Search a single file for pattern matches.
+
+    Returns:
+        Dict with search results or None if no matches/error
+    """
+    try:
+        content = file_path.read_text(encoding='utf-8', errors='ignore')
+    except Exception:
+        return None
+
+    lines = content.splitlines()
+
+    # Find all matching line indices
+    match_indices: Set[int] = set()
+    for i, line in enumerate(lines):
+        if regex.search(line):
+            match_indices.add(i)
+
+    if not match_indices:
+        return None
+
+    match_count = len(match_indices)
+
+    if output_mode == "files_with_matches":
+        return {"file": file_path, "count": match_count}
+
+    elif output_mode == "count":
+        return {"file": file_path, "count": match_count}
+
+    else:  # content mode
+        context_lines = _get_context_lines(
+            lines, match_indices, context_before, context_after
+        )
+
+        formatted_lines = []
+        for line_num, line_content, is_match in context_lines:
+            if show_line_numbers:
+                separator = ":" if is_match else "-"
+                formatted_lines.append(f"{line_num}{separator}{line_content}")
+            else:
+                formatted_lines.append(line_content)
+
+        return {
+            "file": file_path,
+            "count": match_count,
+            "lines": formatted_lines,
+        }
+
 
 # -----------------------------------------------------------------------------
 # Main implementation
@@ -227,59 +235,57 @@ async def grep(
     ),
     path: Optional[str] = Field(
         None,
-        description="File or directory to search in (defaults to current working directory if not specified)",
+        description="File or directory to search in (defaults to workspace root if not specified)",
     ),
     glob: Optional[str] = Field(
         None,
-        description="Glob pattern to filter files (e.g. \"*.js\", \"*.{ts,tsx}\") - maps to git grep pathspec",
+        description="Glob pattern to filter files (e.g. \"*.js\", \"*.{ts,tsx}\")",
     ),
     type: Optional[str] = Field(
         None,
-        description="File type to search (git grep --type). Common types: js, py, rust, go, java, etc. More efficient than include for standard file types.",
+        description="File type to search. Common types: js, py, ts, rust, go, java, etc.",
     ),
     output_mode: str = Field(
         "files_with_matches",
-        description="Output mode: \"content\" shows matching lines (supports -A/-B/-C context, -n line numbers, head_limit), \"files_with_matches\" shows file paths (supports head_limit), \"count\" shows match counts (supports head_limit). Defaults to \"files_with_matches\".",
+        description="Output mode: \"content\" shows matching lines, \"files_with_matches\" shows file paths (default), \"count\" shows match counts.",
     ),
     case_insensitive: bool = Field(
         False,
-        description="Case insensitive search (git grep -i)",
+        description="Case insensitive search",
         alias="-i"
     ),
     show_line_numbers: bool = Field(
         False,
-        description="Show line numbers in output (git grep -n). Requires output_mode: \"content\", ignored otherwise.",
+        description="Show line numbers in output. Requires output_mode: \"content\".",
         alias="-n"
     ),
     context_after: Optional[int] = Field(
         None,
-        description="Number of lines to show after each match (git grep -A). Requires output_mode: \"content\", ignored otherwise.",
+        description="Number of lines to show after each match. Requires output_mode: \"content\".",
         alias="-A"
     ),
     context_before: Optional[int] = Field(
         None,
-        description="Number of lines to show before each match (git grep -B). Requires output_mode: \"content\", ignored otherwise.",
+        description="Number of lines to show before each match. Requires output_mode: \"content\".",
         alias="-B"
     ),
     context_both: Optional[int] = Field(
         None,
-        description="Number of lines to show before and after each match (git grep -C). Requires output_mode: \"content\", ignored otherwise.",
+        description="Number of lines to show before and after each match. Requires output_mode: \"content\".",
         alias="-C"
     ),
     head_limit: Optional[int] = Field(
         None,
-        description="Limit output to first N lines/entries, equivalent to \"| head -N\". Works across all output modes: content (limits output lines), files_with_matches (limits file paths), count (limits count entries). When unspecified, shows all results from git grep.",
+        description="Limit output to first N results.",
     ),
 ) -> Dict[str, Any]:
-    """A powerful search tool built on git grep
+    """A powerful content search tool using Python regex.
 
   Usage:
-  - ALWAYS use Grep for search tasks. NEVER invoke `grep` or `rg` as a Bash command. The Grep tool has been optimized for correct permissions and access.
-  - Supports extended regex syntax including | (OR), +, ?, etc. (e.g., "foo|bar", "log.*Error", "function\\s+\\w+")
-  - Filter files with glob parameter (e.g., "*.js", "**/*.tsx") or type parameter (e.g., "js", "py", "rust")
-  - Output modes: "content" shows matching lines, "files_with_matches" shows only file paths (default), "count" shows match counts
-  - Use Task tool for open-ended searches requiring multiple rounds
-  - Pattern syntax: Uses git grep with extended regex (-E) - literal braces need escaping (use `interface\\{\\}` to find `interface{}` in Go code)
+  - Supports Python regex syntax (e.g., "log.*Error", "function\\s+\\w+", "foo|bar")
+  - Filter files with glob parameter (e.g., "*.js", "*.{ts,tsx}") or type parameter (e.g., "js", "py")
+  - Output modes: "content" shows matching lines, "files_with_matches" shows file paths (default), "count" shows match counts
+  - Automatically skips binary files and files larger than 10MB
 """
 
     # Handle Pydantic FieldInfo objects when invoked programmatically
@@ -289,6 +295,8 @@ async def grep(
         glob = None
     if isinstance(type, FieldInfo):
         type = None
+    if isinstance(output_mode, FieldInfo):
+        output_mode = "files_with_matches"
     if isinstance(case_insensitive, FieldInfo):
         case_insensitive = False
     if isinstance(show_line_numbers, FieldInfo):
@@ -311,46 +319,21 @@ async def grep(
     if output_mode not in valid_modes:
         return error_response(f"Invalid output_mode. Must be one of: {', '.join(valid_modes)}")
 
-    # Check if git is available
-    if not shutil.which("git"):
-        return error_response("git is not installed or not available in PATH")
-
-    # Get workspace root dynamically based on current session (needed for git root search)
-    workspace_root = await get_workspace_root_async(context)
-
-    # Find git repository root
-    git_root = None
+    # Compile regex
     try:
-        # Try to find git root from various possible locations
-        search_dirs = [workspace_root, workspace_root.parent, Path.cwd()]
+        flags = re.IGNORECASE if case_insensitive else 0
+        regex = re.compile(pattern, flags)
+    except re.error as e:
+        return error_response(f"Invalid regex pattern: {e}")
 
-        for search_dir in search_dirs:
-            git_check = subprocess.run(
-                ["git", "rev-parse", "--show-toplevel"],
-                capture_output=True,
-                text=True,
-                cwd=search_dir,
-                timeout=5
-            )
-            if git_check.returncode == 0:
-                git_root = Path(git_check.stdout.strip())
-                break
-
-        if git_root is None:
-            return error_response("Not in a git repository - git grep requires a git repository")
-
-    except Exception:
-        return error_response("Unable to check git repository status")
+    # Get workspace root dynamically
+    workspace_root = await get_workspace_root_async(context)
 
     # Determine search path
     if path:
-        # Normalize path separators for cross-platform compatibility
-        # This handles cases where LLM generates mixed separators (e.g., C:\path/to/dir)
-        # Keep original path for LLM-friendly error messages (forward slashes)
         original_path_for_display = path_to_llm_format(path.strip())
         path = normalize_path_separators(path.strip())
 
-        # Validate provided path against dynamic workspace
         search_path_abs = validate_path_in_workspace(path, workspace_root)
         if search_path_abs is None:
             return error_response(f"Path is outside workspace: {original_path_for_display}")
@@ -359,79 +342,99 @@ async def grep(
         if not search_path.exists():
             return error_response(f"Path does not exist: {original_path_for_display}")
     else:
-        # Default to dynamic workspace root
         search_path = workspace_root
 
-    try:
-        # Run git grep with untracked file support
-        result = _run_git_grep(
-            pattern=pattern,
-            search_path=search_path,
-            glob_pattern=glob,
-            file_type=type,
-            output_mode=output_mode,
-            case_insensitive=case_insensitive,
-            show_line_numbers=show_line_numbers,
-            context_after=context_after,
-            context_before=context_before,
-            context_both=context_both,
-            include_untracked=True,  # Search both tracked and untracked files
-        )
-        
-        # Process git grep result
-        
-        # Handle git grep exit codes
-        if result.returncode == 1:  # No matches found
-            output_lines = []
-        elif result.returncode != 0:  # Error occurred
-            error_msg = result.stderr.strip() if result.stderr else "Unknown git grep error"
-            return error_response(f"Search error: {error_msg}")
-        else:
-            # Process output
-            output_lines = _process_output(result.stdout, head_limit)
+    # Process context arguments
+    ctx_before = context_both if context_both else (context_before or 0)
+    ctx_after = context_both if context_both else (context_after or 0)
 
-        # Build response based on output mode
-        
+    # Expand glob patterns for brace expansion support
+    glob_patterns = []
+    if glob:
+        glob_patterns = _expand_braces(glob)
+
+    try:
+        results = []
+        files_searched = 0
+        max_results = head_limit or MAX_RESULTS_DEFAULT
+
+        # Get all files to search
+        if search_path.is_file():
+            files_to_search = [search_path]
+        else:
+            files_to_search = list(search_path.rglob("*"))
+
+        for file_path in files_to_search:
+            # Skip directories
+            if not file_path.is_file():
+                continue
+
+            # Security checks
+            try:
+                file_path.relative_to(workspace_root.resolve())
+            except ValueError:
+                continue
+
+            if file_path.is_symlink() and not is_safe_symlink(file_path, workspace_root):
+                continue
+
+            if not check_parent_symlinks(file_path, workspace_root):
+                continue
+
+            # Skip binary/large files
+            if _should_skip_file(file_path):
+                continue
+
+            # Filter by glob pattern
+            if not _matches_glob_pattern(file_path, search_path, glob_patterns):
+                continue
+
+            # Filter by file type
+            if not _matches_file_type(file_path, type):
+                continue
+
+            files_searched += 1
+
+            # Search the file
+            result = _search_file(
+                file_path, regex, output_mode,
+                show_line_numbers, ctx_before, ctx_after
+            )
+
+            if result:
+                results.append(result)
+                if len(results) >= max_results:
+                    break
+
+        # Build response
         if output_mode == "files_with_matches":
-            total_files = len(output_lines)
+            file_paths = [path_to_llm_format(r["file"]) for r in results]
+            total_files = len(file_paths)
             message = f"Found {total_files} file{'s' if total_files != 1 else ''}"
 
-            # Simple LLM content - just the file paths, one per line
-            # Provide meaningful message when no results found
-            if output_lines:
-                llm_content = "\n".join(output_lines)
+            if file_paths:
+                llm_content = "\n".join(file_paths)
             else:
                 llm_content = f"No files found matching pattern '{pattern}'"
 
             return success_response(
                 message,
-                llm_content={
-                    "parts": [
-                        {"type": "text", "text": llm_content}
-                    ]
-                },
-                files=output_lines,
+                llm_content={"parts": [{"type": "text", "text": llm_content}]},
+                files=file_paths,
                 total_files=total_files,
                 pattern=pattern,
             )
-            
+
         elif output_mode == "count":
-            # Parse count output (file:count format)
+            output_lines = []
             total_matches = 0
+            for r in results:
+                file_display = path_to_llm_format(r["file"])
+                output_lines.append(f"{file_display}:{r['count']}")
+                total_matches += r["count"]
 
-            for line in output_lines:
-                if ':' in line:
-                    _, count_str = line.rsplit(':', 1)
-                    try:
-                        count = int(count_str)
-                        total_matches += count
-                    except ValueError:
-                        continue
+            message = f"Found {total_matches} matches in {len(results)} files"
 
-            message = f"Found {total_matches} matches in {len(output_lines)} files"
-
-            # Simple LLM content - just the count output, one per line
-            # Provide meaningful message when no results found
             if output_lines:
                 llm_content = "\n".join(output_lines)
             else:
@@ -439,23 +442,21 @@ async def grep(
 
             return success_response(
                 message,
-                llm_content={
-                    "parts": [
-                        {"type": "text", "text": llm_content}
-                    ]
-                },
+                llm_content={"parts": [{"type": "text", "text": llm_content}]},
                 total_matches=total_matches,
-                total_files=len(output_lines),
+                total_files=len(results),
                 pattern=pattern,
             )
-            
+
         else:  # content mode
-            # For content mode, Claude Code doesn't show a count message
-            # Just return the matching lines directly
+            output_lines = []
+            for r in results:
+                file_display = path_to_llm_format(r["file"])
+                for line in r["lines"]:
+                    output_lines.append(f"{file_display}:{line}")
+
             message = f"Search results for pattern '{pattern}'"
 
-            # Simple LLM content - just the matching lines, one per line
-            # Provide meaningful message when no results found
             if output_lines:
                 llm_content = "\n".join(output_lines)
             else:
@@ -463,18 +464,12 @@ async def grep(
 
             return success_response(
                 message,
-                llm_content={
-                    "parts": [
-                        {"type": "text", "text": llm_content}
-                    ]
-                },
+                llm_content={"parts": [{"type": "text", "text": llm_content}]},
                 content=output_lines,
                 total_lines=len(output_lines),
                 pattern=pattern,
             )
 
-    except TimeoutError as e:
-        return error_response(str(e))
     except Exception as exc:
         return error_response(f"Unexpected error during search: {exc}")
 
