@@ -2,19 +2,32 @@
  * Unicode-aware text utilities
  * Reference: Gemini CLI ui/utils/textUtils.ts
  *
- * These utilities work at the code-point level rather than UTF-16
- * code units so that surrogate-pair emoji and CJK characters count correctly.
+ * These utilities work at the grapheme cluster level rather than UTF-16
+ * code units so that emoji sequences (like ❤️, 👨‍👩‍👧‍👦) and CJK characters
+ * are handled correctly as single visual units.
  */
 
 import stringWidth from 'string-width';
 import stripAnsi from 'strip-ansi';
 
-// Cache for code points to reduce GC pressure
-const codePointsCache = new Map<string, string[]>();
+// Grapheme segmenter for proper emoji/Unicode handling
+// Uses Intl.Segmenter (Node.js 16+) to correctly split strings into
+// grapheme clusters, handling:
+// - Emoji with variation selectors (❤️ = U+2764 + U+FE0F)
+// - ZWJ sequences (👨‍👩‍👧‍👦 = multiple emoji joined with U+200D)
+// - Keycap sequences (1️⃣ = digit + U+FE0F + U+20E3)
+const graphemeSegmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+
+// Cache for grapheme clusters to reduce GC pressure
+const graphemesCache = new Map<string, string[]>();
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
 
 /**
- * Convert a string to an array of code points (handles multi-byte chars correctly)
+ * Convert a string to an array of grapheme clusters (handles emoji correctly)
+ *
+ * Unlike Array.from() which splits by code points, this function uses
+ * Intl.Segmenter to split by grapheme clusters, ensuring that multi-codepoint
+ * emoji like ❤️ (heart + variation selector) stay together as one unit.
  */
 export function toCodePoints(str: string): string[] {
   // ASCII fast path - check if all chars are ASCII (0-127)
@@ -31,17 +44,18 @@ export function toCodePoints(str: string): string[] {
 
   // Cache short strings
   if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
-    const cached = codePointsCache.get(str);
+    const cached = graphemesCache.get(str);
     if (cached) {
       return cached;
     }
   }
 
-  const result = Array.from(str);
+  // Use Intl.Segmenter for proper grapheme cluster segmentation
+  const result = [...graphemeSegmenter.segment(str)].map(s => s.segment);
 
   // Cache result
   if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
-    codePointsCache.set(str, result);
+    graphemesCache.set(str, result);
   }
 
   return result;
