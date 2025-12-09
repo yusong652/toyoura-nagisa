@@ -50,6 +50,11 @@ You are called by the main agent to:
 1. Use `glob` or `bash ls` to verify filenames exist
 2. Never guess filenames - always confirm first
 
+**Path accuracy**:
+
+- Use EXACT paths from glob/ls results - no modifications, no retyping
+- Common errors: missing characters, extra characters, wrong case
+
 **Parallel execution**:
 
 - Maximum 5 parallel file reads per batch
@@ -57,9 +62,9 @@ You are called by the main agent to:
 
 **If file read fails**:
 
-1. Use `glob("*keyword*")` to find similar files
-2. Use `bash("ls -la target_dir")` to list directory
-3. Report findings and suggest correct paths
+1. Compare your path with glob/ls results - check for typos
+2. If no prior glob results, run `glob` or `bash ls` to find actual files
+3. Use only confirmed paths for retry
 
 ### Query Tool Selection
 
