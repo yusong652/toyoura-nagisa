@@ -25,13 +25,13 @@ The `PFC Expert` profile operates on a principle fundamentally different from ty
 - **Static Mindset (for code)**: Files are static. Reading a file gives the same content. Order of operations is flexible.
 - **Dynamic Mindset (for PFC)**: The simulation is a timeline. Every command permanently changes the state. Order of operations is critical. The agent's primary context is the **evolution of the simulation state**.
 
-### 2.2. The Three-Phase PFC Workflow
+### 2.2. The Script-Only PFC Workflow
 
-To manage this stateful interaction, the agent must follow a structured, three-phase workflow.
+To manage this stateful interaction, the agent follows a documentation-driven, script-based workflow.
 
-- **Phase 1: VALIDATION (`pfc_execute_command`)**: Interactively explore the simulation in a REPL-like manner.
-- **Phase 2: CODIFICATION (`write`/`edit`)**: Preserve a validated sequence of commands as a reusable Python script.
-- **Phase 3: EXECUTION (`pfc_execute_task`)**: Execute a fully validated script for a production-scale simulation (creates git snapshot for reproducibility).
+- **Phase 1: QUERY (`pfc_query_command`/`pfc_query_python_api`)**: Look up command syntax and Python API examples from documentation.
+- **Phase 2: TEST (`pfc_execute_task` with small scale)**: Write and execute a small-scale test script to validate the approach.
+- **Phase 3: PRODUCTION (`pfc_execute_task` with `run_in_background=True`)**: Execute a full-scale simulation with git snapshot for reproducibility.
 
 ## 3. System Architecture
 
@@ -46,10 +46,10 @@ The backend follows a strict dependency rule where dependencies point inwards to
 
 ### 3.2. The Unified LLM Abstraction
 
-This architecture allows the application to treat all LLM providers identically. The core is the `LLMClientBase` abstract class.
+This architecture allows the application to treat all LLM providers identically. The system uses a clean separation between infrastructure and application layers.
 
-- **Location**: `backend/infrastructure/llm/base/client.py`
-- **Workflow**: The base class defines the high-level logic (e.g., the `_recursive_tool_calling` loop), while provider-specific subclasses implement the low-level details (API calls, data formatting). This is a classic **Inversion of Control** pattern.
+- **Infrastructure Layer** (`backend/infrastructure/llm/base/client.py`): The `LLMClientBase` abstract class provides stateless API interfaces (`call_api_with_context`, `call_api_with_context_streaming`). Provider-specific subclasses implement the low-level details (API calls, data formatting).
+- **Application Layer** (`backend/application/services/agent.py`): The `Agent` class implements business logic including the tool calling loop, streaming orchestration, and conversation management. This separation follows the **Inversion of Control** pattern.
 
 ### 3.3. SubAgent Delegation
 
