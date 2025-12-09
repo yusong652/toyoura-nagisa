@@ -1,13 +1,16 @@
 """
-Todo Storage - Persistent storage for todo items.
+Todo Storage - Persistent and in-memory storage for todo items.
 
-Implements persistent todo storage in workspace directories for project-level tracking.
+Implements two storage modes:
+    - Persistent mode (MainAgent): workspace/todos.json (shared across all sessions)
+    - Memory mode (SubAgent): in-memory storage isolated per session
 
 Storage Strategy:
     - Workspace-level storage: workspace/todos.json (shared across all sessions)
     - Cross-session persistence: All sessions share the same todo list
     - Workspace resolution: Uses workspace.py for profile-aware paths
     - Auto-clear on completion: Delete file when saving empty list
+    - Memory mode: Session-scoped in-memory storage for SubAgents
 
 Data Schema:
     {
@@ -34,6 +37,10 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
+
+# In-memory storage for non-persistent mode (SubAgents)
+# Key: session_id, Value: list of todo items
+_memory_todos: Dict[str, List[Dict[str, Any]]] = {}
 
 
 class TodoStorage:
@@ -108,10 +115,11 @@ class TodoStorage:
         self,
         workspace: Path,
         session_id: str,
-        todos: List[Dict[str, Any]]
+        todos: List[Dict[str, Any]],
+        persistent: bool = True
     ) -> None:
         """
-        Save todos for workspace (cross-session shared list).
+        Save todos for workspace or in-memory (session-scoped).
 
         This implements the "full update" pattern similar to Claude Code's TodoWrite,
         where the entire todo list is replaced on each update.
@@ -124,18 +132,9 @@ class TodoStorage:
             workspace: Workspace directory path
             session_id: Session identifier (for tracking which session created/updated the todo)
             todos: Complete list of todos (replaces existing)
+            persistent: If True, save to local file (MainAgent).
+                       If False, save to in-memory storage (SubAgent).
         """
-        file_path = self._get_todos_path(workspace)
-
-        # Handle empty list: delete the file instead of saving empty JSON
-        if not todos:
-            if file_path.exists():
-                file_path.unlink()
-                self.logger.info(f"✓ Deleted todos file for workspace (empty list)")
-            else:
-                self.logger.debug(f"No todos file to delete for workspace")
-            return
-
         # Ensure all todos have required fields
         current_time = time.time()
         for todo in todos:
@@ -149,20 +148,52 @@ class TodoStorage:
             if "metadata" not in todo:
                 todo["metadata"] = {}
 
-        self._save_todos_to_file(file_path, todos)
-        self.logger.info(f"✓ Saved {len(todos)} todo(s) to workspace (from session {session_id[:8]})")
+        # Non-persistent mode: save to memory
+        if not persistent:
+            _memory_todos[session_id] = todos
+            self.logger.debug(f"Saved {len(todos)} todo(s) to memory (session {session_id[:8]})")
+            return
 
-    def load_todos(self, workspace: Path, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        # Persistent mode: save to file
+        file_path = self._get_todos_path(workspace)
+
+        # Handle empty list: delete the file instead of saving empty JSON
+        if not todos:
+            if file_path.exists():
+                file_path.unlink()
+                self.logger.info(f"Deleted todos file for workspace (empty list)")
+            else:
+                self.logger.debug(f"No todos file to delete for workspace")
+            return
+
+        self._save_todos_to_file(file_path, todos)
+        self.logger.info(f"Saved {len(todos)} todo(s) to workspace (from session {session_id[:8]})")
+
+    def load_todos(
+        self,
+        workspace: Path,
+        session_id: Optional[str] = None,
+        persistent: bool = True
+    ) -> List[Dict[str, Any]]:
         """
-        Load todos from workspace (shared across all sessions).
+        Load todos from workspace or in-memory storage.
 
         Args:
             workspace: Workspace directory path
-            session_id: Optional session identifier (unused, kept for compatibility)
+            session_id: Session identifier (required for non-persistent mode)
+            persistent: If True, load from local file (MainAgent).
+                       If False, load from in-memory storage (SubAgent).
 
         Returns:
-            List of todo dictionaries from the workspace
+            List of todo dictionaries
         """
+        # Non-persistent mode: load from memory
+        if not persistent:
+            todos = _memory_todos.get(session_id, []) if session_id else []
+            self.logger.debug(f"Loaded {len(todos)} todo(s) from memory (session {session_id[:8] if session_id else 'unknown'})")
+            return todos
+
+        # Persistent mode: load from file
         file_path = self._get_todos_path(workspace)
         todos = self._load_todos_from_file(file_path)
         self.logger.debug(f"Loaded {len(todos)} todo(s) from workspace")
@@ -213,6 +244,20 @@ class TodoStorage:
         ]
 
         return pending[:limit] if limit else pending
+
+
+    def clear_memory_todos(self, session_id: str) -> None:
+        """
+        Clear in-memory todos for a session.
+
+        Should be called when a SubAgent completes to free memory.
+
+        Args:
+            session_id: Session identifier to clear
+        """
+        if session_id in _memory_todos:
+            del _memory_todos[session_id]
+            self.logger.debug(f"Cleared memory todos for session {session_id[:8]}")
 
 
 # Global singleton instance

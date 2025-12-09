@@ -100,9 +100,13 @@ class Agent:
 
     @property
     def status_monitor(self):
-        """Get status monitor (cached by session_id)."""
+        """Get status monitor (cached by session_id).
+
+        MainAgent uses persistent=True (local file storage for todos).
+        SubAgent uses persistent=False (in-memory storage for todos).
+        """
         from backend.infrastructure.monitoring import get_status_monitor
-        return get_status_monitor(self.session_id)
+        return get_status_monitor(self.session_id, persistent=self._is_main_agent)
 
     @property
     def is_main_agent(self) -> bool:

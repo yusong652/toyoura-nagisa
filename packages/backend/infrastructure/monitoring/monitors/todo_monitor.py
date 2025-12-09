@@ -1,17 +1,16 @@
 """
 Todo Monitor - Full todo list reminders with periodic injection.
 
-Every reminder contains the entire todo list shared across all sessions so the LLM
-always sees the authoritative state (pending, in-progress, and completed items).
-Cross-session persistence ensures todos are visible to all sessions in the workspace.
+Supports two modes:
+- Persistent mode (MainAgent): Reads from local file storage, shared across sessions
+- Memory mode (SubAgent): Reads from in-memory storage, isolated per session
 
 Implements Claude Code-style periodic reminders: injects todo list every N tool calls
 even when todo list is empty, to prompt the LLM to consider using the TodoWrite tool.
 """
 
-import asyncio
 import logging
-from typing import List
+from typing import List, Dict
 
 from backend.infrastructure.storage.todo_storage import get_todo_storage
 from backend.shared.utils.workspace import get_workspace_for_profile
@@ -25,8 +24,9 @@ class TodoMonitor(BaseMonitor):
     """
     Monitor for todo items with periodic reminders.
 
-    Emits the entire todo list as a reminder whenever todos exist in the workspace.
-    All sessions share the same todo list for cross-session continuity.
+    Supports two modes:
+    - persistent=True (MainAgent): Reads from local file storage
+    - persistent=False (SubAgent): Reads from in-memory storage
 
     Additionally implements Claude Code-style periodic injection:
     - Tracks conversation turns across the session
@@ -39,12 +39,24 @@ class TodoMonitor(BaseMonitor):
 
     # Class-level storage for activity counts per session
     # Tracks both conversation turns and tool iterations
-    _activity_counts = {}
-    _last_reminder_counts = {}
+    _activity_counts: Dict[str, int] = {}
+    _last_reminder_counts: Dict[str, int] = {}
 
     # Configurable reminder interval (default: every 3 activities)
     # Activities include: user messages + tool call iterations
     DEFAULT_REMINDER_INTERVAL = 3
+
+    def __init__(self, session_id: str, persistent: bool = True):
+        """
+        Initialize TodoMonitor.
+
+        Args:
+            session_id: Session ID for scoped monitoring
+            persistent: If True, read from local file storage (MainAgent).
+                       If False, read from in-memory storage (SubAgent).
+        """
+        super().__init__(session_id)
+        self.persistent = persistent
 
     def _ensure_session_initialized(self) -> None:
         """Ensure session tracking is initialized."""
@@ -115,8 +127,10 @@ class TodoMonitor(BaseMonitor):
 
         try:
             storage = get_todo_storage()
-            # Load workspace-level todos (shared across all sessions)
-            todos = storage.load_todos(workspace)
+            # Load todos based on persistence mode
+            # MainAgent (persistent=True): from local file
+            # SubAgent (persistent=False): from in-memory storage
+            todos = storage.load_todos(workspace, self.session_id, persistent=self.persistent)
         except Exception as e:
             logger.debug(f"Failed to load todos for reminders: {e}")
             return []
