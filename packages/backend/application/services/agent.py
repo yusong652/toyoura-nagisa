@@ -23,6 +23,7 @@ from backend.application.services.streaming_processor import StreamingProcessor
 from backend.application.services.message_service import MessageService
 from backend.application.services.contents.title_service import trigger_title_generation
 from backend.infrastructure.storage.session_manager import save_token_usage
+from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
 # Type alias for agent configuration
 AgentConfig = Union[ProfileConfig, SubAgentConfig]
@@ -289,7 +290,6 @@ class Agent:
         Returns:
             Final LLM response object
         """
-        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
         from backend.shared.exceptions import UserRejectionInterruption
 
         # Initialize MainAgent streaming processor
@@ -452,8 +452,6 @@ class Agent:
 
     async def _handle_stream_interruption(self, iteration: int) -> Any:
         """Handle user interruption during streaming."""
-        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-
         print(f"[Agent.stream] Interrupted by user at iteration {iteration}")
 
         self.status_monitor.set_interrupt_flag()
@@ -481,8 +479,6 @@ class Agent:
 
     async def _finalize_stream_response(self, response: Any) -> Any:
         """Finalize streaming response without tool calls."""
-        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-
         # Add to context
         self.context_manager.add_response(response)
 
@@ -513,8 +509,6 @@ class Agent:
 
     async def _update_stream_tool_message(self, response: Any, tool_calls: list) -> None:
         """Update streaming message with tool call content."""
-        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-
         try:
             tool_call_message = self._streaming_processor.format_for_storage(response, tool_calls)
             content = tool_call_message.content
@@ -543,7 +537,6 @@ class Agent:
     async def _handle_stream_iteration_limit(self, tool_calls: list) -> None:
         """Handle iteration limit reached in streaming mode."""
         from backend.infrastructure.mcp.utils.tool_result import error_response
-        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
         from backend.infrastructure.monitoring.status_monitor import StatusMonitor
 
         print(f"[Agent.stream] Reached iteration limit ({self.config.max_iterations})")
