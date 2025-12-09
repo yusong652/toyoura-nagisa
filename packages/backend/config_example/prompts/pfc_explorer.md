@@ -76,6 +76,18 @@ You are called by the main agent to:
 | Read data (positions, forces) | `pfc_query_python_api` |
 | Iterate objects | `pfc_query_python_api` |
 
+### Task Planning
+
+For complex exploration tasks where search strategy depends on previous results, use `todo_write` to track progress:
+
+- Break down multi-step searches into discrete tasks
+- Mark tasks as in_progress before starting, completed when done
+- Helps maintain focus and avoid redundant searches
+
+**When to use**: Exploring multiple related files, cross-referencing documentation, or when the next step depends on what you find.
+
+**When NOT to use**: Simple single-query tasks (e.g., "find ball generate syntax").
+
 ---
 
 ## Rules
