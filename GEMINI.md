@@ -7,6 +7,7 @@ This document provides comprehensive architectural, philosophical, and developme
 **toyoura-nagisa** is a production-grade AI agent platform designed to bridge the gap between conversational AI and professional scientific computing. It is built on a foundation of architectural elegance, scalability, and deep domain expertise.
 
 - **Agent Specialization**: The platform's core innovation is its **Agent Profile System**, which dynamically configures the AI's capabilities (i.e., available tools) based on the task domain (e.g., Coding, Scientific Simulation, Lifestyle). This optimizes context token usage and improves the relevance of the AI's responses.
+- **SubAgent Delegation**: The platform extends specialization through a SubAgent system, where a primary agent can delegate specific, isolated tasks (like documentation lookup or code analysis) to specialized, lightweight agents. This preserves the primary agent's context and improves efficiency.
 - **Clean Architecture**: The backend strictly adheres to a **Clean Architecture**, ensuring separation of concerns between the domain logic, application logic, and infrastructure. This makes the system highly maintainable, testable, and adaptable.
 - **Unified LLM & Tooling**: A sophisticated abstraction layer allows for seamless switching between different LLM providers (Gemini, Anthropic, OpenAI, local models) and ensures that all tools adhere to a unified contract, regardless of the underlying provider.
 - **Expert Workflows**: For specialized domains like scientific computing, the platform defines expert workflows and mental models (e.g., the PFC three-phase workflow) that guide the AI to behave like a domain expert, not just a tool executor.
@@ -50,6 +51,24 @@ This architecture allows the application to treat all LLM providers identically.
 - **Location**: `backend/infrastructure/llm/base/client.py`
 - **Workflow**: The base class defines the high-level logic (e.g., the `_recursive_tool_calling` loop), while provider-specific subclasses implement the low-level details (API calls, data formatting). This is a classic **Inversion of Control** pattern.
 
+### 3.3. SubAgent Delegation
+
+A key architectural feature is the ability for the main agent (the "MainAgent") to delegate tasks to specialized, lightweight "SubAgents". This is achieved via the `invoke_agent` tool. This pattern is critical for optimizing context window usage and focusing the MainAgent on its core task.
+
+- **Core Principle**: Instead of loading the MainAgent's context with extensive documentation or file content, it can spawn a SubAgent to perform the research and return a concise summary.
+
+- **Example: `pfc_explorer`**: A prime example is the `pfc_explorer` SubAgent. It is a read-only agent designed to search PFC documentation and workspace files. It can find relevant information without modifying any files or simulation states, and without cluttering the MainAgent's thought process.
+
+**SubAgent Characteristics:**
+
+- **Invocation**: SubAgents are invoked by the MainAgent using the `invoke_agent` tool, specifying a `subagent_type` (e.g., `"pfc_explorer"`) and a `prompt` for the task.
+- **Stateless & Non-Persistent**: SubAgents are designed for one-off tasks. They do not have persistent sessions, and their work is stored in-memory, which is cleared upon completion.
+- **Non-Streaming & Synchronous**: To improve efficiency and simplify the flow, SubAgents execute their tasks synchronously and do not stream responses back to the MainAgent. They return a single, final result.
+- **Isolated & Read-Only**: SubAgents operate in an isolated context. They are generally read-only and are prevented from using destructive tools like `write` or `pfc_execute_task`. Crucially, they cannot use `invoke_agent` themselves, preventing recursive loops.
+- **Configuration**: SubAgent behaviors are defined in `SubAgentConfig` classes within `packages/backend/domain/models/agent_profiles.py`. This is where their tools, prompts, and iteration limits are set.
+- **Observability**: The frontend can monitor SubAgent progress. The backend emits `SUBAGENT_TOOL_USE` events via WebSockets, allowing the UI to display nested tool calls in real-time.
+- **Secondary Models**: The system can be configured to use smaller, faster, and more cost-effective LLM models for SubAgents, reserving the more powerful primary model for the MainAgent's complex reasoning tasks.
+
 ## 4. Deep Dive: Model Context Protocol (MCP) Architecture
 
 The MCP system is the heart of the agent's tool-use capability. It is a highly modular and scalable system for defining, registering, and executing tools.
@@ -57,7 +76,7 @@ The MCP system is the heart of the agent's tool-use capability. It is a highly m
 ### 4.1. The End-to-End Tool Flow
 
 1.  **Registration**: On startup, the `smart_mcp_server.py` imports registration functions from each tool category (e.g., `register_coding_tools`) and registers *all* available tools with a central `FastMCP` instance.
-2.  **Profile Definition**: The `ToolProfileManager` defines which tool *names* belong to which agent profile (`CODING`, `PFC`, etc.).
+2.  **Profile Definition**: The `ToolProfileManager` defines which tool *names* belong to which agent profile (`CODING`, `PFC`, etc.). This now also includes `SubAgentConfig` definitions.
 3.  **Dynamic Selection**: When an LLM call is made:
     a. The `BaseToolManager` gets the list of tool names for the active profile from the `ToolProfileManager`.
     b. It queries the `FastMCP` server to get the standardized schemas for only those tools.

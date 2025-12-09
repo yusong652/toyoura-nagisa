@@ -1,6 +1,10 @@
 """
-This module provides the foundational LLMClientBase class that all provider-specific
-clients inherit from, implementing common patterns extracted from the Gemini implementation.
+LLM Client Base Module.
+
+Provides the foundational LLMClientBase abstract class that all provider-specific
+clients inherit from. This is a pure infrastructure layer - it handles only API
+communication, while business logic (agent loop, streaming orchestration, tool
+execution) resides in the application layer (Agent, AgentService).
 """
 
 from abc import ABC, abstractmethod
@@ -12,17 +16,21 @@ from backend.infrastructure.llm.base.response_processor import BaseResponseProce
 
 class LLMClientBase(ABC):
     """
-    LLM client base class with unified streaming architecture.
-    
-    Streaming architecture design focused on real-time tool call notifications:
-    - Core interface: get_response() - streaming processing with real-time notifications
-    - Specialized interfaces: generate_title_from_messages(), generate_text_to_image_prompt()
-    - Configuration management: update_config() - dynamic configuration updates
-    
-    Architecture advantages:
-    - Real-time: instant status updates during tool calling processes
-    - Efficient: AsyncGenerator implementation with zero-latency event delivery
-    - Consistent: unified streaming interface avoiding redundant wrappers
+    LLM client base class providing stateless API interfaces.
+
+    This is a pure infrastructure component - business logic (agent loop, tool execution,
+    streaming orchestration) has been moved to the application layer (Agent, AgentService).
+
+    Core interfaces:
+    - call_api_with_context(): Non-streaming API call for tool execution
+    - call_api_with_context_streaming(): Streaming API call yielding StreamingChunk
+    - _build_api_config(): Build provider-specific API configuration
+    - get_or_create_context_manager(): Session-based context management
+
+    Design principles:
+    - Stateless: All session state passed as parameters, not stored in instance
+    - Thread-safe: Supports concurrent sessions without state conflicts
+    - Provider-agnostic: Unified interface across Gemini, Anthropic, OpenAI, etc.
     """
     
     def __init__(self, extra_config: Optional[Dict[str, Any]] = None):

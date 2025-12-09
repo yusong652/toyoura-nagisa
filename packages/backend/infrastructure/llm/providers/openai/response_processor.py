@@ -210,7 +210,7 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
 
         # Note: Usage extraction is now handled in client.py by adding usage metadata
         # to the final __openai_final_response chunk. This ensures usage is in the
-        # last chunk of collected_chunks for proper extraction by chat_orchestrator.
+        # last chunk of collected_chunks for proper extraction by response processor.
 
         return result
 

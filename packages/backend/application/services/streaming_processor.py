@@ -1,7 +1,8 @@
 """
 Streaming Processor - Handles LLM streaming response processing.
 
-Extracts streaming-related logic from ChatOrchestrator for better separation of concerns.
+Extracted streaming-related logic for better separation of concerns.
+Used by Agent for real-time response processing.
 """
 from typing import Any, Optional, AsyncGenerator
 from backend.domain.models.streaming import StreamingChunk

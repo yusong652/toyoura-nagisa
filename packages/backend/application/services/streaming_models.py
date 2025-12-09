@@ -1,7 +1,7 @@
 """
 Data models for conversation service.
 
-This module defines data structures used by the ChatOrchestrator
+This module defines data structures used by Agent
 for managing conversation state and results.
 """
 from dataclasses import dataclass, field

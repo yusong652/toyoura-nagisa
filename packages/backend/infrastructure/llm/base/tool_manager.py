@@ -306,7 +306,7 @@ class BaseToolManager(ABC):
         """
         Handle LLM-generated function_call requests.
 
-        Pure tool execution - confirmation is handled by ChatOrchestrator.
+        Pure tool execution - confirmation is handled by Agent (application layer).
 
         Args:
             function_call: Function call dictionary containing:
@@ -362,7 +362,7 @@ class BaseToolManager(ABC):
                             }
                         )
 
-            # Note: User confirmation is now handled by ChatOrchestrator (application layer)
+            # Note: User confirmation is now handled by Agent (application layer)
             # This method only handles pure tool execution
 
             # Step 1: Execute the tool

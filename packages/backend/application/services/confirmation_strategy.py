@@ -1,7 +1,8 @@
 """
 Tool Confirmation Strategy - Handles user confirmation for tool execution.
 
-Extracts confirmation logic from ChatOrchestrator for extensibility.
+Extracted confirmation logic for extensibility.
+Used by Agent to request user confirmation before executing tools.
 Supports different confirmation types: exec, edit, info.
 """
 from dataclasses import dataclass

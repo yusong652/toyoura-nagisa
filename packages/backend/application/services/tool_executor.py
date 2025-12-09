@@ -1,7 +1,8 @@
 """
 Tool Executor - Handles tool classification, execution, and cascade blocking.
 
-Extracts tool execution logic from ChatOrchestrator for better modularity.
+Extracted tool execution logic for better modularity.
+Used by Agent for tool execution during conversation turns.
 Designed to support future subagent extensions.
 """
 from dataclasses import dataclass, field

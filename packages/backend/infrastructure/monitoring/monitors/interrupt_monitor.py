@@ -96,7 +96,7 @@ class InterruptMonitor(BaseMonitor):
         """
         Set the persistent interrupt flag in both memory and storage.
 
-        Called by ChatOrchestrator after handling an interrupted response.
+        Called by Agent after handling an interrupted response.
         """
         try:
             self._last_response_interrupted = True
