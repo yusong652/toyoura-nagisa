@@ -49,7 +49,7 @@ class StatusMonitor:
     # Re-export iteration limit message function for backward compatibility
     get_iteration_limit_tool_message = staticmethod(get_iteration_limit_tool_message)
 
-    def __init__(self, session_id: str, persistent: bool = True):
+    def __init__(self, session_id: str):
         """
         Initialize status monitor coordinator for a session.
 
@@ -57,18 +57,15 @@ class StatusMonitor:
 
         Args:
             session_id: Session ID for scoped monitoring
-            persistent: If True (MainAgent), TodoMonitor uses local file storage.
-                       If False (SubAgent), TodoMonitor uses in-memory storage.
         """
         self.session_id = session_id
-        self.persistent = persistent
 
         # Initialize specialized monitors
         self.interrupt_monitor = InterruptMonitor(session_id)
         self.queue_monitor = QueueMonitor(session_id)
         self.bash_monitor = BashMonitor(session_id)
         self.pfc_monitor = PfcMonitor(session_id)
-        self.todo_monitor = TodoMonitor(session_id, persistent=persistent)
+        self.todo_monitor = TodoMonitor(session_id)
         self.iteration_monitor = IterationMonitor(session_id)
 
     # -------------------------------------------------------------------------
@@ -211,7 +208,7 @@ class StatusMonitor:
 _monitor_registry: Dict[str, StatusMonitor] = {}
 
 
-def get_status_monitor(session_id: str, persistent: bool = True) -> StatusMonitor:
+def get_status_monitor(session_id: str) -> StatusMonitor:
     """
     Get or create a StatusMonitor for a session.
 
@@ -220,16 +217,12 @@ def get_status_monitor(session_id: str, persistent: bool = True) -> StatusMonito
 
     Args:
         session_id: Session ID
-        persistent: If True (MainAgent), TodoMonitor uses local file storage.
-                   If False (SubAgent), TodoMonitor uses in-memory storage.
-                   Note: This parameter is only used when creating a new monitor.
-                   Existing monitors retain their original persistent setting.
 
     Returns:
         StatusMonitor: Session-scoped monitor instance
     """
     if session_id not in _monitor_registry:
-        _monitor_registry[session_id] = StatusMonitor(session_id, persistent=persistent)
+        _monitor_registry[session_id] = StatusMonitor(session_id)
     return _monitor_registry[session_id]
 
 

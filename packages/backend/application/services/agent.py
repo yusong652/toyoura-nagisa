@@ -102,11 +102,11 @@ class Agent:
     def status_monitor(self):
         """Get status monitor (cached by session_id).
 
-        MainAgent uses persistent=True (local file storage for todos).
-        SubAgent uses persistent=False (in-memory storage for todos).
+        Storage mode for todos is determined dynamically by agent_profile
+        in TodoMonitor.get_reminders(), not at construction time.
         """
         from backend.infrastructure.monitoring import get_status_monitor
-        return get_status_monitor(self.session_id, persistent=self._is_main_agent)
+        return get_status_monitor(self.session_id)
 
     @property
     def is_main_agent(self) -> bool:
@@ -447,9 +447,9 @@ class Agent:
                     inject_reminders=True
                 )
 
-            # Track tool iteration for periodic todo reminders (MainAgent only)
-            if self.is_main_agent:
-                self.status_monitor.todo_monitor.track_iteration()
+            # Track tool iteration for periodic todo reminders (both MainAgent and SubAgent)
+            # SubAgent also needs this to trigger todo reminders during long searches
+            self.status_monitor.todo_monitor.track_iteration()
 
             # Continue to next iteration
             iteration += 1

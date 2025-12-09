@@ -24,9 +24,9 @@ class TodoMonitor(BaseMonitor):
     """
     Monitor for todo items with periodic reminders.
 
-    Supports two modes:
-    - persistent=True (MainAgent): Reads from local file storage
-    - persistent=False (SubAgent): Reads from in-memory storage
+    Storage mode is determined dynamically by agent_profile in get_reminders():
+    - MainAgent (general, coding, etc.): Reads from local file storage
+    - SubAgent (pfc_explorer): Reads from in-memory storage
 
     Additionally implements Claude Code-style periodic injection:
     - Tracks conversation turns across the session
@@ -46,17 +46,14 @@ class TodoMonitor(BaseMonitor):
     # Activities include: user messages + tool call iterations
     DEFAULT_REMINDER_INTERVAL = 3
 
-    def __init__(self, session_id: str, persistent: bool = True):
+    def __init__(self, session_id: str):
         """
         Initialize TodoMonitor.
 
         Args:
             session_id: Session ID for scoped monitoring
-            persistent: If True, read from local file storage (MainAgent).
-                       If False, read from in-memory storage (SubAgent).
         """
         super().__init__(session_id)
-        self.persistent = persistent
 
     def _ensure_session_initialized(self) -> None:
         """Ensure session tracking is initialized."""
@@ -127,10 +124,11 @@ class TodoMonitor(BaseMonitor):
 
         try:
             storage = get_todo_storage()
-            # Load todos based on persistence mode
-            # MainAgent (persistent=True): from local file
-            # SubAgent (persistent=False): from in-memory storage
-            todos = storage.load_todos(workspace, self.session_id, persistent=self.persistent)
+            # Determine persistent mode based on agent_profile
+            # SubAgent (pfc_explorer) uses in-memory storage
+            # MainAgent uses local file storage
+            persistent = agent_profile != "pfc_explorer"
+            todos = storage.load_todos(workspace, self.session_id, persistent=persistent)
         except Exception as e:
             logger.debug(f"Failed to load todos for reminders: {e}")
             return []
