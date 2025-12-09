@@ -47,7 +47,9 @@ class GeminiDebugger:
                     for j, part in enumerate(parts):
                         if hasattr(part, 'text') and part.text:
                             preview = part.text[:100] + "..." if len(part.text) > 100 else part.text
-                            print(f"      text[{j}]: {repr(preview)}")
+                            is_thought = getattr(part, 'thought', False)
+                            thought_marker = " [THOUGHT]" if is_thought else ""
+                            print(f"      text[{j}]{thought_marker}: {repr(preview)}")
                         elif hasattr(part, 'function_call') and part.function_call:
                             print(f"      function_call[{j}]: {part.function_call.name}")
         else:

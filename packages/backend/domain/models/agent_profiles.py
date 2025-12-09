@@ -84,27 +84,23 @@ PFC_TOOLS: List[str] = [
     "invoke_agent",
 ]
 
-# SubAgent-specific tool list (excludes invoke_agent to prevent recursive spawning)
-SUBAGENT_PFC_TOOLS: List[str] = [
-    # File operations (read-only for SubAgent)
+# SubAgent-specific tool list for PFC Explorer (read-only exploration)
+# Following Claude Code's Explore agent design: lightweight, read-only, fast
+SUBAGENT_PFC_EXPLORER_TOOLS: List[str] = [
+    # File operations (read-only)
     "read",
-    # System commands
-    "bash",
-    "bash_output",
-    "kill_shell",
     "glob",
     "grep",
-    # Search and planning
-    "web_search",
-    "todo_write",
-    # PFC documentation (use before writing scripts)
+    # Bash for fallback search (ls, find, git log, etc.)
+    "bash",
+    # PFC documentation query (read-only)
     "pfc_query_python_api",
     "pfc_query_command",
-    # PFC execution (script-only workflow)
-    "pfc_execute_task",
-    "pfc_check_task_status",
-    "pfc_list_tasks",
-    # NOTE: invoke_agent, write, edit excluded - SubAgents have limited write access
+    # Web search for external docs
+    "web_search",
+    # NOTE: No write, no edit, no pfc_execute_task
+    # Explorer uses bash only for read-only operations (ls, find, git)
+    # Complex execution logic should be handled by MainAgent
 ]
 
 GENERAL_TOOLS: List[str] = [
@@ -268,9 +264,9 @@ class SubAgentConfig:
 PFC_EXPLORER = SubAgentConfig(
     name="pfc_explorer",
     display_name="PFC Explorer",
-    description="PFC documentation query and syntax validation agent",
-    tools=tuple(SUBAGENT_PFC_TOOLS),
-    max_iterations=30,  # Increased from 10 to allow complex multi-tool tasks
+    description="PFC documentation query agent (read-only)",
+    tools=tuple(SUBAGENT_PFC_EXPLORER_TOOLS),
+    max_iterations=20,  # Reduced: read-only exploration tasks are simpler
     streaming_enabled=False,
     enable_memory=False,
 )
