@@ -4,28 +4,31 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Project Overview
 
-toyoura-nagisa is an extensible, voice-enabled AI assistant with long-term memory and a dynamic tool-use framework. The system combines a Python FastAPI backend with a React frontend and features sophisticated parallel tool execution, multi-provider LLM architecture, and intelligent memory management.
+toyoura-nagisa is a production-grade AI agent platform bridging conversational AI with professional scientific computing workflows. The system combines a Python FastAPI backend with a React frontend and features multi-provider LLM architecture, agent specialization, and ChromaDB-powered memory.
 
-**Key Innovation**: The project delivers 60-70% faster performance for multi-tool scenarios through parallel execution with intelligent batching, making it significantly faster than traditional sequential tool execution.
+**Key Innovations**:
+- **Agent Profile System**: Token-optimized, domain-specialized agent configurations (coding: 10 tools, lifestyle: 14 tools, PFC: 14 tools, general: 27 tools)
+- **SubAgent Delegation**: MainAgent can delegate specialized tasks to lightweight SubAgents for context optimization
+- **Clean Architecture**: Business logic in application layer (Agent), infrastructure handles only API communication
 
 ## Development Commands
 
 ### Quick Start
 ```bash
 # Start both frontend and backend concurrently
-npm run dev
+npm run dev:all
 
 # Alternative: Start services separately
-npm run start:backend    # Start FastAPI backend
-npm run start:frontend   # Start React frontend
+npm run dev:backend    # Start FastAPI backend
+npm run dev:web        # Start React frontend
 ```
 
 ### Backend Development
 ```bash
 # Start backend server
-uv run python backend/app.py
-# Alternative entry point
-uv run python backend/run.py
+npm run dev:backend
+# OR manually:
+cd packages/backend && uv run python run.py
 
 # Install dependencies
 uv sync
@@ -34,21 +37,15 @@ uv sync
 uv run pytest
 
 # Run MCP server directly (for debugging)
-uv run python backend/infrastructure/mcp/smart_mcp_server.py
-
-# Code quality
-npm run lint:backend     # Lint with ruff
-npm run format:backend   # Format with ruff
+uv run python packages/backend/infrastructure/mcp/smart_mcp_server.py
 ```
 
 ### Frontend Development
 ```bash
-cd frontend
-
-# Start development server (with 5s backend wait)
-npm run dev
-# Start without delay
-npm run dev:nodelay
+# Start Web frontend
+npm run dev:web
+# OR manually:
+cd packages/web && npm run dev
 
 # Build and test
 npm run build
@@ -59,18 +56,18 @@ npm run lint
 ### Installation Commands
 ```bash
 # Install all dependencies
-npm run install:frontend
+npm install
 uv sync
 
 # Copy configuration (required for first run)
-cp -r backend/config_example/ backend/config/
-# Then edit backend/config/llm.py with your API keys
+cp -r packages/backend/config_example/ packages/backend/config/
+# Then edit packages/backend/config/llm.py with your API keys
 ```
 
 ### Running Single Tests
 ```bash
 # Run specific test files or patterns
-uv run pytest backend/tests/test_specific_module.py
+uv run pytest packages/backend/tests/test_specific_module.py
 uv run pytest -k "test_pattern_name"
 ```
 
@@ -89,45 +86,51 @@ toyoura-nagisa follows **Clean Architecture** principles with clear separation o
 ┌────────────▼────────────────────────────┐
 │         Backend (Clean Arch)            │
 │ ┌─────────────┐ ┌───────────────────────┤
-│ │Presentation │ │Domain (Business Logic)│
-│ │(API/WebSocket)│ │ Message Factory     │
+│ │Presentation │ │Application Layer     │
+│ │(API/WebSocket)│ │ Agent, AgentService │
 │ └─────────────┘ └───────────────────────┤
 │ ┌─────────────────────────────────────────┤
 │ │        Infrastructure Layer           │
 │ │ ┌─────────────┐ ┌─────────────────────┤
-│ │ │ Unified LLM │ │ Parallel Tool Exec  │
-│ │ │ Providers   │ │ (MCP/FastMCP)      │
+│ │ │ LLM Client  │ │ Tool Execution      │
+│ │ │ (stateless) │ │ (MCP/FastMCP)      │
 │ │ └─────────────┘ └─────────────────────┤
 │ │ ┌─────────────┐ ┌─────────────────────┤
-│ │ │ Mem0 Memory │ │ ChromaDB Storage    │
-│ │ │ Management  │ │ & Vectorization     │
+│ │ │ ChromaDB    │ │ Domain Models       │
+│ │ │ Memory      │ │ (StreamingChunk)    │
 │ │ └─────────────┘ └─────────────────────┤
 └─────────────────────────────────────────┘
 ```
 
 ### Key Architectural Components
 
-**1. Unified Multi-Provider LLM Architecture**
-- All LLM providers inherit from `LLMClientBase` at `backend/infrastructure/llm/base/client.py`
-- Supports Gemini, OpenAI, Anthropic, and Local models (vLLM, Ollama) with consistent interfaces
-- Provider-specific optimizations while maintaining shared parallel execution capabilities
+**1. Agent System (Application Layer)**
+- `Agent` class at `packages/backend/application/services/agent.py` implements business logic
+- Handles tool calling loop, streaming orchestration, and conversation management
+- `AgentService` provides clean interface for presentation layer
+- SubAgent support via `invoke_agent` tool for task delegation
 
-**2. Parallel Tool Execution System (MCP)**
-- FastMCP-based tool orchestration at `backend/infrastructure/mcp/smart_mcp_server.py`
-- Intelligent batching: single tools run immediately, 3+ tools execute concurrently
-- Error isolation prevents failed tools from blocking others
+**2. Unified Multi-Provider LLM Architecture (Infrastructure Layer)**
+- `LLMClientBase` at `packages/backend/infrastructure/llm/base/client.py` provides stateless API interfaces
+- Supports Gemini, OpenAI, Anthropic, and Local models (vLLM, Ollama) with consistent interfaces
+- Provider-specific implementations handle only API communication
+
+**3. Tool Execution System (MCP)**
+- FastMCP-based tool orchestration at `packages/backend/infrastructure/mcp/smart_mcp_server.py`
+- Profile-based tool loading optimizes token usage per domain
+- Tool categories: builtin, coding, lifestyle, pfc, agent
 - Real-time progress tracking with WebSocket notifications
 
-**3. Intelligent Long-Term Memory (Mem0)**
-- Semantic memory using Mem0 framework with ChromaDB backend
-- Automatic conversation context extraction and injection
-- Session-based memory isolation with vector similarity search
-- Memory database stored at `backend/memory_db/`
+**4. ChromaDB Memory System**
+- Semantic memory with vector similarity search
+- Session-based memory isolation
+- Memory database stored at `memory_db/`
 
-**4. Clean Architecture Layers**
-- **Presentation**: FastAPI routes (`backend/presentation/api/`) and WebSocket handlers (`backend/presentation/websocket/`)
-- **Domain**: Business logic and message factory (`backend/domain/models/`)
-- **Infrastructure**: External integrations (`backend/infrastructure/` - LLM, MCP, Memory, TTS, Storage)
+**5. Clean Architecture Layers**
+- **Presentation**: FastAPI routes (`packages/backend/presentation/api/`) and WebSocket handlers
+- **Application**: Agent orchestration (`packages/backend/application/services/`)
+- **Domain**: Core models (`packages/backend/domain/models/`)
+- **Infrastructure**: External integrations (`packages/backend/infrastructure/`)
 
 ### Frontend Architecture
 
@@ -142,12 +145,12 @@ toyoura-nagisa follows **Clean Architecture** principles with clear separation o
 ### Environment Configuration
 1. Copy configuration templates:
    ```bash
-   cp -r backend/config_example/ backend/config/
+   cp -r packages/backend/config_example/ packages/backend/config/
    ```
 
-2. Edit configuration files in `backend/config/`:
+2. Edit configuration files in `packages/backend/config/`:
    - `llm.py`: LLM provider API keys (Gemini, OpenAI, Anthropic, Local)
-   - `memory.py`: Mem0 memory system settings
+   - `memory.py`: Memory system settings
    - `tts.py`: Text-to-speech provider configuration
    - `email.py`, `text_to_image.py`: Additional service configurations
 
@@ -155,22 +158,25 @@ toyoura-nagisa follows **Clean Architecture** principles with clear separation o
 For tools that use Google services (Calendar, Gmail, Contacts):
 ```bash
 # Initialize Google OAuth tokens
-uv run python backend/infrastructure/mcp/tools/google_auth/init_google_token.py
+uv run python packages/backend/infrastructure/mcp/tools/google_auth/init_google_token.py
 ```
 
 ## Tool System Architecture
 
-### Dynamic Tool Categories
-Tools are organized into categories and loaded based on agent types:
+### Tool Categories
+Tools are organized into categories and loaded based on agent profiles:
 
 - **builtin**: Web search and core system tools
-- **coding**: File operations, shell commands, Python execution  
+- **coding**: File operations (read, write, edit, glob, grep), shell commands (bash)
 - **lifestyle**: Calendar, contacts, email, location, places, text-to-image, time utilities
+- **pfc**: PFC simulation tools (query, execute_task, check_status, list_tasks)
+- **agent**: SubAgent invocation (invoke_agent)
 
-### Tool Loading Strategy
-- **Current Approach**: Static tool categories with intelligent composition
-- **Previous Approach**: Dynamic vectorization with semantic search (proven less reliable with current LLM capabilities)
-- Tools registered via category-specific functions in `backend/infrastructure/mcp/tools/`
+### Agent Profile System
+- Profiles define which tools are available per domain
+- Token-optimized loading: coding profile uses 64% fewer tokens than general
+- Configuration at `packages/backend/domain/models/agent_profiles.py`
+- Tools registered via category-specific functions in `packages/backend/infrastructure/mcp/tools/`
 
 ## Development Patterns
 
@@ -178,27 +184,27 @@ Tools are organized into categories and loaded based on agent types:
 - Messages processed through factory pattern: `message_factory()` and `message_factory_no_thinking()`
 - Support for text, image, and tool result messages with structured ToolResult format
 - Real-time streaming via WebSocket with progress notifications
+- Agent handles conversation turns via `AgentService.process_chat()`
 
 ### Session Management
 - UUID-based session identification
-- Persistent chat history with metadata in `backend/chat/data/`
+- Persistent chat history with metadata in `data/`
 - Tool cache cleared when switching sessions
 - Memory isolation per session
 
 ### Memory System Integration
-- Automatic conversation context extraction using Mem0
-- Semantic similarity search for relevant memory retrieval
-- Memory injection into system prompts without explicit user requests
-- Debug mode available for monitoring memory operations
+- ChromaDB-powered semantic similarity search
+- Session-based memory management with conversation history
+- Memory injection into system prompts
+- Memory database stored at `memory_db/`
 
 ## Technology Stack
 
 **Backend:**
-- **Python 3.10+** with **uv** package manager
+- **Python 3.11+** with **uv** package manager
 - **FastAPI** + **uvicorn** for API server
 - **FastMCP** for Model Context Protocol
-- **ChromaDB** for vector storage (memory + tool vectorization)
-- **Mem0** for intelligent memory management
+- **ChromaDB** for vector storage and memory
 - **WebSockets** for real-time communication
 
 **Frontend:**
@@ -211,7 +217,7 @@ Tools are organized into categories and loaded based on agent types:
 **Key Dependencies:**
 - Multi-provider LLM support: `google-genai`, `openai`, `anthropic`, `vllm`, `ollama`
 - Tool integrations: `google-api-python-client`, `googlemaps`
-- Memory: `mem0ai`, `chromadb`
+- Memory: `chromadb`
 - TTS: `fish-audio-sdk`, `torch`, `torchaudio`
 
 ## Development Guidelines
@@ -228,7 +234,7 @@ Tools are organized into categories and loaded based on agent types:
 uv run pytest
 
 # Test specific modules
-uv run pytest backend/tests/test_specific_module.py
+uv run pytest packages/backend/tests/test_specific_module.py
 
 # Test with coverage
 uv run pytest --cov
@@ -243,13 +249,14 @@ uv run pytest --cov
 ## Common Development Workflows
 
 ### Adding New Tools
-1. Create tool implementation in appropriate category under `backend/infrastructure/mcp/tools/`
+1. Create tool implementation in appropriate category under `packages/backend/infrastructure/mcp/tools/`
 2. Register tool in category's registration function
-3. Tools automatically available via MCP protocol
+3. Add tool name to desired profiles in `packages/backend/domain/models/agent_profiles.py`
+4. Tools automatically available via MCP protocol
 
 ### LLM Provider Integration
 1. Implement provider-specific client inheriting from `LLMClientBase`
-2. Add provider configuration to `backend/config/llm.py`
+2. Add provider configuration to `packages/backend/config/llm.py`
 3. Register provider in LLM factory
 
 ### Frontend Component Development
@@ -258,4 +265,4 @@ uv run pytest --cov
 - Implement WebSocket communication for real-time features
 - Consider Live2D character integration for interactive elements
 
-This architecture enables rapid development while maintaining high performance and extensibility for the toyoura-nagisa AI assistant platform.
+This architecture enables rapid development while maintaining high performance and extensibility for the toyoura-nagisa AI agent platform.
