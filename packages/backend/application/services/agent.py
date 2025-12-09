@@ -6,17 +6,16 @@ configuration (ProfileConfig/SubAgentConfig) and behavior (execute method).
 
 Execution modes (controlled by is_main_agent):
 - MainAgent: streaming LLM calls, WebSocket notifications, message persistence
-- SubAgent: non-streaming calls, activity callbacks, context-only storage
+- SubAgent: non-streaming calls, context-only storage
 """
 
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast
 
-from backend.domain.models.agent import AgentActivity, AgentResult
+from backend.domain.models.agent import AgentResult
 from backend.domain.models.agent_profiles import ProfileConfig, SubAgentConfig
 from backend.domain.models.messages import AssistantMessage, UserMessage
-from backend.domain.models.message_factory import extract_text_from_message
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.application.services.tool_executor import ToolExecutor
 from backend.application.services.streaming_models import StreamingState
@@ -45,9 +44,9 @@ class Agent:
         agent = Agent(config, llm_client, session_id="abc123")
         result = await agent.execute(instruction=user_message)
 
-        # SubAgent (non-streaming, activity callbacks)
+        # SubAgent (non-streaming, context-only)
         from backend.domain.models.agent_profiles import PFC_EXPLORER
-        explorer = Agent(PFC_EXPLORER, llm_client, on_activity=callback)
+        explorer = Agent(PFC_EXPLORER, llm_client)
         result = await explorer.execute(UserMessage(content="Find ball syntax"))
     """
 
@@ -57,7 +56,6 @@ class Agent:
         llm_client: LLMClientBase,
         session_id: Optional[str] = None,
         enable_memory: Optional[bool] = None,
-        on_activity: Optional[Callable[[AgentActivity], None]] = None,
         notification_session_id: Optional[str] = None,
         parent_tool_call_id: Optional[str] = None,
     ):
@@ -72,7 +70,6 @@ class Agent:
                        If None, agent operates as SubAgent with auto-generated temporary ID.
             enable_memory: Whether to enable memory persistence.
                           If None, uses config.enable_memory as default.
-            on_activity: Optional callback for activity events (SubAgent mode)
             notification_session_id: Session ID for WebSocket notifications and confirmations.
                                     If None, uses session_id. This allows SubAgents to route
                                     confirmation requests to MainAgent's WebSocket connection.
@@ -81,7 +78,6 @@ class Agent:
         """
         self.config = config
         self.llm_client = llm_client
-        self.on_activity = on_activity
 
         # session_id is always str - auto-generate for SubAgent
         self._is_main_agent = session_id is not None
@@ -146,10 +142,6 @@ class Agent:
 
         start_time = time.time()
         message_service = MessageService()
-
-        # SubAgent: emit started activity
-        if not self.is_main_agent:
-            self._emit_activity("started", {"instruction": extract_text_from_message(instruction)})
 
         try:
             # Configure context manager from definition and instance settings
@@ -268,8 +260,7 @@ class Agent:
 
                 raise Exception(f"Agent execution failed: {e}")
             else:
-                # SubAgent: emit error activity and return error result
-                self._emit_activity("error", {"error": str(e)})
+                # SubAgent: return error result
                 error_message = AssistantMessage(
                     role="assistant",
                     content=[{"type": "text", "text": f"Error: {str(e)}"}]
@@ -284,9 +275,6 @@ class Agent:
             # Reset iteration context to prevent stale warnings in next conversation turn
             self.status_monitor.reset_iteration_context()
 
-            # SubAgent: emit completed activity
-            if not self.is_main_agent:
-                self._emit_activity("completed", {"elapsed": time.time() - start_time})
 
     async def _execute_loop(self) -> Any:
         """
@@ -342,12 +330,10 @@ class Agent:
                     return await self._handle_stream_interruption(iteration)
             else:
                 # Non-streaming call
-                self._emit_activity("thinking", {"iteration": iteration})
                 response = await self.llm_client.call_api_with_context(
                     context_contents=working_contents,
                     api_config=api_config,
                 )
-                self._emit_activity("llm_response", {"iteration": iteration})
 
             # === Check for tool calls ===
             if self.is_main_agent:
@@ -426,15 +412,10 @@ class Agent:
                     )
                     return response
             else:
-                # SubAgent: Simple tool execution with activity callbacks
-                for tool_call in tool_calls:
-                    self._emit_activity("tool_call_start", {
-                        "tool": tool_call.get("name", "unknown"),
-                        "args": tool_call.get("arguments", {}),
-                    })
-
-                    # Send SUBAGENT_TOOL_USE notification to frontend (SubAgent only)
-                    if not self.is_main_agent and self._parent_tool_call_id:
+                # SubAgent: Simple tool execution
+                # Send SUBAGENT_TOOL_USE notifications to frontend
+                if self._parent_tool_call_id:
+                    for tool_call in tool_calls:
                         await WebSocketNotificationService.send_subagent_tool_use(
                             session_id=self._notification_session_id,
                             parent_tool_call_id=self._parent_tool_call_id,
@@ -461,13 +442,6 @@ class Agent:
                     tool_calls, execution_result.results, self.context_manager,
                     inject_reminders=True
                 )
-
-                # Emit tool_call_end activities
-                for tool_call, result in zip(tool_calls, execution_result.results):
-                    self._emit_activity("tool_call_end", {
-                        "tool": tool_call.get("name", "unknown"),
-                        "status": result.get("status", "unknown") if result else "rejected",
-                    })
 
             # Track tool iteration for periodic todo reminders (MainAgent only)
             if self.is_main_agent:
@@ -632,22 +606,3 @@ class Agent:
 
         # Return special marker dict for caller to handle
         return {"_iteration_limit_text": summary_text}
-
-    def _emit_activity(self, event_type: str, data: Dict[str, Any]) -> None:
-        """Emit activity event if callback is registered."""
-        if not self.on_activity:
-            return
-
-        valid_types = [
-            "started", "thinking", "tool_call_start", "tool_call_end",
-            "llm_response", "completed", "error"
-        ]
-        if event_type not in valid_types:
-            return
-
-        activity = AgentActivity(
-            agent_name=self.config.name,
-            event_type=event_type,  # type: ignore
-            data=data,
-        )
-        self.on_activity(activity)

@@ -89,16 +89,11 @@ Usage notes:
         if req_ctx and hasattr(req_ctx, 'meta') and req_ctx.meta:
             parent_tool_call_id = getattr(req_ctx.meta, 'tool_call_id', "") or ""
 
-        # Activity tracking (optional - for future WebSocket integration)
-        def track_activity(activity):
-            logger.debug(f"[SubAgent:{subagent_type}] {activity.event_type}: {activity.data}")
-
         # Execute SubAgent (pass MainAgent's session_id for confirmation routing)
         logger.info(f"[invoke_agent] Starting SubAgent '{subagent_type}' ({description}) for session {session_id[:8]}")
         result = await agent_service.run_subagent(
             config=config,
             instruction=prompt,
-            on_activity=track_activity,
             notification_session_id=session_id,  # Route confirmations to MainAgent's WebSocket
             parent_tool_call_id=parent_tool_call_id,  # For frontend to associate SubAgent tools
         )

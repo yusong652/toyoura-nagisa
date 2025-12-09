@@ -163,21 +163,7 @@ class TestActivityTracking:
             execution_time_seconds=0.5,
         )
 
-        async def mock_run_subagent(config, instruction, on_activity=None):
-            # Simulate activity events
-            if on_activity:
-                from backend.domain.models.agent import AgentActivity
-                import time
-                on_activity(AgentActivity(
-                    agent_name="pfc_explorer",
-                    event_type="started",
-                    data={"instruction": instruction},
-                ))
-                on_activity(AgentActivity(
-                    agent_name="pfc_explorer",
-                    event_type="completed",
-                    data={"elapsed": 0.5},
-                ))
+        async def mock_run_subagent(config, instruction, **kwargs):
             return mock_agent_result
 
         with patch("backend.infrastructure.mcp.tools.agent.invoke_agent.get_llm_client") as mock_get_client, \

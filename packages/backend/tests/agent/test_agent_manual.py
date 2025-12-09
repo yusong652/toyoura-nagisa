@@ -48,7 +48,6 @@ async def initialize_backend():
 
 
 # Import after path setup
-from backend.domain.models.agent import AgentActivity
 from backend.domain.models.agent_profiles import (
     SubAgentConfig,
     AgentProfile,
@@ -82,11 +81,6 @@ TEST_AGENT_WITH_TOOLS = SubAgentConfig(
 )
 
 
-def activity_callback(activity: AgentActivity):
-    """Print activity events for debugging."""
-    print(f"  [Activity] {activity.event_type}: {activity.data}")
-
-
 async def test_no_tools(llm_client):
     """Test agent without tools - should just respond."""
     print("\n" + "=" * 60)
@@ -96,7 +90,6 @@ async def test_no_tools(llm_client):
     agent = Agent(
         config=TEST_AGENT_NO_TOOLS,
         llm_client=llm_client,
-        on_activity=activity_callback,
     )
 
     print(f"\nRunning agent: {agent.display_name}")
@@ -123,7 +116,6 @@ async def test_with_tools(llm_client):
     agent = Agent(
         config=TEST_AGENT_WITH_TOOLS,
         llm_client=llm_client,
-        on_activity=activity_callback,
     )
 
     print(f"\nRunning agent: {agent.display_name}")
@@ -152,7 +144,6 @@ async def test_pfc_explorer(llm_client):
     agent = Agent(
         config=PFC_EXPLORER,
         llm_client=llm_client,
-        on_activity=activity_callback,
     )
 
     print(f"\nRunning agent: {agent.display_name}")
