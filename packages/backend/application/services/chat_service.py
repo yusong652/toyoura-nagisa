@@ -157,15 +157,9 @@ class ChatService:
         if not session_id:
             raise ValueError("Session ID is required in the message data")
 
-        # 3. Extract file mentions from frontend or fallback to backend parsing
+        # 3. Get validated file mentions from frontend (only files selected via search API)
         mentioned_files = parsed_data.get('mentioned_files', [])
-        if not mentioned_files:
-            message_text = parsed_data.get('message', '')
-            if message_text:
-                mentioned_files = self._extract_file_mentions(message_text)
-
         if mentioned_files:
-            parsed_data['mentioned_files'] = mentioned_files
             print(f"[DEBUG] Processing {len(mentioned_files)} file mentions: {mentioned_files}", flush=True)
 
         # 4. Inject system status reminders into content
@@ -178,7 +172,7 @@ class ChatService:
 
         # 6. Build UserMessage object
         content = parsed_data.get('content', [])
-        message_id = parsed_data.get('id', '')
+        message_id = parsed_data.get('id') or ''
         timestamp = parsed_data.get('timestamp')
 
         # Convert timestamp to datetime if provided
@@ -205,60 +199,6 @@ class ChatService:
             agent_profile=parsed_data.get('agent_profile', 'general'),
             enable_memory=parsed_data.get('enable_memory', True)
         )
-
-    def _extract_file_mentions(self, text: str) -> list[str]:
-        """
-        Extract file paths from @ mentions in message text.
-
-        Parses message content to find all @ file mention patterns and extracts
-        the file paths. Supports paths with directories, extensions, and special characters.
-
-        Pattern: @<filepath> where filepath contains:
-        - Alphanumeric characters (a-z, A-Z, 0-9)
-        - Dots (.)
-        - Hyphens (-)
-        - Underscores (_)
-        - Forward slashes (/)
-
-        Stops at:
-        - Whitespace (space, tab, newline)
-        - End of string
-
-        Args:
-            text: Message text content to parse
-
-        Returns:
-            List of unique file paths (relative to workspace)
-
-        Examples:
-            >>> _extract_file_mentions("Check @backend/app.py")
-            ['backend/app.py']
-
-            >>> _extract_file_mentions("Compare @src/a.py and @src/b.py")
-            ['src/a.py', 'src/b.py']
-
-            >>> _extract_file_mentions("Same @file.txt twice @file.txt")
-            ['file.txt']
-        """
-        import re
-
-        file_paths = []
-        seen = set()
-
-        # Regex to match @ followed by a file path
-        # Pattern: @<path> where path contains alphanumeric, dots, slashes, dashes, underscores
-        # Stops at whitespace, newline, or end of string
-        pattern = r'@([a-zA-Z0-9._\-/]+)'
-
-        for match in re.finditer(pattern, text):
-            file_path = match.group(1)
-
-            # Deduplicate
-            if file_path not in seen:
-                seen.add(file_path)
-                file_paths.append(file_path)
-
-        return file_paths
 
     async def _inject_status_reminders(self, session_id: str, parsed_data: MessageParseResult) -> None:
         """
