@@ -163,9 +163,10 @@ def _read_text_content(
         lines = content.splitlines()
         total_lines = len(lines)
 
-        # Apply offset and limit
+        # Apply offset and limit (always cap at DEFAULT_MAX_LINES if limit not specified)
         start_line = offset or 0
-        end_line = min(start_line + (limit or DEFAULT_MAX_LINES), total_lines) if limit else total_lines
+        max_lines = limit if limit is not None else DEFAULT_MAX_LINES
+        end_line = min(start_line + max_lines, total_lines)
 
         selected_lines = lines[start_line:end_line]
 
