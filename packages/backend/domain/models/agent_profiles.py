@@ -93,11 +93,14 @@ SUBAGENT_PFC_EXPLORER_TOOLS: List[str] = [
     "grep",
     # Bash for fallback search (ls, find, git log, etc.)
     "bash",
+    "bash_output",
     # PFC documentation query (read-only)
     "pfc_query_python_api",
     "pfc_query_command",
     # Web search for external docs
     "web_search",
+    # Task tracking (consistent with Claude Code Explore agent)
+    "todo_write",
     # NOTE: No write, no edit, no pfc_execute_task
     # Explorer uses bash only for read-only operations (ls, find, git)
     # Complex execution logic should be handled by MainAgent
