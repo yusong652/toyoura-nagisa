@@ -57,6 +57,15 @@ Different tasks need different tools. toyoura-nagisa loads tool categories based
 
 **PFC Expert Tools**: Documentation query, script execution, progress monitoring, task status tracking
 
+### 🤖 **SubAgent Delegation**
+
+MainAgent can delegate documentation search and codebase exploration to specialized SubAgents:
+
+- **Token Efficiency**: SubAgent exploration doesn't consume MainAgent's context window
+- **Focused Results**: SubAgents return concise summaries, preserving MainAgent context for simulation work
+
+**PFC Explorer SubAgent**: Queries command documentation, searches Python API examples, and explores the codebase to find relevant patterns - all without bloating the PFC Expert's valuable context
+
 ### ⚡ **Real-Time WebSocket Integration**
 
 Production-grade architecture solving industrial software integration challenges:
@@ -153,10 +162,15 @@ toyoura-nagisa/
 │   │   │   ├── mcp/               # Tool Execution (MCP)
 │   │   │   │   ├── smart_mcp_server.py # Main MCP server
 │   │   │   │   └── tools/         # Tool implementations by category
+│   │   │   │       └── agent/     # SubAgent invocation (invoke_agent)
+│   │   │   ├── monitoring/        # Status monitoring system
+│   │   │   │   ├── status_monitor.py  # Unified coordinator
+│   │   │   │   └── monitors/      # Specialized monitors (iteration, todo, bash, pfc)
 │   │   │   ├── pfc/               # PFC WebSocket client integration
 │   │   │   ├── memory/            # Long-term memory system (ChromaDB)
 │   │   │   └── tts/               # Text-to-speech engines
 │   │   └── config/                # Configuration management
+│   │       └── prompts/           # Agent system prompts (pfc_explorer.md)
 │   ├── web/                       # React web frontend
 │   │   ├── src/
 │   │   │   ├── App.tsx            # Main React application
