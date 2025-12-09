@@ -96,9 +96,16 @@ class Agent:
         # enable_memory: use provided value or fall back to config default
         self._enable_memory = enable_memory if enable_memory is not None else config.enable_memory
 
-        # Instance attributes initialized during execution
-        self._status_monitor = None
-        self._context_manager = None
+    @property
+    def context_manager(self):
+        """Get context manager from llm_client (cached by session_id)."""
+        return self.llm_client.get_or_create_context_manager(self.session_id)
+
+    @property
+    def status_monitor(self):
+        """Get status monitor (cached by session_id)."""
+        from backend.infrastructure.monitoring import get_status_monitor
+        return get_status_monitor(self.session_id)
 
     @property
     def is_main_agent(self) -> bool:
@@ -145,12 +152,9 @@ class Agent:
             self._emit_activity("started", {"instruction": extract_text_from_message(instruction)})
 
         try:
-            # Setup context manager (cached as instance attribute)
-            self._context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
-
             # Configure context manager from definition and instance settings
-            self._context_manager.agent_profile = self.config.tool_profile
-            self._context_manager.enable_memory = self._enable_memory
+            self.context_manager.agent_profile = self.config.tool_profile
+            self.context_manager.enable_memory = self._enable_memory
 
             # SubAgent: Also register in primary LLM client for tool workspace resolution
             # Tools use get_llm_client() to find agent_profile, so SubAgent must be visible there
@@ -164,18 +168,18 @@ class Agent:
 
             # Build system prompt once (immutable during Agent lifecycle)
             prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
-                self.session_id, self._context_manager.agent_profile
+                self.session_id, self.config.tool_profile
             )
             self._system_prompt = await build_system_prompt(
                 agent_profile=self.config.name,  # Use config.name for SubAgent prompt lookup
                 session_id=self.session_id,
-                enable_memory=self._context_manager.enable_memory,
+                enable_memory=self.context_manager.enable_memory,
                 tool_schemas=prompt_tool_schemas,
                 include_expression=self.is_main_agent,  # SubAgent: no expression instructions
             )
 
             # Add instruction to context
-            await self._context_manager.add_user_message(instruction)
+            await self.context_manager.add_user_message(instruction)
 
             # MainAgent: persist to database
             if self.is_main_agent:
@@ -202,7 +206,7 @@ class Agent:
             if self.is_main_agent:
                 # MainAgent: use processor for storage format
                 final_message = processor.format_response_for_storage(final_response)
-                streaming_message_id = getattr(self._context_manager, 'streaming_message_id', None)
+                streaming_message_id = getattr(self.context_manager, 'streaming_message_id', None)
             else:
                 # SubAgent: check for iteration limit marker first
                 if isinstance(final_response, dict) and "_iteration_limit_text" in final_response:
@@ -254,7 +258,7 @@ class Agent:
                 print(f"[Agent] Exception: {e}")
                 print(f"[Agent] Traceback: {traceback.format_exc()}")
 
-                streaming_message_id = getattr(self._context_manager, 'streaming_message_id', None)
+                streaming_message_id = getattr(self.context_manager, 'streaming_message_id', None)
                 if streaming_message_id:
                     try:
                         message_service = MessageService()
@@ -278,8 +282,7 @@ class Agent:
 
         finally:
             # Reset iteration context to prevent stale warnings in next conversation turn
-            if self._status_monitor:
-                self._status_monitor.reset_iteration_context()
+            self.status_monitor.reset_iteration_context()
 
             # SubAgent: emit completed activity
             if not self.is_main_agent:
@@ -299,24 +302,19 @@ class Agent:
             Final LLM response object
         """
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-        from backend.infrastructure.monitoring import get_status_monitor
         from backend.shared.exceptions import UserRejectionInterruption
 
-        # Initialize MainAgent execution context (stored as instance attributes)
+        # Initialize MainAgent streaming processor
         if self.is_main_agent:
             self._streaming_processor = StreamingProcessor(self.llm_client, self.session_id)
-            self._status_monitor = get_status_monitor(self.session_id)
-        else:
-            # SubAgent also needs status monitor for iteration warnings
-            self._status_monitor = get_status_monitor(self.session_id)
 
         iteration = 0
         while True:
             # Set iteration context for warning reminders
-            self._status_monitor.set_iteration_context(iteration, self.config.max_iterations)
+            self.status_monitor.set_iteration_context(iteration, self.config.max_iterations)
             # Get tool schemas and build API config
             tool_schemas = await self.llm_client.tool_manager.get_function_call_schemas(
-                self.session_id, self._context_manager.agent_profile
+                self.session_id, self.config.tool_profile
             )
             api_config = self.llm_client._build_api_config(self._system_prompt, tool_schemas)
 
@@ -327,11 +325,11 @@ class Agent:
                 await WebSocketNotificationService.send_message_create(
                     self.session_id, self._message_id, streaming=True
                 )
-                self._context_manager.streaming_message_id = self._message_id
+                self.context_manager.streaming_message_id = self._message_id
                 self._state = StreamingState(message_id=self._message_id)
 
             # Get working contents from context manager
-            working_contents = self._context_manager.get_working_contents()
+            working_contents = self.context_manager.get_working_contents()
 
             # === LLM Call (streaming vs non-streaming) ===
             if self.is_main_agent:
@@ -366,11 +364,11 @@ class Agent:
                     return await self._finalize_stream_response(response)
                 else:
                     # Non-streaming: just return response
-                    self._context_manager.add_response(response)
+                    self.context_manager.add_response(response)
                     return response
 
             # === Has tool calls - process them ===
-            self._context_manager.add_response(response)
+            self.context_manager.add_response(response)
 
             # MainAgent: Update streaming message with tool content
             if self.is_main_agent:
@@ -394,12 +392,12 @@ class Agent:
                     notification_session_id=self._notification_session_id
                 )
                 execution_result = await tool_executor.execute_all(
-                    tool_calls, self._message_id, self._context_manager.agent_profile
+                    tool_calls, self._message_id, self.config.tool_profile
                 )
 
                 # Save to context and database
                 await tool_executor.save_results_to_context(
-                    tool_calls, execution_result.results, self._context_manager
+                    tool_calls, execution_result.results, self.context_manager
                 )
                 await tool_executor.save_results_to_database(
                     tool_calls, execution_result.results
@@ -417,7 +415,7 @@ class Agent:
                     raise UserRejectionInterruption(self.session_id, execution_result.rejected_tools)
 
                 # Check for user interrupt
-                if self._status_monitor.is_user_interrupted():
+                if self.status_monitor.is_user_interrupted():
                     print(f"[Agent] Tool calling interrupted by user at iteration {iteration}")
                     await WebSocketNotificationService.send_streaming_update(
                         session_id=self.session_id,
@@ -460,7 +458,7 @@ class Agent:
                 # Save results to context only (no database persistence for SubAgent)
                 # inject_reminders=True to include iteration warnings in last tool result
                 await tool_executor.save_results_to_context(
-                    tool_calls, execution_result.results, self._context_manager,
+                    tool_calls, execution_result.results, self.context_manager,
                     inject_reminders=True
                 )
 
@@ -473,7 +471,7 @@ class Agent:
 
             # Track tool iteration for periodic todo reminders (MainAgent only)
             if self.is_main_agent:
-                self._status_monitor.todo_monitor.track_iteration()
+                self.status_monitor.todo_monitor.track_iteration()
 
             # Continue to next iteration
             iteration += 1
@@ -484,7 +482,7 @@ class Agent:
 
         print(f"[Agent.stream] Interrupted by user at iteration {iteration}")
 
-        self._status_monitor.set_interrupt_flag()
+        self.status_monitor.set_interrupt_flag()
 
         # Construct partial response
         processor = self.llm_client._get_response_processor()
@@ -512,7 +510,7 @@ class Agent:
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
         # Add to context
-        self._context_manager.add_response(response)
+        self.context_manager.add_response(response)
 
         # Format and save (format_for_storage always returns AssistantMessage with List content)
         final_message = self._streaming_processor.format_for_storage(response)
@@ -587,7 +585,7 @@ class Agent:
                 llm_content={"parts": [{"type": "text", "text": stop_message}]}
             )
 
-            await self._context_manager.add_tool_result(
+            await self.context_manager.add_tool_result(
                 tool_call['id'],
                 tool_call['name'],
                 limit_result,
