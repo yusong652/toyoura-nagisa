@@ -24,7 +24,7 @@ __all__ = ["invoke_agent", "register_invoke_agent_tool"]
 
 # Available SubAgent types (matches SubAgentConfig names in agent_profiles.py)
 AVAILABLE_SUBAGENTS = {
-    "pfc_explorer": "PFC documentation query and syntax validation agent",
+    "pfc_explorer": "PFC documentation query agent (read-only)",
 }
 
 
@@ -48,7 +48,7 @@ async def invoke_agent(
 The invoke_agent tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
 
 Available agent types and the tools they have access to:
-- pfc_explorer: PFC documentation query and syntax validation agent. Use this when you need to query PFC command syntax, find Python API usage examples, or validate PFC script patterns. (Tools: write, read, edit, bash, glob, grep, pfc_query_command, pfc_query_python_api, pfc_execute_task, pfc_check_task_status, pfc_list_tasks)
+- pfc_explorer: PFC documentation query agent (read-only). Use this when you need to query PFC command syntax, find Python API usage examples, or search workspace files for context. This agent cannot execute scripts or modify files. (Tools: read, glob, grep, bash, pfc_query_command, pfc_query_python_api, web_search)
 
 When using the invoke_agent tool, you must specify a subagent_type parameter to select which agent type to use.
 
