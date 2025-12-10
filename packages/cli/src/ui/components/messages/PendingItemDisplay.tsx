@@ -167,21 +167,28 @@ function getToolDescription(toolName: string, input: Record<string, unknown>): s
 
 // SubAgent Tool Item (nested under invoke_agent)
 // Displayed with additional indentation and dimmer styling
-// Shows BlinkingCircle when executing, checkmark when parent invoke_agent completed
+// Shows BlinkingCircle when executing, checkmark/error when tool completes
 const SubagentToolItemDisplay: React.FC<{
   toolName: string;
   toolInput: Record<string, unknown>;
-  parentCompleted: boolean;  // When invoke_agent has result, all SubAgent tools are done
-}> = ({ toolName, toolInput, parentCompleted }) => {
+  hasResult?: boolean;   // True when this specific tool completed
+  isError?: boolean;     // True if tool execution resulted in error
+  parentCompleted: boolean;  // Fallback: when invoke_agent has result, all SubAgent tools are done
+}> = ({ toolName, toolInput, hasResult, isError, parentCompleted }) => {
   const description = getToolDescription(toolName, toolInput);
   // Additional indent for nested tools (2 spaces)
   const SUBAGENT_INDENT = 2;
 
+  // Tool is completed if it has its own result, or if parent (invoke_agent) is completed
+  const isCompleted = hasResult === true || parentCompleted;
+  const statusIcon = isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
+  const statusColor = isError ? theme.status.error : theme.text.muted;
+
   return (
     <Box paddingX={1} paddingLeft={STATUS_INDICATOR_WIDTH + SUBAGENT_INDENT}>
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-        {parentCompleted ? (
-          <Text color={theme.text.muted}>{TOOL_STATUS.SUCCESS}</Text>
+        {isCompleted ? (
+          <Text color={statusColor}>{statusIcon}</Text>
         ) : (
           <BlinkingCircle color={theme.text.muted} />
         )}
@@ -202,10 +209,18 @@ const SubagentToolItemDisplay: React.FC<{
 // Layout matches ToolCallMessage for visual consistency
 // Shows BlinkingCircle when executing, success/error icon when result received
 const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> = ({ item }) => {
-  const description = getToolDescription(item.toolName, item.toolInput);
   const hasResult = item.hasResult === true;
   const isError = item.isError === true;
   const subagentTools = item.subagentTools || [];
+
+  // Check if this is an invoke_agent call
+  const isInvokeAgent = item.toolName === 'invoke_agent';
+  const subagentType = isInvokeAgent ? String(item.toolInput.subagent_type || 'SubAgent') : '';
+
+  // For invoke_agent: show description (task summary), otherwise use standard description
+  const description = isInvokeAgent
+    ? String(item.toolInput.description || '')
+    : getToolDescription(item.toolName, item.toolInput);
 
   // Color based on result status: success (green) or error (red)
   const statusColor = isError ? theme.status.error : theme.status.success;
@@ -228,14 +243,27 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
             <BlinkingCircle color={theme.status.success} />
           )}
         </Box>
-        <Text wrap="truncate">
-          <Text bold color={theme.text.primary}>
-            {item.toolName}
+        {isInvokeAgent ? (
+          // Special display for invoke_agent: show SubAgent type with accent background
+          <Text wrap="truncate">
+            <Text bold color={theme.text.accent} inverse>
+              {subagentType}
+            </Text>
+            {description && (
+              <Text color={theme.text.secondary}> {description}</Text>
+            )}
           </Text>
-          {description && (
-            <Text color={theme.text.secondary}> {description}</Text>
-          )}
-        </Text>
+        ) : (
+          // Standard tool display
+          <Text wrap="truncate">
+            <Text bold color={theme.text.primary}>
+              {item.toolName}
+            </Text>
+            {description && (
+              <Text color={theme.text.secondary}> {description}</Text>
+            )}
+          </Text>
+        )}
       </Box>
       {/* Render SubAgent tools (for invoke_agent) with auto-scroll effect */}
       {hiddenCount > 0 && (
@@ -250,6 +278,8 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
           key={tool.toolCallId}
           toolName={tool.toolName}
           toolInput={tool.toolInput}
+          hasResult={tool.hasResult}
+          isError={tool.isError}
           parentCompleted={hasResult}
         />
       ))}

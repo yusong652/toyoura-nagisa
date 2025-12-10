@@ -42,6 +42,7 @@ export interface UsePendingItemsReturn {
   addToolPair: (toolCall: ToolCallHistoryItemWithoutId) => void;
   fillToolResult: (toolCallId: string, result: ToolResultHistoryItemWithoutId) => boolean;
   addSubagentTool: (parentToolCallId: string, tool: SubagentToolItem) => void;
+  fillSubagentToolResult: (parentToolCallId: string, toolCallId: string, isError: boolean) => void;
   commitAssistantToHistory: () => void;
   commitAllPendingToHistory: () => void;
   clearAll: () => void;
@@ -193,6 +194,23 @@ export function usePendingItems({
     [triggerRerender]
   );
 
+  // Fill SubAgent tool result (mark as completed, stop blinking)
+  const fillSubagentToolResult = useCallback(
+    (parentToolCallId: string, toolCallId: string, isError: boolean) => {
+      const pair = pendingToolPairsRef.current.find((p) => p.toolCallId === parentToolCallId);
+      if (!pair?.subagentTools) {
+        return;
+      }
+      const tool = pair.subagentTools.find((t) => t.toolCallId === toolCallId);
+      if (tool) {
+        tool.hasResult = true;
+        tool.isError = isError;
+        triggerRerender();
+      }
+    },
+    [triggerRerender]
+  );
+
   // Commit pending assistant to history (filters empty content)
   const commitAssistantToHistory = useCallback(() => {
     const assistantItem = pendingAssistantItemRef.current;
@@ -283,6 +301,7 @@ export function usePendingItems({
     addToolPair,
     fillToolResult,
     addSubagentTool,
+    fillSubagentToolResult,
     commitAssistantToHistory,
     commitAllPendingToHistory,
     clearAll,

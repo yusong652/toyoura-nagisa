@@ -92,7 +92,15 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
     ? (isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS)
     : TOOL_STATUS.PENDING;
 
-  const description = getToolDescription(item.toolName, item.toolInput);
+  // Check if this is an invoke_agent call
+  const isInvokeAgent = item.toolName === 'invoke_agent';
+  const subagentType = isInvokeAgent ? String(item.toolInput.subagent_type || 'SubAgent') : '';
+
+  // For invoke_agent: show description (task summary), otherwise use standard description
+  const description = isInvokeAgent
+    ? String(item.toolInput.description || '')
+    : getToolDescription(item.toolName, item.toolInput);
+
   const boxWidth = terminalWidth ? terminalWidth : undefined;
 
   return (
@@ -100,14 +108,27 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
         <Text color={statusColor}>{statusIndicator}</Text>
       </Box>
-      <Text wrap="truncate">
-        <Text bold color={theme.text.primary}>
-          {item.toolName}
+      {isInvokeAgent ? (
+        // Special display for invoke_agent: show SubAgent type with accent background
+        <Text wrap="truncate">
+          <Text bold color={theme.text.accent} inverse>
+            {subagentType}
+          </Text>
+          {description && (
+            <Text color={theme.text.secondary}> {description}</Text>
+          )}
         </Text>
-        {description && (
-          <Text color={theme.text.secondary}> {description}</Text>
-        )}
-      </Text>
+      ) : (
+        // Standard tool display
+        <Text wrap="truncate">
+          <Text bold color={theme.text.primary}>
+            {item.toolName}
+          </Text>
+          {description && (
+            <Text color={theme.text.secondary}> {description}</Text>
+          )}
+        </Text>
+      )}
     </Box>
   );
 };

@@ -440,6 +440,18 @@ class Agent:
                     agent_profile=self.config.tool_profile,
                 )
 
+                # Send SUBAGENT_TOOL_RESULT notifications to frontend (stop blinking)
+                if self._parent_tool_call_id:
+                    for tool_call, result in zip(tool_calls, execution_result.results):
+                        is_error = result.get("status") == "error" if result else True
+                        await WebSocketNotificationService.send_subagent_tool_result(
+                            session_id=self._notification_session_id,
+                            parent_tool_call_id=self._parent_tool_call_id,
+                            tool_call_id=tool_call.get("id", ""),
+                            tool_name=tool_call.get("name", "unknown"),
+                            is_error=is_error,
+                        )
+
                 # Save results to context only (no database persistence for SubAgent)
                 # inject_reminders=True to include iteration warnings in last tool result
                 await tool_executor.save_results_to_context(
