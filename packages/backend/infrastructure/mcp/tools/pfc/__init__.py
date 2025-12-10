@@ -9,9 +9,18 @@ Execution Tools:
 - pfc_check_task_status: Query status of long-running tasks
 - pfc_list_tasks: List all tracked long-running tasks
 
-Documentation Query Tools:
-- pfc_query_python_api: Query PFC Python SDK documentation (115 APIs, modules, objects)
-- pfc_query_command: Query PFC command documentation (115 commands + model properties)
+Documentation Browse Tools (like glob + cat):
+- pfc_browse_commands: Navigate command hierarchy and retrieve docs by command
+- pfc_browse_contact_models: Navigate contact model properties (separate from commands)
+
+Documentation Query Tools (like grep):
+- pfc_query_python_api: Search PFC Python SDK documentation by keywords
+- pfc_query_command: Search PFC command documentation by keywords
+
+Usage Pattern:
+    - Use browse tools to explore documentation boundaries and navigate by path
+    - Use query tools for keyword search when path is unknown
+    - browse = "I know where to look" / query = "I know what to search for"
 
 Version Tracking:
     Each pfc_execute_task creates a git snapshot for traceability.
@@ -26,6 +35,8 @@ from .pfc_task_status import register_pfc_task_status_tool
 from .pfc_list_tasks import register_pfc_list_tasks_tool
 from .pfc_query_python_api import register_pfc_query_python_api_tool
 from .pfc_query_command import register_pfc_query_command_tool
+from .pfc_browse_commands import register_pfc_browse_commands_tool
+from .pfc_browse_contact_models import register_pfc_browse_contact_models_tool
 
 __all__ = [
     "register_pfc_task_tool",
@@ -33,4 +44,6 @@ __all__ = [
     "register_pfc_list_tasks_tool",
     "register_pfc_query_python_api_tool",
     "register_pfc_query_command_tool",
+    "register_pfc_browse_commands_tool",
+    "register_pfc_browse_contact_models_tool",
 ]

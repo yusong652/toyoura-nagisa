@@ -1,0 +1,258 @@
+"""PFC Command Browse Tool - Navigate and retrieve command documentation.
+
+This tool provides hierarchical navigation through PFC command documentation,
+similar to 'glob + cat' for file systems. It enables LLM to:
+1. Discover available command categories and commands (understand boundaries)
+2. Retrieve full documentation by exact command
+
+Use pfc_query_command for keyword-based search when command is unknown.
+"""
+
+from typing import Dict, Any, Optional
+from fastmcp import FastMCP
+from pydantic import Field
+
+from backend.infrastructure.pfc.commands import CommandLoader, CommandFormatter
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+
+
+def register_pfc_browse_commands_tool(mcp: FastMCP):
+    """Register PFC command browse tool with the MCP server."""
+
+    @mcp.tool(
+        tags={"pfc", "command", "browse", "documentation"},
+        annotations={"category": "pfc", "tags": ["pfc", "command", "browse"]}
+    )
+    async def pfc_browse_commands(
+        command: Optional[str] = Field(
+            None,
+            description=(
+                "PFC command to browse (space-separated, matching PFC syntax). Examples:\n"
+                "- None or '': List all command categories\n"
+                "- 'ball': List all ball commands\n"
+                "- 'ball create': Get ball create documentation\n"
+                "- 'contact': List all contact commands\n"
+                "- 'contact property': Get contact property command documentation"
+            )
+        )
+    ) -> Dict[str, Any]:
+        """Browse PFC command documentation hierarchy.
+
+        This tool provides structured navigation through PFC command docs.
+        Command format matches PFC syntax (space-separated).
+
+        USE THIS TOOL TO:
+        1. Explore what commands exist (understand documentation boundaries)
+        2. Navigate to specific documentation by command
+        3. Discover available options before making decisions
+
+        NAVIGATION LEVELS:
+        - Level 0 (no command): Overview of all 7 command categories
+        - Level 1 (category): List of all commands in that category
+        - Level 2 (category command): Full command documentation
+
+        RECOMMENDED WORKFLOW:
+        - Start with pfc_browse_commands() to see all categories
+        - Drill down: pfc_browse_commands(command="ball")
+        - Get doc: pfc_browse_commands(command="ball create")
+        - Use pfc_query_command only when you have keywords but don't know the command
+
+        NOTE: For contact model properties (kn, ks, fric), use pfc_browse_contact_models instead.
+        """
+        try:
+            # Normalize command input
+            cmd = _normalize_command(command)
+
+            # Route to appropriate handler based on command depth
+            if not cmd:
+                return _browse_root()
+
+            parts = cmd.split()
+
+            # Standard category/command navigation
+            if len(parts) == 1:
+                return _browse_category(parts[0])
+            elif len(parts) == 2:
+                return _browse_command(parts[0], parts[1])
+            else:
+                return error_response(
+                    f"Invalid command: {cmd}. Use format: '<category>' or '<category> <command>'"
+                )
+
+        except FileNotFoundError as e:
+            return error_response(f"Documentation not found: {str(e)}")
+        except Exception as e:
+            return error_response(f"Error browsing documentation: {str(e)}")
+
+    print("[DEBUG] Registered PFC command browse tool: pfc_browse_commands")
+
+
+def _normalize_command(command: Optional[str]) -> str:
+    """Normalize command input."""
+    if command is None:
+        return ""
+    # Strip whitespace and normalize multiple spaces to single space
+    return " ".join(command.split())
+
+
+def _browse_root() -> Dict[str, Any]:
+    """Level 0: Return overview of all command categories."""
+    index = CommandLoader.load_index()
+    categories = index.get("categories", {})
+
+    # Build category summary
+    category_lines = []
+    total_commands = 0
+    for cat_name, cat_data in categories.items():
+        cmd_count = len(cat_data.get("commands", []))
+        total_commands += cmd_count
+        description = cat_data.get("description", "")
+        # Truncate long descriptions
+        if len(description) > 50:
+            description = description[:47] + "..."
+
+        category_lines.append(f"- {cat_name} ({cmd_count}): {description}")
+
+    content = f"""## PFC Command Documentation
+
+Total: {len(categories)} categories, {total_commands} commands
+
+{chr(10).join(category_lines)}
+
+Navigation:
+- pfc_browse_commands(command="<category>") to list commands
+- pfc_browse_commands(command="<category> <cmd>") for full doc
+
+Search: pfc_query_command(query="...") for keyword search
+
+Contact Models: pfc_browse_contact_models() for model properties (kn, ks, fric)
+"""
+
+    return success_response(
+        message=f"PFC Command Documentation: {len(categories)} categories, {total_commands} commands",
+        llm_content={"parts": [{"type": "text", "text": content}]},
+        data={
+            "level": "root",
+            "categories": list(categories.keys()),
+            "total_commands": total_commands
+        }
+    )
+
+
+def _browse_category(category: str) -> Dict[str, Any]:
+    """Level 1: Return list of commands in a category."""
+    index = CommandLoader.load_index()
+    categories = index.get("categories", {})
+
+    if category not in categories:
+        available = ", ".join(categories.keys())
+        return error_response(
+            f"Category '{category}' not found. Available: {available}"
+        )
+
+    cat_data = categories[category]
+    commands = cat_data.get("commands", [])
+    full_name = cat_data.get("full_name", category.title())
+    description = cat_data.get("description", "")
+
+    # Build command list
+    command_lines = []
+    for cmd in commands:
+        name = cmd.get("name", "")
+        python_avail = cmd.get("python_available", False)
+        if python_avail is True:
+            python_mark = "[py]"
+        elif python_avail == "partial":
+            python_mark = "[py:partial]"
+        else:
+            python_mark = ""
+
+        short_desc = cmd.get("short_description", "")
+        if len(short_desc) > 45:
+            short_desc = short_desc[:42] + "..."
+
+        command_lines.append(f"- {name}{' ' + python_mark if python_mark else ''}: {short_desc}")
+
+    # Related categories
+    related = cat_data.get("related_categories", [])
+    related_text = f"Related: {', '.join(related)}" if related else ""
+
+    # Special note for contact category
+    contact_note = ""
+    if category == "contact":
+        contact_note = "\nContact Models: pfc_browse_contact_models() for model properties (kn, ks, fric)"
+
+    content = f"""## {full_name} ({len(commands)} commands)
+
+{description}
+
+{chr(10).join(command_lines)}
+
+[py] = Python SDK available, [py:partial] = partial support
+
+Navigation:
+- pfc_browse_commands(command="{category} <cmd>") for full doc
+- pfc_browse_commands() for categories overview
+{contact_note}
+{related_text}
+"""
+
+    return success_response(
+        message=f"{full_name}: {len(commands)} commands",
+        llm_content={"parts": [{"type": "text", "text": content}]},
+        data={
+            "level": "category",
+            "category": category,
+            "command_count": len(commands),
+            "commands": [cmd.get("name") for cmd in commands]
+        }
+    )
+
+
+def _browse_command(category: str, command_name: str) -> Dict[str, Any]:
+    """Level 2: Return full documentation for a specific command."""
+    # Load command documentation
+    cmd_doc = CommandLoader.load_command_doc(category, command_name)
+
+    if not cmd_doc:
+        # Try to provide helpful suggestions
+        index = CommandLoader.load_index()
+        categories = index.get("categories", {})
+
+        if category not in categories:
+            available_cats = ", ".join(categories.keys())
+            return error_response(
+                f"Category '{category}' not found. Available: {available_cats}"
+            )
+
+        cat_data = categories[category]
+        available_cmds = [cmd.get("name") for cmd in cat_data.get("commands", [])]
+        return error_response(
+            f"Command '{command_name}' not found in '{category}'. "
+            f"Available: {', '.join(available_cmds[:10])}{'...' if len(available_cmds) > 10 else ''}"
+        )
+
+    # Format the documentation
+    formatted_doc = CommandFormatter.format_command(cmd_doc, category)
+
+    # Add navigation footer
+    navigation = f"""
+
+Navigation:
+- pfc_browse_commands(command="{category}") for {category} commands list
+- pfc_browse_commands() for categories overview
+"""
+    full_content = formatted_doc + navigation
+
+    return success_response(
+        message=f"Documentation: {category} {command_name}",
+        llm_content={"parts": [{"type": "text", "text": full_content}]},
+        data={
+            "level": "command",
+            "category": category,
+            "command": command_name,
+            "full_command": f"{category} {command_name}"
+        }
+    )
+
+

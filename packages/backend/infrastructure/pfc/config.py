@@ -24,6 +24,10 @@ PFC_DOCS_SOURCE = _CURRENT_DIR / "resources" / "python_sdk_docs"
 # Contains PFC command documentation with 115 commands across 7 categories
 PFC_COMMAND_DOCS_ROOT = _CURRENT_DIR / "resources" / "command_docs"
 
+# Contact model documentation (version-controlled, JSON format)
+# Separate from commands - models define contact behavior (kn, ks, fric, etc.)
+PFC_CONTACT_MODELS_ROOT = _CURRENT_DIR / "resources" / "contact_models"
+
 # Runtime semantic index (generated dynamically, NOT version-controlled)
 # Future: Will contain ChromaDB/FAISS embeddings for semantic search
 PFC_DOCS_INDEX = _PROJECT_ROOT / "data" / "pfc" / "python_sdk_index"

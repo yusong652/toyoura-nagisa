@@ -15,7 +15,7 @@ from functools import lru_cache
 from pathlib import Path
 import json
 
-from backend.infrastructure.pfc.config import PFC_COMMAND_DOCS_ROOT
+from backend.infrastructure.pfc.config import PFC_COMMAND_DOCS_ROOT, PFC_CONTACT_MODELS_ROOT
 
 
 class CommandLoader:
@@ -134,7 +134,7 @@ class CommandLoader:
             >>> models[0]["name"]
             'linear'
         """
-        index_path = PFC_COMMAND_DOCS_ROOT / "commands" / "contact" / "model-properties" / "index.json"
+        index_path = PFC_CONTACT_MODELS_ROOT / "index.json"
         if not index_path.exists():
             return {}
 
@@ -185,7 +185,7 @@ class CommandLoader:
             return None
 
         # Load model properties documentation
-        doc_path = PFC_COMMAND_DOCS_ROOT / "commands" / "contact" / "model-properties" / model_file
+        doc_path = PFC_CONTACT_MODELS_ROOT / model_file
         if not doc_path.exists():
             return None
 

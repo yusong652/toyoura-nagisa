@@ -590,11 +590,6 @@
       "python_module": "itasca.contact",
       "python_object_class": "Contact (BallBallContact, BallFacetContact, etc.)",
       "doc_url": "https://docs.itascacg.com/pfc700/pfc/docproject/source/manual/contact/contact.html",
-      "model_properties_reference": {
-        "path": "commands/contact/model-properties/index.json",
-        "description": "Detailed properties reference for all contact models. Contains comprehensive documentation of each model's properties including types, ranges, defaults, and usage patterns.",
-        "use_when": "Need to know available properties for a contact model, valid ranges, or typical values"
-      },
       "commands": [
         {
           "name": "activate",
