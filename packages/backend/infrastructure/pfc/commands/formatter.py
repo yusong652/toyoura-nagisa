@@ -378,15 +378,15 @@ class CommandFormatter:
         """
         return f"""No PFC command documentation found for '{query}'.
 
-**Suggestions**:
-- Try using simpler keywords (e.g., "ball create" instead of "how to create a ball")
-- Check command categories: ball, wall, clump, contact, model, fragment, measure
-- Use `include_model_properties=False` if you're only looking for commands
-- Try the Python SDK query tool (`pfc_query_python_api`) for Python SDK alternatives
+Suggestions:
+- Try simpler keywords (e.g., "ball create" instead of "how to create a ball")
+- Command categories: ball, wall, clump, contact, model, fragment, measure
+- For contact model properties: use pfc_browse_contact_models tool
+- For Python SDK: use pfc_query_python_api tool
 
-**Common commands**:
-- `ball create`, `ball generate`, `ball attribute`
-- `wall generate`, `wall attribute`
-- `contact model`, `contact property`, `contact cmat`
-- `model cycle`, `model solve`, `model domain`
+Common commands:
+- ball create, ball generate, ball attribute
+- wall generate, wall attribute
+- contact model, contact property, contact cmat
+- model cycle, model solve, model domain
 """

@@ -42,22 +42,23 @@ def register_pfc_query_command_tool(mcp: FastMCP):
         ),
         limit: int = Field(
             DEFAULT_SEARCH_LIMIT,
-            description="Maximum number of results to return (1-20).",
+            description=f"Maximum number of results (1-{MAX_SEARCH_LIMIT}).",
             ge=1,
             le=MAX_SEARCH_LIMIT
         )
     ) -> Dict[str, Any]:
-        """Search PFC command documentation by keywords.
+        """Search PFC command documentation by keywords (like grep).
 
-        Returns matching command paths with brief descriptions. Use this tool when
-        you don't know the exact command but have keywords to search.
+        Returns matching command paths. Use pfc_browse_commands for full documentation.
 
-        WORKFLOW:
-        1. Use this tool to find matching command paths
-        2. Use pfc_browse_commands(command="<category> <cmd>") for full documentation
+        When to use:
+        - You have keywords but don't know exact command path
+        - Example: "ball create", "contact property", "model solve"
 
-        For contact model properties, use pfc_browse_contact_models directly.
-        For direct path navigation when you know the command, use pfc_browse_commands.
+        Related tools:
+        - pfc_browse_commands: Get full documentation for a known command path
+        - pfc_browse_contact_models: Browse contact model properties (linear, rrlinear, etc.)
+        - pfc_query_python_api: Search Python SDK by keywords
         """
         try:
             # Validate limit is within bounds

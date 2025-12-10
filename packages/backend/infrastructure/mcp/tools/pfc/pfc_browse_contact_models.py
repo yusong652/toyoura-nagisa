@@ -38,27 +38,21 @@ def register_pfc_browse_contact_models_tool(mcp: FastMCP):
             )
         )
     ) -> Dict[str, Any]:
-        """Browse PFC Contact Model documentation.
+        """Browse PFC contact model properties (like glob + cat for model docs).
 
-        Contact Models define mechanical behavior at contact points.
-        This is separate from Commands - use pfc_browse_commands for command syntax.
+        Contact models define mechanical behavior at contact points (kn, ks, fric, etc.).
 
-        USE THIS TOOL TO:
-        1. See all available contact models
-        2. Get properties for a specific model (kn, ks, fric, etc.)
-        3. Understand which properties to set with 'contact property' command
+        Navigation levels:
+        - No model: List all 5 built-in contact models
+        - Model name (e.g., "linear"): Full property documentation
 
-        WORKFLOW:
-        1. pfc_browse_contact_models() - see available models
-        2. pfc_browse_contact_models(model="linear") - get model properties
-        3. Use properties with: contact cmat add model linear property kn 1e8 ks 1e8
+        When to use:
+        - Need to know property names for contact model configuration
+        - Setting up "contact cmat add model ... property ..." commands
 
-        COMMON MODELS:
-        - linear: Default elastic-frictional (kn, ks, fric)
-        - hertz: Nonlinear Hertzian contact
-        - linearpbond: Parallel bonds for cemented materials
-        - linearcbond: Contact bonds
-        - rrlinear: Rolling resistance
+        Related tools:
+        - pfc_browse_commands: Command syntax (e.g., "contact cmat")
+        - pfc_query_command: Search commands by keywords
         """
         try:
             # Normalize model input

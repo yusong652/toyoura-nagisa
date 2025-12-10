@@ -37,28 +37,24 @@ def register_pfc_browse_python_api_tool(mcp: FastMCP):
             )
         )
     ) -> Dict[str, Any]:
-        """Browse PFC Python SDK documentation hierarchy.
+        """Browse PFC Python SDK documentation by path (like glob + cat).
 
-        This tool provides structured navigation through PFC Python API docs.
-        All paths use Python dot notation starting from 'itasca'.
+        Paths use Python dot notation starting from 'itasca'.
 
-        NAVIGATION LEVELS:
-        - Root (no api or 'itasca'): All modules and objects overview
+        Navigation levels:
+        - Root (no api): All modules and objects overview
         - Module (itasca.ball): Module functions list
         - Function (itasca.ball.create): Full function documentation
         - Object (itasca.ball.Ball): Object method groups
         - Method (itasca.ball.Ball.pos): Full method documentation
 
-        PATH RESOLUTION:
-        - Lowercase = module or function (itasca, ball, create)
-        - Capitalized = object (Ball, Contact, Wall)
-        - After object = method (Ball.pos, Contact.force_global)
+        When to use:
+        - You know the API path (module.function or module.Object.method)
+        - You want to explore available functions/methods
 
-        FALLBACK BEHAVIOR:
-        - Invalid path returns parent level with error hint
-        - Unknown function/method returns module/object overview
-
-        NOTE: For keyword search when path is unknown, use pfc_query_python_api.
+        Related tools:
+        - pfc_query_python_api: Search API by keywords (when path unknown)
+        - pfc_browse_commands: PFC command syntax documentation
         """
         try:
             # Normalize and parse API path

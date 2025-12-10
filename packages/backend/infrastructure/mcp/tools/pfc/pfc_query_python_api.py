@@ -45,21 +45,22 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
         ),
         limit: int = Field(
             DEFAULT_SEARCH_LIMIT,
-            description="Maximum number of results to return (1-20).",
+            description=f"Maximum number of results (1-{MAX_SEARCH_LIMIT}).",
             ge=1,
             le=MAX_SEARCH_LIMIT
         )
     ) -> Dict[str, Any]:
-        """Search PFC Python SDK documentation by keywords.
+        """Search PFC Python SDK documentation by keywords (like grep).
 
-        Returns matching API paths with brief signatures. Use this tool when you
-        don't know the exact API path but have keywords to search.
+        Returns matching API paths with signatures. Use pfc_browse_python_api for full documentation.
 
-        WORKFLOW:
-        1. Use this tool to find matching API paths
-        2. Use pfc_browse_python_api(api="<path>") for full documentation
+        When to use:
+        - You have keywords but don't know exact API path
+        - Example: "ball velocity", "create", "contact force"
 
-        For direct path navigation when you know the API, use pfc_browse_python_api.
+        Related tools:
+        - pfc_browse_python_api: Get full documentation for a known API path
+        - pfc_query_command: Search PFC commands by keywords
         """
         try:
             # Search for matching APIs

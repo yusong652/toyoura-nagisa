@@ -36,28 +36,20 @@ def register_pfc_browse_commands_tool(mcp: FastMCP):
             )
         )
     ) -> Dict[str, Any]:
-        """Browse PFC command documentation hierarchy.
+        """Browse PFC command documentation by path (like glob + cat).
 
-        This tool provides structured navigation through PFC command docs.
-        Command format matches PFC syntax (space-separated).
+        Navigation levels:
+        - No command: All 7 categories overview
+        - Category only (e.g., "ball"): List commands in category
+        - Full command (e.g., "ball create"): Full documentation
 
-        USE THIS TOOL TO:
-        1. Explore what commands exist (understand documentation boundaries)
-        2. Navigate to specific documentation by command
-        3. Discover available options before making decisions
+        When to use:
+        - You know the command category or exact command
+        - You want to explore available commands
 
-        NAVIGATION LEVELS:
-        - Level 0 (no command): Overview of all 7 command categories
-        - Level 1 (category): List of all commands in that category
-        - Level 2 (category command): Full command documentation
-
-        RECOMMENDED WORKFLOW:
-        - Start with pfc_browse_commands() to see all categories
-        - Drill down: pfc_browse_commands(command="ball")
-        - Get doc: pfc_browse_commands(command="ball create")
-        - Use pfc_query_command only when you have keywords but don't know the command
-
-        NOTE: For contact model properties (kn, ks, fric), use pfc_browse_contact_models instead.
+        Related tools:
+        - pfc_query_command: Search commands by keywords (when path unknown)
+        - pfc_browse_contact_models: Browse contact model properties (kn, ks, fric)
         """
         try:
             # Normalize command input
