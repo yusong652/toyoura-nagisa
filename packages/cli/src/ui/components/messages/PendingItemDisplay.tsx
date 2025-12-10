@@ -209,10 +209,18 @@ const SubagentToolItemDisplay: React.FC<{
 // Layout matches ToolCallMessage for visual consistency
 // Shows BlinkingCircle when executing, success/error icon when result received
 const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> = ({ item }) => {
-  const description = getToolDescription(item.toolName, item.toolInput);
   const hasResult = item.hasResult === true;
   const isError = item.isError === true;
   const subagentTools = item.subagentTools || [];
+
+  // Check if this is an invoke_agent call
+  const isInvokeAgent = item.toolName === 'invoke_agent';
+  const subagentType = isInvokeAgent ? String(item.toolInput.subagent_type || 'SubAgent') : '';
+
+  // For invoke_agent: show description (task summary), otherwise use standard description
+  const description = isInvokeAgent
+    ? String(item.toolInput.description || '')
+    : getToolDescription(item.toolName, item.toolInput);
 
   // Color based on result status: success (green) or error (red)
   const statusColor = isError ? theme.status.error : theme.status.success;
@@ -235,14 +243,27 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
             <BlinkingCircle color={theme.status.success} />
           )}
         </Box>
-        <Text wrap="truncate">
-          <Text bold color={theme.text.primary}>
-            {item.toolName}
+        {isInvokeAgent ? (
+          // Special display for invoke_agent: show SubAgent type with accent background
+          <Text wrap="truncate">
+            <Text bold color={theme.text.accent} inverse>
+              {subagentType}
+            </Text>
+            {description && (
+              <Text color={theme.text.secondary}> {description}</Text>
+            )}
           </Text>
-          {description && (
-            <Text color={theme.text.secondary}> {description}</Text>
-          )}
-        </Text>
+        ) : (
+          // Standard tool display
+          <Text wrap="truncate">
+            <Text bold color={theme.text.primary}>
+              {item.toolName}
+            </Text>
+            {description && (
+              <Text color={theme.text.secondary}> {description}</Text>
+            )}
+          </Text>
+        )}
       </Box>
       {/* Render SubAgent tools (for invoke_agent) with auto-scroll effect */}
       {hiddenCount > 0 && (
