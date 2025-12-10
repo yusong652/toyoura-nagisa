@@ -138,9 +138,9 @@ pfc_browse_python_api(api="itasca.ball.Ball.pos") # Full method documentation
 pfc_browse_python_api(api="itasca.BallBallContact")  # Contact type object
 ```
 
-**`pfc_browse_contact_models`** - Navigate contact model properties
+**`pfc_browse_contact_models`** - Dedicated contact model browser
 ```python
-pfc_browse_contact_models()              # List all 5 contact models
+pfc_browse_contact_models()                # List available contact models
 pfc_browse_contact_models(model="linear")  # Linear model properties (kn, ks, fric, etc.)
 ```
 
