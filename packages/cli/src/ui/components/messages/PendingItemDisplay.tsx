@@ -167,21 +167,28 @@ function getToolDescription(toolName: string, input: Record<string, unknown>): s
 
 // SubAgent Tool Item (nested under invoke_agent)
 // Displayed with additional indentation and dimmer styling
-// Shows BlinkingCircle when executing, checkmark when parent invoke_agent completed
+// Shows BlinkingCircle when executing, checkmark/error when tool completes
 const SubagentToolItemDisplay: React.FC<{
   toolName: string;
   toolInput: Record<string, unknown>;
-  parentCompleted: boolean;  // When invoke_agent has result, all SubAgent tools are done
-}> = ({ toolName, toolInput, parentCompleted }) => {
+  hasResult?: boolean;   // True when this specific tool completed
+  isError?: boolean;     // True if tool execution resulted in error
+  parentCompleted: boolean;  // Fallback: when invoke_agent has result, all SubAgent tools are done
+}> = ({ toolName, toolInput, hasResult, isError, parentCompleted }) => {
   const description = getToolDescription(toolName, toolInput);
   // Additional indent for nested tools (2 spaces)
   const SUBAGENT_INDENT = 2;
 
+  // Tool is completed if it has its own result, or if parent (invoke_agent) is completed
+  const isCompleted = hasResult === true || parentCompleted;
+  const statusIcon = isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
+  const statusColor = isError ? theme.status.error : theme.text.muted;
+
   return (
     <Box paddingX={1} paddingLeft={STATUS_INDICATOR_WIDTH + SUBAGENT_INDENT}>
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-        {parentCompleted ? (
-          <Text color={theme.text.muted}>{TOOL_STATUS.SUCCESS}</Text>
+        {isCompleted ? (
+          <Text color={statusColor}>{statusIcon}</Text>
         ) : (
           <BlinkingCircle color={theme.text.muted} />
         )}
@@ -250,6 +257,8 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
           key={tool.toolCallId}
           toolName={tool.toolName}
           toolInput={tool.toolInput}
+          hasResult={tool.hasResult}
+          isError={tool.isError}
           parentCompleted={hasResult}
         />
       ))}

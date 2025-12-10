@@ -104,3 +104,16 @@ export interface SubagentToolUseEvent {
   tool_name: string;
   tool_input: Record<string, unknown>;
 }
+
+/**
+ * SubAgent tool result notification from backend
+ * Sent when a SubAgent tool completes execution
+ */
+export interface SubagentToolResultEvent {
+  type: 'SUBAGENT_TOOL_RESULT';
+  session_id: string;
+  parent_tool_call_id: string;  // ID of the invoke_agent tool call
+  tool_call_id: string;
+  tool_name: string;
+  is_error: boolean;
+}

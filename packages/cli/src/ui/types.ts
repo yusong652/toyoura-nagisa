@@ -62,6 +62,8 @@ export interface SubagentToolItem {
   toolCallId: string;
   toolName: string;
   toolInput: Record<string, unknown>;
+  hasResult?: boolean;  // True when tool execution completes
+  isError?: boolean;    // True if tool execution resulted in error
 }
 
 export interface ToolCallHistoryItem extends HistoryItemBase {

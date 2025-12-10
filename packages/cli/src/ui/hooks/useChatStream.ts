@@ -122,6 +122,7 @@ export function useChatStream({
     connectionManager.on('tool_confirmation_request', toolConfirmation.handleToolConfirmationRequest);
     connectionManager.on('tool_result_update', streamHandlers.handleToolResultUpdate);
     connectionManager.on('subagent_tool_use', streamHandlers.handleSubagentToolUse);
+    connectionManager.on('subagent_tool_result', streamHandlers.handleSubagentToolResult);
     connectionManager.on('error', streamHandlers.handleError);
 
     return () => {
@@ -130,6 +131,7 @@ export function useChatStream({
       connectionManager.off('tool_confirmation_request', toolConfirmation.handleToolConfirmationRequest);
       connectionManager.off('tool_result_update', streamHandlers.handleToolResultUpdate);
       connectionManager.off('subagent_tool_use', streamHandlers.handleSubagentToolUse);
+      connectionManager.off('subagent_tool_result', streamHandlers.handleSubagentToolResult);
       connectionManager.off('error', streamHandlers.handleError);
     };
   }, [connectionManager, streamHandlers, toolConfirmation]);

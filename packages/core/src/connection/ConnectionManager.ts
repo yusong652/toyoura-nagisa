@@ -221,6 +221,17 @@ export class ConnectionManager extends WebSocketManager {
         });
         break;
 
+      case 'SUBAGENT_TOOL_RESULT':
+        this.emit('subagent_tool_result', {
+          type: 'SUBAGENT_TOOL_RESULT',
+          session_id: message.session_id,
+          parent_tool_call_id: message.parent_tool_call_id,
+          tool_call_id: message.tool_call_id,
+          tool_name: message.tool_name,
+          is_error: message.is_error
+        });
+        break;
+
       default:
         // Emit generic message for unhandled types
         this.emit('unhandled_message', message);
