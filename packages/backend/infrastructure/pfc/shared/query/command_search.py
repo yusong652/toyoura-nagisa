@@ -1,33 +1,28 @@
 """High-level command search interface.
 
-This module provides a simple, user-friendly API for searching PFC commands
-and model properties, abstracting away the complexity of search engines.
+This module provides a simple, user-friendly API for searching PFC commands.
+Model properties are handled separately via pfc_browse_contact_models tool.
 """
 
 from typing import List, Optional, Dict, Any
-from backend.infrastructure.pfc.shared.models.document import DocumentType
 from backend.infrastructure.pfc.shared.models.search_result import SearchResult
 from backend.infrastructure.pfc.shared.adapters.command_adapter import CommandDocumentAdapter
 from backend.infrastructure.pfc.shared.search.engines.bm25_engine import BM25SearchEngine
 
 
 class CommandSearch:
-    """Unified command and model property search interface.
+    """Command search interface for PFC documentation.
 
-    This class provides a high-level API for searching PFC commands and
-    contact model properties using BM25 algorithm with multi-field scoring.
+    This class provides a high-level API for searching PFC commands
+    using BM25 algorithm with multi-field scoring.
 
     Features:
     - Automatic index initialization (lazy loading)
     - Singleton pattern for efficient memory usage
-    - Support for filtering by doc_type and category
-    - Optional model properties inclusion
-
-    Design Decisions:
-    - Unified search (commands + model properties) for better UX
+    - Support for filtering by category
     - BM25 with multi-field scoring (name=0.5, keywords=0.3, description=0.2)
-    - Automatic index building on first query
-    - Thread-safe singleton pattern
+
+    Note: For contact model properties, use pfc_browse_contact_models tool directly.
 
     Usage:
         >>> # Basic search
@@ -35,19 +30,10 @@ class CommandSearch:
         >>> results[0].document.title
         "ball create"
 
-        >>> # With filters
-        >>> results = CommandSearch.search(
-        ...     "contact",
-        ...     top_k=10,
-        ...     category="contact",
-        ...     include_model_properties=True
-        ... )
-
-        >>> # Commands only (exclude model properties)
-        >>> results = CommandSearch.search(
-        ...     "linear",
-        ...     include_model_properties=False
-        ... )
+        >>> # With category filter
+        >>> results = CommandSearch.search("create", category="ball")
+        >>> results[0].document.category
+        "ball"
     """
 
     # Singleton instance
@@ -59,15 +45,10 @@ class CommandSearch:
 
         Returns:
             BM25SearchEngine instance (shared across all calls)
-
-        Example:
-            >>> engine = CommandSearch._get_engine()
-            >>> engine.is_built()
-            True
         """
         if cls._engine is None:
             cls._engine = BM25SearchEngine(
-                document_loader=CommandDocumentAdapter.load_all
+                document_loader=CommandDocumentAdapter.load_commands
             )
             cls._engine.build()
 
@@ -79,21 +60,16 @@ class CommandSearch:
         query: str,
         top_k: int = 10,
         category: Optional[str] = None,
-        include_model_properties: bool = True,
         min_score: Optional[float] = None
     ) -> List[SearchResult]:
-        """Search for PFC commands and optionally model properties.
-
-        This is the main entry point for command search. It uses BM25 algorithm
-        with multi-field scoring for high-quality results.
+        """Search for PFC commands.
 
         Args:
             query: Search query string
-                  Examples: "ball create", "contact property", "kn stiffness"
+                  Examples: "ball create", "contact property", "model solve"
             top_k: Maximum number of results to return (default: 10)
             category: Optional category filter
                      Examples: "ball", "contact", "model"
-            include_model_properties: Include model properties in search (default: True)
             min_score: Optional minimum score threshold
 
         Returns:
@@ -101,36 +77,14 @@ class CommandSearch:
             Empty list if no matches found
 
         Example:
-            >>> # Basic search
-            >>> results = CommandSearch.search("ball porosity")
-            >>> len(results)
-            5
+            >>> results = CommandSearch.search("ball create")
             >>> results[0].document.title
-            "ball distribute"
+            "ball create"
 
-            >>> # Filter by category
-            >>> results = CommandSearch.search(
-            ...     "create",
-            ...     category="ball"
-            ... )
+            >>> results = CommandSearch.search("create", category="ball")
             >>> results[0].document.category
             "ball"
-
-            >>> # Commands only
-            >>> results = CommandSearch.search(
-            ...     "linear",
-            ...     include_model_properties=False
-            ... )
-            >>> all(r.document.doc_type == DocumentType.COMMAND for r in results)
-            True
-
-            >>> # With minimum score
-            >>> results = CommandSearch.search(
-            ...     "packing",
-            ...     min_score=5.0
-            ... )
         """
-        # Get singleton engine
         engine = cls._get_engine()
 
         # Build filter dictionary
@@ -138,9 +92,6 @@ class CommandSearch:
 
         if category is not None:
             filters["category"] = category
-
-        if not include_model_properties:
-            filters["doc_type"] = DocumentType.COMMAND.value
 
         if min_score is not None:
             filters["min_score"] = min_score
@@ -161,9 +112,9 @@ class CommandSearch:
         top_k: int = 10,
         category: Optional[str] = None
     ) -> List[SearchResult]:
-        """Search for commands only (exclude model properties).
+        """Search for commands (alias for search method).
 
-        Convenience method for searching only commands, excluding model properties.
+        Kept for backward compatibility.
 
         Args:
             query: Search query string
@@ -171,55 +122,9 @@ class CommandSearch:
             category: Optional category filter
 
         Returns:
-            List of SearchResult objects (commands only)
-
-        Example:
-            >>> results = CommandSearch.search_commands_only("ball create")
-            >>> all(r.document.doc_type == DocumentType.COMMAND for r in results)
-            True
+            List of SearchResult objects
         """
-        return cls.search(
-            query=query,
-            top_k=top_k,
-            category=category,
-            include_model_properties=False
-        )
-
-    @classmethod
-    def search_model_properties(
-        cls,
-        query: str,
-        top_k: int = 10
-    ) -> List[SearchResult]:
-        """Search for model properties only.
-
-        Convenience method for searching only contact model properties.
-
-        Args:
-            query: Search query string
-                  Examples: "linear", "kn stiffness", "hertz"
-            top_k: Maximum number of results to return (default: 10)
-
-        Returns:
-            List of SearchResult objects (model properties only)
-
-        Example:
-            >>> results = CommandSearch.search_model_properties("linear stiffness")
-            >>> all(r.document.doc_type == DocumentType.MODEL_PROPERTY for r in results)
-            True
-        """
-        filters = {
-            "doc_type": DocumentType.MODEL_PROPERTY.value
-        }
-
-        engine = cls._get_engine()
-        results = engine.search(
-            query=query,
-            top_k=top_k,
-            filters=filters
-        )
-
-        return results
+        return cls.search(query=query, top_k=top_k, category=category)
 
     @classmethod
     def get_by_category(
@@ -241,12 +146,7 @@ class CommandSearch:
             >>> all(r.document.category == "ball" for r in results)
             True
         """
-        # Use category name as query (will match all documents in that category)
-        return cls.search(
-            query=category,
-            top_k=top_k,
-            category=category
-        )
+        return cls.search(query=category, top_k=top_k, category=category)
 
     @classmethod
     def rebuild_index(cls) -> None:
@@ -256,9 +156,6 @@ class CommandSearch:
         - Documentation files have been updated
         - Index parameters need to be changed
         - Troubleshooting index issues
-
-        Example:
-            >>> CommandSearch.rebuild_index()
         """
         if cls._engine is not None:
             cls._engine.rebuild()
@@ -270,14 +167,9 @@ class CommandSearch:
         Returns:
             Dictionary with index statistics:
             - doc_count: Number of indexed documents
-            - name_field: Name field statistics (avg_doc_len, vocab_size, total_terms)
+            - name_field: Name field statistics
             - description_field: Description field statistics
             - keywords_field: Keywords field statistics
-
-        Example:
-            >>> stats = CommandSearch.get_index_stats()
-            >>> stats['doc_count']
-            120  # 115 commands + 5 model properties
         """
         engine = cls._get_engine()
         return engine.get_index_stats()
