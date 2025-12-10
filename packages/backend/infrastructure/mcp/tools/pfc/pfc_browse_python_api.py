@@ -61,8 +61,11 @@ def register_pfc_browse_python_api_tool(mcp: FastMCP):
             normalized = _normalize_api_path(api)
 
             # Route to appropriate handler
-            if not normalized or normalized == "itasca":
+            if not normalized:
                 return _browse_root()
+
+            if normalized == "itasca":
+                return _browse_module("itasca")
 
             parsed = _parse_api_path(normalized)
 
