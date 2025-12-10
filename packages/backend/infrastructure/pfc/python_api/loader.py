@@ -471,6 +471,172 @@ class DocumentationLoader:
                 DocumentationLoader._load_keywords_recursive(item, all_keywords)
 
     @staticmethod
+    def load_module(module_key: str) -> Optional[Dict[str, Any]]:
+        """Load module documentation by index key.
+
+        Args:
+            module_key: Module key from index (e.g., "itasca", "ball", "wall.facet")
+
+        Returns:
+            Module documentation dict with:
+                - module: Module name
+                - description: Module description
+                - functions: List of function definitions
+
+            Returns None if module not found.
+
+        Example:
+            >>> doc = DocumentationLoader.load_module("ball")
+            >>> doc["module"]
+            "itasca.ball"
+            >>> len(doc["functions"])
+            9
+        """
+        index = DocumentationLoader.load_index()
+        modules = index.get("modules", {})
+
+        if module_key not in modules:
+            return None
+
+        module_info = modules[module_key]
+        file_path = module_info.get("file")
+
+        if not file_path:
+            # Return basic info from index if no file specified
+            return {
+                "module": f"itasca.{module_key}" if module_key != "itasca" else "itasca",
+                "description": module_info.get("description", ""),
+                "functions": module_info.get("functions", [])
+            }
+
+        # Load full module documentation
+        doc_path = PFC_DOCS_SOURCE / file_path
+        if not doc_path.exists():
+            # Return basic info from index
+            return {
+                "module": f"itasca.{module_key}" if module_key != "itasca" else "itasca",
+                "description": module_info.get("description", ""),
+                "functions": module_info.get("functions", [])
+            }
+
+        with open(doc_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+    @staticmethod
+    def load_function(module_key: str, func_name: str) -> Optional[Dict[str, Any]]:
+        """Load function documentation from a module.
+
+        Args:
+            module_key: Module key from index (e.g., "itasca", "ball")
+            func_name: Function name (e.g., "create", "cycle")
+
+        Returns:
+            Function documentation dict with:
+                - name: Function name
+                - signature: Function signature
+                - description: Detailed description
+                - parameters: List of parameter definitions
+                - returns: Return value information
+                - examples: Usage examples (optional)
+
+            Returns None if function not found.
+
+        Example:
+            >>> doc = DocumentationLoader.load_function("ball", "create")
+            >>> doc["signature"]
+            "itasca.ball.create(radius: float, centroid: vec, id: int = None) -> Ball"
+        """
+        module_doc = DocumentationLoader.load_module(module_key)
+        if not module_doc:
+            return None
+
+        functions = module_doc.get("functions", [])
+        for func in functions:
+            if isinstance(func, dict) and func.get("name") == func_name:
+                return func
+
+        return None
+
+    @staticmethod
+    def load_object(object_name: str) -> Optional[Dict[str, Any]]:
+        """Load object documentation by class name.
+
+        Args:
+            object_name: Object class name (e.g., "Ball", "Contact", "Wall")
+
+        Returns:
+            Object documentation dict with:
+                - class: Class name
+                - description: Object description
+                - note: Usage note (optional)
+                - method_groups: Dict of method group names to method lists
+                - methods: List of method definitions (if full doc available)
+
+            Returns None if object not found.
+
+        Example:
+            >>> doc = DocumentationLoader.load_object("Ball")
+            >>> doc["class"]
+            "Ball"
+            >>> "position" in doc["method_groups"]
+            True
+        """
+        index = DocumentationLoader.load_index()
+        objects = index.get("objects", {})
+
+        if object_name not in objects:
+            return None
+
+        object_info = objects[object_name]
+        file_path = object_info.get("file")
+
+        if not file_path:
+            # Return basic info from index
+            return object_info
+
+        # Load full object documentation
+        doc_path = PFC_DOCS_SOURCE / file_path
+        if not doc_path.exists():
+            return object_info
+
+        with open(doc_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+    @staticmethod
+    def load_method(object_name: str, method_name: str) -> Optional[Dict[str, Any]]:
+        """Load method documentation from an object.
+
+        Args:
+            object_name: Object class name (e.g., "Ball", "Wall")
+            method_name: Method name (e.g., "pos", "vel")
+
+        Returns:
+            Method documentation dict with:
+                - name: Method name
+                - signature: Method signature
+                - description: Detailed description
+                - parameters: List of parameter definitions (optional)
+                - returns: Return value information
+
+            Returns None if method not found.
+
+        Example:
+            >>> doc = DocumentationLoader.load_method("Ball", "pos")
+            >>> doc["signature"]
+            "ball.pos() -> vec"
+        """
+        object_doc = DocumentationLoader.load_object(object_name)
+        if not object_doc:
+            return None
+
+        methods = object_doc.get("methods", [])
+        for method in methods:
+            if isinstance(method, dict) and method.get("name") == method_name:
+                return method
+
+        return None
+
+    @staticmethod
     def clear_cache():
         """Clear all cached data.
 

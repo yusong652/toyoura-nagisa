@@ -275,3 +275,119 @@ class APIDocFormatter:
             f"**Next Step**: Use pfc_query_command tool to search for PFC commands instead"
         )
 
+    @staticmethod
+    def format_function(func_doc: Dict[str, Any], module_path: str) -> str:
+        """Format function documentation for browse tool.
+
+        Args:
+            func_doc: Function documentation dict
+            module_path: Full module path (e.g., "itasca.ball")
+
+        Returns:
+            LLM-friendly formatted markdown
+        """
+        lines = []
+
+        name = func_doc.get("name", "")
+        signature = func_doc.get("signature", f"{module_path}.{name}()")
+        description = func_doc.get("description", "")
+
+        lines.append(f"## {module_path}.{name}")
+        lines.append("")
+        lines.append(f"Signature: `{signature}`")
+        lines.append("")
+        lines.append(description)
+        lines.append("")
+
+        # Parameters
+        params = func_doc.get("parameters", [])
+        if params:
+            lines.append("Parameters:")
+            for param in params:
+                pname = param.get("name", "")
+                ptype = param.get("type", "")
+                required = param.get("required", False)
+                pdesc = param.get("description", "")
+                req_str = "required" if required else "optional"
+                lines.append(f"- {pname} ({ptype}, {req_str}): {pdesc}")
+            lines.append("")
+
+        # Returns
+        returns = func_doc.get("returns", {})
+        if returns:
+            rtype = returns.get("type", "")
+            rdesc = returns.get("description", "")
+            lines.append(f"Returns: {rtype} - {rdesc}")
+            lines.append("")
+
+        # Limitations
+        limitations = func_doc.get("limitations")
+        if limitations:
+            lines.append(f"Limitations: {limitations}")
+            lines.append("")
+
+        # Examples
+        examples = func_doc.get("examples", [])
+        if examples:
+            lines.append("Example:")
+            lines.append("```python")
+            lines.append(examples[0].get("code", ""))
+            lines.append("```")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def format_method(method_doc: Dict[str, Any], object_name: str) -> str:
+        """Format method documentation for browse tool.
+
+        Args:
+            method_doc: Method documentation dict
+            object_name: Object class name (e.g., "Ball")
+
+        Returns:
+            LLM-friendly formatted markdown
+        """
+        lines = []
+
+        name = method_doc.get("name", "")
+        signature = method_doc.get("signature", f"{object_name.lower()}.{name}()")
+        description = method_doc.get("description", "")
+
+        lines.append(f"## {object_name}.{name}")
+        lines.append("")
+        lines.append(f"Signature: `{signature}`")
+        lines.append("")
+        lines.append(description)
+        lines.append("")
+
+        # Parameters
+        params = method_doc.get("parameters", [])
+        if params:
+            lines.append("Parameters:")
+            for param in params:
+                pname = param.get("name", "")
+                ptype = param.get("type", "")
+                required = param.get("required", False)
+                pdesc = param.get("description", "")
+                req_str = "required" if required else "optional"
+                lines.append(f"- {pname} ({ptype}, {req_str}): {pdesc}")
+            lines.append("")
+
+        # Returns
+        returns = method_doc.get("returns", {})
+        if returns:
+            rtype = returns.get("type", "")
+            rdesc = returns.get("description", "")
+            lines.append(f"Returns: {rtype} - {rdesc}")
+            lines.append("")
+
+        # Examples
+        examples = method_doc.get("examples", [])
+        if examples:
+            lines.append("Example:")
+            lines.append("```python")
+            lines.append(examples[0].get("code", ""))
+            lines.append("```")
+
+        return "\n".join(lines)
+

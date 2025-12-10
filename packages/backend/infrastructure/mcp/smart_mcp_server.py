@@ -27,7 +27,8 @@ from backend.infrastructure.mcp.tools.pfc import (
     register_pfc_query_python_api_tool,
     register_pfc_query_command_tool,
     register_pfc_browse_commands_tool,
-    register_pfc_browse_contact_models_tool
+    register_pfc_browse_contact_models_tool,
+    register_pfc_browse_python_api_tool
 )
 from backend.infrastructure.mcp.tools.planning import register_planning_tools
 from backend.infrastructure.mcp.tools.agent import register_agent_tools
@@ -60,6 +61,7 @@ register_pfc_list_tasks_tool(mcp)
 # PFC documentation tools - browse (like glob+cat) and query (like grep)
 register_pfc_browse_commands_tool(mcp)
 register_pfc_browse_contact_models_tool(mcp)
+register_pfc_browse_python_api_tool(mcp)
 register_pfc_query_python_api_tool(mcp)
 register_pfc_query_command_tool(mcp)
 # Planning tools - persistent todo tracking with cross-session awareness

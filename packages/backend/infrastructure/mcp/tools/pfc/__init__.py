@@ -12,6 +12,7 @@ Execution Tools:
 Documentation Browse Tools (like glob + cat):
 - pfc_browse_commands: Navigate command hierarchy and retrieve docs by command
 - pfc_browse_contact_models: Navigate contact model properties (separate from commands)
+- pfc_browse_python_api: Navigate Python SDK hierarchy and retrieve docs by API path
 
 Documentation Query Tools (like grep):
 - pfc_query_python_api: Search PFC Python SDK documentation by keywords
@@ -37,6 +38,7 @@ from .pfc_query_python_api import register_pfc_query_python_api_tool
 from .pfc_query_command import register_pfc_query_command_tool
 from .pfc_browse_commands import register_pfc_browse_commands_tool
 from .pfc_browse_contact_models import register_pfc_browse_contact_models_tool
+from .pfc_browse_python_api import register_pfc_browse_python_api_tool
 
 __all__ = [
     "register_pfc_task_tool",
@@ -46,4 +48,5 @@ __all__ = [
     "register_pfc_query_command_tool",
     "register_pfc_browse_commands_tool",
     "register_pfc_browse_contact_models_tool",
+    "register_pfc_browse_python_api_tool",
 ]

@@ -40,12 +40,19 @@ from backend.infrastructure.pfc.python_api.formatter import APIDocFormatter
 from backend.infrastructure.pfc.python_api.loader import DocumentationLoader
 from backend.infrastructure.pfc.python_api.models import SearchResult, APIDocumentation, SearchStrategy
 
+# Aliases for browse tool (more intuitive names)
+APILoader = DocumentationLoader
+APIFormatter = APIDocFormatter
+
 
 # Public API exports
 __all__ = [
     # Core components
     "DocumentationLoader",
     "APIDocFormatter",
+    # Aliases for browse tool
+    "APILoader",
+    "APIFormatter",
     # Data models
     "SearchResult",
     "APIDocumentation",
