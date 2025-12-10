@@ -65,11 +65,6 @@ class KimiToolManager(BaseToolManager):
             if kimi_tool:
                 kimi_tools.append(kimi_tool)
 
-        from backend.config.llm import get_llm_settings
-        llm_settings = get_llm_settings()
-        if llm_settings.debug:
-            print(f"[DEBUG] Final Kimi tools count: {len(kimi_tools)}")
-
         return kimi_tools if kimi_tools else None
 
     def _convert_tool_schema_to_kimi_format(self, tool_schema) -> Dict[str, Any] | None:
@@ -159,9 +154,6 @@ class KimiToolManager(BaseToolManager):
                 if llm_settings.debug:
                     print(f"[WARNING] Failed to convert tool {tool_name} for system prompt: {e}")
                 continue
-
-        if llm_settings.debug:
-            print(f"[DEBUG] Kimi system prompt schemas count: {len(prompt_schemas)}")
 
         return prompt_schemas
 

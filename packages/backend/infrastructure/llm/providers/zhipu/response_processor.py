@@ -265,8 +265,7 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
                             'arguments': func_args
                         }
                     })
-            print(f"[DEBUG] Zhipu raw tool calls: {raw_tool_calls}")
-
+                    
         tool_calls: List[Dict[str, Any]] = []
 
         for tool_call in message.tool_calls:

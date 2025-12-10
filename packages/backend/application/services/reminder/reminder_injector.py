@@ -67,7 +67,6 @@ class ReminderInjector:
         if not reminders:
             return
 
-        print(f"[DEBUG] Injecting {len(reminders)} reminders into user message")
         self._inject_to_content_list(content, reminders)
 
     async def inject_to_tool_result(self, result: Dict[str, Any]) -> None:

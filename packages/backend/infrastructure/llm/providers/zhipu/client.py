@@ -172,12 +172,6 @@ class ZhipuClient(LLMClientBase):
                 )
             )
 
-            if debug:
-                print(f"[DEBUG] Zhipu response received:")
-                print(f"[DEBUG] Finish reason: {response.choices[0].finish_reason}")
-                if hasattr(response, 'usage') and response.usage:
-                    print(f"[DEBUG] Token usage: {response.usage}")
-
             return response
         except Exception as exc:
             if debug:

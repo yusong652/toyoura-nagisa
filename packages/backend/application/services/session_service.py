@@ -135,7 +135,6 @@ class SessionService:
         # Clear tool cache if LLM client provided
         if llm_client and hasattr(llm_client, '_clear_session_context'):
             await llm_client._clear_session_context(session_id)
-            print(f"[DEBUG] Cleared tool cache for session: {session_id}")
         
         # Load session history
         history = load_all_message_history(session_id)

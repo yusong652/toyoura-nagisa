@@ -180,13 +180,6 @@ class KimiClient(LLMClientBase):
 
         try:
             response = await self.async_client.chat.completions.create(**api_kwargs)
-
-            if debug:
-                print(f"[DEBUG] Kimi response received:")
-                print(f"[DEBUG] Finish reason: {response.choices[0].finish_reason}")
-                if response.usage:
-                    print(f"[DEBUG] Token usage: {response.usage}")
-
             return response
         except Exception as exc:
             if debug:

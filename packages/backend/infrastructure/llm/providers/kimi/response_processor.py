@@ -79,16 +79,23 @@ class KimiStreamingProcessor(BaseStreamingProcessor):
         delta = choice.delta
 
         # Also check for usage in choice.usage (appears in finish_reason chunk)
+        # Note: Kimi may include usage in choice, though not in OpenAI's type definition
         usage_metadata = {}
-        if hasattr(choice, 'usage') and choice.usage:
-            usage = choice.usage
+        usage = getattr(choice, 'usage', None)
+        if usage:
+            # Usage may be dict or CompletionUsage object depending on API version
+            def get_usage_field(field: str) -> Any:
+                if isinstance(usage, dict):
+                    return usage.get(field)
+                return getattr(usage, field, None)
+
             usage_metadata = {
-                'prompt_token_count': usage.get('prompt_tokens') if isinstance(usage, dict) else getattr(usage, 'prompt_tokens', None),
-                'candidates_token_count': usage.get('completion_tokens') if isinstance(usage, dict) else getattr(usage, 'completion_tokens', None),
-                'total_token_count': usage.get('total_tokens') if isinstance(usage, dict) else getattr(usage, 'total_tokens', None),
+                'prompt_token_count': get_usage_field('prompt_tokens'),
+                'candidates_token_count': get_usage_field('completion_tokens'),
+                'total_token_count': get_usage_field('total_tokens'),
             }
-            # Extract cached tokens
-            cached = usage.get('cached_tokens') if isinstance(usage, dict) else getattr(usage, 'cached_tokens', None)
+            # Extract cached tokens (Kimi-specific field)
+            cached = get_usage_field('cached_tokens')
             if cached:
                 usage_metadata['cached_tokens'] = cached
 

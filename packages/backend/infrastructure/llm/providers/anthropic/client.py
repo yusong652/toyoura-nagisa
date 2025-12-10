@@ -205,9 +205,6 @@ class AnthropicClient(LLMClientBase):
                     for chunk in processed_chunks:
                         yield chunk
 
-            if debug:
-                print("[DEBUG] Streaming completed successfully")
-
         except Exception as e:
             if debug:
                 print(f"[DEBUG] Streaming API call failed with error: {str(e)}")

@@ -279,9 +279,6 @@ class GeminiClient(LLMClientBase):
                 for processed_chunk in processed_chunks:
                     yield processed_chunk
 
-            if debug:
-                print(f"[DEBUG] Streaming API call completed successfully")
-
         except Exception as e:
             error_message = f"Gemini streaming API call failed: {str(e)}"
             if debug:
