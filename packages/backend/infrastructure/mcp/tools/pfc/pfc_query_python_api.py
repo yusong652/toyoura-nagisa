@@ -1,11 +1,13 @@
-"""PFC Python API Query Tool - MCP wrapper for SDK documentation queries.
+"""PFC Python API Query Tool - Keyword search for SDK documentation.
 
-This MCP tool enables LLM to query PFC Python API documentation and should
-be used FIRST before falling back to itasca.command() strings.
+This tool searches PFC Python SDK documentation by keywords (like grep).
+Returns matching API paths with brief signatures for LLM to identify relevant APIs.
 
-This is a thin wrapper around the core SDK documentation utilities in
-backend.infrastructure.pfc.python_api, handling only MCP protocol integration
-and error response formatting.
+For full documentation, use pfc_browse_python_api with the returned API path.
+
+Workflow:
+1. pfc_query_python_api(query="ball position") → Returns matching API paths
+2. pfc_browse_python_api(api="itasca.ball.Ball.pos") → Get full documentation
 """
 
 from typing import Dict, Any
@@ -29,41 +31,41 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
     """Register PFC Python API query tool with the MCP server."""
 
     @mcp.tool(
-        tags={"pfc", "python", "api", "documentation"},
-        annotations={"category": "pfc", "tags": ["pfc", "python", "documentation"]}
+        tags={"pfc", "python", "api", "documentation", "search"},
+        annotations={"category": "pfc", "tags": ["pfc", "python", "search"]}
     )
     async def pfc_query_python_api(
         context: Context,
         query: str = Field(
             ...,
             description=(
-                "Search for PFC Python API. Examples: 'Ball.pos', 'ball velocity', "
-                "'create a ball', 'pos'. Case-insensitive, supports partial matching."
+                "Search keywords for PFC Python API. Examples: 'ball velocity', "
+                "'create', 'contact force', 'position'. Case-insensitive."
             )
         ),
         limit: int = Field(
             DEFAULT_SEARCH_LIMIT,
-            description=(
-                "Number of results to return. Use higher values for exploring "
-                "related APIs, lower values for focused searches."
-            ),
+            description="Maximum number of results to return (1-20).",
             ge=1,
             le=MAX_SEARCH_LIMIT
         )
     ) -> Dict[str, Any]:
-        """Query PFC Python API documentation - preferred for PFC operations.
+        """Search PFC Python SDK documentation by keywords.
 
-        Searches complete API catalog using exact paths, keywords, or natural language.
-        Returns best matches with full documentation and related alternatives.
+        Returns matching API paths with brief signatures. Use this tool when you
+        don't know the exact API path but have keywords to search.
 
-        The limit parameter controls how many results to return. Use higher values
-        when exploring related APIs, lower values when you know what you're looking for.
+        WORKFLOW:
+        1. Use this tool to find matching API paths
+        2. Use pfc_browse_python_api(api="<path>") for full documentation
+
+        For direct path navigation when you know the API, use pfc_browse_python_api.
         """
         try:
-            # Search for matching APIs with user-specified limit using new search system
+            # Search for matching APIs
             matches = APISearch.search(query, top_k=limit)
 
-            # ===== Condition 1: No results found =====
+            # No results found
             if not matches:
                 # Check fallback hints
                 index = DocumentationLoader.load_index()
@@ -72,13 +74,10 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     if hint_key in query.lower():
                         hints.append(hint_msg)
 
-                # No match is not an error - it's a normal query result
-                # Return success to guide LLM to the next step (query commands)
-                message = f"No Python SDK API found for '{query}'"
                 llm_text = APIDocFormatter.format_no_results_response(query, hints)
 
                 return success_response(
-                    message=message,
+                    message=f"No Python SDK API found for '{query}'",
                     llm_content={
                         "parts": [{
                             "type": "text",
@@ -88,67 +87,36 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     data={
                         "query": query,
                         "matches_found": 0,
-                        "reason": "no_results",
-                        "suggestion": "Use pfc_query_command tool"
+                        "suggestion": "Try pfc_query_command or different keywords"
                     }
                 )
 
-            # ===== Condition 2: Results found - show full documentation =====
-            best_result = matches[0]
-            api_path = best_result.document.name
-            best_score = best_result.score
+            # Format results as list of signatures
+            result_lines = [f"Found {len(matches)} API(s) for '{query}':", ""]
 
-            # Load full documentation for best match
-            api_doc = DocumentationLoader.load_api_doc(api_path)
+            for result in matches:
+                api_path = result.document.name
+                sig = APIDocFormatter.format_signature(api_path, result.document.metadata)
+                if sig:
+                    result_lines.append(f"- {api_path}: {sig}")
+                else:
+                    result_lines.append(f"- {api_path}")
 
-            if not api_doc:
-                return error_response(f"API documentation not found for {api_path}")
-
-            # Format full documentation using new simplified API
-            formatted_doc = APIDocFormatter.format_full_doc(
-                api_doc,
-                api_name=best_result.document.name,
-                metadata=best_result.document.metadata
-            )
-
-            # Format related APIs (if multiple matches)
-            related_section = ""
-            if len(matches) > 1:
-                related_apis = []
-                for result in matches[1:]:
-                    # Pass metadata to formatter for Contact type handling
-                    sig = APIDocFormatter.format_signature(result.document.name, result.document.metadata)
-                    if sig:
-                        related_apis.append(f"- {sig}")
-
-                if related_apis:
-                    related_section = (
-                        f"\n\n---\n\n"
-                        f"## Related APIs\n\n"
-                        f"Query again with exact name if needed:\n\n"
-                        + "\n".join(related_apis)
-                    )
+            result_lines.append("")
+            result_lines.append("Use pfc_browse_python_api(api=\"<path>\") for full documentation")
 
             return success_response(
-                message=f"Found {len(matches)} Python SDK API(s): {api_path}" + (f" + {len(matches)-1} more" if len(matches) > 1 else ""),
+                message=f"Found {len(matches)} Python SDK API(s) for '{query}'",
                 llm_content={
                     "parts": [{
                         "type": "text",
-                        "text": f"**STATUS**: Python SDK Available (preferred approach)\n\n{formatted_doc}{related_section}"
+                        "text": "\n".join(result_lines)
                     }]
                 },
                 data={
-                    "api_name": api_path,
-                    "signature": api_doc['signature'],
-                    "has_limitations": bool(api_doc.get('limitations')),
-                    "fallback_commands": api_doc.get('fallback_commands', []),
-                    "match_count": len(matches),
-                    "is_contact_type": bool(best_result.document.metadata and 'contact_type' in best_result.document.metadata),
-                    "contact_type": best_result.document.metadata.get('contact_type') if best_result.document.metadata else None,
-                    "related_apis": [
-                        {"name": result.document.name, "score": result.score}
-                        for result in matches[1:]
-                    ] if len(matches) > 1 else []
+                    "query": query,
+                    "matches_found": len(matches),
+                    "api_paths": [r.document.name for r in matches]
                 }
             )
 

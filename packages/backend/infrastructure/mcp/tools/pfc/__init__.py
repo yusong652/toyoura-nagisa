@@ -9,26 +9,33 @@ Execution Tools:
 - pfc_check_task_status: Query status of long-running tasks
 - pfc_list_tasks: List all tracked long-running tasks
 
-Documentation Browse Tools (like glob + cat):
-- pfc_browse_commands: Navigate command hierarchy and retrieve docs by command
-- pfc_browse_contact_models: Navigate contact model properties (separate from commands)
-- pfc_browse_python_api: Navigate Python SDK hierarchy and retrieve docs by API path
+Documentation Browse Tools (like glob + cat - navigate by path):
+- pfc_browse_commands: Navigate command hierarchy (e.g., "ball create")
+- pfc_browse_contact_models: Navigate contact model properties (e.g., "linear")
+- pfc_browse_python_api: Navigate Python SDK hierarchy (e.g., "itasca.ball.Ball.pos")
 
-Documentation Query Tools (like grep):
-- pfc_query_python_api: Search PFC Python SDK documentation by keywords
-- pfc_query_command: Search PFC command documentation by keywords
+Documentation Query Tools (like grep - search by keywords):
+- pfc_query_python_api: Search Python SDK by keywords → returns API paths
+- pfc_query_command: Search commands by keywords → returns command paths
 
 Usage Pattern:
-    - Use browse tools to explore documentation boundaries and navigate by path
-    - Use query tools for keyword search when path is unknown
-    - browse = "I know where to look" / query = "I know what to search for"
+    Browse vs Query are PARALLEL tools (not sequential):
+    - Browse = "I know where to look" → navigate directly to documentation
+    - Query = "I have keywords" → search and get paths, then browse for details
+
+    Typical workflow:
+    1. Query: pfc_query_python_api("ball velocity") → finds "itasca.ball.Ball.vel"
+    2. Browse: pfc_browse_python_api("itasca.ball.Ball.vel") → full documentation
+
+    Or directly browse if you know the path:
+    - pfc_browse_commands("ball create") → full command documentation
+    - pfc_browse_python_api("itasca.ball.create") → full API documentation
 
 Version Tracking:
     Each pfc_execute_task creates a git snapshot for traceability.
     Use git_commit in task info to trace code versions.
 
 Note: All PFC command execution is done through Python scripts using itasca.command().
-      Query pfc_query_command for command syntax, then use in scripts.
 """
 
 from .pfc_execute_task import register_pfc_task_tool

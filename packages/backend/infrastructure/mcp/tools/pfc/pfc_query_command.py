@@ -1,10 +1,13 @@
-"""PFC Command Query Tool - MCP wrapper for command documentation queries.
+"""PFC Command Query Tool - Keyword search for command documentation.
 
-This MCP tool enables LLM to query PFC command documentation including
-integrated contact model properties support.
+This tool searches PFC command documentation by keywords (like grep).
+Returns matching command paths with brief descriptions for LLM to identify relevant commands.
 
-This tool complements pfc_query_python_api by providing access to command-level
-documentation when Python SDK doesn't support an operation.
+For full documentation, use pfc_browse_commands with the returned command path.
+
+Workflow:
+1. pfc_query_command(query="ball create") → Returns matching command paths
+2. pfc_browse_commands(command="ball create") → Get full documentation
 """
 
 from typing import Dict, Any
@@ -12,12 +15,8 @@ from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from pydantic import Field
 
-from backend.infrastructure.pfc.commands import (
-    CommandLoader,
-    CommandFormatter
-)
+from backend.infrastructure.pfc.commands import CommandFormatter
 from backend.infrastructure.pfc.shared.query import CommandSearch
-from backend.infrastructure.pfc.shared.models.document import DocumentType
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 # Default and maximum limits for search results
@@ -29,49 +28,36 @@ def register_pfc_query_command_tool(mcp: FastMCP):
     """Register PFC command query tool with the MCP server."""
 
     @mcp.tool(
-        tags={"pfc", "command", "documentation"},
-        annotations={"category": "pfc", "tags": ["pfc", "command", "documentation"]}
+        tags={"pfc", "command", "documentation", "search"},
+        annotations={"category": "pfc", "tags": ["pfc", "command", "search"]}
     )
     async def pfc_query_command(
         context: Context,
         query: str = Field(
             ...,
             description=(
-                "Search for PFC commands or contact model properties. Examples: "
-                "'ball create', 'contact property', 'kn stiffness', 'model solve'. "
-                "Case-insensitive, supports partial matching."
+                "Search keywords for PFC commands. Examples: 'ball create', "
+                "'contact property', 'model solve'. Case-insensitive."
             )
         ),
         limit: int = Field(
             DEFAULT_SEARCH_LIMIT,
-            description=(
-                "Number of results to return (1-20). Use higher values for "
-                "exploring related commands."
-            ),
+            description="Maximum number of results to return (1-20).",
             ge=1,
             le=MAX_SEARCH_LIMIT
-        ),
-        include_model_properties: bool = Field(
-            True,
-            description=(
-                "Include contact model properties in search (default: True). "
-                "Set to False to search only commands."
-            )
         )
     ) -> Dict[str, Any]:
-        """Query PFC command documentation with optional model properties.
+        """Search PFC command documentation by keywords.
 
-        Searches the complete PFC command catalog (115 commands across 7 categories)
-        and optionally includes contact model properties (5 models with detailed
-        property documentation).
+        Returns matching command paths with brief descriptions. Use this tool when
+        you don't know the exact command but have keywords to search.
 
-        Use this tool when:
-        - Python SDK doesn't support an operation (check pfc_query_python_api first)
-        - Need command syntax and parameters
-        - Looking for contact model properties (kn, ks, fric, etc.)
-        - Exploring available commands in a category
+        WORKFLOW:
+        1. Use this tool to find matching command paths
+        2. Use pfc_browse_commands(command="<category> <cmd>") for full documentation
 
-        Returns command documentation with syntax, examples, and Python SDK alternatives.
+        For contact model properties, use pfc_browse_contact_models directly.
+        For direct path navigation when you know the command, use pfc_browse_commands.
         """
         try:
             # Validate limit is within bounds
@@ -80,12 +66,8 @@ def register_pfc_query_command_tool(mcp: FastMCP):
                     f"Limit must be between 1 and {MAX_SEARCH_LIMIT}, got {limit}"
                 )
 
-            # Search for matching commands/properties using new search system
-            results = CommandSearch.search(
-                query,
-                top_k=limit,
-                include_model_properties=include_model_properties
-            )
+            # Search for matching commands only (model properties have separate browse tool)
+            results = CommandSearch.search_commands_only(query, top_k=limit)
 
             # No results found
             if not results:
@@ -102,83 +84,45 @@ def register_pfc_query_command_tool(mcp: FastMCP):
                     data={
                         "query": query,
                         "matches_found": 0,
-                        "include_model_properties": include_model_properties,
-                        "suggestion": "Try pfc_query_python_api for Python SDK alternatives"
+                        "suggestion": "Try different keywords or pfc_browse_commands()"
                     }
                 )
 
-            # Format best result (full documentation)
-            best_result = results[0]
-            formatted_doc = ""
+            # Format results as list
+            result_lines = [f"Found {len(results)} command(s) for '{query}':", ""]
 
-            if best_result.document.doc_type == DocumentType.COMMAND:
-                # Load full command documentation
-                category = best_result.document.category
-                if not category:
-                    formatted_doc = f"# {best_result.document.title}\n\n*Category information missing*"
-                else:
-                    command_name = best_result.document.title.split(maxsplit=1)[1]  # Remove category prefix
-                    cmd_doc = CommandLoader.load_command_doc(category, command_name)
+            for result in results:
+                title = result.document.title
+                category = result.document.category
 
-                    if cmd_doc:
-                        formatted_doc = CommandFormatter.format_command(cmd_doc, category)
-                    else:
-                        formatted_doc = f"# {best_result.document.title}\n\n*Documentation not available*"
+                # Extract command name from title (e.g., "ball create" -> "create")
+                cmd_parts = title.split(maxsplit=1)
+                cmd_name = cmd_parts[1] if len(cmd_parts) > 1 else title
+                browse_path = f"{category} {cmd_name}" if category else title
+                result_lines.append(f"- {title}: pfc_browse_commands(command=\"{browse_path}\")")
 
-            elif best_result.document.doc_type == DocumentType.MODEL_PROPERTY:
-                # Load full model documentation (model-level, not individual property)
-                # Use document.name (e.g., "hertz") instead of category (e.g., "contact")
-                model_name = best_result.document.name
-                if not model_name:
-                    formatted_doc = f"# {best_result.document.title}\n\n*Model name missing*"
-                else:
-                    model_doc = CommandLoader.load_model_property_doc(model_name)
-
-                    if model_doc:
-                        formatted_doc = CommandFormatter.format_full_model(model_doc)
-                    else:
-                        formatted_doc = f"# {best_result.document.title}\n\n*Documentation not available*"
-
-            # Format related results (if multiple matches)
-            related_section = ""
-            if len(results) > 1:
-                related_section = "\n\n---\n\n## Related Results\n\n"
-                # Format related results manually (new SearchResult format)
-                related_parts = [f"Found {len(results) - 1} related result(s):", ""]
-                for i, result in enumerate(results[1:], 1):
-                    type_label = "[CMD]" if result.document.doc_type == DocumentType.COMMAND else "[MODEL]"
-                    score_indicator = "★★★" if result.score >= 900 else ("★★" if result.score >= 700 else "★")
-                    related_parts.append(f"{i}. **{type_label} {result.document.title}** {score_indicator}")
-                related_section += "\n".join(related_parts)
-
-            full_response = formatted_doc + related_section
+            result_lines.append("")
+            result_lines.append("Use pfc_browse_commands(command=\"...\") for full documentation")
 
             return success_response(
-                message=f"Found {len(results)} command(s): {best_result.document.title}" +
-                        (f" + {len(results)-1} more" if len(results) > 1 else ""),
+                message=f"Found {len(results)} command(s) for '{query}'",
                 llm_content={
                     "parts": [{
                         "type": "text",
-                        "text": full_response
+                        "text": "\n".join(result_lines)
                     }]
                 },
                 data={
                     "query": query,
-                    "best_match": best_result.document.title,
-                    "match_type": best_result.document.doc_type.value,
-                    "category": best_result.document.category,
-                    "score": best_result.score,
-                    "total_results": len(results),
-                    "include_model_properties": include_model_properties,
-                    "python_alternative": best_result.document.metadata.get("python_available") if best_result.document.doc_type == DocumentType.COMMAND else None,
-                    "related_results": [
+                    "matches_found": len(results),
+                    "results": [
                         {
-                            "name": r.document.title,
+                            "title": r.document.title,
                             "type": r.document.doc_type.value,
-                            "score": r.score
+                            "category": r.document.category
                         }
-                        for r in results[1:]
-                    ] if len(results) > 1 else []
+                        for r in results
+                    ]
                 }
             )
 
