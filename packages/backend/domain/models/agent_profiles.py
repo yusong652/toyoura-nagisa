@@ -95,8 +95,11 @@ SUBAGENT_PFC_EXPLORER_TOOLS: List[str] = [
     "bash",
     "bash_output",
     # PFC documentation query (read-only)
+    "pfc_browse_commands",
+    "pfc_browse_python_api",
     "pfc_query_python_api",
     "pfc_query_command",
+    "pfc_browse_contact_models",
     # Web search for external docs
     "web_search",
     # Task tracking (consistent with Claude Code Explore agent)
@@ -269,7 +272,7 @@ PFC_EXPLORER = SubAgentConfig(
     display_name="PFC Explorer",
     description="PFC documentation query agent (read-only)",
     tools=tuple(SUBAGENT_PFC_EXPLORER_TOOLS),
-    max_iterations=20,  # Reduced: read-only exploration tasks are simpler
+    max_iterations=64,  # Reduced: read-only exploration tasks are simpler
     streaming_enabled=False,
     enable_memory=False,
 )
