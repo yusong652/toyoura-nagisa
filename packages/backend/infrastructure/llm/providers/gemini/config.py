@@ -83,10 +83,10 @@ class GeminiModelConfig(BaseModel):
         description="Top-K sampling"
     )
     
-    # Gemini 2.5 特有配置
-    enable_thinking_for_gemini_2_5: bool = Field(
+    # Thinking configuration
+    enable_thinking: bool = Field(
         default=True,
-        description="Whether to enable thinking mode for Gemini 2.5 model"
+        description="Whether to enable thinking mode for supported models (Gemini 2.5+, Gemini 3+)"
     )
     include_thoughts_in_response: bool = Field(
         default=True,
@@ -104,6 +104,12 @@ class GeminiModelConfig(BaseModel):
             "Recommended: Enable for PFC agent or domain-specific sessions where reasoning continuity is valuable."
         )
     )
+
+    # Backward compatibility alias
+    @property
+    def enable_thinking_for_gemini_2_5(self) -> bool:
+        """Backward compatibility alias for enable_thinking"""
+        return self.enable_thinking
 
 
 class GeminiClientConfig(BaseModel):
@@ -133,13 +139,15 @@ class GeminiClientConfig(BaseModel):
         description="Whether to enable tool calling function"
     )
     
-    def get_generation_config_kwargs(self, system_prompt: str, tool_schemas: List[types.Tool] = None) -> Dict[str, Any]:
+    def get_generation_config_kwargs(self, system_prompt: str, tool_schemas: Optional[List[types.Tool]]) -> Dict[str, Any]:
         """
         Get GenerateContentConfig parameters for Gemini API
         
         Args:
             system_prompt: system prompt
-            tool_schemas: tool schemas list
+            tool_schemas: tool schemas list 
+
+            
             
         Returns:
             Dict[str, Any]: GenerateContentConfig parameters
@@ -162,13 +170,22 @@ class GeminiClientConfig(BaseModel):
         if tool_schemas:
             config_kwargs["tools"] = tool_schemas
         
-        # Add thinking configuration for Gemini 2.5 model
-        if (self.model_settings.model.startswith("gemini-2.5") and 
-            self.model_settings.enable_thinking_for_gemini_2_5):
-            config_kwargs["thinking_config"] = types.ThinkingConfig(
-                include_thoughts=self.model_settings.include_thoughts_in_response
-            )
-        
+        # Add thinking configuration based on model version
+        model = self.model_settings.model
+        if self.model_settings.enable_thinking:
+            # Gemini 3 models use thinking_level parameter (enum)
+            if model.startswith("gemini-3"):
+                config_kwargs["thinking_config"] = types.ThinkingConfig(
+                    thinking_level=types.ThinkingLevel.HIGH,  # LOW or HIGH, cannot be disabled for Gemini 3
+                    include_thoughts=self.model_settings.include_thoughts_in_response
+                )
+            # Gemini 2.5 models use thinking_budget parameter
+            elif model.startswith("gemini-2.5"):
+                config_kwargs["thinking_config"] = types.ThinkingConfig(
+                    thinking_budget=-1,  # -1 = dynamic (auto), model adjusts based on complexity
+                    include_thoughts=self.model_settings.include_thoughts_in_response
+                )
+
         return config_kwargs
 
 

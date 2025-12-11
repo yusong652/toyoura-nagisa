@@ -297,12 +297,18 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
             # Use model from context
             model = context.get('model', llm_gemini_config.model)
 
-            # Add thinking configuration if applicable
-            if (model.startswith("gemini-2.5") and
-                gemini_client_config.model_settings.enable_thinking_for_gemini_2_5):
-                config_kwargs["thinking_config"] = types.ThinkingConfig(
-                    include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
-                )
+            # Add thinking configuration based on model version
+            if gemini_client_config.model_settings.enable_thinking:
+                if model.startswith("gemini-3"):
+                    config_kwargs["thinking_config"] = types.ThinkingConfig(
+                        thinking_level=types.ThinkingLevel.HIGH,
+                        include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
+                    )
+                elif model.startswith("gemini-2.5"):
+                    config_kwargs["thinking_config"] = types.ThinkingConfig(
+                        thinking_budget=-1,
+                        include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
+                    )
 
             prompt_config = types.GenerateContentConfig(**config_kwargs)
 
@@ -409,12 +415,18 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
             # Use model from context
             model = context.get('model', llm_gemini_config.model)
 
-            # Add thinking configuration if applicable
-            if (model.startswith("gemini-2.5") and
-                gemini_client_config.model_settings.enable_thinking_for_gemini_2_5):
-                config_kwargs["thinking_config"] = types.ThinkingConfig(
-                    include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
-                )
+            # Add thinking configuration based on model version
+            if gemini_client_config.model_settings.enable_thinking:
+                if model.startswith("gemini-3"):
+                    config_kwargs["thinking_config"] = types.ThinkingConfig(
+                        thinking_level=types.ThinkingLevel.HIGH,
+                        include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
+                    )
+                elif model.startswith("gemini-2.5"):
+                    config_kwargs["thinking_config"] = types.ThinkingConfig(
+                        thinking_budget=-1,
+                        include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
+                    )
 
             prompt_config = types.GenerateContentConfig(**config_kwargs)
 
