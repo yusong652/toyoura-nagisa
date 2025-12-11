@@ -24,7 +24,8 @@ import { BlinkingCircle } from '../BlinkingCircle.js';
 import { getCachedStringWidth } from '../../utils/textUtils.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
-const MAX_THINKING_LINES = 3;
+// Keep in sync with AssistantMessage.tsx for consistent display
+const MAX_THINKING_LINES = 4;
 
 interface PendingItemDisplayProps {
   item: HistoryItemWithoutId;

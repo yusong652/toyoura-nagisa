@@ -15,7 +15,8 @@ import { theme } from '../../colors.js';
 import { getCachedStringWidth } from '../../utils/textUtils.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
-const MAX_THINKING_LINES = 8;
+// Keep in sync with PendingItemDisplay.tsx for consistent display
+const MAX_THINKING_LINES = 4;
 
 interface AssistantMessageProps {
   item: AssistantHistoryItem;
