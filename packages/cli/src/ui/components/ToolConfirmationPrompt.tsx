@@ -7,10 +7,16 @@
  * - edit: Shows git diff-style visualization for file changes
  * - exec: Shows command to be executed
  * - info: Generic tool confirmation
+ *
+ * Confirmation outcomes:
+ * - approve: Execute the tool
+ * - reject: Stop execution, user wants to provide input via main input
+ * - reject_and_tell: Continue execution with user's brief instruction
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Box, Text, useStdout } from 'ink';
+import TextInput from 'ink-text-input';
 import type {
   ToolConfirmationData,
   EditToolConfirmationData,
@@ -22,13 +28,17 @@ import { RadioButtonSelect, type RadioSelectItem } from './shared/RadioButtonSel
 import { useKeypress } from '../hooks/useKeypress.js';
 import { DiffRenderer, getDiffStats } from './DiffRenderer.js';
 
+// Confirmation outcome types matching backend
+export type ConfirmationOutcome = 'approve' | 'reject' | 'reject_and_tell';
+
 interface ToolConfirmationPromptProps {
   data: ToolConfirmationData;
-  onConfirm: (approved: boolean, message?: string) => void;
+  onConfirm: (outcome: ConfirmationOutcome, message?: string) => void;
   isFocused?: boolean;
 }
 
-type ConfirmationOutcome = 'approve' | 'reject';
+// Radio option type (without reject_and_tell input mode)
+type RadioOutcome = 'approve' | 'reject' | 'reject_and_tell';
 
 export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
   data,
@@ -39,12 +49,35 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
   const terminalWidth = stdout?.columns ?? 80;
   const terminalHeight = stdout?.rows ?? 24;
 
+  // State for "reject and tell" input mode
+  const [isInputMode, setIsInputMode] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+
   const handleSelect = useCallback(
-    (outcome: ConfirmationOutcome) => {
-      onConfirm(outcome === 'approve');
+    (outcome: RadioOutcome) => {
+      if (outcome === 'reject_and_tell') {
+        // Enter input mode for user instruction
+        setIsInputMode(true);
+      } else {
+        onConfirm(outcome);
+      }
     },
     [onConfirm]
   );
+
+  const handleInputSubmit = useCallback(
+    (value: string) => {
+      // Submit the reject_and_tell with user's instruction
+      onConfirm('reject_and_tell', value.trim() || undefined);
+    },
+    [onConfirm]
+  );
+
+  const handleInputCancel = useCallback(() => {
+    // Cancel input mode, go back to radio selection
+    setIsInputMode(false);
+    setInputValue('');
+  }, []);
 
   // Calculate available height for diff content
   // We need to reserve space for:
@@ -67,21 +100,29 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
     return 0;
   }, [data, terminalHeight]);
 
-  // Handle escape key only (scrolling removed - use native terminal scrolling)
+  // Handle escape key and input mode keys
   useKeypress(
     (key) => {
       if (!isFocused) return;
 
-      // Escape to reject
-      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
-        onConfirm(false);
-        return;
+      if (isInputMode) {
+        // In input mode: Escape to cancel input and go back to radio
+        if (key.name === 'escape') {
+          handleInputCancel();
+          return;
+        }
+      } else {
+        // In radio mode: Escape to reject
+        if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+          onConfirm('reject');
+          return;
+        }
       }
     },
     { isActive: isFocused }
   );
 
-  const options: Array<RadioSelectItem<ConfirmationOutcome>> = useMemo(
+  const options: Array<RadioSelectItem<RadioOutcome>> = useMemo(
     () => [
       {
         label: 'Yes, allow',
@@ -92,6 +133,11 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
         label: 'No, reject (Esc)',
         value: 'reject' as const,
         key: 'reject',
+      },
+      {
+        label: 'Reject and tell agent...',
+        value: 'reject_and_tell' as const,
+        key: 'reject_and_tell',
       },
     ],
     []
@@ -238,20 +284,44 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
         <Text color={theme.text.primary}>{question}</Text>
       </Box>
 
-      {/* Radio Button Select - fixed height, never shrinks */}
+      {/* Radio Button Select or Input Mode */}
       <Box flexShrink={0}>
-        <RadioButtonSelect
-          items={options}
-          onSelect={handleSelect}
-          isFocused={isFocused}
-          showNumbers={true}
-        />
+        {isInputMode ? (
+          // Input mode for "reject and tell"
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text color={theme.text.accent}>
+                Tell the agent what to do instead:
+              </Text>
+            </Box>
+            <Box>
+              <Text color={theme.text.muted}>{'> '}</Text>
+              <TextInput
+                value={inputValue}
+                onChange={setInputValue}
+                onSubmit={handleInputSubmit}
+                focus={isFocused}
+                placeholder="e.g., use a different approach..."
+              />
+            </Box>
+          </Box>
+        ) : (
+          // Radio button selection
+          <RadioButtonSelect
+            items={options}
+            onSelect={handleSelect}
+            isFocused={isFocused}
+            showNumbers={true}
+          />
+        )}
       </Box>
 
       {/* Help text - fixed height, never shrinks */}
       <Box marginTop={1} flexShrink={0}>
         <Text color={theme.text.muted}>
-          (↑↓ select, Enter confirm, Esc cancel)
+          {isInputMode
+            ? '(Enter submit, Esc cancel)'
+            : '(↑↓ select, Enter confirm, Esc cancel)'}
         </Text>
       </Box>
     </Box>

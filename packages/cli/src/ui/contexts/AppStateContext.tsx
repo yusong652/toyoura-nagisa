@@ -83,7 +83,7 @@ export interface AppActions {
   cancelRequest: () => void;
 
   // Tool confirmation
-  confirmTool: (approved: boolean, message?: string) => void;
+  confirmTool: (outcome: 'approve' | 'reject' | 'reject_and_tell', message?: string) => void;
 
   // UI
   quit: () => void;

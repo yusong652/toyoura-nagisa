@@ -49,7 +49,7 @@ export interface UseChatStreamReturn {
   // Actions
   submitQuery: (text: string, mentionedFiles?: string[]) => void;
   cancelRequest: () => void;
-  confirmTool: (approved: boolean, message?: string) => void;
+  confirmTool: (outcome: 'approve' | 'reject' | 'reject_and_tell', message?: string) => void;
   clearError: () => void;
 }
 
@@ -92,10 +92,19 @@ export function useChatStream({
       setStreamingState(StreamingState.WaitingForConfirmation);
       setIsStreaming(false);
     },
-    onConfirmationEnd: () => {
-      // Resume streaming state after confirmation
-      setIsStreaming(true);
-      setStreamingState(StreamingState.Responding);
+    onConfirmationEnd: (outcome) => {
+      // Handle based on outcome:
+      // - approve/reject_and_tell: Resume streaming, agent continues
+      // - reject: Stay in idle state, user will input via main input
+      if (outcome === 'reject') {
+        // User rejected - stay idle, user will provide new input
+        setStreamingState(StreamingState.Idle);
+        setIsStreaming(false);
+      } else {
+        // approve or reject_and_tell - agent continues execution
+        setIsStreaming(true);
+        setStreamingState(StreamingState.Responding);
+      }
     },
   });
 
