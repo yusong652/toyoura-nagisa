@@ -58,8 +58,8 @@ class KimiStreamingProcessor(BaseStreamingProcessor):
                     'total_token_count': getattr(usage, 'total_tokens', None),
                 }
                 # Extract cached tokens if available
-                if hasattr(usage, 'cached_tokens') and usage.cached_tokens:
-                    usage_metadata['cached_tokens'] = usage.cached_tokens
+                if hasattr(usage, 'cached_tokens') and usage.cached_tokens: # type: ignore
+                    usage_metadata['cached_tokens'] = usage.cached_tokens # type: ignore
                 # Extract completion_tokens_details if available (for K2 Thinking models)
                 if hasattr(usage, 'completion_tokens_details') and usage.completion_tokens_details:
                     usage_metadata['reasoning_tokens'] = getattr(usage.completion_tokens_details, 'reasoning_tokens', None)
@@ -280,7 +280,6 @@ class KimiResponseProcessor(BaseResponseProcessor):
                             'arguments': getattr(function, 'arguments', '')
                         }
                     })
-            KimiDebugger.print_tool_call_received(raw_tool_calls)
 
         tool_calls: List[Dict[str, Any]] = []
 
@@ -318,11 +317,6 @@ class KimiResponseProcessor(BaseResponseProcessor):
             except Exception as exc:
                 print(f"[WARNING] Failed to parse tool call: {exc}")
                 continue
-
-        # Debug: Print extracted tool calls
-        from backend.config.llm import get_llm_settings
-        if get_llm_settings().debug:
-            KimiDebugger.print_extracted_tool_calls(tool_calls)
 
         return tool_calls
 
