@@ -4,9 +4,13 @@ Tool execution and confirmation message schemas.
 This module defines WebSocket messages for tool usage notifications,
 user confirmation requests, and interrupt controls.
 """
-from typing import Optional
+from typing import Literal, Optional
 from backend.presentation.websocket.messages.base import BaseWebSocketMessage
 from backend.presentation.websocket.messages.types import MessageType
+
+
+# Confirmation outcome types
+ConfirmationOutcome = Literal["approve", "reject", "reject_and_tell"]
 
 
 class ToolConfirmationRequestMessage(BaseWebSocketMessage):
@@ -55,17 +59,26 @@ class ToolConfirmationResponseMessage(BaseWebSocketMessage):
     Tool confirmation response message schema.
 
     Sent by frontend in response to ToolConfirmationRequestMessage
-    to approve or reject tool execution.
+    to approve, reject, or reject with instruction.
+
+    Outcomes:
+        - approve: Execute the tool
+        - reject: Stop execution, user wants to provide complex input via main input
+        - reject_and_tell: Don't execute but continue with user's instruction injected
 
     Attributes:
         tool_call_id: ID matching the original request
-        approved: Whether user approved the tool execution
-        user_message: Optional message from user (e.g., modifications, cancellation reason)
+        outcome: The user's decision (approve/reject/reject_and_tell)
+        user_message: Optional message from user
+            - For reject: reason for rejection (saved for context injection)
+            - For reject_and_tell: instruction to tell the agent
+        approved: (Deprecated) Legacy field for backward compatibility
     """
     type: MessageType = MessageType.TOOL_CONFIRMATION_RESPONSE
     tool_call_id: str  # ID of the tool call to match the request
-    approved: bool
+    outcome: Optional[ConfirmationOutcome] = None  # New field: approve/reject/reject_and_tell
     user_message: Optional[str] = None
+    approved: Optional[bool] = None  # Legacy field for backward compatibility
 
 
 class UserInterruptMessage(BaseWebSocketMessage):

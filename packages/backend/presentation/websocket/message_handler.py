@@ -331,6 +331,11 @@ class ToolConfirmationHandler(MessageHandler):
     Purpose: Process user responses to tool confirmation requests (bash, edit, write, etc.).
     When user approves/rejects a tool operation in the frontend, this handler
     routes the response to the ToolConfirmationService to unblock waiting tools.
+
+    Supports three outcomes:
+    - approve: Execute the tool
+    - reject: Stop execution, save context for next message injection
+    - reject_and_tell: Continue execution with user's instruction injected
     """
 
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
@@ -340,10 +345,11 @@ class ToolConfirmationHandler(MessageHandler):
 
                 # Extract confirmation data from message
                 tool_call_id = getattr(message, 'tool_call_id', None)
-                approved = getattr(message, 'approved', False)
+                outcome = getattr(message, 'outcome', None)
                 user_message = getattr(message, 'user_message', None)
+                approved = getattr(message, 'approved', None)  # Legacy field
 
-                print(f"[ToolConfirmationHandler] tool_call_id={tool_call_id}, session_id={session_id}, approved={approved}", flush=True)
+                print(f"[ToolConfirmationHandler] tool_call_id={tool_call_id}, session_id={session_id}, outcome={outcome}, approved={approved}", flush=True)
                 if user_message:
                     print(f"[ToolConfirmationHandler] user_message={user_message}", flush=True)
 
@@ -356,11 +362,12 @@ class ToolConfirmationHandler(MessageHandler):
                 confirmation_service = get_tool_confirmation_service()
 
                 if confirmation_service:
-                    # Handle the confirmation response
+                    # Handle the confirmation response (supports both outcome and legacy approved)
                     handled = confirmation_service.handle_confirmation_response(
                         tool_call_id=tool_call_id,
-                        approved=approved,
-                        user_message=user_message
+                        outcome=outcome,
+                        user_message=user_message,
+                        approved=approved,  # Legacy fallback
                     )
 
                     if handled:
@@ -373,15 +380,15 @@ class ToolConfirmationHandler(MessageHandler):
                             f"No active confirmation for session: {session_id}"
                         )
                 else:
-                    logger.error("Bash confirmation service not available")
+                    logger.error("Tool confirmation service not available")
                     await self.send_error(
                         session_id,
                         "SERVICE_UNAVAILABLE",
-                        "Bash confirmation service is not available"
+                        "Tool confirmation service is not available"
                     )
 
             except Exception as e:
-                logger.error(f"Error processing bash confirmation response: {e}")
+                logger.error(f"Error processing tool confirmation response: {e}")
                 await self.send_error(
                     session_id,
                     "CONFIRMATION_PROCESSING_ERROR",

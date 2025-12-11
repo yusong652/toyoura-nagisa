@@ -4,10 +4,19 @@ Tool Executor - Handles tool classification, execution, and cascade blocking.
 Extracted tool execution logic for better modularity.
 Used by Agent for tool execution during conversation turns.
 Designed to support future subagent extensions.
+
+Confirmation outcomes:
+- approve: Execute the tool
+- reject: Stop execution, user wants to provide input via main input
+- reject_and_tell: Don't execute but continue with user's instruction injected
 """
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 from backend.application.services.confirmation_strategy import ConfirmationStrategy
+
+
+# Rejection outcome types (subset of ConfirmationOutcome, excluding "approve")
+RejectionOutcome = Literal["reject", "reject_and_tell"]
 
 
 @dataclass
@@ -15,7 +24,9 @@ class ToolExecutionResult:
     """Result of tool execution batch."""
     results: List[Optional[Dict]]  # Results indexed by original order
     rejected_tools: List[str]  # Names of rejected tools
-    user_rejected: bool  # Whether any tool was user-rejected
+    user_rejected: bool  # Whether any tool was user-rejected (reject or reject_and_tell)
+    rejection_outcome: Optional[RejectionOutcome] = None  # The type of rejection
+    rejection_message: Optional[str] = None  # User's message for rejection
 
 
 @dataclass
@@ -102,6 +113,10 @@ class ToolExecutor:
 
         Returns:
             ToolExecutionResult with all results and rejection info
+
+        Note:
+            - reject: Cascade blocks remaining tools, agent should stop
+            - reject_and_tell: Cascade blocks remaining tools, but agent continues with instruction
         """
         # Classify tools
         classified = self.classify_tools(tool_calls)
@@ -109,6 +124,8 @@ class ToolExecutor:
         # Prepare results storage
         results: List[Optional[Dict]] = [None] * len(tool_calls)
         rejected_tools: List[str] = []
+        rejection_outcome: Optional[RejectionOutcome] = None
+        rejection_message: Optional[str] = None
 
         # Execute non-confirmation tools first
         for original_index, tool_call in classified.non_confirm:
@@ -129,13 +146,15 @@ class ToolExecutor:
                 rejected_tools.append(tool_name)
             else:
                 # Request confirmation and execute
-                result, was_rejected = await self._execute_with_confirmation(
+                result, outcome, user_message = await self._execute_with_confirmation(
                     tool_call, message_id
                 )
-                if was_rejected:
+                if outcome in ("reject", "reject_and_tell"):
                     user_rejected = True
                     rejected_tool_name = tool_name
                     rejected_tools.append(tool_name)
+                    rejection_outcome = outcome
+                    rejection_message = user_message
 
             results[original_index] = result
             await self._notify_result(tool_call, result, agent_profile)
@@ -143,7 +162,9 @@ class ToolExecutor:
         return ToolExecutionResult(
             results=results,
             rejected_tools=rejected_tools,
-            user_rejected=user_rejected
+            user_rejected=user_rejected,
+            rejection_outcome=rejection_outcome,
+            rejection_message=rejection_message,
         )
 
     async def _execute_single_tool(
@@ -160,12 +181,13 @@ class ToolExecutor:
         self,
         tool_call: Dict,
         message_id: str
-    ) -> Tuple[Dict, bool]:
+    ) -> Tuple[Dict, Optional[str], Optional[str]]:
         """
         Execute tool with user confirmation.
 
         Returns:
-            Tuple[Dict, bool]: (result, was_rejected)
+            Tuple[Dict, Optional[str], Optional[str]]: (result, outcome, user_message)
+            - outcome is None if approved, "reject" or "reject_and_tell" if rejected
         """
         from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
 
@@ -173,19 +195,30 @@ class ToolExecutor:
         info = await self.confirmation_strategy.build_confirmation_info(tool_call)
 
         # Request confirmation (use notification_session_id for WebSocket routing)
-        approved, user_message = await self.confirmation_strategy.request_confirmation(
+        confirmation_result = await self.confirmation_strategy.request_confirmation(
             info, self.notification_session_id, message_id
         )
 
-        if approved:
+        if confirmation_result.outcome == "approve":
             result = await self._execute_single_tool(tool_call, message_id)
-            return (result, False)
-        else:
+            return (result, None, None)
+        elif confirmation_result.outcome == "reject_and_tell":
+            # User wants to continue but with instruction
             result = user_rejected_response(
-                user_message=user_message or f"User rejected {info.tool_name}"
+                user_message=confirmation_result.user_message or f"User rejected {info.tool_name}",
+                include_stop_instruction=False,  # Don't tell agent to stop, continue with instruction
             )
             result["user_rejected"] = True
-            return (result, True)
+            result["rejection_outcome"] = "reject_and_tell"
+            return (result, "reject_and_tell", confirmation_result.user_message)
+        else:
+            # reject: User wants to stop and provide input via main input
+            result = user_rejected_response(
+                user_message=confirmation_result.user_message or f"User rejected {info.tool_name}"
+            )
+            result["user_rejected"] = True
+            result["rejection_outcome"] = "reject"
+            return (result, "reject", confirmation_result.user_message)
 
     def _create_cascade_blocked_result(
         self,

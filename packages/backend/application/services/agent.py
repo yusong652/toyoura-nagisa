@@ -205,19 +205,43 @@ class Agent:
                 final_message = processor.format_response_for_storage(final_response)
                 streaming_message_id = getattr(self.context_manager, 'streaming_message_id', None)
             else:
-                # SubAgent: check for iteration limit marker first
-                if isinstance(final_response, dict) and "_iteration_limit_text" in final_response:
-                    # Iteration limit reached - use pre-formatted text
-                    response_text = final_response["_iteration_limit_text"]
-                    return AgentResult(
-                        status="max_iterations",
-                        message=AssistantMessage(
-                            role="assistant",
-                            content=[{"type": "text", "text": response_text}]
-                        ),
-                        iterations_used=self.config.max_iterations,
-                        execution_time_seconds=time.time() - start_time,
-                    )
+                # SubAgent: check for special markers first
+                if isinstance(final_response, dict):
+                    # Check for user rejection marker
+                    if "_subagent_rejected" in final_response:
+                        rejected_tools = final_response.get("_rejected_tools", [])
+                        rejection_message = final_response.get("_rejection_message")
+                        tools_str = ", ".join(rejected_tools) if rejected_tools else "unknown"
+
+                        response_text = (
+                            f"SubAgent operation was rejected by user.\n"
+                            f"Rejected tool(s): {tools_str}"
+                        )
+                        if rejection_message:
+                            response_text += f"\nUser's reason: {rejection_message}"
+
+                        return AgentResult(
+                            status="user_rejected",
+                            message=AssistantMessage(
+                                role="assistant",
+                                content=[{"type": "text", "text": response_text}]
+                            ),
+                            execution_time_seconds=time.time() - start_time,
+                        )
+
+                    # Check for iteration limit marker
+                    if "_iteration_limit_text" in final_response:
+                        # Iteration limit reached - use pre-formatted text
+                        response_text = final_response["_iteration_limit_text"]
+                        return AgentResult(
+                            status="max_iterations",
+                            message=AssistantMessage(
+                                role="assistant",
+                                content=[{"type": "text", "text": response_text}]
+                            ),
+                            iterations_used=self.config.max_iterations,
+                            execution_time_seconds=time.time() - start_time,
+                        )
 
                 # SubAgent: extract text content from LLM response
                 response_text = processor.extract_text_content(final_response)
@@ -393,16 +417,28 @@ class Agent:
                     tool_calls, execution_result.results
                 )
 
-                # Handle rejection
+                # Handle rejection based on outcome type
                 if execution_result.rejected_tools:
-                    await WebSocketNotificationService.send_streaming_update(
-                        session_id=self.session_id,
-                        message_id=self._message_id,
-                        content=self._state.get_content_blocks(),
-                        streaming=False,
-                        interrupted=False
-                    )
-                    raise UserRejectionInterruption(self.session_id, execution_result.rejected_tools)
+                    if execution_result.rejection_outcome == "reject":
+                        # reject: Stop execution, user wants to provide input via main input
+                        # Save rejection context for next message injection
+                        await self._save_rejection_context(
+                            execution_result.rejected_tools,
+                            execution_result.rejection_message
+                        )
+                        await WebSocketNotificationService.send_streaming_update(
+                            session_id=self.session_id,
+                            message_id=self._message_id,
+                            content=self._state.get_content_blocks(),
+                            streaming=False,
+                            interrupted=False
+                        )
+                        raise UserRejectionInterruption(self.session_id, execution_result.rejected_tools)
+                    elif execution_result.rejection_outcome == "reject_and_tell":
+                        # reject_and_tell: Continue execution with user's instruction
+                        # Results already saved to context, just continue to next iteration
+                        print(f"[Agent] Tool rejected with instruction, continuing: {execution_result.rejection_message}")
+                        # Don't raise exception, continue to next iteration
 
                 # Check for user interrupt
                 if self.status_monitor.is_user_interrupted():
@@ -452,6 +488,24 @@ class Agent:
                             is_error=is_error,
                         )
 
+                # Handle SubAgent rejection based on outcome type
+                if execution_result.rejected_tools:
+                    if execution_result.rejection_outcome == "reject":
+                        # reject: Stop SubAgent, return rejection result to MainAgent
+                        # Save rejection context for MainAgent's next message injection
+                        await self._save_rejection_context(
+                            execution_result.rejected_tools,
+                            execution_result.rejection_message,
+                            is_subagent=True
+                        )
+                        # Return special marker for SubAgent rejection
+                        return {
+                            "_subagent_rejected": True,
+                            "_rejected_tools": execution_result.rejected_tools,
+                            "_rejection_message": execution_result.rejection_message,
+                        }
+                    # reject_and_tell: Continue execution, results already in context
+
                 # Save results to context only (no database persistence for SubAgent)
                 # inject_reminders=True to include iteration warnings in last tool result
                 await tool_executor.save_results_to_context(
@@ -465,6 +519,37 @@ class Agent:
 
             # Continue to next iteration
             iteration += 1
+
+    async def _save_rejection_context(
+        self,
+        rejected_tools: list,
+        rejection_message: Optional[str],
+        is_subagent: bool = False
+    ) -> None:
+        """
+        Save rejection context for next message injection.
+
+        When user rejects a tool, we save the context so that the next message
+        can include information about what was rejected. This helps the agent
+        understand the context when user provides their next input.
+
+        Args:
+            rejected_tools: List of rejected tool names
+            rejection_message: Optional message from user
+            is_subagent: Whether this is a SubAgent rejection
+        """
+        from backend.infrastructure.storage.session_manager import update_runtime_state
+
+        rejection_context = {
+            "rejected_tools": rejected_tools,
+            "rejection_message": rejection_message,
+            "is_subagent": is_subagent,
+        }
+
+        # Use notification_session_id for SubAgent (MainAgent's session)
+        target_session_id = self._notification_session_id if is_subagent else self.session_id
+        update_runtime_state(target_session_id, "rejection_context", rejection_context)
+        print(f"[Agent] Saved rejection context for session {target_session_id}: {rejection_context}")
 
     async def _handle_stream_interruption(self, iteration: int) -> Any:
         """Handle user interruption during streaming."""

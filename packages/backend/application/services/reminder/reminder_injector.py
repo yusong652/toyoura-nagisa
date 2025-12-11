@@ -108,6 +108,12 @@ class ReminderInjector:
         """
         reminders = []
 
+        # 0. Check for rejection context (only for user messages, not tool results)
+        if not check_queue:
+            rejection_reminder = await self._get_rejection_context_reminder()
+            if rejection_reminder:
+                reminders.append(rejection_reminder)
+
         # 1. Process file mentions (only for user messages)
         if mentioned_files:
             from backend.infrastructure.file_mention import FileMentionProcessor
@@ -125,6 +131,60 @@ class ReminderInjector:
         reminders.extend(status_reminders)
 
         return reminders
+
+    async def _get_rejection_context_reminder(self) -> Optional[str]:
+        """
+        Get rejection context reminder if user previously rejected a tool.
+
+        When user rejects a tool and then provides new input, we inject context
+        about what was rejected so the agent understands the situation.
+
+        Returns:
+            Formatted reminder string or None if no rejection context exists
+        """
+        from backend.infrastructure.storage.session_manager import (
+            load_runtime_state,
+            update_runtime_state,
+        )
+
+        state = load_runtime_state(self.session_id)
+        rejection_context = state.get("rejection_context")
+
+        if not rejection_context:
+            return None
+
+        # Clear the rejection context after reading (one-time injection)
+        update_runtime_state(self.session_id, "rejection_context", None)
+
+        rejected_tools = rejection_context.get("rejected_tools", [])
+        rejection_message = rejection_context.get("rejection_message")
+        is_subagent = rejection_context.get("is_subagent", False)
+
+        # Format the reminder
+        tools_str = ", ".join(rejected_tools) if rejected_tools else "unknown"
+
+        if is_subagent:
+            reminder = (
+                f"<system-reminder>\n"
+                f"The user just rejected a SubAgent's tool call ({tools_str})."
+            )
+        else:
+            reminder = (
+                f"<system-reminder>\n"
+                f"The user just rejected a tool call ({tools_str})."
+            )
+
+        if rejection_message:
+            reminder += f"\nUser's reason: {rejection_message}"
+
+        reminder += (
+            f"\nPlease take this rejection into account and adjust your approach "
+            f"based on the user's new input below.\n"
+            f"</system-reminder>"
+        )
+
+        print(f"[ReminderInjector] Injecting rejection context reminder for session {self.session_id}")
+        return reminder
 
     def _inject_to_content_list(
         self,

@@ -112,6 +112,26 @@ Usage notes:
                 iterations_used=result.iterations_used,
                 execution_time_seconds=result.execution_time_seconds,
             )
+        elif result.status == "user_rejected":
+            # SubAgent's tool was rejected by user - propagate rejection to MainAgent
+            from backend.shared.exceptions import UserRejectionInterruption
+
+            # Return error response first (for tool result)
+            error_result = error_response(
+                f"SubAgent '{config.display_name}' was rejected by user. "
+                f"Details:\n\n{result.text}",
+                subagent_type=subagent_type,
+                status="user_rejected",
+                execution_time_seconds=result.execution_time_seconds,
+            )
+            error_result["user_rejected"] = True
+
+            # Raise interruption to stop MainAgent execution
+            # The rejection context has already been saved by SubAgent
+            raise UserRejectionInterruption(
+                session_id=session_id,
+                rejected_tools=[f"invoke_agent:{subagent_type}"]
+            )
         elif result.status == "empty_response":
             # SubAgent completed but returned empty/whitespace-only content
             return error_response(

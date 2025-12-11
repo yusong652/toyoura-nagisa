@@ -237,7 +237,7 @@ class ConfirmationStrategy:
         info: ConfirmationInfo,
         session_id: str,
         message_id: str
-    ) -> Tuple[bool, Optional[str]]:
+    ):
         """
         Request user confirmation for tool execution.
 
@@ -247,19 +247,20 @@ class ConfirmationStrategy:
             message_id: Message ID containing the tool call
 
         Returns:
-            Tuple[bool, Optional[str]]: (approved, user_message)
+            ConfirmationResult with outcome and optional user_message
         """
         from backend.application.services.notifications.tool_confirmation_service import (
-            get_tool_confirmation_service
+            get_tool_confirmation_service,
+            ConfirmationResult,
         )
 
         confirmation_service = get_tool_confirmation_service()
         if not confirmation_service:
             print(f"[ConfirmationStrategy] Service not available, auto-rejecting {info.tool_name}")
-            return (False, "Confirmation service not available")
+            return ConfirmationResult(outcome="reject", user_message="Confirmation service not available")
 
         try:
-            approved, user_message = await confirmation_service.request_confirmation(
+            result = await confirmation_service.request_confirmation(
                 session_id=session_id,
                 message_id=message_id,
                 tool_call_id=info.tool_id,
@@ -273,8 +274,8 @@ class ConfirmationStrategy:
                 original_content=info.original_content,
                 new_content=info.new_content
             )
-            return (approved, user_message)
+            return result
 
         except Exception as e:
             print(f"[ConfirmationStrategy] Error requesting confirmation: {e}")
-            return (False, f"Error during confirmation: {str(e)}")
+            return ConfirmationResult(outcome="reject", user_message=f"Error during confirmation: {str(e)}")

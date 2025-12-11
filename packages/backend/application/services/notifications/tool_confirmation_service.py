@@ -11,12 +11,33 @@ DDD Role: Application Service
 """
 import asyncio
 import logging
-import uuid
-from typing import Optional, Dict
+from dataclasses import dataclass
+from typing import Literal, Optional, Dict
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
 from backend.presentation.websocket.message_types import MessageType, create_message
 
 logger = logging.getLogger(__name__)
+
+
+# Confirmation outcome types
+ConfirmationOutcome = Literal["approve", "reject", "reject_and_tell"]
+
+
+@dataclass
+class ConfirmationResult:
+    """Result of a tool confirmation request."""
+    outcome: ConfirmationOutcome
+    user_message: Optional[str] = None
+
+    @property
+    def approved(self) -> bool:
+        """Legacy property for backward compatibility."""
+        return self.outcome == "approve"
+
+    @property
+    def should_continue(self) -> bool:
+        """Whether the agent should continue execution (approve or reject_and_tell)."""
+        return self.outcome in ("approve", "reject_and_tell")
 
 
 class ToolConfirmationService:
@@ -38,7 +59,7 @@ class ToolConfirmationService:
             connection_manager: WebSocket connection manager instance
         """
         self.connection_manager = connection_manager
-        self.active_confirmations: Dict[str, asyncio.Future[tuple[bool, Optional[str]]]] = {}  # tool_call_id -> Future
+        self.active_confirmations: Dict[str, asyncio.Future[ConfirmationResult]] = {}  # tool_call_id -> Future
 
     async def request_confirmation(
         self,
@@ -56,7 +77,7 @@ class ToolConfirmationService:
         file_diff: Optional[str] = None,
         original_content: Optional[str] = None,
         new_content: Optional[str] = None
-    ) -> tuple[bool, Optional[str]]:
+    ) -> ConfirmationResult:
         """
         Request user confirmation for a tool execution.
 
@@ -78,13 +99,11 @@ class ToolConfirmationService:
             new_content: For edit type - new content to be written
 
         Returns:
-            tuple[bool, Optional[str]]: (approved, user_message) - approved is True if approved,
-                                        False if rejected or timed out. user_message contains
-                                        optional message from user when rejecting
+            ConfirmationResult with outcome (approve/reject/reject_and_tell) and optional user_message
         """
 
         # Create Future for this confirmation request (keyed by tool_call_id)
-        confirmation_future: asyncio.Future[tuple[bool, Optional[str]]] = asyncio.Future()
+        confirmation_future: asyncio.Future[ConfirmationResult] = asyncio.Future()
         self.active_confirmations[tool_call_id] = confirmation_future
 
         try:
@@ -123,29 +142,35 @@ class ToolConfirmationService:
                 logger.info(f"Sent tool confirmation request {tool_call_id} for session {session_id}, tool: {tool_name}, command: {command}")
             else:
                 logger.warning(f"Session {session_id} not connected, auto-rejecting tool: {tool_name}")
-                return (False, None)
+                return ConfirmationResult(outcome="reject", user_message="Session not connected")
 
             # Wait for response (infinite wait if timeout_seconds is None)
             try:
-                approved, user_message = await asyncio.wait_for(
+                result = await asyncio.wait_for(
                     confirmation_future,
                     timeout=timeout_seconds
                 )
-                logger.info(f"Tool call {tool_call_id} confirmation result: {'approved' if approved else 'rejected'}")
-                if user_message:
-                    logger.info(f"User message: {user_message}")
-                return (approved, user_message)
+                logger.info(f"Tool call {tool_call_id} confirmation result: {result.outcome}")
+                if result.user_message:
+                    logger.info(f"User message: {result.user_message}")
+                return result
             except asyncio.TimeoutError:
                 timeout_str = f"{timeout_seconds}s" if timeout_seconds else "unknown"
                 logger.warning(f"Tool call {tool_call_id} confirmation timed out after {timeout_str}")
-                return (False, None)
+                return ConfirmationResult(outcome="reject", user_message="Confirmation timed out")
 
         finally:
             # Clean up the Future
             if tool_call_id in self.active_confirmations:
                 del self.active_confirmations[tool_call_id]
 
-    def handle_confirmation_response(self, tool_call_id: str, approved: bool, user_message: Optional[str] = None) -> bool:
+    def handle_confirmation_response(
+        self,
+        tool_call_id: str,
+        outcome: Optional[ConfirmationOutcome] = None,
+        user_message: Optional[str] = None,
+        approved: Optional[bool] = None,  # Legacy parameter for backward compatibility
+    ) -> bool:
         """
         Handle confirmation response from frontend.
 
@@ -153,13 +178,13 @@ class ToolConfirmationService:
 
         Args:
             tool_call_id: The tool call ID from the response
-            approved: Whether the command was approved
-            user_message: Optional message from user when rejecting
+            outcome: The user's decision (approve/reject/reject_and_tell)
+            user_message: Optional message from user
+            approved: (Deprecated) Legacy parameter, use outcome instead
 
         Returns:
             bool: True if confirmation was found and processed, False otherwise
         """
-
         confirmation_future = self.active_confirmations.get(tool_call_id)
 
         if confirmation_future is None:
@@ -170,9 +195,20 @@ class ToolConfirmationService:
             logger.warning(f"Received duplicate response for tool call: {tool_call_id}")
             return False
 
-        # Set the result to wake up the waiting coroutine
-        confirmation_future.set_result((approved, user_message))
-        logger.info(f"Processed tool call {tool_call_id} confirmation: {'approved' if approved else 'rejected'}")
+        # Determine outcome (support both new outcome field and legacy approved field)
+        if outcome is not None:
+            final_outcome = outcome
+        elif approved is not None:
+            # Legacy fallback: convert approved bool to outcome
+            final_outcome = "approve" if approved else "reject"
+        else:
+            # Default to reject if neither is provided
+            final_outcome = "reject"
+
+        # Create result and set it
+        result = ConfirmationResult(outcome=final_outcome, user_message=user_message)
+        confirmation_future.set_result(result)
+        logger.info(f"Processed tool call {tool_call_id} confirmation: {final_outcome}")
         if user_message:
             logger.info(f"With user message: {user_message}")
         return True

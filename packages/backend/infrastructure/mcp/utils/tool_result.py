@@ -309,7 +309,10 @@ def error_response(message: str, llm_content: Any = None, **data) -> Dict[str, A
     ).model_dump()
 
 
-def user_rejected_response(user_message: Optional[str] = None) -> Dict[str, Any]:
+def user_rejected_response(
+    user_message: Optional[str] = None,
+    include_stop_instruction: bool = True
+) -> Dict[str, Any]:
     """Create a standardized user rejection response for all MCP tools.
 
     This function provides a unified way for tools to return user rejection responses,
@@ -322,6 +325,8 @@ def user_rejected_response(user_message: Optional[str] = None) -> Dict[str, Any]
 
     Args:
         user_message: Optional message from the user explaining the rejection
+        include_stop_instruction: If True (default), include "STOP what you are doing..."
+            instruction. Set to False for "reject_and_tell" where agent should continue.
 
     Returns:
         Dict[str, Any]: ToolResult dictionary with four fields:
@@ -340,18 +345,25 @@ def user_rejected_response(user_message: Optional[str] = None) -> Dict[str, Any]
         #   "data": None
         # }
     """
-    # Follow Claude Code's rejection message pattern with clear instruction to stop
+    # Build rejection message based on whether we should include stop instruction
+    if include_stop_instruction:
+        # reject: User wants to stop and provide input via main input
+        stop_instruction = "STOP what you are doing and wait for the user to tell you how to proceed."
+    else:
+        # reject_and_tell: User provided instruction, agent should continue
+        stop_instruction = "Please proceed based on the user's instruction above."
+
     if user_message:
         text = (
             f"The user doesn't want to proceed with this tool use. "
             f"The tool use was rejected: {user_message}. "
-            f"STOP what you are doing and wait for the user to tell you how to proceed."
+            f"{stop_instruction}"
         )
     else:
         text = (
             "The user doesn't want to proceed with this tool use. "
             "The tool use was rejected. "
-            "STOP what you are doing and wait for the user to tell you how to proceed."
+            f"{stop_instruction}"
         )
 
     # Use error_response for consistent error formatting with <error> tags
