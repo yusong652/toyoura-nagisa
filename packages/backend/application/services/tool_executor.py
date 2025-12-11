@@ -201,6 +201,12 @@ class ToolExecutor:
 
         if confirmation_result.outcome == "approve":
             result = await self._execute_single_tool(tool_call, message_id)
+            # Check for SubAgent rejection marker (from invoke_agent)
+            # SubAgent rejection is treated as MainAgent tool rejection
+            if result.get("_subagent_user_rejected"):
+                result["user_rejected"] = True
+                result["rejection_outcome"] = "reject"
+                return (result, "reject", None)
             return (result, None, None)
         elif confirmation_result.outcome == "reject_and_tell":
             # User wants to continue but with instruction

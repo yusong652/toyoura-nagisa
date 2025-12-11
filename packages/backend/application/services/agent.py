@@ -208,23 +208,14 @@ class Agent:
                 # SubAgent: check for special markers first
                 if isinstance(final_response, dict):
                     # Check for user rejection marker
+                    # Note: rejection context is already saved by _execute_iteration
+                    # MainAgent will see this as invoke_agent rejection
                     if "_subagent_rejected" in final_response:
-                        rejected_tools = final_response.get("_rejected_tools", [])
-                        rejection_message = final_response.get("_rejection_message")
-                        tools_str = ", ".join(rejected_tools) if rejected_tools else "unknown"
-
-                        response_text = (
-                            f"SubAgent operation was rejected by user.\n"
-                            f"Rejected tool(s): {tools_str}"
-                        )
-                        if rejection_message:
-                            response_text += f"\nUser's reason: {rejection_message}"
-
                         return AgentResult(
                             status="user_rejected",
                             message=AssistantMessage(
                                 role="assistant",
-                                content=[{"type": "text", "text": response_text}]
+                                content=[{"type": "text", "text": "SubAgent operation was rejected by user."}]
                             ),
                             execution_time_seconds=time.time() - start_time,
                         )
@@ -491,19 +482,15 @@ class Agent:
                 # Handle SubAgent rejection based on outcome type
                 if execution_result.rejected_tools:
                     if execution_result.rejection_outcome == "reject":
-                        # reject: Stop SubAgent, return rejection result to MainAgent
+                        # reject: Stop SubAgent, return rejection marker to MainAgent
                         # Save rejection context for MainAgent's next message injection
                         await self._save_rejection_context(
                             execution_result.rejected_tools,
                             execution_result.rejection_message,
                             is_subagent=True
                         )
-                        # Return special marker for SubAgent rejection
-                        return {
-                            "_subagent_rejected": True,
-                            "_rejected_tools": execution_result.rejected_tools,
-                            "_rejection_message": execution_result.rejection_message,
-                        }
+                        # Return simple marker - details already in rejection context
+                        return {"_subagent_rejected": True}
                     # reject_and_tell: Continue execution, results already in context
 
                 # Save results to context only (no database persistence for SubAgent)

@@ -383,6 +383,8 @@ class BaseToolManager(ABC):
                     self._track_read_file(session_id, file_path)
 
             # Step 4: Return tool result directly (already in standardized ToolResult format)
+            # Note: _subagent_user_rejected marker is handled by tool_executor
+            # to ensure results are saved to context before raising exception
             return tool_result
 
         except ValidationError as e:
@@ -435,6 +437,12 @@ class BaseToolManager(ABC):
             )
 
         except Exception as e:
+            # Let UserRejectionInterruption propagate directly
+            # This ensures SubAgent rejection stops MainAgent execution
+            from backend.shared.exceptions import UserRejectionInterruption
+            if isinstance(e, UserRejectionInterruption):
+                raise
+
             # System/infrastructure errors - re-raise for upper layer handling
             llm_settings = get_llm_settings()
             if llm_settings.debug:

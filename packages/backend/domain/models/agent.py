@@ -29,6 +29,7 @@ class AgentResult(BaseModel):
             - max_iterations: Reached iteration limit
             - aborted: Execution was aborted
             - empty_response: Completed but returned empty/whitespace-only content
+            - user_rejected: User rejected a tool execution (SubAgent only)
         message: Structured response message (BaseMessage)
         message_id: Streaming message ID for WebSocket updates (MainAgent only)
         iterations_used: Number of tool call iterations used
@@ -49,7 +50,7 @@ class AgentResult(BaseModel):
             pass
     """
 
-    status: Literal["success", "error", "max_iterations", "aborted", "empty_response"] = Field(
+    status: Literal["success", "error", "max_iterations", "aborted", "empty_response", "user_rejected"] = Field(
         description="Execution outcome status"
     )
 
