@@ -207,7 +207,12 @@ def save_history(session_id: str, current_history: List[Any]) -> None:
 
 
 def load_history(session_id: str) -> List[Dict[str, Any]]:
-    """load history without image and video"""
+    """
+    Load history without image and video.
+
+    This function also repairs any interrupted tool calls by adding placeholder
+    tool_result messages for orphaned tool_use blocks.
+    """
     session_file = _get_session_file(session_id)
     if not os.path.exists(session_file):
         return []
@@ -224,6 +229,10 @@ def load_history(session_id: str) -> List[Dict[str, Any]]:
                         print(f"[WARNING] Tool message missing tool_call_id: {msg}")
                     if 'name' not in msg:
                         print(f"[WARNING] Tool message missing name: {msg}")
+
+            # Repair interrupted tool calls (add placeholder tool_result for orphaned tool_use)
+            history = _repair_interrupted_tool_calls(history, session_id)
+
             return history
     except Exception as e:
         print(f"[ERROR] Failed to load history for session {session_id}: {str(e)}")
@@ -231,7 +240,12 @@ def load_history(session_id: str) -> List[Dict[str, Any]]:
 
 
 def load_all_message_history(session_id: str) -> List[Dict[str, Any]]:
-    """Load complete message history for session, including image messages"""
+    """
+    Load complete message history for session, including image messages.
+
+    This function also repairs any interrupted tool calls by adding placeholder
+    tool_result messages for orphaned tool_use blocks.
+    """
     session_file = _get_session_file(session_id)
     if not os.path.exists(session_file):
         return []
@@ -246,6 +260,10 @@ def load_all_message_history(session_id: str) -> List[Dict[str, Any]]:
                         print(f"[WARNING] Tool message missing tool_call_id: {msg}")
                     if 'name' not in msg:
                         print(f"[WARNING] Tool message missing name: {msg}")
+
+            # Repair interrupted tool calls (add placeholder tool_result for orphaned tool_use)
+            history = _repair_interrupted_tool_calls(history, session_id)
+
             return history
     except Exception as e:
         print(f"[ERROR] Failed to load all message history for session {session_id}: {str(e)}")
@@ -459,6 +477,126 @@ def get_latest_user_message(session_id: str) -> Optional[BaseMessage]:
 
 
 # ========== Internal Helper Functions ==========
+
+def _detect_interrupted_tool_calls(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Detect tool_use blocks that don't have corresponding tool_result.
+
+    When a session is interrupted unexpectedly (e.g., process killed during tool execution),
+    the assistant message with tool_use may be saved but the tool_result message is missing.
+    This function identifies such orphaned tool_use blocks.
+
+    Args:
+        history: List of message dictionaries
+
+    Returns:
+        List of dictionaries containing message_index and tool_use block for each interrupted call
+    """
+    # Collect all tool_result's tool_use_id
+    completed_tool_ids = set()
+    for msg in history:
+        if msg.get('role') == 'user':
+            content = msg.get('content', [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get('type') == 'tool_result':
+                        tool_use_id = block.get('tool_use_id')
+                        if tool_use_id:
+                            completed_tool_ids.add(tool_use_id)
+
+    # Find tool_use blocks without corresponding tool_result
+    interrupted = []
+    for idx, msg in enumerate(history):
+        if msg.get('role') == 'assistant':
+            content = msg.get('content', [])
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get('type') == 'tool_use':
+                        tool_id = block.get('id')
+                        if tool_id and tool_id not in completed_tool_ids:
+                            interrupted.append({
+                                'message_index': idx,
+                                'tool_use': block
+                            })
+
+    return interrupted
+
+
+def _repair_interrupted_tool_calls(history: List[Dict[str, Any]], session_id: str) -> List[Dict[str, Any]]:
+    """
+    Repair history by adding placeholder tool_result for interrupted tool_use blocks.
+
+    This ensures that the message history maintains proper tool_use/tool_result pairing,
+    which is required by LLM APIs. The placeholder tool_result indicates that the
+    operation was interrupted, preserving the few-shot learning signal that tools
+    should be used in similar contexts.
+
+    Args:
+        history: List of message dictionaries
+        session_id: Session ID for logging
+
+    Returns:
+        Repaired history with placeholder tool_results added
+    """
+    interrupted = _detect_interrupted_tool_calls(history)
+
+    if not interrupted:
+        return history
+
+    # Group interrupted tool calls by message index
+    tool_uses_by_msg_idx: Dict[int, List[Dict]] = {}
+    for item in interrupted:
+        idx = item['message_index']
+        if idx not in tool_uses_by_msg_idx:
+            tool_uses_by_msg_idx[idx] = []
+        tool_uses_by_msg_idx[idx].append(item['tool_use'])
+
+    # Build repaired history
+    repaired_history = []
+    for idx, msg in enumerate(history):
+        repaired_history.append(msg)
+
+        # If this assistant message has interrupted tool_use, add placeholder tool_result
+        if idx in tool_uses_by_msg_idx:
+            tool_uses = tool_uses_by_msg_idx[idx]
+
+            # Create placeholder tool_result blocks for each interrupted tool_use
+            tool_result_blocks = []
+            for tool_use in tool_uses:
+                tool_result_block = {
+                    "type": "tool_result",
+                    "tool_use_id": tool_use.get('id'),
+                    "tool_name": tool_use.get('name', 'unknown'),
+                    "content": {
+                        "parts": [
+                            {
+                                "type": "text",
+                                "text": "Operation interrupted: session terminated unexpectedly before tool execution completed."
+                            }
+                        ]
+                    },
+                    "is_error": True,
+                    "data": {
+                        "interrupted": True,
+                        "original_input": tool_use.get('input', {})
+                    }
+                }
+                tool_result_blocks.append(tool_result_block)
+
+            # Create a user message containing all tool_result blocks
+            placeholder_message = {
+                "role": "user",
+                "content": tool_result_blocks,
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.now().isoformat()
+            }
+            repaired_history.append(placeholder_message)
+
+    # Save the repaired history to persist the fix
+    save_history(session_id, repaired_history)
+
+    return repaired_history
+
 
 def _is_tool_message(msg: BaseMessage) -> bool:
     """
