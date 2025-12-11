@@ -273,11 +273,31 @@ class GeminiClient(LLMClientBase):
 
             # Create stateful streaming processor
             streaming_processor = self._get_response_processor().create_streaming_processor()
+
+            # Debug counters
+            chunk_index = 0
+            empty_chunk_count = 0
+
             async for chunk in await stream_generator:
+                # Debug: print raw chunk before processing
+                if debug:
+                    GeminiDebugger.print_streaming_chunk(chunk, chunk_index)
+
                 # Delegate chunk processing to streaming processor
                 processed_chunks = streaming_processor.process_event(chunk)
+
+                # Track empty chunks for debugging
+                if debug and not processed_chunks:
+                    empty_chunk_count += 1
+
                 for processed_chunk in processed_chunks:
                     yield processed_chunk
+
+                chunk_index += 1
+
+            # Debug: print summary after streaming completes
+            if debug:
+                GeminiDebugger.print_streaming_summary(chunk_index, empty_chunk_count)
 
         except Exception as e:
             error_message = f"Gemini streaming API call failed: {str(e)}"

@@ -58,6 +58,78 @@ class GeminiDebugger:
         print("========== END ==========")
 
     @staticmethod
+    def print_streaming_chunk(chunk, chunk_index: int) -> None:
+        """Print debug info for streaming chunk."""
+        print(f"\n---------- Streaming Chunk [{chunk_index}] ----------")
+
+        if not hasattr(chunk, 'candidates') or not chunk.candidates:
+            print("❌ No candidates in chunk")
+            print("---------- END ----------")
+            return
+
+        candidate = chunk.candidates[0]
+        finish_reason = getattr(candidate, 'finish_reason', None)
+        print(f"finish_reason: {finish_reason}")
+
+        if not hasattr(candidate, 'content') or not candidate.content:
+            print("❌ No content in candidate")
+            print("---------- END ----------")
+            return
+
+        parts = getattr(candidate.content, 'parts', None)
+        if not parts:
+            print("❌ No parts in content (parts is None or empty)")
+            print(f"   content object: {candidate.content}")
+            print("---------- END ----------")
+            return
+
+        print(f"parts count: {len(parts)}")
+        for j, part in enumerate(parts):
+            part_info = []
+
+            # Check for text
+            if hasattr(part, 'text'):
+                text = part.text
+                if text:
+                    preview = text[:100] + "..." if len(text) > 100 else text
+                    is_thought = getattr(part, 'thought', False)
+                    thought_marker = " [THOUGHT]" if is_thought else ""
+                    part_info.append(f"text{thought_marker}: {repr(preview)}")
+                else:
+                    part_info.append("text: <empty string>")
+
+            # Check for function_call
+            if hasattr(part, 'function_call') and part.function_call:
+                fc = part.function_call
+                part_info.append(f"function_call: {fc.name}")
+
+            # Check for thought_signature
+            if hasattr(part, 'thought_signature') and part.thought_signature:
+                part_info.append("has_thought_signature: True")
+
+            if part_info:
+                print(f"  part[{j}]: {', '.join(part_info)}")
+            else:
+                print(f"  part[{j}]: <unknown part type> {type(part).__name__}")
+
+        # Print usage metadata if available
+        if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
+            usage = chunk.usage_metadata
+            print(f"usage: prompt={getattr(usage, 'prompt_token_count', 'N/A')}, "
+                  f"candidates={getattr(usage, 'candidates_token_count', 'N/A')}, "
+                  f"thoughts={getattr(usage, 'thoughts_token_count', 'N/A')}")
+
+        print("---------- END ----------")
+
+    @staticmethod
+    def print_streaming_summary(total_chunks: int, empty_chunks: int) -> None:
+        """Print summary after streaming completes."""
+        print(f"\n========== Streaming Summary ==========")
+        print(f"Total chunks: {total_chunks}")
+        print(f"Empty chunks (no valid parts): {empty_chunks}")
+        print("========== END ==========")
+
+    @staticmethod
     def print_error(error_type: str, model: str, response=None, candidate=None) -> None:
         """Print detailed debug info for API errors."""
         print(f"\n========== Gemini API Error ==========")

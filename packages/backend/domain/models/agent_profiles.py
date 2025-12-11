@@ -73,7 +73,11 @@ PFC_TOOLS: List[str] = [
     # Search and planning
     "web_search",
     "todo_write",
-    # PFC documentation (use before writing scripts)
+    # PFC documentation - Browse (directory listing)
+    "pfc_browse_commands",
+    "pfc_browse_python_api",
+    "pfc_browse_contact_models",
+    # PFC documentation - Query (detailed lookup)
     "pfc_query_python_api",
     "pfc_query_command",
     # PFC execution (script-only workflow)
