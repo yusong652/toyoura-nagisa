@@ -12,11 +12,13 @@
  * - approve: Execute the tool
  * - reject: Stop execution, user wants to provide input via main input
  * - reject_and_tell: Continue execution with user's brief instruction
+ *
+ * The third option "Reject and tell" has inline text input - user can type
+ * directly when option 3 is selected without needing to "enter" input mode.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { Box, Text, useStdout, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import React, { useMemo, useState } from 'react';
+import { Box, Text, useStdout } from 'ink';
 import type {
   ToolConfirmationData,
   EditToolConfirmationData,
@@ -24,7 +26,6 @@ import type {
   InfoToolConfirmationData,
 } from '../types.js';
 import { theme } from '../colors.js';
-import { RadioButtonSelect, type RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { DiffRenderer, getDiffStats } from './DiffRenderer.js';
 
@@ -37,9 +38,6 @@ interface ToolConfirmationPromptProps {
   isFocused?: boolean;
 }
 
-// Radio option type (without reject_and_tell input mode)
-type RadioOutcome = 'approve' | 'reject' | 'reject_and_tell';
-
 export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
   data,
   onConfirm,
@@ -49,102 +47,110 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
   const terminalWidth = stdout?.columns ?? 80;
   const terminalHeight = stdout?.rows ?? 24;
 
-  // State for "reject and tell" input mode
-  const [isInputMode, setIsInputMode] = useState(false);
+  // Active option index (0: approve, 1: reject, 2: reject_and_tell)
+  const [activeIndex, setActiveIndex] = useState(0);
+  // Input value for option 3 (reject_and_tell)
   const [inputValue, setInputValue] = useState('');
+  // Cursor blink state
+  const [cursorVisible, setCursorVisible] = useState(true);
 
-  const handleSelect = useCallback(
-    (outcome: RadioOutcome) => {
-      if (outcome === 'reject_and_tell') {
-        // Enter input mode for user instruction
-        setIsInputMode(true);
-      } else {
-        onConfirm(outcome);
-      }
-    },
-    [onConfirm]
-  );
+  // Cursor blink effect for option 3
+  React.useEffect(() => {
+    if (!isFocused || activeIndex !== 2) return;
 
-  const handleInputSubmit = useCallback(
-    (value: string) => {
-      // Submit the reject_and_tell with user's instruction
-      onConfirm('reject_and_tell', value.trim() || undefined);
-    },
-    [onConfirm]
-  );
+    const interval = setInterval(() => {
+      setCursorVisible((v) => !v);
+    }, 500);
 
-  const handleInputCancel = useCallback(() => {
-    // Cancel input mode, go back to radio selection
-    setIsInputMode(false);
-    setInputValue('');
-  }, []);
+    return () => clearInterval(interval);
+  }, [isFocused, activeIndex]);
 
   // Calculate available height for diff content
-  // We need to reserve space for:
-  // - Outer border (2 lines: top + bottom)
-  // - Header "Tool Confirmation Required" (1 line + 1 margin)
-  // - File info line (1 line + 1 margin)
-  // - Diff border (2 lines: top + bottom)
-  // - Question line (1 line + 1 margin)
-  // - Radio options (2 lines)
-  // - Help text (1 line + 1 margin)
-  // Total fixed UI: ~14 lines minimum
   const UI_CHROME_HEIGHT = 14;
 
   const availableHeight = useMemo(() => {
     const confirmationType = (data as { type?: string }).type;
     if (confirmationType === 'edit') {
-      // Ensure at least 3 lines for diff content
       return Math.max(3, terminalHeight - UI_CHROME_HEIGHT);
     }
     return 0;
   }, [data, terminalHeight]);
 
-  // Handle escape key in radio mode using custom keypress handler
+  // Unified keyboard handler using our custom useKeypress
   useKeypress(
     (key) => {
-      if (!isFocused || isInputMode) return;
+      if (!isFocused) return;
 
-      // Escape or Ctrl+C to reject (only in radio mode)
+      // Escape or Ctrl+C to reject
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
         onConfirm('reject');
         return;
       }
-    },
-    { isActive: isFocused && !isInputMode }
-  );
 
-  // Handle escape key in input mode using ink's useInput (compatible with TextInput)
-  useInput(
-    (_input, key) => {
-      if (!isFocused || !isInputMode) return;
+      // Navigation: Up/Down arrows
+      if (key.name === 'up') {
+        setActiveIndex((prev) => Math.max(0, prev - 1));
+        return;
+      }
+      if (key.name === 'down') {
+        setActiveIndex((prev) => Math.min(2, prev + 1));
+        return;
+      }
 
-      if (key.escape) {
-        handleInputCancel();
+      // Number keys for quick selection
+      if (key.name === '1') {
+        setActiveIndex(0);
+        return;
+      }
+      if (key.name === '2') {
+        setActiveIndex(1);
+        return;
+      }
+      if (key.name === '3') {
+        setActiveIndex(2);
+        return;
+      }
+
+      // Enter to confirm
+      if (key.name === 'return' || key.name === 'enter') {
+        if (activeIndex === 0) {
+          onConfirm('approve');
+        } else if (activeIndex === 1) {
+          onConfirm('reject');
+        } else if (activeIndex === 2) {
+          onConfirm('reject_and_tell', inputValue.trim() || undefined);
+        }
+        return;
+      }
+
+      // When on option 3, handle text input
+      if (activeIndex === 2) {
+        // Backspace to delete
+        if (key.name === 'backspace') {
+          setInputValue((prev) => prev.slice(0, -1));
+          return;
+        }
+
+        // Ctrl+U to clear line
+        if (key.ctrl && key.name === 'u') {
+          setInputValue('');
+          return;
+        }
+
+        // Paste
+        if (key.paste) {
+          setInputValue((prev) => prev + key.sequence);
+          return;
+        }
+
+        // Printable characters
+        if (key.insertable && key.sequence.length > 0) {
+          setInputValue((prev) => prev + key.sequence);
+          return;
+        }
       }
     },
-    { isActive: isFocused && isInputMode }
-  );
-
-  const options: Array<RadioSelectItem<RadioOutcome>> = useMemo(
-    () => [
-      {
-        label: 'Yes, allow',
-        value: 'approve' as const,
-        key: 'approve',
-      },
-      {
-        label: 'No, reject (Esc)',
-        value: 'reject' as const,
-        key: 'reject',
-      },
-      {
-        label: 'Reject and tell agent...',
-        value: 'reject_and_tell' as const,
-        key: 'reject_and_tell',
-      },
-    ],
-    []
+    { isActive: isFocused }
   );
 
   // Render content based on confirmation type
@@ -288,44 +294,74 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
         <Text color={theme.text.primary}>{question}</Text>
       </Box>
 
-      {/* Radio Button Select or Input Mode */}
-      <Box flexShrink={0}>
-        {isInputMode ? (
-          // Input mode for "reject and tell"
-          <Box flexDirection="column">
-            <Box marginBottom={1}>
-              <Text color={theme.text.accent}>
-                Tell the agent what to do instead:
+      {/* Custom options with inline input for option 3 */}
+      <Box flexShrink={0} flexDirection="column">
+        {/* Option 1: Yes, allow */}
+        <Box>
+          <Text color={activeIndex === 0 ? theme.status.success : theme.text.primary}>
+            {activeIndex === 0 ? '● ' : '  '}
+          </Text>
+          <Text color={activeIndex === 0 ? theme.status.success : theme.text.muted}>
+            1.{' '}
+          </Text>
+          <Text color={activeIndex === 0 ? theme.status.success : theme.text.primary}>
+            Yes, allow
+          </Text>
+        </Box>
+
+        {/* Option 2: No, reject */}
+        <Box>
+          <Text color={activeIndex === 1 ? theme.status.success : theme.text.primary}>
+            {activeIndex === 1 ? '● ' : '  '}
+          </Text>
+          <Text color={activeIndex === 1 ? theme.status.success : theme.text.muted}>
+            2.{' '}
+          </Text>
+          <Text color={activeIndex === 1 ? theme.status.success : theme.text.primary}>
+            No, reject (Esc)
+          </Text>
+        </Box>
+
+        {/* Option 3: Reject and tell (with inline input) */}
+        <Box>
+          <Text color={activeIndex === 2 ? theme.status.success : theme.text.primary}>
+            {activeIndex === 2 ? '● ' : '  '}
+          </Text>
+          <Text color={activeIndex === 2 ? theme.status.success : theme.text.muted}>
+            3.{' '}
+          </Text>
+          <Text color={activeIndex === 2 ? theme.status.success : theme.text.primary}>
+            Reject:{' '}
+          </Text>
+          {/* Inline input area */}
+          {activeIndex === 2 ? (
+            <>
+              <Text color={theme.text.primary}>
+                {inputValue || ''}
               </Text>
-            </Box>
-            <Box>
-              <Text color={theme.text.muted}>{'> '}</Text>
-              <TextInput
-                value={inputValue}
-                onChange={setInputValue}
-                onSubmit={handleInputSubmit}
-                focus={isFocused}
-                placeholder="e.g., use a different approach..."
-              />
-            </Box>
-          </Box>
-        ) : (
-          // Radio button selection
-          <RadioButtonSelect
-            items={options}
-            onSelect={handleSelect}
-            isFocused={isFocused}
-            showNumbers={true}
-          />
-        )}
+              {cursorVisible && (
+                <Text inverse>{' '}</Text>
+              )}
+              {!inputValue && (
+                <Text color={theme.text.muted}>
+                  {cursorVisible ? '' : ' '}type instruction...
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text color={theme.text.muted}>
+              {inputValue || 'type instruction...'}
+            </Text>
+          )}
+        </Box>
       </Box>
 
       {/* Help text - fixed height, never shrinks */}
       <Box marginTop={1} flexShrink={0}>
         <Text color={theme.text.muted}>
-          {isInputMode
-            ? '(Enter submit, Esc cancel)'
-            : '(↑↓ select, Enter confirm, Esc cancel)'}
+          {activeIndex === 2
+            ? '(Enter submit, Esc reject, ↑↓ select)'
+            : '(↑↓ select, Enter confirm, Esc reject)'}
         </Text>
       </Box>
     </Box>
