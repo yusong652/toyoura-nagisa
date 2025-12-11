@@ -68,11 +68,17 @@ class GeminiStreamingProcessor(BaseStreamingProcessor):
                 ))
 
             # Regular text part
+            # Note: Final text parts may also contain thought_signature (Gemini 2.5+)
+            # See: https://ai.google.dev/gemini-api/docs/thought-signatures
             elif hasattr(part, 'text') and part.text and not getattr(part, 'thought', False):
                 result.append(StreamingChunk(
                     chunk_type="text",
                     content=part.text,
-                    metadata=usage_info  # Include usage metadata
+                    metadata={
+                        "has_signature": bool(getattr(part, 'thought_signature', None)),
+                        **usage_info
+                    },
+                    thought_signature=part.thought_signature if hasattr(part, 'thought_signature') and part.thought_signature else None
                 ))
 
             # Function call part
@@ -197,31 +203,24 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                 - tokens_left: Remaining tokens in context window
         """
         if not hasattr(response, 'usage_metadata') or not response.usage_metadata:
-            print("[GeminiResponseProcessor] No usage_metadata found in response")
             return None
 
         usage = response.usage_metadata
-        print(f"[GeminiResponseProcessor] Found usage_metadata: {usage}")
 
         # Extract token counts from Gemini usage_metadata
         prompt_tokens = getattr(usage, 'prompt_token_count', 0)
         completion_tokens = getattr(usage, 'candidates_token_count', 0)
         total_tokens = getattr(usage, 'total_token_count', 0)
 
-        print(f"[GeminiResponseProcessor] Extracted: prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}")
-
         # Calculate remaining tokens in context window
         tokens_left = max_tokens - prompt_tokens
 
-        result = {
+        return {
             'prompt_tokens': prompt_tokens,
             'completion_tokens': completion_tokens,
             'total_tokens': total_tokens,
             'tokens_left': max(0, tokens_left)  # Ensure non-negative
         }
-
-        print(f"[GeminiResponseProcessor] Returning usage dict: {result}")
-        return result
 
     @staticmethod
     def format_response_for_storage(response, tool_calls: Optional[List[Dict[str, Any]]] = None) -> BaseMessage:
@@ -257,8 +256,11 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         # Track tool call index to match with pre-extracted tool_calls
         tool_call_index = 0
 
-        # Track thought_signature for thinking content
-        thought_signature = None
+        # Track thought_signature for thinking content and text content
+        # Note: Gemini 2.5+ may include thought_signature in final text/inlineData parts
+        # See: https://ai.google.dev/gemini-api/docs/thought-signatures
+        thinking_thought_signature = None
+        text_thought_signature = None  # For final text part signature
 
         # Process all parts from the response
         if hasattr(candidate.content, 'parts') and candidate.content.parts:
@@ -269,10 +271,13 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                         thinking_parts.append(part.text)
                         # Capture thought_signature if present (for tool calling chains)
                         if hasattr(part, 'thought_signature') and part.thought_signature:
-                            thought_signature = part.thought_signature
+                            thinking_thought_signature = part.thought_signature
                     else:
                         # Collect ALL non-thinking text parts (preserves order)
                         text_parts.append(part.text)
+                        # Capture thought_signature from text parts (final part may have it)
+                        if hasattr(part, 'thought_signature') and part.thought_signature:
+                            text_thought_signature = part.thought_signature
                 elif hasattr(part, 'function_call') and part.function_call:
                     # Use pre-extracted tool call with consistent ID
                     if tool_call_index < len(tool_calls):
@@ -298,10 +303,10 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     "thinking": full_thinking_content,
                 }
                 # Add thought_signature if present (for tool calling chain validation)
-                if thought_signature:
+                if thinking_thought_signature:
                     # Convert bytes to base64 string for JSON serialization
                     import base64
-                    thinking_block["thought_signature"] = base64.b64encode(thought_signature).decode('utf-8')
+                    thinking_block["thought_signature"] = base64.b64encode(thinking_thought_signature).decode('utf-8')
                 content.append(thinking_block)
 
         # Merge all text parts into single block for consistent rendering
@@ -309,10 +314,15 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         if text_parts:
             combined_text = "".join(text_parts).strip()
             if combined_text:
-                content.append({
+                text_block = {
                     "type": "text",
                     "text": combined_text
-                })
+                }
+                # Add thought_signature if present in final text part
+                if text_thought_signature:
+                    import base64
+                    text_block["thought_signature"] = base64.b64encode(text_thought_signature).decode('utf-8')
+                content.append(text_block)
         
         # If no content was extracted, add empty text
         if not content:
@@ -510,6 +520,9 @@ class GeminiResponseProcessor(BaseResponseProcessor):
 
             elif chunk.chunk_type == "text":
                 part_dict["text"] = chunk.content
+                # Preserve thought_signature for final text parts (Gemini 2.5+)
+                if chunk.thought_signature:
+                    part_dict["thought_signature"] = chunk.thought_signature
 
             elif chunk.chunk_type == "function_call" and chunk.function_call:
                 # Function call requires special handling
@@ -553,6 +566,9 @@ class GeminiResponseProcessor(BaseResponseProcessor):
             else:
                 # Regular text part
                 part = types.Part(text=part_data["text"])
+                # Add thought_signature if present (Gemini 2.5+ final text parts)
+                if "thought_signature" in part_data:
+                    part.thought_signature = part_data["thought_signature"]
 
             parts.append(part)
 

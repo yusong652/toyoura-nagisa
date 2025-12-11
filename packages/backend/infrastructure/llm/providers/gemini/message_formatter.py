@@ -86,7 +86,18 @@ class GeminiMessageFormatter(BaseMessageFormatter):
                             continue
 
                         if item.get("type") == "text" and item.get("text"):
-                            parts.append(types.Part(text=item["text"]))
+                            text_part = types.Part(text=item["text"])
+                            # Restore thought_signature if available (Gemini 2.5+ final text parts)
+                            # Only when preserve_thinking is enabled
+                            if preserve_thinking:
+                                thought_sig_b64 = item.get("thought_signature")
+                                if thought_sig_b64:
+                                    try:
+                                        thought_sig_bytes = base64.b64decode(thought_sig_b64)
+                                        text_part.thought_signature = thought_sig_bytes
+                                    except Exception as e:
+                                        print(f"[WARNING] Failed to decode thought_signature for text: {e}")
+                            parts.append(text_part)
 
                         # Handle tool_use blocks (for assistant messages with tool calls)
                         elif item.get("type") == "tool_use":
