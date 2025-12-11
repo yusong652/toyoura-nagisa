@@ -15,7 +15,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Box, Text, useStdout } from 'ink';
+import { Box, Text, useStdout, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type {
   ToolConfirmationData,
@@ -100,26 +100,30 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
     return 0;
   }, [data, terminalHeight]);
 
-  // Handle escape key and input mode keys
+  // Handle escape key in radio mode using custom keypress handler
   useKeypress(
     (key) => {
-      if (!isFocused) return;
+      if (!isFocused || isInputMode) return;
 
-      if (isInputMode) {
-        // In input mode: Escape to cancel input and go back to radio
-        if (key.name === 'escape') {
-          handleInputCancel();
-          return;
-        }
-      } else {
-        // In radio mode: Escape to reject
-        if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
-          onConfirm('reject');
-          return;
-        }
+      // Escape or Ctrl+C to reject (only in radio mode)
+      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+        onConfirm('reject');
+        return;
       }
     },
-    { isActive: isFocused }
+    { isActive: isFocused && !isInputMode }
+  );
+
+  // Handle escape key in input mode using ink's useInput (compatible with TextInput)
+  useInput(
+    (_input, key) => {
+      if (!isFocused || !isInputMode) return;
+
+      if (key.escape) {
+        handleInputCancel();
+      }
+    },
+    { isActive: isFocused && isInputMode }
   );
 
   const options: Array<RadioSelectItem<RadioOutcome>> = useMemo(
