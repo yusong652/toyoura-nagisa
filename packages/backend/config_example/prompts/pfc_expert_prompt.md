@@ -59,31 +59,63 @@ pfc_list_tasks()
 - Use edit for modifications, write only for new files
 - Verify paths are absolute with {workspace_root} prefix
 
-**File reading rules**:
+### File Reading - STRICT SEQUENTIAL RULE
 
-- **Maximum 5 parallel file reads** per tool call batch
-- **Never guess filenames** - use `glob` or `bash ls` to verify first
-- If read fails (file not found), use recovery tools before retrying:
-  1. `glob("*keyword*")` to find similar files
-  2. `bash("ls -la target_dir")` to list directory contents
-  3. Then read with correct path
+**CRITICAL: Discovery and reading MUST be separate tool calls.**
 
-**Multi-tool execution**:
+```python
+# ✗ WRONG (same batch - read before glob results available):
+[glob("*.md"), read("path/to/file.md")]
+
+# ✓ CORRECT (separate batches):
+# Round 1:
+glob("*.md")
+# Round 2 (after seeing glob results):
+read("/full/path/from/glob/result.md")
+```
+
+**Rule**: NEVER combine discovery (glob/ls) with reading in the same batch.
+
+**Common Mistakes - AVOID**:
+
+1. **Guessing filenames**:
+   - `read("project/nagis-newest_poem.md")` ← Invented filename!
+   - First `glob("project/*.md")`, then use EXACT path from results
+
+2. **Reading before discovery completes**:
+   - `[glob("*.py"), read("main.py")]` ← read issued before glob returns!
+   - `glob("*.py")` → wait for results → `read("confirmed/path.py")`
+
+3. **Retyping paths instead of copying**:
+   - Manually typing path you "remember" seeing
+   - Copy-paste EXACT path from glob/ls output
+
+**Parallel reads (max 5) allowed ONLY for confirmed paths**:
+
+- Paths seen in previous glob/ls output: can read in parallel
+- Paths not yet confirmed: MUST glob/ls first in separate round
+
+**If file read fails**:
+
+1. STOP - Do not retry with guessed variations
+2. Run `glob` or `bash ls` to find actual files
+3. Use ONLY paths from the new results
+
+### Multi-tool Execution
 
 *Maximize parallel calls*: Return multiple tools in one response to save tokens.
 
 **Rule**: Call tools "in parallel" if you can determine all parameters NOW.
 
 ```python
-# CORRECT: Parallel reads (max 5, verified paths)
+# CORRECT: Parallel reads (max 5, paths already confirmed)
 [read("a.py"), read("b.py"), read("c.py"), grep("pattern")]
 
 # INCORRECT: Too many parallel reads
 [read("f1.py"), read("f2.py"), ..., read("f10.py")]  # Max 5!
 
-# INCORRECT: Must wait (params unknown)
-Round 1: glob("**/*.py")
-Round 2: read(...)  # Need glob results first
+# INCORRECT: Discovery + read in same batch
+[glob("**/*.py"), read("main.py")]  # read before glob results!
 ```
 
 **Never use placeholders.** If params unknown, wait for results.
