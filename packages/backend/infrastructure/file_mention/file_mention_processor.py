@@ -38,10 +38,10 @@ logger = logging.getLogger(__name__)
 
 
 # LLM providers that support multimodal content (images, binary files)
-MULTIMODAL_PROVIDERS = {"gemini", "anthropic", "openai", "openrouter"}
+MULTIMODAL_PROVIDERS = {"gemini", "anthropic", "openai", "openrouter", "zhipu"}
 
 # LLM providers that do NOT support multimodal content
-NON_MULTIMODAL_PROVIDERS = {"local_llm", "kimi", "zhipu"}
+NON_MULTIMODAL_PROVIDERS = {"local_llm", "kimi"}
 
 
 def _check_multimodal_support() -> bool:

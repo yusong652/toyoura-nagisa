@@ -3,6 +3,7 @@ Zhipu debug utilities for API request/response logging.
 """
 
 import json
+import copy
 from typing import Dict, Any, List
 
 
@@ -40,9 +41,9 @@ class ZhipuDebugger:
         print("=" * 80)
 
         # Create a copy of api_kwargs with simplified verbose fields
-        simplified_request = api_kwargs.copy()
+        simplified_request = copy.deepcopy(api_kwargs)
 
-        # Simplify messages (only truncate system prompt, keep others full)
+        # Simplify messages (truncate system prompt and multimodal content)
         if 'messages' in simplified_request:
             simplified_messages = []
             for msg in simplified_request['messages']:
@@ -50,9 +51,13 @@ class ZhipuDebugger:
                 role = msg_copy.get('role', '')
                 content = msg_copy.get('content', '')
 
-                # Only simplify system prompt
+                # Simplify system prompt
                 if role == 'system' and isinstance(content, str) and len(content) > 150:
                     msg_copy['content'] = content[:150] + f"... (truncated, {len(content)} chars total)"
+
+                # Truncate multimodal content (image_url with base64 data)
+                if isinstance(content, list):
+                    msg_copy['content'] = ZhipuDebugger._truncate_multimodal_content(content)
 
                 simplified_messages.append(msg_copy)
             simplified_request['messages'] = simplified_messages
@@ -113,3 +118,53 @@ class ZhipuDebugger:
     def log_streaming_chunk(chunk: Any):
         """Log streaming chunk"""
         print(f"[DEBUG] Stream chunk: {chunk}")
+
+    @staticmethod
+    def _truncate_multimodal_content(content: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Truncate multimodal content (image_url with base64 data) for debug output.
+
+        Args:
+            content: List of content parts (text, image_url, etc.)
+
+        Returns:
+            Truncated content list with base64 data replaced by summary
+        """
+        truncated = []
+        for part in content:
+            if not isinstance(part, dict):
+                truncated.append(part)
+                continue
+
+            part_copy = copy.deepcopy(part)
+            part_type = part_copy.get('type', '')
+
+            # Handle image_url with base64 data
+            if part_type == 'image_url' and 'image_url' in part_copy:
+                image_url = part_copy['image_url']
+                url = image_url.get('url', '')
+
+                # Check if URL is base64 data
+                if isinstance(url, str) and url.startswith('data:') and len(url) > 200:
+                    # Extract mime type and base64 data from data URL
+                    if ';base64,' in url:
+                        mime_type = url.split(';base64,')[0].replace('data:', '')
+                        base64_data = url.split(';base64,')[1]
+                        data_len = len(base64_data)
+                        # Replace with truncated summary
+                        image_url['url'] = f"data:{mime_type};base64,{base64_data[:50]}... [truncated {data_len} chars]"
+                    else:
+                        # Non-base64 data URL, just truncate
+                        image_url['url'] = f"{url[:100]}... [truncated {len(url)} chars]"
+
+            # Handle inline_data format (Gemini style, for compatibility)
+            if 'inline_data' in part_copy:
+                inline_data = part_copy['inline_data']
+                data = inline_data.get('data', '')
+                if isinstance(data, str) and len(data) > 200:
+                    mime_type = inline_data.get('mime_type', 'unknown')
+                    inline_data['data'] = f"{data[:50]}... [truncated {len(data)} chars]"
+
+            truncated.append(part_copy)
+
+        return truncated

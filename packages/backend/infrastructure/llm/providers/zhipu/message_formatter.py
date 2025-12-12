@@ -206,7 +206,11 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
     @staticmethod
     def _format_image_block(inline_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
-        Format inline_data into Zhipu image_url block.
+        Format inline_data block for Zhipu API.
+
+        GLM-4V models support image_url format with base64 data URL.
+        We keep the inline_data format consistent throughout the pipeline
+        and convert to image_url format here for API compatibility.
 
         Args:
             inline_data: Dictionary containing image data and mime_type
@@ -229,11 +233,13 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
         if isinstance(data, str):
             data = data.strip().replace('\n', '').replace('\r', '').replace(' ', '')
 
+        # Return inline_data format to keep consistency throughout the pipeline
+        # The format will be converted to image_url at API call time if needed
         return {
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:{mime_type};base64,{data}",
-                "detail": "high"
+            "type": "image",
+            "inline_data": {
+                "mime_type": mime_type,
+                "data": data
             }
         }
 

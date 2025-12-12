@@ -94,6 +94,52 @@ class ZhipuClient(LLMClientBase):
 
     # ========== CORE API METHODS ==========
 
+    @staticmethod
+    def _convert_inline_data_to_image_url(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Convert inline_data format to image_url format for Zhipu API.
+
+        GLM-4V models expect image_url format with base64 data URL.
+        This method converts inline_data blocks to the required format.
+
+        Args:
+            messages: List of messages potentially containing inline_data
+
+        Returns:
+            List of messages with inline_data converted to image_url
+        """
+        import copy
+        converted = []
+
+        for msg in messages:
+            msg_copy = copy.deepcopy(msg)
+            content = msg_copy.get('content')
+
+            if isinstance(content, list):
+                new_content = []
+                for part in content:
+                    if isinstance(part, dict):
+                        # Check for inline_data format
+                        if 'inline_data' in part or part.get('type') == 'image':
+                            inline_data = part.get('inline_data', part)
+                            if isinstance(inline_data, dict) and 'data' in inline_data:
+                                mime_type = inline_data.get('mime_type', 'image/png')
+                                data = inline_data['data']
+                                # Convert to image_url format
+                                new_content.append({
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:{mime_type};base64,{data}"
+                                    }
+                                })
+                                continue
+                    new_content.append(part)
+                msg_copy['content'] = new_content
+
+            converted.append(msg_copy)
+
+        return converted
+
     async def call_api_with_context(
         self,
         context_contents: List[Dict[str, Any]],
@@ -117,8 +163,8 @@ class ZhipuClient(LLMClientBase):
 
         tools = api_config.get("tools", []) or []
 
-        # Build messages
-        messages = context_contents.copy()
+        # Build messages and convert inline_data to image_url for API compatibility
+        messages = self._convert_inline_data_to_image_url(context_contents)
 
         # Add system message if provided
         system_prompt = api_config.get("system_prompt")
@@ -199,8 +245,8 @@ class ZhipuClient(LLMClientBase):
 
         tools = api_config.get("tools", []) or []
 
-        # Build messages
-        messages = context_contents.copy()
+        # Build messages and convert inline_data to image_url for API compatibility
+        messages = self._convert_inline_data_to_image_url(context_contents)
 
         # Add system message if provided
         system_prompt = api_config.get("system_prompt")
