@@ -339,12 +339,11 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
               <Text color={theme.text.primary}>
                 {inputValue || ''}
               </Text>
-              {cursorVisible && (
-                <Text inverse>{' '}</Text>
-              )}
+              {/* Cursor: always occupies space, visibility controlled by inverse */}
+              <Text inverse={cursorVisible}>{' '}</Text>
               {!inputValue && (
                 <Text color={theme.text.muted}>
-                  {cursorVisible ? '' : ' '}type instruction...
+                  type instruction...
                 </Text>
               )}
             </>
