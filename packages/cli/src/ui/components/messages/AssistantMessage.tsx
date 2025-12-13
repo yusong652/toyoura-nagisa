@@ -13,6 +13,7 @@ import Spinner from 'ink-spinner';
 import type { AssistantHistoryItem, ContentBlock } from '../../types.js';
 import { theme } from '../../colors.js';
 import { getCachedStringWidth } from '../../utils/textUtils.js';
+import { MarkdownText } from '../MarkdownText.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
 // Keep in sync with PendingItemDisplay.tsx for consistent display
@@ -44,9 +45,7 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
       const displayText = block.text.trim();
       return (
         <Box key={`text-${index}`} flexDirection="row">
-          <Text wrap="wrap" color={theme.text.primary}>
-            {displayText}
-          </Text>
+          <MarkdownText>{displayText}</MarkdownText>
           {/* Show cursor when streaming and this is the last text block */}
           {isStreaming && (
             <Text color={theme.text.muted}>▌</Text>
