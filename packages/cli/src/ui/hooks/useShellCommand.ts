@@ -5,7 +5,7 @@
  * Calls the backend REST API endpoint /api/shell/execute.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { apiClient } from '@toyoura-nagisa/core';
 
 export interface ShellExecuteRequest {
@@ -22,6 +22,12 @@ export interface ShellExecuteResponse {
   exit_code: number;
   cwd: string;
   context: string;
+  error?: string;
+}
+
+export interface CwdResponse {
+  success: boolean;
+  cwd: string;
   error?: string;
 }
 
@@ -43,6 +49,26 @@ export function useShellCommand(
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cwd, setCwd] = useState<string | null>(null);
+
+  // Fetch initial cwd when session and profile are available
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const fetchCwd = async () => {
+      try {
+        const response = await apiClient.get<CwdResponse>(
+          `/api/shell/cwd/${sessionId}?agent_profile=${encodeURIComponent(agentProfile)}`
+        );
+        if (response.success && response.cwd) {
+          setCwd(response.cwd);
+        }
+      } catch {
+        // Silently ignore errors on initial fetch
+      }
+    };
+
+    fetchCwd();
+  }, [sessionId, agentProfile]);
 
   const executeCommand = useCallback(
     async (command: string): Promise<ShellExecuteResponse | null> => {

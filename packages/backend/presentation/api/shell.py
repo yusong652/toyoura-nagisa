@@ -147,15 +147,19 @@ async def execute_shell_command(request: ExecuteRequest) -> ExecuteResponse:
 
 
 @router.get("/cwd/{session_id}", response_model=CwdResponse)
-async def get_current_directory(session_id: str) -> CwdResponse:
+async def get_current_directory(session_id: str, agent_profile: str = "general") -> CwdResponse:
     """
     Get the current working directory for a session.
+
+    Args:
+        session_id: Session ID
+        agent_profile: Agent profile for workspace resolution
 
     Returns:
         CwdResponse with the current working directory path
     """
     try:
-        service = await _get_shell_service(session_id)
+        service = await _get_shell_service(session_id, agent_profile)
         return CwdResponse(
             success=True,
             cwd=service.get_cwd(),
