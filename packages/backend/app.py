@@ -19,6 +19,7 @@ from backend.presentation.api import settings
 from backend.presentation.api import profiles
 from backend.presentation.api import file_search
 from backend.presentation.api import todos
+from backend.presentation.api import shell
 from backend.presentation.websocket.websocket_handler import create_websocket_handler
 from backend.presentation.websocket.routes import register_websocket_routes
 from backend.presentation.exceptions import register_exception_handlers
@@ -107,6 +108,7 @@ app.include_router(settings.router, prefix="/api")
 app.include_router(profiles.router)
 app.include_router(file_search.router, prefix="/api")
 app.include_router(todos.router)
+app.include_router(shell.router)
 
 # Register WebSocket routes (cannot use include_router for WebSocket)
 register_websocket_routes(app)
