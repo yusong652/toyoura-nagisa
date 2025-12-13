@@ -43,6 +43,8 @@ interface InputPromptProps {
   buffer: TextBuffer;
   onSubmit: (text: string, mentionedFiles?: string[]) => void | Promise<void>;
   onSlashCommand?: (command: string, args: string) => void | Promise<void>;
+  /** Callback for shell commands (! prefix) */
+  onShellCommand?: (command: string) => void | Promise<void>;
   slashCommands?: readonly SlashCommand[];
   commandContext?: CommandContext;
   disabled?: boolean;
@@ -57,6 +59,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   buffer,
   onSubmit,
   onSlashCommand,
+  onShellCommand,
   slashCommands = [],
   commandContext,
   disabled = false,
@@ -94,6 +97,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const isSlashCommand = (text: string): boolean => {
     const trimmed = text.trim();
     return trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/*');
+  };
+
+  // Check if input is a shell command (! prefix)
+  const isShellCommand = (text: string): boolean => {
+    const trimmed = text.trim();
+    return trimmed.startsWith('!') && trimmed.length > 1;
+  };
+
+  // Parse shell command from input (remove ! prefix)
+  const parseShellCommand = (text: string): string => {
+    return text.trim().substring(1);
   };
 
   // Parse slash command from input
@@ -154,6 +168,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       mentionedFilesRef.current = [];
       lastKeyWasBackslash.current = false;
 
+      // Check for shell command (! prefix) - takes precedence
+      if (isShellCommand(submittedValue) && onShellCommand) {
+        const shellCommand = parseShellCommand(submittedValue);
+        onShellCommand(shellCommand);
+        return;
+      }
+
       // Check for slash command
       if (isSlashCommand(submittedValue) && onSlashCommand) {
         const parsed = parseSlashCommand(submittedValue);
@@ -165,7 +186,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       onSubmit(submittedValue, mentionedFiles.length > 0 ? mentionedFiles : undefined);
     },
-    [buffer, completion, fileMention, onSubmit, onSlashCommand]
+    [buffer, completion, fileMention, onSubmit, onSlashCommand, onShellCommand]
   );
 
   // Handle submit

@@ -32,6 +32,7 @@ import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
+import { useShellCommand } from '../hooks/useShellCommand.js';
 import { useTextBuffer } from '../utils/text-buffer.js';
 import { MessageType, type AgentProfileType } from '../types.js';
 import { theme, themeManager } from '../colors.js';
@@ -102,6 +103,11 @@ export const MainLayout: React.FC = () => {
 
   // Session manager for API calls
   const sessionManager = useSessionManager();
+
+  // Shell command execution
+  const { executeCommand: executeShellCommand, isExecuting: isShellExecuting } = useShellCommand(
+    appState.currentSessionId
+  );
 
   // Slash command processor context
   const commandProcessorContext = useMemo(() => ({
@@ -265,6 +271,41 @@ export const MainLayout: React.FC = () => {
     }
     setActiveDialog(null);
   }, [sessionManager, appActions]);
+
+  // Handle shell command execution (! prefix)
+  const handleShellCommand = useCallback(async (command: string) => {
+    // Add user's shell command to history
+    appActions.addHistoryItem({
+      type: MessageType.USER,
+      text: `!${command}`,
+    });
+
+    // Execute the shell command
+    const result = await executeShellCommand(command);
+
+    if (result) {
+      // Format output for display
+      const output = result.stdout || result.stderr || '';
+      const displayOutput = output.trim() || (result.success ? '(no output)' : '');
+
+      if (result.success) {
+        appActions.addHistoryItem({
+          type: MessageType.INFO,
+          message: displayOutput,
+        });
+      } else {
+        appActions.addHistoryItem({
+          type: MessageType.ERROR,
+          message: result.error || result.stderr || 'Command failed',
+        });
+      }
+    } else {
+      appActions.addHistoryItem({
+        type: MessageType.ERROR,
+        message: 'Failed to execute shell command',
+      });
+    }
+  }, [appActions, executeShellCommand]);
 
   // Handle slash command execution
   const handleSlashCommand = useCallback(async (name: string, args: string) => {
@@ -474,16 +515,18 @@ export const MainLayout: React.FC = () => {
           />
         )}
 
-        {/* Input area with slash command support */}
+        {/* Input area with slash command and shell command support */}
         {appState.isInputActive && !appState.pendingConfirmation && !isDialogActive && (
           <InputPrompt
             buffer={buffer}
             onSubmit={appActions.sendMessage}
             onSlashCommand={handleSlashCommand}
+            onShellCommand={handleShellCommand}
             slashCommands={commands}
             commandContext={commandContext}
             agentProfile={appState.currentProfile}
             sessionId={appState.currentSessionId || undefined}
+            disabled={isShellExecuting}
           />
         )}
 
