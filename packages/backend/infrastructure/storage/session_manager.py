@@ -210,8 +210,9 @@ def load_history(session_id: str) -> List[Dict[str, Any]]:
     """
     Load history without image and video.
 
-    This function also repairs any interrupted tool calls by adding placeholder
-    tool_result messages for orphaned tool_use blocks.
+    NOTE: This function returns RAW history from disk without any modifications.
+    For LLM API calls that require tool_use/tool_result pairing, use
+    repair_interrupted_tool_calls() after loading.
     """
     session_file = _get_session_file(session_id)
     if not os.path.exists(session_file):
@@ -230,9 +231,6 @@ def load_history(session_id: str) -> List[Dict[str, Any]]:
                     if 'name' not in msg:
                         print(f"[WARNING] Tool message missing name: {msg}")
 
-            # Repair interrupted tool calls (add placeholder tool_result for orphaned tool_use)
-            history = _repair_interrupted_tool_calls(history, session_id)
-
             return history
     except Exception as e:
         print(f"[ERROR] Failed to load history for session {session_id}: {str(e)}")
@@ -243,8 +241,9 @@ def load_all_message_history(session_id: str) -> List[Dict[str, Any]]:
     """
     Load complete message history for session, including image messages.
 
-    This function also repairs any interrupted tool calls by adding placeholder
-    tool_result messages for orphaned tool_use blocks.
+    NOTE: This function returns RAW history from disk without any modifications.
+    For LLM API calls that require tool_use/tool_result pairing, use
+    repair_interrupted_tool_calls() after loading.
     """
     session_file = _get_session_file(session_id)
     if not os.path.exists(session_file):
@@ -260,9 +259,6 @@ def load_all_message_history(session_id: str) -> List[Dict[str, Any]]:
                         print(f"[WARNING] Tool message missing tool_call_id: {msg}")
                     if 'name' not in msg:
                         print(f"[WARNING] Tool message missing name: {msg}")
-
-            # Repair interrupted tool calls (add placeholder tool_result for orphaned tool_use)
-            history = _repair_interrupted_tool_calls(history, session_id)
 
             return history
     except Exception as e:
@@ -522,21 +518,22 @@ def _detect_interrupted_tool_calls(history: List[Dict[str, Any]]) -> List[Dict[s
     return interrupted
 
 
-def _repair_interrupted_tool_calls(history: List[Dict[str, Any]], session_id: str) -> List[Dict[str, Any]]:
+def repair_interrupted_tool_calls(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Repair history by adding placeholder tool_result for interrupted tool_use blocks.
 
     This ensures that the message history maintains proper tool_use/tool_result pairing,
     which is required by LLM APIs. The placeholder tool_result indicates that the
-    operation was interrupted, preserving the few-shot learning signal that tools
-    should be used in similar contexts.
+    operation was interrupted.
+
+    IMPORTANT: This function creates IN-MEMORY placeholders only. The returned history
+    should NOT be persisted to disk. Use this only for preparing history for LLM API calls.
 
     Args:
-        history: List of message dictionaries
-        session_id: Session ID for logging
+        history: List of message dictionaries (will not be modified)
 
     Returns:
-        Repaired history with placeholder tool_results added
+        New list with placeholder tool_results added (original list unchanged)
     """
     interrupted = _detect_interrupted_tool_calls(history)
 
@@ -592,8 +589,10 @@ def _repair_interrupted_tool_calls(history: List[Dict[str, Any]], session_id: st
             }
             repaired_history.append(placeholder_message)
 
-    # Save the repaired history to persist the fix
-    save_history(session_id, repaired_history)
+    # NOTE: Do NOT persist the repaired history to disk.
+    # Placeholders are only for in-memory LLM API calls to maintain tool_use/tool_result pairing.
+    # If the tool execution completes later, save_tool_result_message will add the real result.
+    # If the session was truly interrupted, placeholders will be regenerated on next load.
 
     return repaired_history
 

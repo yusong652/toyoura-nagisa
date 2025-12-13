@@ -69,10 +69,12 @@ class BaseContextManager(ABC):
 
         # Load historical messages and initialize working contents
         # Use load_history (not load_all_message_history) to exclude image/video messages
-        from backend.infrastructure.storage.session_manager import load_history
+        from backend.infrastructure.storage.session_manager import load_history, repair_interrupted_tool_calls
         from backend.domain.models.message_factory import message_factory
 
         history_dicts = load_history(session_id)
+        # Repair interrupted tool calls for LLM API (in-memory only, not persisted)
+        history_dicts = repair_interrupted_tool_calls(history_dicts)
         historical_messages = [message_factory(msg) for msg in history_dicts]
         self.working_contents: List[Dict[str, Any]] = []
 
