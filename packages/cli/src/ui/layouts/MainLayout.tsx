@@ -276,6 +276,14 @@ export const MainLayout: React.FC = () => {
     setActiveDialog(null);
   }, [sessionManager, appActions]);
 
+  // Handle shell command blocked during streaming
+  const handleShellBlocked = useCallback(() => {
+    appActions.addHistoryItem({
+      type: MessageType.ERROR,
+      message: 'Shell commands are disabled while AI is responding. Please wait.',
+    });
+  }, [appActions]);
+
   // Handle shell command execution (! prefix)
   const handleShellCommand = useCallback(async (command: string) => {
     // Add user's shell command to history
@@ -527,11 +535,13 @@ export const MainLayout: React.FC = () => {
             onSlashCommand={handleSlashCommand}
             onShellCommand={handleShellCommand}
             onShellModeChange={setIsShellMode}
+            onShellBlocked={handleShellBlocked}
             slashCommands={commands}
             commandContext={commandContext}
             agentProfile={appState.currentProfile}
             sessionId={appState.currentSessionId || undefined}
             disabled={isShellExecuting}
+            isStreaming={appState.isStreaming}
           />
         )}
 

@@ -47,9 +47,13 @@ interface InputPromptProps {
   onShellCommand?: (command: string) => void | Promise<void>;
   /** Callback when shell mode changes */
   onShellModeChange?: (isShellMode: boolean) => void;
+  /** Callback when shell command is blocked during streaming */
+  onShellBlocked?: () => void;
   slashCommands?: readonly SlashCommand[];
   commandContext?: CommandContext;
   disabled?: boolean;
+  /** Whether LLM is currently streaming (blocks shell commands) */
+  isStreaming?: boolean;
   placeholder?: string;
   /** Agent profile for file search */
   agentProfile?: string;
@@ -63,9 +67,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onSlashCommand,
   onShellCommand,
   onShellModeChange,
+  onShellBlocked,
   slashCommands = [],
   commandContext,
   disabled = false,
+  isStreaming = false,
   placeholder = 'Type your message...',
   agentProfile = 'general',
   sessionId,
@@ -173,6 +179,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Clear buffer BEFORE calling handlers to prevent re-submission issues
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      // Block shell commands during LLM streaming to prevent file system inconsistency
+      // Don't clear buffer so user can retry after streaming completes
+      if (isShellCommand(submittedValue) && isStreaming) {
+        onShellBlocked?.();
+        return;
+      }
+
       // Capture mentioned files before clearing
       const mentionedFiles = [...mentionedFilesRef.current];
 
@@ -200,7 +213,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       onSubmit(submittedValue, mentionedFiles.length > 0 ? mentionedFiles : undefined);
     },
-    [buffer, completion, fileMention, onSubmit, onSlashCommand, onShellCommand]
+    [buffer, completion, fileMention, onSubmit, onSlashCommand, onShellCommand, isStreaming, onShellBlocked]
   );
 
   // Handle submit
