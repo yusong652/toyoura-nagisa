@@ -8,7 +8,6 @@ Key improvements:
 """
 
 import asyncio
-import os
 import re
 import subprocess
 import time
@@ -20,6 +19,11 @@ from typing import Dict, Set, Optional, List, Any, Literal
 from threading import Lock, Thread
 
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.shell.utils import (
+    detect_python_command,
+    enhance_python_command,
+    prepare_shell_env,
+)
 from ..utils.path_security import validate_path_in_workspace, WORKSPACE_ROOT
 
 
@@ -134,48 +138,6 @@ class BackgroundProcessManager:
         """Generate a unique 6-character process ID."""
         return str(uuid.uuid4()).replace('-', '')[:6]
 
-    def _detect_python_command(self, command: str) -> bool:
-        """
-        Detect if a command is running Python.
-
-        Args:
-            command: Shell command to analyze
-
-        Returns:
-            True if command appears to run Python
-        """
-        # Common Python invocation patterns
-        python_patterns = [
-            r'^\s*python\d*\s+',
-            r'^\s*python\d*\.\d+\s+',
-            r'^\s*/.*python\d*\s+',
-            r'^\s*\.venv/.*python\s+',
-            r'^\s*venv/.*python\s+',
-            r'^\s*uv\s+run\s+python\s+',
-        ]
-
-        for pattern in python_patterns:
-            if re.match(pattern, command, re.IGNORECASE):
-                return True
-        return False
-
-    def _enhance_python_command(self, command: str) -> str:
-        """
-        Enhance Python commands to force unbuffered output.
-
-        Args:
-            command: Original command
-
-        Returns:
-            Enhanced command with unbuffered output
-        """
-        if not self._detect_python_command(command):
-            return command
-
-        # Add PYTHONUNBUFFERED environment variable
-        # This is more reliable than -u flag since it works with all Python invocations
-        return f"PYTHONUNBUFFERED=1 {command}"
-
     def _read_output_stream(self, process: BackgroundProcess, stream: Any, is_stderr: bool) -> None:
         """
         Read output from a process stream in a separate thread.
@@ -253,14 +215,12 @@ class BackgroundProcessManager:
                 while process_id in self.processes:
                     process_id = self._generate_process_id()
 
-                # Detect and enhance Python commands
-                is_python = self._detect_python_command(command)
-                enhanced_command = self._enhance_python_command(command)
+                # Detect and enhance Python commands using shared utils
+                is_python = detect_python_command(command)
+                enhanced_command, _ = enhance_python_command(command)
 
-                # Prepare environment with unbuffered output
-                env = os.environ.copy()
-                env['PYTHONUNBUFFERED'] = '1'  # Force Python unbuffered
-                env['PYTHONIOENCODING'] = 'utf-8'  # Ensure UTF-8 encoding
+                # Prepare environment with unbuffered output using shared utils
+                env = prepare_shell_env(force_unbuffered=True, encoding='utf-8')
 
                 # Start the subprocess with line buffering
                 popen = subprocess.Popen(

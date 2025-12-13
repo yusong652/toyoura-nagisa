@@ -100,14 +100,19 @@ InputParser
 │   ├── '>' → { type: 'pfc_python', code: string }
 │   └── null → regular chat message
 │
-├── LocalShellExecutor
-│   └── execute(command) → { stdout, stderr, exitCode }
+├── LocalShellExecutor (STATEFUL - persistent shell session)
+│   ├── spawn() → Initialize persistent shell process
+│   ├── execute(command) → { stdout, stderr, exitCode }
+│   ├── getCwd() → Current working directory
+│   └── dispose() → Cleanup shell process
 │
 └── PFCPythonExecutor
     └── execute(code) → { output, returnValue, error, taskId }
 
 ContextInjector
-└── injectCommandResult(type, input, output) → injectedMessage
+└── formatForLLM(type, input, output) → Claude Code compatible format
+    ├── shell → <bash-input>/<bash-stdout>/<bash-stderr>
+    └── pfc   → <pfc-python>/<input>/<output>/<error>
 ```
 
 ### Backend Components (packages/backend)
@@ -144,17 +149,33 @@ pfc-server modifications:
 }
 ```
 
+## Architecture: User Terminal vs Agent Bash Tool
+
+A key insight from Claude Code: **User terminal is stateful, Agent bash tool is stateless**.
+
+| Feature | User Terminal (`!`) | Agent Bash Tool |
+|---------|---------------------|-----------------|
+| State | **Stateful** (preserves cwd/env) | **Stateless** (each invocation independent) |
+| Format | `bash-input/stdout/stderr` | Same format (reused logic) |
+| Session | Persistent shell session | Fresh execution context |
+| Purpose | Human operation context awareness | Agent automated execution |
+
+**Implementation Implication**:
+- User terminal needs a persistent shell session (e.g., `child_process.spawn` with persistent stdin/stdout)
+- Agent bash tool can use simple `exec()` per command
+- Both use the same output format for LLM consumption
+
 ## Context Injection Format
+
+**Important**: Match Claude Code's exact format for consistency and potential future compatibility.
 
 ### Shell Command (`!`)
 
 ```
-<shell-command>
-<input>git status</input>
-<stdout>On branch feature/shell-and-pfc-console
-nothing to commit, working tree clean</stdout>
-<stderr></stderr>
-</shell-command>
+<bash-input>git status</bash-input>
+<bash-stdout>On branch feature/shell-and-pfc-console
+nothing to commit, working tree clean</bash-stdout>
+<bash-stderr></bash-stderr>
 ```
 
 ### PFC Python Command (`>`)
@@ -173,10 +194,13 @@ nothing to commit, working tree clean</stdout>
 ### Phase 1: CLI Shell Command (`!`)
 
 1. [ ] Add command prefix detection in InputPrompt
-2. [ ] Implement LocalShellExecutor using Node.js child_process
+2. [ ] Implement LocalShellExecutor with **stateful persistent shell**
+   - Use `child_process.spawn` with persistent stdin/stdout
+   - Maintain working directory across commands
+   - Handle shell session lifecycle (spawn/dispose)
 3. [ ] Create shell result display component
-4. [ ] Implement context injection for shell commands
-5. [ ] Test with various shell commands
+4. [ ] Implement context injection using Claude Code format (`<bash-input/stdout/stderr>`)
+5. [ ] Test stateful behavior (cd, environment variables, etc.)
 
 ### Phase 2: PFC Quick Command (`>`)
 
@@ -235,6 +259,9 @@ AI: I can see you created balls at (0,0,0) and (1,0,0) using itasca.command().
 ## References
 
 - Claude Code `!` command injection pattern
+  - **Key insight**: User terminal is stateful (preserves cwd/env)
+  - **Format**: `<bash-input>`, `<bash-stdout>`, `<bash-stderr>` (same as agent bash tool)
+  - **Design**: Reuses bash tool logic for format consistency
 - Current pfc-server implementation: `pfc-server/server/`
 - CLI input handling: `packages/cli/src/ui/components/InputPrompt.tsx`
 - Task manager: `pfc-server/server/task_manager.py`

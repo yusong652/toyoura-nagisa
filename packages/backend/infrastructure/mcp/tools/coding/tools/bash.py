@@ -2,28 +2,38 @@
 
 This tool provides shell command execution with simple parameters and clean output,
 designed to match Claude Code's Bash tool interface and behavior.
+
+Uses the infrastructure layer ShellExecutor for actual command execution.
 """
 
-import os
-import subprocess
-import time
-from pathlib import Path
 from typing import Dict, Any, Optional
 
 from pydantic import Field
 from fastmcp import FastMCP  # type: ignore
 from fastmcp.server.context import Context  # type: ignore
 
-from ..utils.path_security import validate_path_in_workspace, get_workspace_root_async
-from backend.infrastructure.mcp.utils.path_normalization import normalize_windows_paths, normalize_output_paths_to_llm_format
+from ..utils.path_security import get_workspace_root_async
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.shell import process_shell_output
+from backend.infrastructure.shell import ShellExecutor
+from backend.infrastructure.shell.executor import (
+    ShellExecutorError,
+    TimeoutError as ShellTimeoutError,
+    ValidationError as ShellValidationError,
+)
 
 __all__ = ["bash", "register_bash_tool"]
 
-# Constants
-DEFAULT_TIMEOUT_MS = 120000  # 2 minutes in milliseconds
-MAX_TIMEOUT_MS = 600000      # 10 minutes maximum
-MAX_OUTPUT_SIZE = 30000      # 30KB output limit (matching Claude Code)
+# Singleton executor instance
+_executor: Optional[ShellExecutor] = None
+
+
+def _get_executor() -> ShellExecutor:
+    """Get or create the singleton ShellExecutor instance."""
+    global _executor
+    if _executor is None:
+        _executor = ShellExecutor()
+    return _executor
 
 
 async def bash(
@@ -76,10 +86,6 @@ Working directory:
   - Bad: cd /foo/bar && pytest tests
 """
     
-    # Validate command
-    if not command or not command.strip():
-        return error_response("Command cannot be empty")
-
     # Handle Pydantic FieldInfo objects when invoked programmatically
     from pydantic.fields import FieldInfo
     if isinstance(description, FieldInfo):
@@ -88,31 +94,16 @@ Working directory:
         timeout = None
     if isinstance(run_in_background, FieldInfo):
         run_in_background = False
-    
+
     # Acknowledge description parameter (used in tool interface)
     _ = description
-    
-    # Set timeout
-    timeout_ms = timeout if timeout is not None else DEFAULT_TIMEOUT_MS
-    if timeout_ms > MAX_TIMEOUT_MS:
-        return error_response(f"Timeout cannot exceed {MAX_TIMEOUT_MS}ms (10 minutes)")
-    if timeout_ms < 1000:
-        return error_response("Timeout must be at least 1000ms (1 second)")
-
-    timeout_seconds = timeout_ms / 1000.0
 
     # Get workspace root dynamically based on current session
-    # Pass context explicitly for better reliability
     work_dir = await get_workspace_root_async(context)
 
-    # Validate workspace access
-    if not work_dir.exists():
-        return error_response(f"Workspace directory does not exist: {work_dir}")
-
-    # Handle background execution
+    # Handle background execution (separate path, not using ShellExecutor)
     if run_in_background:
         try:
-            # Get session ID from MCP context
             session_id = getattr(context, 'client_id', None) if context else None
             if not session_id:
                 return error_response("Session ID not available for background execution")
@@ -127,62 +118,28 @@ Working directory:
         except Exception as e:
             return error_response(f"Failed to start background process: {e}")
 
+    # Execute command using infrastructure layer ShellExecutor
     try:
-        # Normalize Windows paths to prevent mixed separator errors
-        normalized_command = normalize_windows_paths(command)
-
-        # Execute command
-        start_time = time.time()
-
-        # Use shell=True for full shell command support
-        process = subprocess.Popen(
-            normalized_command,
-            shell=True,
+        executor = _get_executor()
+        result = await executor.execute(
+            command=command,
             cwd=str(work_dir),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=os.environ.copy()
+            timeout_ms=timeout,
         )
 
-        try:
-            stdout, stderr = process.communicate(timeout=timeout_seconds)
-            exit_code = process.returncode
-            execution_time = time.time() - start_time
-            
-        except subprocess.TimeoutExpired:
-            process.kill()
-            stdout, stderr = process.communicate()
-            exit_code = -1
-            execution_time = timeout_seconds
-            timeout_msg = f"Command timed out after {timeout_seconds:.1f} seconds"
-            return error_response(timeout_msg)
+        # Process output for LLM consumption
+        combined_output = process_shell_output(
+            stdout=result.stdout,
+            stderr=result.stderr,
+        )
 
-        # Combine output (stdout and stderr)
-        combined_output = ""
-        if stdout:
-            combined_output += stdout
-        if stderr:
-            if combined_output:
-                combined_output += "\n" + stderr
-            else:
-                combined_output = stderr
-
-        # Normalize Windows paths in output to LLM-friendly format (forward slashes)
-        combined_output = normalize_output_paths_to_llm_format(combined_output)
-
-        # Truncate if too large
-        if len(combined_output) > MAX_OUTPUT_SIZE:
-            combined_output = combined_output[:MAX_OUTPUT_SIZE] + f"\n\n... [OUTPUT TRUNCATED - exceeded {MAX_OUTPUT_SIZE} character limit] ..."
-
-        # Build message for internal use
-        if exit_code == 0:
-            message = f"Command executed successfully (exit code {exit_code}, {execution_time:.1f}s)"
+        # Build response message
+        if result.exit_code == 0:
+            message = f"Command executed successfully (exit code {result.exit_code}, {result.execution_time:.1f}s)"
         else:
-            message = f"Command failed with exit code {exit_code} ({execution_time:.1f}s)"
-        
-        # Always return complete terminal output for both success and failure
-        # This matches real terminal behavior where you see all output regardless of exit code
+            message = f"Command failed with exit code {result.exit_code} ({result.execution_time:.1f}s)"
+
+        # Return complete terminal output for both success and failure
         return success_response(
             message,
             llm_content={
@@ -190,18 +147,21 @@ Working directory:
                     {"type": "text", "text": combined_output}
                 ]
             },
-            exit_code=exit_code,
-            execution_time=execution_time,
-            stdout=stdout,
-            stderr=stderr,
-            command=normalized_command,  # Show the normalized command that was actually executed
-            original_command=command if normalized_command != command else None,  # Show original if different
-            working_directory=str(work_dir)
+            exit_code=result.exit_code,
+            execution_time=result.execution_time,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            command=result.command,
+            original_command=result.original_command,
+            working_directory=result.working_directory,
         )
 
-    except Exception as e:
-        error_msg = f"Command execution failed: {e}"
-        return error_response(error_msg)
+    except ShellValidationError as e:
+        return error_response(str(e))
+    except ShellTimeoutError as e:
+        return error_response(str(e))
+    except ShellExecutorError as e:
+        return error_response(str(e))
 
 
 def register_bash_tool(mcp: FastMCP):
