@@ -9,6 +9,11 @@ import { useAppState } from '../contexts/AppStateContext.js';
 import { theme } from '../colors.js';
 import type { AgentProfileType } from '../types.js';
 
+interface HeaderProps {
+  /** Whether shell mode is active (! prefix detected) */
+  isShellMode?: boolean;
+}
+
 /**
  * Format tokens in K units (e.g., 128000 -> "128k")
  */
@@ -26,7 +31,7 @@ const PROFILE_DISPLAY: Record<AgentProfileType, { color: string; name: string }>
   disabled: { color: '#f85149', name: 'Disabled' },  // GitHub red
 };
 
-export const Header: React.FC = () => {
+export const Header: React.FC<HeaderProps> = ({ isShellMode = false }) => {
   const appState = useAppState();
 
   const statusColor =
@@ -74,6 +79,12 @@ export const Header: React.FC = () => {
         <Text color={appState.memoryEnabled ? '#3fb950' : theme.text.muted}>
           {appState.memoryEnabled ? 'Memory ON' : 'Memory OFF'}
         </Text>
+        {isShellMode && (
+          <>
+            <Text color={theme.text.muted}> | </Text>
+            <Text color={theme.status.warning} bold>SHELL</Text>
+          </>
+        )}
       </Box>
       <Box>
         <Text color={theme.text.muted}>

@@ -109,6 +109,9 @@ export const MainLayout: React.FC = () => {
     appState.currentSessionId
   );
 
+  // Shell mode state (for UI indicator)
+  const [isShellMode, setIsShellMode] = useState(false);
+
   // Slash command processor context
   const commandProcessorContext = useMemo(() => ({
     ui: {
@@ -522,6 +525,7 @@ export const MainLayout: React.FC = () => {
             onSubmit={appActions.sendMessage}
             onSlashCommand={handleSlashCommand}
             onShellCommand={handleShellCommand}
+            onShellModeChange={setIsShellMode}
             slashCommands={commands}
             commandContext={commandContext}
             agentProfile={appState.currentProfile}
@@ -531,7 +535,7 @@ export const MainLayout: React.FC = () => {
         )}
 
         {/* Status bar - below input */}
-        <Header />
+        <Header isShellMode={isShellMode} />
       </Box>
     </Box>
   );

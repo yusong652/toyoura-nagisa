@@ -25,7 +25,7 @@
  * - Slash commands with autocomplete (/)
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useEffect, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { replaceMention } from '@toyoura-nagisa/core/utils';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
@@ -45,6 +45,8 @@ interface InputPromptProps {
   onSlashCommand?: (command: string, args: string) => void | Promise<void>;
   /** Callback for shell commands (! prefix) */
   onShellCommand?: (command: string) => void | Promise<void>;
+  /** Callback when shell mode changes */
+  onShellModeChange?: (isShellMode: boolean) => void;
   slashCommands?: readonly SlashCommand[];
   commandContext?: CommandContext;
   disabled?: boolean;
@@ -60,6 +62,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onSubmit,
   onSlashCommand,
   onShellCommand,
+  onShellModeChange,
   slashCommands = [],
   commandContext,
   disabled = false,
@@ -92,6 +95,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     agentProfile,
     sessionId
   );
+
+  // Detect shell mode (input starts with !)
+  const isInShellMode = useMemo(() => {
+    const trimmed = buffer.text.trim();
+    return trimmed.startsWith('!') && trimmed.length >= 1;
+  }, [buffer.text]);
+
+  // Notify parent when shell mode changes
+  useEffect(() => {
+    onShellModeChange?.(isInShellMode);
+  }, [isInShellMode, onShellModeChange]);
 
   // Check if input is a slash command
   const isSlashCommand = (text: string): boolean => {
@@ -406,13 +420,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     );
   };
 
+  // Determine border color based on state
+  const borderColor = disabled
+    ? theme.border.default
+    : isInShellMode
+      ? theme.status.warning
+      : theme.border.focused;
+
   return (
     <Box flexDirection="column">
       {/* Input box */}
       <Box
         flexDirection="column"
         borderStyle="round"
-        borderColor={disabled ? theme.border.default : theme.border.focused}
+        borderColor={borderColor}
         paddingX={1}
       >
         {disabled ? (
