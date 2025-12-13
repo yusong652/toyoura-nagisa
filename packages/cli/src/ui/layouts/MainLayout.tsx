@@ -286,31 +286,24 @@ export const MainLayout: React.FC = () => {
 
   // Handle shell command execution (! prefix)
   const handleShellCommand = useCallback(async (command: string) => {
-    // Add user's shell command to history
+    // Add user's shell command to history with distinct styling
     appActions.addHistoryItem({
-      type: MessageType.USER,
-      text: `!${command}`,
+      type: MessageType.SHELL_COMMAND,
+      command: command,
     });
 
     // Execute the shell command
     const result = await executeShellCommand(command);
 
     if (result) {
-      // Format output for display
-      const output = result.stdout || result.stderr || '';
-      const displayOutput = output.trim() || (result.success ? '(no output)' : '');
-
-      if (result.success) {
-        appActions.addHistoryItem({
-          type: MessageType.INFO,
-          message: displayOutput,
-        });
-      } else {
-        appActions.addHistoryItem({
-          type: MessageType.ERROR,
-          message: result.error || result.stderr || 'Command failed',
-        });
-      }
+      // Add shell result with distinct styling
+      appActions.addHistoryItem({
+        type: MessageType.SHELL_RESULT,
+        stdout: result.stdout || '',
+        stderr: result.stderr || '',
+        exitCode: result.exit_code,
+        isError: !result.success,
+      });
     } else {
       appActions.addHistoryItem({
         type: MessageType.ERROR,

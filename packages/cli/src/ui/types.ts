@@ -11,6 +11,8 @@ export enum MessageType {
   TOOL_RESULT = 'tool_result',
   ERROR = 'error',
   INFO = 'info',
+  SHELL_COMMAND = 'shell_command',
+  SHELL_RESULT = 'shell_result',
 }
 
 // Content block types
@@ -102,13 +104,28 @@ export interface InfoHistoryItem extends HistoryItemBase {
   message: string;
 }
 
+export interface ShellCommandHistoryItem extends HistoryItemBase {
+  type: MessageType.SHELL_COMMAND;
+  command: string;
+}
+
+export interface ShellResultHistoryItem extends HistoryItemBase {
+  type: MessageType.SHELL_RESULT;
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  isError: boolean;
+}
+
 export type HistoryItem =
   | UserHistoryItem
   | AssistantHistoryItem
   | ToolCallHistoryItem
   | ToolResultHistoryItem
   | ErrorHistoryItem
-  | InfoHistoryItem;
+  | InfoHistoryItem
+  | ShellCommandHistoryItem
+  | ShellResultHistoryItem;
 
 // Separate types without id/timestamp for pending items
 export interface UserHistoryItemWithoutId {
@@ -157,6 +174,21 @@ export interface InfoHistoryItemWithoutId {
   timestamp?: number;
 }
 
+export interface ShellCommandHistoryItemWithoutId {
+  type: MessageType.SHELL_COMMAND;
+  command: string;
+  timestamp?: number;
+}
+
+export interface ShellResultHistoryItemWithoutId {
+  type: MessageType.SHELL_RESULT;
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  isError: boolean;
+  timestamp?: number;
+}
+
 // HistoryItemWithoutId is a union of all item types without id
 export type HistoryItemWithoutId =
   | UserHistoryItemWithoutId
@@ -164,7 +196,9 @@ export type HistoryItemWithoutId =
   | ToolCallHistoryItemWithoutId
   | ToolResultHistoryItemWithoutId
   | ErrorHistoryItemWithoutId
-  | InfoHistoryItemWithoutId;
+  | InfoHistoryItemWithoutId
+  | ShellCommandHistoryItemWithoutId
+  | ShellResultHistoryItemWithoutId;
 
 // Tool confirmation types
 export type ToolConfirmationType = 'edit' | 'exec' | 'info';

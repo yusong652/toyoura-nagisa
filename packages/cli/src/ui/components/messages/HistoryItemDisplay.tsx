@@ -13,6 +13,8 @@ import { ToolCallMessage } from './ToolCallMessage.js';
 import { ToolResultMessage } from './ToolResultMessage.js';
 import { InfoMessage } from './InfoMessage.js';
 import { ErrorMessage } from './ErrorMessage.js';
+import { ShellCommandMessage } from './ShellCommandMessage.js';
+import { ShellResultMessage } from './ShellResultMessage.js';
 import { theme } from '../../colors.js';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 
@@ -46,6 +48,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({ item }) 
 
     case MessageType.ERROR:
       return <ErrorMessage item={item} terminalWidth={terminalWidth} />;
+
+    case MessageType.SHELL_COMMAND:
+      return <ShellCommandMessage item={item} terminalWidth={terminalWidth} />;
+
+    case MessageType.SHELL_RESULT:
+      return <ShellResultMessage item={item} terminalWidth={terminalWidth} />;
 
     default:
       return (
