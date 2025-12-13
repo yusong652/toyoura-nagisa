@@ -12,6 +12,7 @@ import { Box, Text } from 'ink';
 import type { ToolResultHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
 import { DiffRenderer } from '../DiffRenderer.js';
+import { MarkdownText } from '../MarkdownText.js';
 
 // Maximum lines to show before truncating
 const MAX_RESULT_LINES = 10;
@@ -88,7 +89,7 @@ const DiffToolResultDisplay: React.FC<{
 
 /**
  * Default tool result display (text output)
- * Shows content lines with consistent indentation
+ * Shows content with markdown rendering and consistent indentation
  * Note: Status indicator removed - success/error is shown on tool call block instead
  */
 const DefaultToolResultDisplay: React.FC<{
@@ -102,9 +103,6 @@ const DefaultToolResultDisplay: React.FC<{
   // Width constraint prevents Ink rendering bug with borders spanning multiple lines
   const boxWidth = terminalWidth ? terminalWidth : undefined;
 
-  // Split into lines for individual rendering (preserves line formatting)
-  const lines = text.split('\n');
-
   return (
     <Box
       flexDirection="column"
@@ -112,14 +110,10 @@ const DefaultToolResultDisplay: React.FC<{
       width={boxWidth}
       marginBottom={1}
     >
-      {/* Content lines - indented to align with tool call description */}
-      {lines.map((line, index) => (
-        <Box key={index} paddingLeft={STATUS_INDICATOR_WIDTH}>
-          <Text wrap="truncate-end" color={theme.text.secondary}>
-            {line}
-          </Text>
-        </Box>
-      ))}
+      {/* Content with markdown rendering */}
+      <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
+        <MarkdownText>{text}</MarkdownText>
+      </Box>
       {truncated && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
           <Text color={theme.text.muted}>

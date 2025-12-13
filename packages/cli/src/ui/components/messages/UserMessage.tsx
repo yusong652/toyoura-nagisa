@@ -7,6 +7,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { UserHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
+import { MarkdownText } from '../MarkdownText.js';
 
 interface UserMessageProps {
   item: UserHistoryItem;
@@ -18,8 +19,21 @@ export const UserMessage: React.FC<UserMessageProps> = ({ item, terminalWidth })
   const prefixWidth = prefix.length;
   const isSlashCommand = item.text.startsWith('/');
 
-  // Use message.user color for user messages (distinct from assistant text)
-  const textColor = isSlashCommand ? theme.text.accent : theme.message.user;
+  // Slash commands don't need markdown rendering
+  if (isSlashCommand) {
+    return (
+      <Box flexDirection="row" marginBottom={1} width={terminalWidth}>
+        <Box width={prefixWidth} flexShrink={0}>
+          <Text color={theme.text.accent}>{prefix}</Text>
+        </Box>
+        <Box flexGrow={1}>
+          <Text wrap="wrap" color={theme.text.accent}>
+            {item.text}
+          </Text>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="row" marginBottom={1} width={terminalWidth}>
@@ -27,9 +41,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ item, terminalWidth })
         <Text color={theme.text.accent}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
-        <Text wrap="wrap" color={textColor}>
-          {item.text}
-        </Text>
+        <MarkdownText>{item.text}</MarkdownText>
       </Box>
     </Box>
   );
