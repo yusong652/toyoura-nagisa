@@ -109,21 +109,70 @@ class ShellService:
         if cd_target is not None:
             return await self._handle_cd(cd_target, command)
 
-        # Execute regular command
+        # Check if command contains cd (compound command like "cd dir && ls")
+        has_cd = self._contains_cd_command(command)
+
+        # For compound commands with cd, append pwd to track final directory
+        actual_command = command
+        if has_cd:
+            actual_command = f"{command} && pwd"
+
+        # Execute command
         result = await self._executor.execute(
-            command=command,
+            command=actual_command,
             cwd=cwd,
             timeout_ms=timeout_ms,
+        )
+
+        # If compound command with cd succeeded, extract pwd and update cwd
+        stdout = result.stdout
+        if has_cd and result.exit_code == 0 and stdout:
+            lines = stdout.rstrip('\n').split('\n')
+            if lines:
+                # Last line is pwd output
+                pwd_output = lines[-1]
+                if pwd_output.startswith('/') and os.path.isdir(pwd_output):
+                    self._state_storage.update_cwd(pwd_output)
+                    # Remove pwd output from stdout
+                    stdout = '\n'.join(lines[:-1])
+                    if stdout:
+                        stdout += '\n'
+
+        # Create result with cleaned stdout
+        clean_result = ShellExecutionResult(
+            stdout=stdout,
+            stderr=result.stderr,
+            exit_code=result.exit_code,
+            command=command,  # Original command, not the one with pwd
+            working_directory=self.get_cwd(),
         )
 
         # Format for LLM context with caveat
         context = format_with_caveat(
             command=command,
-            stdout=result.stdout,
-            stderr=result.stderr,
+            stdout=clean_result.stdout,
+            stderr=clean_result.stderr,
         )
 
-        return result, context
+        return clean_result, context
+
+    def _contains_cd_command(self, command: str) -> bool:
+        """Check if command contains a cd command (for compound commands).
+
+        Detects cd in compound commands like:
+        - cd dir && ls
+        - cd dir; cat file
+        - cd dir || echo "failed"
+
+        Args:
+            command: Command string to check
+
+        Returns:
+            True if command contains cd, False otherwise
+        """
+        # Check for cd at start or after command separators
+        # Pattern: start of string or separator, then 'cd' followed by space or separator
+        return bool(re.search(r'(^|&&|\|\||;|\|)\s*cd(\s|$|&&|\|\||;|\|)', command))
 
     def _parse_cd_command(self, command: str) -> Optional[str]:
         """Parse cd command and extract target directory.
