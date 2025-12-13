@@ -14,7 +14,12 @@ from .output_utils import (
     process_shell_output,
     DEFAULT_MAX_OUTPUT_SIZE,
 )
-from .context_format import format_for_llm_context, format_caveat_message
+from .context_format import (
+    format_for_llm_context,
+    format_caveat_message,
+    format_with_caveat,
+    format_from_result,
+)
 
 __all__ = [
     "ShellExecutionResult",
@@ -23,5 +28,7 @@ __all__ = [
     "process_shell_output",
     "format_for_llm_context",
     "format_caveat_message",
+    "format_with_caveat",
+    "format_from_result",
     "DEFAULT_MAX_OUTPUT_SIZE",
 ]
