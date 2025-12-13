@@ -106,7 +106,8 @@ export const MainLayout: React.FC = () => {
 
   // Shell command execution
   const { executeCommand: executeShellCommand, isExecuting: isShellExecuting } = useShellCommand(
-    appState.currentSessionId
+    appState.currentSessionId,
+    appState.currentProfile
   );
 
   // Shell mode state (for UI indicator)

@@ -15,27 +15,31 @@ from backend.infrastructure.shell.executor import (
     TimeoutError as ShellTimeoutError,
     ValidationError as ShellValidationError,
 )
+from backend.infrastructure.monitoring.status_monitor import get_status_monitor
 from backend.shared.utils.workspace import get_workspace_for_profile
 
 router = APIRouter(prefix="/api/shell", tags=["shell"])
 
-# Service instances per session (simple in-memory cache)
-_shell_services: dict[str, ShellService] = {}
+# Service instances per session+profile (simple in-memory cache)
+# Key: (session_id, agent_profile)
+_shell_services: dict[tuple[str, str], ShellService] = {}
 
 
-async def _get_shell_service(session_id: str) -> ShellService:
-    """Get or create ShellService for a session."""
-    if session_id not in _shell_services:
-        # Use unified workspace resolution (defaults to general profile workspace)
-        workspace_root = await get_workspace_for_profile("general", session_id)
-        _shell_services[session_id] = ShellService(workspace_root=workspace_root)
-    return _shell_services[session_id]
+async def _get_shell_service(session_id: str, agent_profile: str) -> ShellService:
+    """Get or create ShellService for a session and profile."""
+    cache_key = (session_id, agent_profile)
+    if cache_key not in _shell_services:
+        # Use unified workspace resolution based on agent profile
+        workspace_root = await get_workspace_for_profile(agent_profile, session_id)
+        _shell_services[cache_key] = ShellService(workspace_root=workspace_root)
+    return _shell_services[cache_key]
 
 
 class ExecuteRequest(BaseModel):
     """Request body for shell command execution."""
     command: str = Field(..., description="Shell command to execute")
     session_id: str = Field(..., description="Session ID for state management")
+    agent_profile: str = Field("general", description="Agent profile for workspace resolution")
     timeout_ms: Optional[int] = Field(None, description="Optional timeout in milliseconds")
 
 
@@ -69,10 +73,18 @@ async def execute_shell_command(request: ExecuteRequest) -> ExecuteResponse:
         ExecuteResponse with stdout, stderr, exit_code, cwd, and LLM context
     """
     try:
-        service = await _get_shell_service(request.session_id)
+        service = await _get_shell_service(request.session_id, request.agent_profile)
         result, context = await service.execute(
             command=request.command,
             timeout_ms=request.timeout_ms,
+        )
+
+        # Store context for LLM injection (intent awareness)
+        status_monitor = get_status_monitor(request.session_id)
+        status_monitor.add_user_bash_context(
+            command=request.command,
+            stdout=result.stdout,
+            stderr=result.stderr,
         )
 
         return ExecuteResponse(
@@ -85,7 +97,7 @@ async def execute_shell_command(request: ExecuteRequest) -> ExecuteResponse:
         )
 
     except ShellValidationError as e:
-        service = await _get_shell_service(request.session_id)
+        service = await _get_shell_service(request.session_id, request.agent_profile)
         return ExecuteResponse(
             success=False,
             stdout="",
@@ -96,7 +108,7 @@ async def execute_shell_command(request: ExecuteRequest) -> ExecuteResponse:
             error=str(e),
         )
     except ShellTimeoutError as e:
-        service = await _get_shell_service(request.session_id)
+        service = await _get_shell_service(request.session_id, request.agent_profile)
         return ExecuteResponse(
             success=False,
             stdout="",
@@ -107,7 +119,7 @@ async def execute_shell_command(request: ExecuteRequest) -> ExecuteResponse:
             error=str(e),
         )
     except ShellExecutorError as e:
-        service = await _get_shell_service(request.session_id)
+        service = await _get_shell_service(request.session_id, request.agent_profile)
         return ExecuteResponse(
             success=False,
             stdout="",
@@ -119,7 +131,7 @@ async def execute_shell_command(request: ExecuteRequest) -> ExecuteResponse:
         )
     except Exception as e:
         try:
-            service = await _get_shell_service(request.session_id)
+            service = await _get_shell_service(request.session_id, request.agent_profile)
             cwd = service.get_cwd()
         except Exception:
             cwd = ""

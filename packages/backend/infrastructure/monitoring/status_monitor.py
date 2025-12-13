@@ -9,6 +9,7 @@ Architecture:
     - InterruptMonitor: User interrupt status
     - QueueMonitor: Queue messages during tool execution
     - BackgroundProcessMonitor: Agent background processes
+    - UserBashMonitor: User shell command context injection
     - PfcMonitor: PFC simulation tasks
     - TodoMonitor: Todo completion tracking
 
@@ -22,6 +23,8 @@ from .monitors import (
     InterruptMonitor,
     QueueMonitor,
     BackgroundProcessMonitor,
+    UserBashMonitor,
+    get_user_bash_monitor,
     PfcMonitor,
     TodoMonitor,
     IterationMonitor,
@@ -64,6 +67,7 @@ class StatusMonitor:
         self.interrupt_monitor = InterruptMonitor(session_id)
         self.queue_monitor = QueueMonitor(session_id)
         self.background_process_monitor = BackgroundProcessMonitor(session_id)
+        self.user_bash_monitor = get_user_bash_monitor(session_id)
         self.pfc_monitor = PfcMonitor(session_id)
         self.todo_monitor = TodoMonitor(session_id)
         self.iteration_monitor = IterationMonitor(session_id)
@@ -151,6 +155,23 @@ class StatusMonitor:
         self.interrupt_monitor.clear_interrupt_flag()
 
     # -------------------------------------------------------------------------
+    # User Bash Monitor Delegation
+    # -------------------------------------------------------------------------
+
+    def add_user_bash_context(self, command: str, stdout: str, stderr: str) -> None:
+        """
+        Add a user shell command context for LLM injection.
+
+        Delegates to UserBashMonitor.
+
+        Args:
+            command: The shell command executed
+            stdout: Standard output from the command
+            stderr: Standard error from the command
+        """
+        self.user_bash_monitor.add_context(command, stdout, stderr)
+
+    # -------------------------------------------------------------------------
     # Main Coordination Method
     # -------------------------------------------------------------------------
 
@@ -192,6 +213,10 @@ class StatusMonitor:
         # Agent background processes
         background_reminders = await self.background_process_monitor.get_reminders()
         reminders.extend(background_reminders)
+
+        # User bash command context (intent awareness)
+        user_bash_reminders = await self.user_bash_monitor.get_reminders()
+        reminders.extend(user_bash_reminders)
 
         # PFC simulation tasks (requires agent_profile)
         pfc_reminders = await self.pfc_monitor.get_reminders(agent_profile)

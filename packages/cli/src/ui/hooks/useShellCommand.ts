@@ -11,6 +11,7 @@ import { apiClient } from '@toyoura-nagisa/core';
 export interface ShellExecuteRequest {
   command: string;
   session_id: string;
+  agent_profile: string;
   timeout_ms?: number;
 }
 
@@ -35,7 +36,10 @@ export interface UseShellCommandReturn {
   cwd: string | null;
 }
 
-export function useShellCommand(sessionId: string | null): UseShellCommandReturn {
+export function useShellCommand(
+  sessionId: string | null,
+  agentProfile: string = 'general'
+): UseShellCommandReturn {
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cwd, setCwd] = useState<string | null>(null);
@@ -56,6 +60,7 @@ export function useShellCommand(sessionId: string | null): UseShellCommandReturn
           {
             command,
             session_id: sessionId,
+            agent_profile: agentProfile,
           } as ShellExecuteRequest
         );
 
@@ -73,7 +78,7 @@ export function useShellCommand(sessionId: string | null): UseShellCommandReturn
         setIsExecuting(false);
       }
     },
-    [sessionId]
+    [sessionId, agentProfile]
   );
 
   return {
