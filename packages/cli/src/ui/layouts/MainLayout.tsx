@@ -105,7 +105,7 @@ export const MainLayout: React.FC = () => {
   const sessionManager = useSessionManager();
 
   // Shell command execution
-  const { executeCommand: executeShellCommand, isExecuting: isShellExecuting } = useShellCommand(
+  const { executeCommand: executeShellCommand, isExecuting: isShellExecuting, cwd: shellCwd } = useShellCommand(
     appState.currentSessionId,
     appState.currentProfile
   );
@@ -536,7 +536,7 @@ export const MainLayout: React.FC = () => {
         )}
 
         {/* Status bar - below input */}
-        <Header isShellMode={isShellMode} />
+        <Header isShellMode={isShellMode} cwd={shellCwd} />
       </Box>
     </Box>
   );

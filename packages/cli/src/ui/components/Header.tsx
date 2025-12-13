@@ -12,6 +12,8 @@ import type { AgentProfileType } from '../types.js';
 interface HeaderProps {
   /** Whether shell mode is active (! prefix detected) */
   isShellMode?: boolean;
+  /** Current working directory for shell commands */
+  cwd?: string | null;
 }
 
 /**
@@ -31,7 +33,26 @@ const PROFILE_DISPLAY: Record<AgentProfileType, { color: string; name: string }>
   disabled: { color: '#f85149', name: 'Disabled' },  // GitHub red
 };
 
-export const Header: React.FC<HeaderProps> = ({ isShellMode = false }) => {
+/**
+ * Format cwd for display, showing only the last part or truncating if too long
+ */
+const formatCwd = (cwd: string | null | undefined, maxLength: number = 30): string => {
+  if (!cwd) return '~';
+
+  // Get the last component of the path
+  const parts = cwd.split('/').filter(Boolean);
+  const lastPart = parts[parts.length - 1] || '~';
+
+  // If the last part is short enough, show it
+  if (lastPart.length <= maxLength) {
+    return lastPart;
+  }
+
+  // Truncate with ellipsis
+  return '...' + lastPart.slice(-(maxLength - 3));
+};
+
+export const Header: React.FC<HeaderProps> = ({ isShellMode = false, cwd }) => {
   const appState = useAppState();
 
   const statusColor =
@@ -60,11 +81,14 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false }) => {
     ? Math.round((tokensLeft / totalCapacity) * 100)
     : 100;
 
+  // Format cwd for display
+  const displayCwd = formatCwd(cwd);
+
   return (
     <Box flexDirection="row" justifyContent="space-between">
       <Box>
         <Text bold color={theme.text.accent}>
-          toyoura-nagisa
+          {displayCwd}
         </Text>
         {appState.currentSessionId && (
           <Text color={theme.text.muted}>
