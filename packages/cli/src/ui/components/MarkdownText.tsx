@@ -7,6 +7,7 @@
  * - *italic* text
  * - `inline code`
  * - ```code blocks```
+ * - # headings (h1-h6)
  * - - list items
  * - > blockquotes
  * - --- horizontal rules
@@ -142,6 +143,15 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children }) => {
     // Horizontal rule
     if (/^-{3,}$/.test(line.trim())) {
       elements.push(<Text key={`hr-${i}`} color={theme.text.muted}>───</Text>);
+      continue;
+    }
+
+    // Heading (# text, ## text, etc.)
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      elements.push(
+        <Text key={`h-${i}`} bold color={theme.text.primary}>{headingMatch[2]}</Text>
+      );
       continue;
     }
 
