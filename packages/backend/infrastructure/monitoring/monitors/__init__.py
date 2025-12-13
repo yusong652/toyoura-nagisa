@@ -3,7 +3,7 @@ Specialized monitoring modules for different system components.
 
 This package provides modular monitors for various background tasks and system states:
 - TodoMonitor: Todo completion tracking
-- BashMonitor: Background bash process monitoring
+- BackgroundProcessMonitor: Agent background process monitoring
 - PfcMonitor: PFC simulation task tracking
 - InterruptMonitor: User interrupt status management
 - QueueMonitor: Queue message handling
@@ -12,7 +12,7 @@ This package provides modular monitors for various background tasks and system s
 
 from .base_monitor import BaseMonitor
 from .todo_monitor import TodoMonitor
-from .bash_monitor import BashMonitor
+from .background_process_monitor import BackgroundProcessMonitor
 from .pfc_monitor import PfcMonitor
 from .interrupt_monitor import InterruptMonitor
 from .queue_monitor import QueueMonitor
@@ -21,7 +21,7 @@ from .iteration_monitor import IterationMonitor
 __all__ = [
     "BaseMonitor",
     "TodoMonitor",
-    "BashMonitor",
+    "BackgroundProcessMonitor",
     "PfcMonitor",
     "InterruptMonitor",
     "QueueMonitor",

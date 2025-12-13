@@ -1,7 +1,8 @@
 """
-Bash Monitor - Background bash process monitoring.
+Background Process Monitor - Agent background process monitoring.
 
-Tracks background bash processes and generates status reminders.
+Tracks background processes spawned by the agent's bash tool
+and generates status reminders.
 """
 
 import logging
@@ -11,9 +12,9 @@ from .base_monitor import BaseMonitor
 logger = logging.getLogger(__name__)
 
 
-class BashMonitor(BaseMonitor):
+class BackgroundProcessMonitor(BaseMonitor):
     """
-    Monitor for bash background processes.
+    Monitor for agent background processes.
 
     Queries the background process manager for running processes
     and generates system reminders.
@@ -21,21 +22,21 @@ class BashMonitor(BaseMonitor):
 
     async def get_reminders(self) -> List[str]:
         """
-        Get reminders for bash background processes.
+        Get reminders for background processes.
 
         Returns:
-            List[str]: Bash process reminder blocks (with system-reminder tags)
+            List[str]: Background process reminder blocks (with system-reminder tags)
         """
         try:
             from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import get_process_manager
 
             process_manager = get_process_manager()
-            bash_reminders = process_manager.get_system_reminders(self.session_id)
+            process_reminders = process_manager.get_system_reminders(self.session_id)
 
             # Wrap each reminder in system-reminder tags
             return [
                 f"<system-reminder>\n{reminder}\n</system-reminder>"
-                for reminder in bash_reminders
+                for reminder in process_reminders
             ]
 
         except Exception:

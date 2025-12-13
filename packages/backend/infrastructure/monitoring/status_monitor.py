@@ -8,7 +8,7 @@ Architecture:
     StatusMonitor serves as a coordinator, delegating to specialized monitors:
     - InterruptMonitor: User interrupt status
     - QueueMonitor: Queue messages during tool execution
-    - BashMonitor: Background bash processes
+    - BackgroundProcessMonitor: Agent background processes
     - PfcMonitor: PFC simulation tasks
     - TodoMonitor: Todo completion tracking
 
@@ -21,7 +21,7 @@ from typing import List, Dict
 from .monitors import (
     InterruptMonitor,
     QueueMonitor,
-    BashMonitor,
+    BackgroundProcessMonitor,
     PfcMonitor,
     TodoMonitor,
     IterationMonitor,
@@ -63,7 +63,7 @@ class StatusMonitor:
         # Initialize specialized monitors
         self.interrupt_monitor = InterruptMonitor(session_id)
         self.queue_monitor = QueueMonitor(session_id)
-        self.bash_monitor = BashMonitor(session_id)
+        self.background_process_monitor = BackgroundProcessMonitor(session_id)
         self.pfc_monitor = PfcMonitor(session_id)
         self.todo_monitor = TodoMonitor(session_id)
         self.iteration_monitor = IterationMonitor(session_id)
@@ -189,9 +189,9 @@ class StatusMonitor:
         queue_reminders = await self.queue_monitor.get_reminders()
         reminders.extend(queue_reminders)
 
-        # Bash background processes
-        bash_reminders = await self.bash_monitor.get_reminders()
-        reminders.extend(bash_reminders)
+        # Agent background processes
+        background_reminders = await self.background_process_monitor.get_reminders()
+        reminders.extend(background_reminders)
 
         # PFC simulation tasks (requires agent_profile)
         pfc_reminders = await self.pfc_monitor.get_reminders(agent_profile)
