@@ -404,30 +404,30 @@ export const MainLayout: React.FC = () => {
     [appState.pendingHistoryItems, appState.isStreaming, appState.streamingState.thinkingContent],
   );
 
-  // Full context view mode - shows overlay with complete history
-  if (appState.isFullContextMode) {
-    return (
-      <FullContextView onClose={appActions.toggleFullContextMode} />
-    );
-  }
-
+  // Always render Static to prevent unmount/remount issues
+  // Full context mode renders FullContextView AFTER Static (which only shows new items)
   return (
     <Box flexDirection="column" width="100%">
       {/* Welcome header - rendered outside Static to avoid removal issues */}
       {/* Ink's Static doesn't clear previous output when items are removed */}
-      {showWelcomeHeader && <MemoizedAppHeader showTips={true} />}
+      {!appState.isFullContextMode && showWelcomeHeader && <MemoizedAppHeader showTips={true} />}
 
-      {/* Static content area - rendered once to terminal buffer */}
+      {/* Static content area - ALWAYS mounted to preserve internal state */}
       {/* Key changes on resize to force re-render and fix layout artifacts */}
       <Static key={renderKey} items={staticItems}>
         {(item) => item}
       </Static>
 
-      {/* Dynamic pending items - updated during streaming */}
-      {pendingItems}
+      {/* Full context view mode - shows after Static to avoid remount */}
+      {appState.isFullContextMode ? (
+        <FullContextView onClose={appActions.toggleFullContextMode} />
+      ) : (
+        <>
+          {/* Dynamic pending items - updated during streaming */}
+          {pendingItems}
 
-      {/* Bottom controls */}
-      <Box flexDirection="column">
+          {/* Bottom controls */}
+          <Box flexDirection="column">
         {/* Tool confirmation dialog */}
         {appState.pendingConfirmation && (
           <ToolConfirmationPrompt
@@ -546,9 +546,11 @@ export const MainLayout: React.FC = () => {
           />
         )}
 
-        {/* Status bar - below input */}
-        <Header isShellMode={isShellMode} cwd={shellCwd} />
-      </Box>
+            {/* Status bar - below input */}
+            <Header isShellMode={isShellMode} cwd={shellCwd} />
+          </Box>
+        </>
+      )}
     </Box>
   );
 };
