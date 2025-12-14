@@ -14,10 +14,13 @@ import type { AssistantHistoryItem, ContentBlock } from '../../types.js';
 import { theme } from '../../colors.js';
 import { getCachedStringWidth } from '../../utils/textUtils.js';
 import { MarkdownText } from '../MarkdownText.js';
+import { useAppState } from '../../contexts/AppStateContext.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
 // Keep in sync with PendingItemDisplay.tsx for consistent display
 const MAX_THINKING_LINES = 4;
+// No limit when in full context mode
+const MAX_THINKING_LINES_FULL = Infinity;
 
 interface AssistantMessageProps {
   item: AssistantHistoryItem;
@@ -38,7 +41,12 @@ function getLastLines(content: string, maxLines: number): { text: string; trunca
   };
 }
 
-const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boolean): React.ReactNode => {
+const renderContentBlock = (
+  block: ContentBlock,
+  index: number,
+  isStreaming: boolean,
+  maxThinkingLines: number,
+): React.ReactNode => {
   switch (block.type) {
     case 'text': {
       // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
@@ -56,15 +64,15 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
 
     case 'thinking': {
       // Trim and limit thinking content to last N lines (auto-scroll effect)
-      const { text, truncated } = getLastLines(block.thinking.trim(), MAX_THINKING_LINES);
+      const { text, truncated } = getLastLines(block.thinking.trim(), maxThinkingLines);
       return (
         <Box key={`thinking-${index}`} flexDirection="column">
           {truncated && (
             <Text color={theme.text.muted}>...</Text>
           )}
-          <Text color={theme.message.thinking} dimColor wrap="wrap">
+          <MarkdownText dimColor baseColor={theme.message.thinking}>
             {text}
-          </Text>
+          </MarkdownText>
         </Box>
       );
     }
@@ -75,9 +83,14 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
 };
 
 export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item, terminalWidth }) => {
+  const { isFullContextMode } = useAppState();
+
   // Use ⏺ (white ball) prefix - represents Nagisa's round body shape
   const prefix = '⏺ ';
   const prefixWidth = getCachedStringWidth(prefix);
+
+  // Determine max lines for thinking blocks based on mode
+  const maxThinkingLines = isFullContextMode ? MAX_THINKING_LINES_FULL : MAX_THINKING_LINES;
 
   // Filter to get only text blocks for streaming indicator logic
   const textBlocks = item.content.filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text');
@@ -101,7 +114,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item, termin
         {item.content.map((block, index) => {
           // Only show streaming cursor on the last text block
           const isLastTextBlock = block.type === 'text' && index === lastTextBlockIndex;
-          return renderContentBlock(block, index, item.isStreaming === true && isLastTextBlock);
+          return renderContentBlock(block, index, item.isStreaming === true && isLastTextBlock, maxThinkingLines);
         })}
         {/* Show spinner when streaming but no content yet */}
         {item.isStreaming && !hasTextContent && (

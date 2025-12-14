@@ -59,6 +59,9 @@ export interface AppState {
 
   // Current todo (in_progress task)
   currentTodo: TodoItem | null;
+
+  // Full context mode (Ctrl+O toggle - show full thinking/tool results)
+  isFullContextMode: boolean;
 }
 
 export interface AppActions {
@@ -88,6 +91,7 @@ export interface AppActions {
   // UI
   quit: () => void;
   clearScreen: () => void;
+  toggleFullContextMode: () => void;
 
   // Error
   clearError: () => void;
@@ -113,6 +117,7 @@ const defaultState: AppState = {
   isInputActive: true,
   tokenUsage: null,
   currentTodo: null,
+  isFullContextMode: false,
 };
 
 const defaultActions: AppActions = {
@@ -129,6 +134,7 @@ const defaultActions: AppActions = {
   confirmTool: () => {},
   quit: () => {},
   clearScreen: () => {},
+  toggleFullContextMode: () => {},
   clearError: () => {},
 };
 

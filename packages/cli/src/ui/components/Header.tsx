@@ -109,6 +109,12 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, cwd }) => {
             <Text color={theme.status.warning} bold>SHELL</Text>
           </>
         )}
+        {appState.isFullContextMode && (
+          <>
+            <Text color={theme.text.muted}> | </Text>
+            <Text color={theme.status.info} bold>FULL</Text>
+          </>
+        )}
       </Box>
       <Box>
         <Text color={theme.text.muted}>

@@ -22,10 +22,13 @@ import { theme } from '../../colors.js';
 import { TOOL_STATUS } from '../../markers.js';
 import { BlinkingCircle } from '../BlinkingCircle.js';
 import { getCachedStringWidth } from '../../utils/textUtils.js';
+import { MarkdownText } from '../MarkdownText.js';
+import { useAppState } from '../../contexts/AppStateContext.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
 // Keep in sync with AssistantMessage.tsx for consistent display
 const MAX_THINKING_LINES = 4;
+const MAX_THINKING_LINES_FULL = Infinity;
 
 interface PendingItemDisplayProps {
   item: HistoryItemWithoutId;
@@ -46,16 +49,19 @@ function getLastLines(content: string, maxLines: number): { text: string; trunca
 }
 
 // Render content block for assistant message
-const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boolean): React.ReactNode => {
+const renderContentBlock = (
+  block: ContentBlock,
+  index: number,
+  isStreaming: boolean,
+  maxThinkingLines: number,
+): React.ReactNode => {
   switch (block.type) {
     case 'text': {
       // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
       const displayText = block.text.trim();
       return (
         <Box key={`text-${index}`} flexDirection="row">
-          <Text wrap="wrap" color={theme.text.primary}>
-            {displayText}
-          </Text>
+          <MarkdownText>{displayText}</MarkdownText>
           {isStreaming && (
             <Text color={theme.text.muted}>▌</Text>
           )}
@@ -65,15 +71,15 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
 
     case 'thinking': {
       // Trim and limit thinking content to last N lines (auto-scroll effect)
-      const { text, truncated } = getLastLines(block.thinking.trim(), MAX_THINKING_LINES);
+      const { text, truncated } = getLastLines(block.thinking.trim(), maxThinkingLines);
       return (
         <Box key={`thinking-${index}`} flexDirection="column">
           {truncated && (
             <Text color={theme.text.muted}>...</Text>
           )}
-          <Text color={theme.message.thinking} dimColor wrap="wrap">
+          <MarkdownText dimColor baseColor={theme.message.thinking}>
             {text}
-          </Text>
+          </MarkdownText>
         </Box>
       );
     }
@@ -85,9 +91,14 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
 
 // Pending Assistant Message
 const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }> = ({ item }) => {
+  const { isFullContextMode } = useAppState();
+
   // Use ⏺ (ball) prefix - represents Nagisa
   const prefix = '⏺ ';
   const prefixWidth = getCachedStringWidth(prefix);
+
+  // Determine max lines for thinking blocks based on mode
+  const maxThinkingLines = isFullContextMode ? MAX_THINKING_LINES_FULL : MAX_THINKING_LINES;
 
   const content = item.content || [];
   const textBlocks = content.filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text');
@@ -112,7 +123,7 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
       <Box flexGrow={1} flexDirection="column">
         {content.map((block, index) => {
           const isLastTextBlock = block.type === 'text' && index === lastTextBlockIndex;
-          return renderContentBlock(block, index, isStreaming && isLastTextBlock);
+          return renderContentBlock(block, index, isStreaming && isLastTextBlock, maxThinkingLines);
         })}
         {isStreaming && !hasTextContent && (
           <Text color={theme.ui.spinner}>
@@ -128,6 +139,7 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
 const STATUS_INDICATOR_WIDTH = 3;
 // Maximum lines for tool result content
 const MAX_RESULT_LINES = 10;
+const MAX_RESULT_LINES_FULL = Infinity;
 // Maximum SubAgent tools to show (shows most recent, older ones collapsed)
 const MAX_SUBAGENT_TOOLS_SHOWN = 5;
 
@@ -292,11 +304,16 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
 // Layout matches ToolResultMessage for visual consistency
 // Note: Status indicator removed - success/error is shown on tool call block instead
 const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId }> = ({ item }) => {
+  const { isFullContextMode } = useAppState();
+
+  // Determine max lines based on mode
+  const maxResultLines = isFullContextMode ? MAX_RESULT_LINES_FULL : MAX_RESULT_LINES;
+
   // Trim and split content into lines (matches ToolResultMessage behavior)
   const content = (item.content || '').trimEnd();
   const allLines = content.split('\n');
-  const truncated = allLines.length > MAX_RESULT_LINES;
-  const lines = truncated ? allLines.slice(0, MAX_RESULT_LINES) : allLines;
+  const truncated = allLines.length > maxResultLines;
+  const lines = truncated ? allLines.slice(0, maxResultLines) : allLines;
 
   return (
     <Box flexDirection="column" paddingX={1} marginBottom={1}>

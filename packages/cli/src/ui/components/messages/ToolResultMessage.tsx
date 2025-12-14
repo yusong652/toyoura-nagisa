@@ -13,12 +13,16 @@ import type { ToolResultHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
 import { DiffRenderer } from '../DiffRenderer.js';
 import { MarkdownText } from '../MarkdownText.js';
+import { useAppState } from '../../contexts/AppStateContext.js';
 
 // Maximum lines to show before truncating
 const MAX_RESULT_LINES = 10;
+// No limit when in full context mode
+const MAX_RESULT_LINES_FULL = Infinity;
 const STATUS_INDICATOR_WIDTH = 3;
 // Maximum height for diff display
 const MAX_DIFF_HEIGHT = 15;
+const MAX_DIFF_HEIGHT_FULL = Infinity;
 
 interface ToolResultMessageProps {
   item: ToolResultHistoryItem;
@@ -54,7 +58,8 @@ function truncateContent(content: string, maxLines: number): { text: string; tru
 const DiffToolResultDisplay: React.FC<{
   item: ToolResultHistoryItem;
   terminalWidth?: number;
-}> = ({ item, terminalWidth }) => {
+  maxDiffHeight: number;
+}> = ({ item, terminalWidth, maxDiffHeight }) => {
   const diff = item.diff!;
   const fileName = getFileName(diff.file_path);
   const contentWidth = terminalWidth ? terminalWidth - 4 : undefined;
@@ -79,7 +84,7 @@ const DiffToolResultDisplay: React.FC<{
             diffContent={diff.content}
             filename={fileName}
             maxWidth={contentWidth}
-            maxHeight={MAX_DIFF_HEIGHT}
+            maxHeight={maxDiffHeight}
           />
         </Box>
       )}
@@ -95,10 +100,11 @@ const DiffToolResultDisplay: React.FC<{
 const DefaultToolResultDisplay: React.FC<{
   item: ToolResultHistoryItem;
   terminalWidth?: number;
-}> = ({ item, terminalWidth }) => {
+  maxResultLines: number;
+}> = ({ item, terminalWidth, maxResultLines }) => {
   // Only trim trailing whitespace to preserve line number indentation
   // (some LLM APIs add trailing newlines, but leading spaces are part of formatting)
-  const { text, truncated } = truncateContent(item.content.trimEnd(), MAX_RESULT_LINES);
+  const { text, truncated } = truncateContent(item.content.trimEnd(), maxResultLines);
 
   // Width constraint prevents Ink rendering bug with borders spanning multiple lines
   const boxWidth = terminalWidth ? terminalWidth : undefined;
@@ -126,11 +132,17 @@ const DefaultToolResultDisplay: React.FC<{
 };
 
 export const ToolResultMessage: React.FC<ToolResultMessageProps> = ({ item, terminalWidth }) => {
+  const { isFullContextMode } = useAppState();
+
+  // Determine max lines based on mode
+  const maxResultLines = isFullContextMode ? MAX_RESULT_LINES_FULL : MAX_RESULT_LINES;
+  const maxDiffHeight = isFullContextMode ? MAX_DIFF_HEIGHT_FULL : MAX_DIFF_HEIGHT;
+
   // If this is an edit/write tool with diff info, show diff visualization
   if (item.diff && item.diff.content && !item.isError) {
-    return <DiffToolResultDisplay item={item} terminalWidth={terminalWidth} />;
+    return <DiffToolResultDisplay item={item} terminalWidth={terminalWidth} maxDiffHeight={maxDiffHeight} />;
   }
 
   // Default display for other tools or error cases
-  return <DefaultToolResultDisplay item={item} terminalWidth={terminalWidth} />;
+  return <DefaultToolResultDisplay item={item} terminalWidth={terminalWidth} maxResultLines={maxResultLines} />;
 };

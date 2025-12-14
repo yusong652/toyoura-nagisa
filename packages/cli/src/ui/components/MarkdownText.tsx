@@ -19,6 +19,10 @@ import { theme } from '../colors.js';
 
 interface MarkdownTextProps {
   children: string;
+  /** Apply dim effect to all colors (for thinking blocks) */
+  dimColor?: boolean;
+  /** Base text color override (defaults to theme.text.primary) */
+  baseColor?: string;
 }
 
 interface Segment {
@@ -82,32 +86,38 @@ function parseInline(text: string): Segment[] {
 /**
  * Render inline segments
  */
-const InlineLine: React.FC<{ text: string }> = ({ text }) => {
+const InlineLine: React.FC<{
+  text: string;
+  dimColor?: boolean;
+  baseColor?: string;
+}> = ({ text, dimColor, baseColor }) => {
   const segments = parseInline(text);
+  const textColor = baseColor || theme.text.primary;
 
   return (
-    <Text wrap="wrap">
+    <Text wrap="wrap" dimColor={dimColor}>
       {segments.map((seg, i) => {
         switch (seg.type) {
           case 'bold':
-            return <Text key={i} bold color={theme.text.primary}>{seg.content}</Text>;
+            return <Text key={i} bold color={textColor}>{seg.content}</Text>;
           case 'italic':
-            return <Text key={i} italic color={theme.text.primary}>{seg.content}</Text>;
+            return <Text key={i} italic color={textColor}>{seg.content}</Text>;
           case 'boldItalic':
-            return <Text key={i} bold italic color={theme.text.primary}>{seg.content}</Text>;
+            return <Text key={i} bold italic color={textColor}>{seg.content}</Text>;
           case 'code':
             return <Text key={i} color={theme.status.info}>{seg.content}</Text>;
           default:
-            return <Text key={i} color={theme.text.primary}>{seg.content}</Text>;
+            return <Text key={i} color={textColor}>{seg.content}</Text>;
         }
       })}
     </Text>
   );
 };
 
-export const MarkdownText: React.FC<MarkdownTextProps> = ({ children }) => {
+export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, dimColor, baseColor }) => {
   const lines = children.split('\n');
   const elements: React.ReactNode[] = [];
+  const textColor = baseColor || theme.text.primary;
 
   let inCodeBlock = false;
   let codeLines: string[] = [];
@@ -125,7 +135,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children }) => {
         elements.push(
           <Box key={`code-${i}`} flexDirection="column">
             {codeLines.map((cl, j) => (
-              <Text key={j} color={theme.status.success}>{cl}</Text>
+              <Text key={j} color={theme.status.success} dimColor={dimColor}>{cl}</Text>
             ))}
           </Box>
         );
@@ -142,7 +152,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children }) => {
 
     // Horizontal rule
     if (/^-{3,}$/.test(line.trim())) {
-      elements.push(<Text key={`hr-${i}`} color={theme.text.muted}>───</Text>);
+      elements.push(<Text key={`hr-${i}`} color={theme.text.muted} dimColor={dimColor}>───</Text>);
       continue;
     }
 
@@ -150,15 +160,21 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children }) => {
     const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
     if (headingMatch) {
       elements.push(
-        <Text key={`h-${i}`} bold color={theme.text.primary}>{headingMatch[2]}</Text>
+        <Text key={`h-${i}`} bold color={textColor} dimColor={dimColor}>{headingMatch[2]}</Text>
       );
       continue;
     }
 
-    // Blockquote
-    if (line.startsWith('> ')) {
+    // Blockquote (handles "> text", ">text", and empty ">")
+    if (line.startsWith('>')) {
+      // Extract content after '>' (with or without space)
+      const quoteContent = line.startsWith('> ') ? line.slice(2) : line.slice(1);
+      // Skip empty blockquotes (just ">")
+      if (quoteContent.trim() === '') {
+        continue;
+      }
       elements.push(
-        <Text key={`q-${i}`} color={theme.text.muted} italic>{line.slice(2)}</Text>
+        <Text key={`q-${i}`} color={theme.text.muted} italic dimColor={dimColor}>{quoteContent}</Text>
       );
       continue;
     }
@@ -168,8 +184,8 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children }) => {
     if (listMatch) {
       elements.push(
         <Box key={`li-${i}`} flexDirection="row">
-          <Text color={theme.status.warning}>{listMatch[1]}- </Text>
-          <InlineLine text={listMatch[2]} />
+          <Text color={theme.status.warning} dimColor={dimColor}>{listMatch[1]}- </Text>
+          <InlineLine text={listMatch[2]} dimColor={dimColor} baseColor={baseColor} />
         </Box>
       );
       continue;
@@ -178,7 +194,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children }) => {
     // Regular line
     elements.push(
       <Box key={`l-${i}`}>
-        <InlineLine text={line} />
+        <InlineLine text={line} dimColor={dimColor} baseColor={baseColor} />
       </Box>
     );
   }
@@ -188,7 +204,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children }) => {
     elements.push(
       <Box key="code-end" flexDirection="column">
         {codeLines.map((cl, j) => (
-          <Text key={j} color={theme.status.success}>{cl}</Text>
+          <Text key={j} color={theme.status.success} dimColor={dimColor}>{cl}</Text>
         ))}
       </Box>
     );

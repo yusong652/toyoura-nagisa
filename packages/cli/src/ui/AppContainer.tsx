@@ -99,6 +99,9 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const [ctrlCPending, setCtrlCPending] = useState(false);
   const ctrlCTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Full context mode (Ctrl+O toggle)
+  const [isFullContextMode, setIsFullContextMode] = useState(false);
+
   // ========== Hooks ==========
 
   // Connection state management
@@ -256,6 +259,10 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     historyManager.clearItems();
   }, [historyManager]);
 
+  const toggleFullContextMode = useCallback(() => {
+    setIsFullContextMode(prev => !prev);
+  }, []);
+
   // ========== Global Keypress Handling ==========
 
   // Clear Ctrl+C pending state
@@ -305,7 +312,13 @@ export const AppContainer: React.FC<AppContainerProps> = ({
       }
       // Note: pendingConfirmation ESC is handled by ToolConfirmationPrompt component
     }
-  }, [quit, isStreaming, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager]);
+
+    // Ctrl+O: toggle full context mode (show full thinking/tool results)
+    // Only handle here when NOT in full context mode (FullContextView handles its own Ctrl+O)
+    if (key.ctrl && key.name === 'o' && !isFullContextMode) {
+      toggleFullContextMode();
+    }
+  }, [quit, isStreaming, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager, toggleFullContextMode, isFullContextMode]);
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 
@@ -341,6 +354,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     // Token usage: streaming update takes priority, fallback to session usage
     tokenUsage: tokenUsage || sessionTokenUsage,
     currentTodo,
+    isFullContextMode,
   }), [
     connectionStatus,
     error,
@@ -359,6 +373,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     tokenUsage,
     sessionTokenUsage,
     currentTodo,
+    isFullContextMode,
   ]);
 
   const appActions: AppActions = useMemo(() => ({
@@ -375,6 +390,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     confirmTool,
     quit,
     clearScreen,
+    toggleFullContextMode,
     clearError,
   }), [
     historyManager.addItem,
@@ -390,6 +406,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     confirmTool,
     quit,
     clearScreen,
+    toggleFullContextMode,
     clearError,
   ]);
 

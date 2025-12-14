@@ -29,6 +29,7 @@ import { LoadingIndicator } from '../components/LoadingIndicator.js';
 import { TodoStatusIndicator } from '../components/TodoStatusIndicator.js';
 import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js';
 import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
+import { FullContextView } from '../components/FullContextView.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
@@ -402,6 +403,13 @@ export const MainLayout: React.FC = () => {
     ),
     [appState.pendingHistoryItems, appState.isStreaming, appState.streamingState.thinkingContent],
   );
+
+  // Full context view mode - shows overlay with complete history
+  if (appState.isFullContextMode) {
+    return (
+      <FullContextView onClose={appActions.toggleFullContextMode} />
+    );
+  }
 
   return (
     <Box flexDirection="column" width="100%">
