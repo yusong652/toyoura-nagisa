@@ -135,6 +135,17 @@ export const MainLayout: React.FC = () => {
     context: commandProcessorContext,
   });
 
+  // Track session ID to detect session changes
+  const previousSessionIdRef = useRef(appState.currentSessionId);
+
+  // Force re-render when session changes (Static doesn't clear previous output)
+  useEffect(() => {
+    if (previousSessionIdRef.current !== appState.currentSessionId) {
+      previousSessionIdRef.current = appState.currentSessionId;
+      setRenderKey((prev) => prev + 1);
+    }
+  }, [appState.currentSessionId]);
+
   // Handle terminal resize - force re-render to fix layout artifacts
   useEffect(() => {
     // Only process if width actually changed
