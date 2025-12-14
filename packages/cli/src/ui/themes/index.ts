@@ -293,8 +293,9 @@ class ThemeManager {
     if (themes[name]) {
       this.currentThemeName = name;
 
-      // Clear terminal screen (Static component renders to main buffer with old theme colors)
-      process.stdout.write('\x1B[2J\x1B[H');
+      // Clear terminal screen and scrollback buffer (Static renders to main buffer with old colors)
+      // \x1B[2J = clear visible screen, \x1B[3J = clear scrollback buffer, \x1B[H = move cursor home
+      process.stdout.write('\x1B[2J\x1B[3J\x1B[H');
 
       this.notifyListeners();
 

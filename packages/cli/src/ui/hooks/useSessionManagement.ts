@@ -202,8 +202,9 @@ export function useSessionManagement({
     setCurrentSessionId(sessionId);
     historyManager.clearItems();
 
-    // Clear terminal screen (Static component renders to main buffer, can't be cleared by React)
-    process.stdout.write('\x1B[2J\x1B[H');
+    // Clear terminal screen and scrollback buffer (Static renders to main buffer, can't be cleared by React)
+    // \x1B[2J = clear visible screen, \x1B[3J = clear scrollback buffer, \x1B[H = move cursor home
+    process.stdout.write('\x1B[2J\x1B[3J\x1B[H');
 
     // Persist current session ID to storage (for CLI restart)
     await sessionManager.switchSession(sessionId);
