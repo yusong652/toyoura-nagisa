@@ -252,6 +252,9 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
         Extracts llm_content from standardized ToolResult objects and formats
         according to Zhipu API requirements.
 
+        For multimodal content (images), returns a list format that will be
+        converted to image_url format by _convert_inline_data_to_image_url.
+
         Args:
             content: Tool execution result with standardized parts format:
                 - llm_content.parts: List of content parts (text and/or inline_data)
@@ -259,22 +262,24 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
                 - message: User-facing summary
 
         Returns:
-            str: Formatted text content for Zhipu API
-                Note: Zhipu tool messages only support text, inline_data is omitted
+            Union[str, List[Dict[str, Any]]]:
+                - str: Formatted text content for text-only results
+                - List: Multimodal content parts with text and inline_data
 
         Example:
             # ToolResult with text content
             result = {"status": "success", "llm_content": {"parts": [{"type": "text", "text": "result"}]}}
             # Returns: 'result'
 
-            # Result with image content (API limitation)
-            result = {"llm_content": {"parts": [{"type": "text", "text": "image"}, {"type": "inline_data", ...}]}}
-            # Returns: 'image' (inline_data omitted due to API constraints)
+            # Result with image content (multimodal)
+            result = {"llm_content": {"parts": [{"type": "inline_data", "mime_type": "image/png", "data": "..."}]}}
+            # Returns: [{"type": "text", "text": "Image content:"}, {"type": "image", "inline_data": {...}}]
         """
         # All tools use standardized parts format
         llm_content = content["llm_content"]
         content_parts = llm_content["parts"]
         text_parts = []
+        image_parts = []
 
         for part in content_parts:
             part_type = part["type"]
@@ -286,11 +291,34 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
                 # Empty files are valid and LLM should see them as empty
                 text_parts.append(text_content)
             elif part_type == "inline_data":
-                # Zhipu tool messages only support text, skip inline_data
-                # Note: This is an API limitation, not a choice
-                pass
+                # Collect inline_data for multimodal content
+                # Format for _convert_inline_data_to_image_url processing
+                image_parts.append({
+                    "type": "image",
+                    "inline_data": {
+                        "mime_type": part.get("mime_type", "image/png"),
+                        "data": part.get("data", "")
+                    }
+                })
 
-        # Return combined text or indicate content was processed
+        # If we have image content, return multimodal format
+        if image_parts:
+            result_parts: List[Dict[str, Any]] = []
+
+            # Add text description if available
+            if text_parts:
+                combined_text = "\n".join(text_parts)
+                result_parts.append({"type": "text", "text": combined_text})
+            else:
+                # Add minimal text for context when no text provided
+                result_parts.append({"type": "text", "text": "Image content from tool result:"})
+
+            # Add all image parts
+            result_parts.extend(image_parts)
+
+            return result_parts
+
+        # Return combined text for text-only results
         if text_parts:
             return "\n".join(text_parts)
 
