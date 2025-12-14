@@ -292,6 +292,10 @@ class ThemeManager {
   setTheme(name: ThemeName, persist = true): void {
     if (themes[name]) {
       this.currentThemeName = name;
+
+      // Clear terminal screen (Static component renders to main buffer with old theme colors)
+      process.stdout.write('\x1B[2J\x1B[H');
+
       this.notifyListeners();
 
       // Persist to config file
