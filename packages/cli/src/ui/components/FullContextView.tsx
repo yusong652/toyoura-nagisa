@@ -4,6 +4,8 @@
  *
  * Activated by Ctrl+O, provides a scrollable view of all context
  * Press ESC or Ctrl+O again to return to normal view
+ *
+ * Reuses the same message components as normal mode for consistent styling.
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -12,102 +14,11 @@ import { useAppState } from '../contexts/AppStateContext.js';
 import { theme } from '../colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
-import { MarkdownText } from './MarkdownText.js';
-import type { HistoryItem, ContentBlock } from '../types.js';
-import { MessageType } from '../types.js';
+import { HistoryItemDisplay } from './messages/HistoryItemDisplay.js';
 
 interface FullContextViewProps {
   onClose: () => void;
 }
-
-/**
- * Render a single history item with full content (no truncation)
- */
-const FullHistoryItem: React.FC<{ item: HistoryItem }> = ({ item }) => {
-  switch (item.type) {
-    case MessageType.USER:
-      return (
-        <Box flexDirection="column" marginBottom={1}>
-          <Text bold color={theme.message.user}>User:</Text>
-          <Box paddingLeft={2}>
-            <MarkdownText>{item.text}</MarkdownText>
-          </Box>
-        </Box>
-      );
-
-    case MessageType.ASSISTANT:
-      return (
-        <Box flexDirection="column" marginBottom={1}>
-          <Text bold color={theme.text.accent}>Assistant:</Text>
-          <Box paddingLeft={2} flexDirection="column">
-            {item.content.map((block: ContentBlock, index: number) => {
-              if (block.type === 'text') {
-                return (
-                  <Box key={`text-${index}`}>
-                    <MarkdownText>{block.text.trim()}</MarkdownText>
-                  </Box>
-                );
-              }
-              if (block.type === 'thinking') {
-                return (
-                  <Box key={`thinking-${index}`} flexDirection="column" marginY={1}>
-                    <Text bold color={theme.text.muted}>Thinking:</Text>
-                    <Box paddingLeft={2}>
-                      <MarkdownText dimColor baseColor={theme.message.thinking}>
-                        {block.thinking.trim()}
-                      </MarkdownText>
-                    </Box>
-                  </Box>
-                );
-              }
-              return null;
-            })}
-          </Box>
-        </Box>
-      );
-
-    case MessageType.TOOL_CALL:
-      return (
-        <Box flexDirection="column" marginBottom={1}>
-          <Text bold color={theme.message.tool}>Tool Call: {item.toolName}</Text>
-          <Box paddingLeft={2}>
-            <Text color={theme.text.secondary}>
-              {JSON.stringify(item.toolInput, null, 2)}
-            </Text>
-          </Box>
-        </Box>
-      );
-
-    case MessageType.TOOL_RESULT:
-      return (
-        <Box flexDirection="column" marginBottom={1}>
-          <Text bold color={item.isError ? theme.status.error : theme.status.success}>
-            Tool Result {item.toolName ? `(${item.toolName})` : ''}:
-          </Text>
-          <Box paddingLeft={2}>
-            <MarkdownText>{item.content}</MarkdownText>
-          </Box>
-        </Box>
-      );
-
-    case MessageType.INFO:
-      return (
-        <Box marginBottom={1}>
-          <Text color={theme.status.info}>[info] {item.message}</Text>
-        </Box>
-      );
-
-    case MessageType.ERROR:
-      return (
-        <Box marginBottom={1}>
-          <Text color={theme.status.error}>[error] {item.message}</Text>
-        </Box>
-      );
-
-    default:
-      return null;
-  }
-};
 
 export const FullContextView: React.FC<FullContextViewProps> = ({ onClose }) => {
   const appState = useAppState();
@@ -170,13 +81,13 @@ export const FullContextView: React.FC<FullContextViewProps> = ({ onClose }) => 
         </Text>
       </Box>
 
-      {/* Content area */}
-      <Box flexDirection="column" flexGrow={1} paddingX={1}>
+      {/* Content area - reuse same components as normal mode */}
+      <Box flexDirection="column" flexGrow={1}>
         {history.length === 0 ? (
           <Text color={theme.text.muted}>No history to display.</Text>
         ) : (
           history.map((item) => (
-            <FullHistoryItem key={item.id} item={item} />
+            <HistoryItemDisplay key={item.id} item={item} />
           ))
         )}
       </Box>
