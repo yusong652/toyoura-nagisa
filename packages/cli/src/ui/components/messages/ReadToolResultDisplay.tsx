@@ -12,6 +12,8 @@ import type { ToolResultHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
 import { MarkdownText } from '../MarkdownText.js';
 
+// Note: Text and theme are used for truncation indicator
+
 // Maximum lines to show before truncating
 const MAX_RESULT_LINES = 10;
 // Status indicator width (matches other tool displays)
@@ -24,14 +26,6 @@ interface ReadToolResultDisplayProps {
   item: ToolResultHistoryItem;
   terminalWidth?: number;
   maxResultLines?: number;
-}
-
-/**
- * Get file name from path
- */
-function getFileName(filePath: string): string {
-  const parts = filePath.split(/[/\\]/);
-  return parts[parts.length - 1] || filePath;
 }
 
 /**
@@ -78,8 +72,6 @@ export const ReadToolResultDisplay: React.FC<ReadToolResultDisplayProps> = ({
   maxResultLines = MAX_RESULT_LINES,
 }) => {
   const content = item.content || '';
-  const filePath = item.file?.path || '';
-  const fileName = filePath ? getFileName(filePath) : '';
 
   // Check if content has line number format and remove them
   const hasLineNumbers = hasLineNumberFormat(content);
@@ -88,15 +80,6 @@ export const ReadToolResultDisplay: React.FC<ReadToolResultDisplayProps> = ({
 
   return (
     <Box flexDirection="column" paddingX={1} marginBottom={1}>
-      {/* Header line - only show if we have a file name */}
-      {fileName && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH + 1}>
-          <Text bold color={theme.text.primary}>read</Text>
-          <Text color={theme.text.secondary}> </Text>
-          <Text color={theme.text.link}>{fileName}</Text>
-        </Box>
-      )}
-
       {/* Content - rendered as markdown without line numbers */}
       <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
         <MarkdownText>{text}</MarkdownText>
