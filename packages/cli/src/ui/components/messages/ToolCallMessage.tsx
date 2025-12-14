@@ -104,7 +104,7 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
   const boxWidth = terminalWidth ? terminalWidth : undefined;
 
   return (
-    <Box paddingX={1} width={boxWidth} marginBottom={1}>
+    <Box width={boxWidth} marginBottom={1}>
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
         <Text color={statusColor}>{statusIndicator}</Text>
       </Box>

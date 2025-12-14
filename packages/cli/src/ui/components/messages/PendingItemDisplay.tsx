@@ -24,6 +24,7 @@ import { BlinkingCircle } from '../BlinkingCircle.js';
 import { getCachedStringWidth } from '../../utils/textUtils.js';
 import { MarkdownText } from '../MarkdownText.js';
 import { useAppState } from '../../contexts/AppStateContext.js';
+import { ReadToolResultDisplay } from './ReadToolResultDisplay.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
 // Keep in sync with AssistantMessage.tsx for consistent display
@@ -198,7 +199,7 @@ const SubagentToolItemDisplay: React.FC<{
   const statusColor = isError ? theme.status.error : theme.text.muted;
 
   return (
-    <Box paddingX={1} paddingLeft={STATUS_INDICATOR_WIDTH + SUBAGENT_INDENT}>
+    <Box paddingLeft={STATUS_INDICATOR_WIDTH + SUBAGENT_INDENT}>
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
         {isCompleted ? (
           <Text color={statusColor}>{statusIcon}</Text>
@@ -248,7 +249,7 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Box paddingX={1}>
+      <Box>
         <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
           {hasResult ? (
             <Text color={statusColor}>{statusIcon}</Text>
@@ -280,7 +281,7 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
       </Box>
       {/* Render SubAgent tools (for invoke_agent) with auto-scroll effect */}
       {hiddenCount > 0 && (
-        <Box paddingX={1} paddingLeft={STATUS_INDICATOR_WIDTH + 2}>
+        <Box paddingLeft={STATUS_INDICATOR_WIDTH + 2}>
           <Text color={theme.text.muted} dimColor>
             ... {hiddenCount} more tool{hiddenCount > 1 ? 's' : ''} above
           </Text>
@@ -308,6 +309,17 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
 
   // Determine max lines based on mode
   const maxResultLines = isFullContextMode ? MAX_RESULT_LINES_FULL : MAX_RESULT_LINES;
+
+  // If this is a read tool, use specialized display (removes line numbers)
+  if (item.toolName === 'read' && !item.isError) {
+    // Cast to full type for ReadToolResultDisplay (pending items have same structure)
+    return (
+      <ReadToolResultDisplay
+        item={item as any}
+        maxResultLines={maxResultLines}
+      />
+    );
+  }
 
   // Trim and split content into lines (matches ToolResultMessage behavior)
   const content = (item.content || '').trimEnd();

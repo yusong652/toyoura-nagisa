@@ -250,6 +250,11 @@ export function useStreamHandlers({
         // Extract diff info from data field (for edit/write tools)
         const diff = block.data?.diff;
 
+        // Extract file info from data field (for read tool)
+        const fileInfo = block.data?.file_path && block.data?.file_type
+          ? { path: block.data.file_path as string, type: block.data.file_type as 'text' | 'image' | 'binary' }
+          : undefined;
+
         const toolResult: ToolResultHistoryItemWithoutId = {
           type: MessageType.TOOL_RESULT,
           toolCallId: block.tool_use_id,
@@ -257,6 +262,7 @@ export function useStreamHandlers({
           content: contentText,
           isError: block.is_error,
           diff: diff,
+          file: fileInfo,
         };
 
         // Check if this tool call was already committed to history

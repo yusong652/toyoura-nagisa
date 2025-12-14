@@ -15,7 +15,8 @@ interface UserMessageProps {
 }
 
 export const UserMessage: React.FC<UserMessageProps> = ({ item, terminalWidth }) => {
-  const prefix = '> ';
+  // Use ">  " (> + 2 spaces) to align with assistant message prefix "⏺ " (width 3)
+  const prefix = '>  ';
   const prefixWidth = prefix.length;
   const isSlashCommand = item.text.startsWith('/');
 
@@ -41,7 +42,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ item, terminalWidth })
         <Text color={theme.text.accent}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
-        <MarkdownText>{item.text}</MarkdownText>
+        <MarkdownText baseColor={theme.text.accent}>{item.text}</MarkdownText>
       </Box>
     </Box>
   );

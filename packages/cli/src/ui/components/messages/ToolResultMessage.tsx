@@ -14,6 +14,7 @@ import { theme } from '../../colors.js';
 import { DiffRenderer } from '../DiffRenderer.js';
 import { MarkdownText } from '../MarkdownText.js';
 import { useAppState } from '../../contexts/AppStateContext.js';
+import { ReadToolResultDisplay } from './ReadToolResultDisplay.js';
 
 // Maximum lines to show before truncating
 const MAX_RESULT_LINES = 10;
@@ -141,6 +142,11 @@ export const ToolResultMessage: React.FC<ToolResultMessageProps> = ({ item, term
   // If this is an edit/write tool with diff info, show diff visualization
   if (item.diff && item.diff.content && !item.isError) {
     return <DiffToolResultDisplay item={item} terminalWidth={terminalWidth} maxDiffHeight={maxDiffHeight} />;
+  }
+
+  // If this is a read tool, use specialized display (removes line numbers)
+  if (item.toolName === 'read' && !item.isError) {
+    return <ReadToolResultDisplay item={item} terminalWidth={terminalWidth} maxResultLines={maxResultLines} />;
   }
 
   // Default display for other tools or error cases

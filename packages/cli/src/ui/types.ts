@@ -85,6 +85,12 @@ export interface DiffInfo {
   file_path: string;     // Path to the modified file
 }
 
+/** File metadata for read tool results */
+export interface FileInfo {
+  path: string;          // Full file path
+  type: 'text' | 'image' | 'binary';  // File type category
+}
+
 export interface ToolResultHistoryItem extends HistoryItemBase {
   type: MessageType.TOOL_RESULT;
   toolCallId: string;
@@ -92,6 +98,7 @@ export interface ToolResultHistoryItem extends HistoryItemBase {
   content: string;
   isError?: boolean;
   diff?: DiffInfo;       // Diff info for edit/write tools
+  file?: FileInfo;       // File info for read tool
 }
 
 export interface ErrorHistoryItem extends HistoryItemBase {
@@ -159,6 +166,7 @@ export interface ToolResultHistoryItemWithoutId {
   content: string;
   isError?: boolean;
   diff?: DiffInfo;       // Diff info for edit/write tools
+  file?: FileInfo;       // File info for read tool
   timestamp?: number;
 }
 
