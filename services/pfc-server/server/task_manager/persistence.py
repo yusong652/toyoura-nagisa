@@ -84,6 +84,7 @@ class TaskPersistence:
             "task_id": task.task_id,
             "session_id": task.session_id,  # Add session ID
             "task_type": task.task_type,
+            "source": getattr(task, "source", "agent"),  # Task source (default: agent)
             "description": task.description,
             "status": task.status,
             "start_time": task.start_time,
@@ -301,6 +302,7 @@ class HistoricalTask:
         self.task_id = task_data["task_id"]
         self.session_id = task_data.get("session_id", "default")  # Session ID with default fallback
         self.task_type = task_data["task_type"]
+        self.source = task_data.get("source", "agent")  # Task source (default: agent)
         self.description = task_data["description"]
         self.status = task_data["status"]
         self.start_time = task_data["start_time"]
@@ -349,6 +351,7 @@ class HistoricalTask:
                 "data": {
                     "task_id": self.task_id,
                     "task_type": self.task_type,
+                    "source": self.source,
                     "script_name": self.script_name,
                     "entry_script": self.script_path,
                     "script_path": self.script_path,
@@ -372,6 +375,7 @@ class HistoricalTask:
                 "data": {
                     "task_id": self.task_id,
                     "task_type": self.task_type,
+                    "source": self.source,
                     "script_name": self.script_name,
                     "entry_script": self.script_path,
                     "script_path": self.script_path,
@@ -391,6 +395,7 @@ class HistoricalTask:
             "task_id": self.task_id,
             "session_id": self.session_id,
             "task_type": self.task_type,
+            "source": self.source,  # Task source: "agent" or "user_console"
             "description": self.description,
             "status": self.status,
             "elapsed_time": self.get_elapsed_time(),

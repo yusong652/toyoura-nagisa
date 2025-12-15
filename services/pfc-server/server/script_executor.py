@@ -176,8 +176,8 @@ class PFCScriptExecutor:
             # Always restore stdout
             sys.stdout = old_stdout
 
-    async def execute_script(self, session_id, script_path, description, timeout_ms=None, run_in_background=True):
-        # type: (str, str, str, Optional[int], bool) -> Dict[str, Any]
+    async def execute_script(self, session_id, script_path, description, timeout_ms=None, run_in_background=True, source="agent", enable_git_snapshot=True):
+        # type: (str, str, str, Optional[int], bool, str, bool) -> Dict[str, Any]
         """
         Execute Python script with flexible execution control.
 
@@ -197,6 +197,12 @@ class PFCScriptExecutor:
             run_in_background: Background execution control (default: True - production mode)
                 - True: Asynchronous - return task_id immediately, query via check_task_status
                 - False: Synchronous - wait for completion, return result directly
+            source: Task source identifier (default: "agent")
+                - "agent": Script created/executed by LLM agent
+                - "user_console": Script from user Python console (`>` prefix)
+            enable_git_snapshot: Whether to create git snapshot before execution (default: True)
+                - True: Create git commit on pfc-executions branch (for agent scripts)
+                - False: Skip git snapshot (for quick console commands)
 
         Returns:
             Result dictionary:
@@ -267,17 +273,19 @@ class PFCScriptExecutor:
 
             # Create git execution snapshot (before running script)
             # This captures the exact code state that will be executed
-            git_manager = get_git_manager()
+            # Skip for quick console commands (enable_git_snapshot=False)
             git_commit = None
-            if git_manager.is_git_available():
-                # Generate task_id early for commit message
-                import uuid
-                task_id_preview = uuid.uuid4().hex[:8]
-                git_commit = git_manager.create_execution_commit(
-                    task_id=task_id_preview,
-                    description=description,
-                    entry_script=script_path
-                )
+            if enable_git_snapshot:
+                git_manager = get_git_manager()
+                if git_manager.is_git_available():
+                    # Generate task_id early for commit message
+                    import uuid
+                    task_id_preview = uuid.uuid4().hex[:8]
+                    git_commit = git_manager.create_execution_commit(
+                        task_id=task_id_preview,
+                        description=description,
+                        entry_script=script_path
+                    )
 
             # Submit to main thread queue
             future = self.main_executor.submit(
@@ -298,7 +306,8 @@ class PFCScriptExecutor:
                     script_path,
                     output_buffer,  # Pass buffer reference for live status queries
                     description,  # Agent-provided task description
-                    git_commit  # Git version snapshot
+                    git_commit,  # Git version snapshot
+                    source  # Task source: "agent" or "user_console"
                 )
 
                 return {
@@ -307,6 +316,7 @@ class PFCScriptExecutor:
                     "data": {
                         "task_id": task_id,
                         "task_type": "script",
+                        "source": source,
                         "script_name": script_name,
                         "entry_script": script_path,
                         "script_path": script_path,
@@ -332,7 +342,8 @@ class PFCScriptExecutor:
                     script_path,
                     output_buffer,  # Pass buffer reference for output caching
                     description,  # Agent-provided task description
-                    git_commit  # Git version snapshot
+                    git_commit,  # Git version snapshot
+                    source  # Task source: "agent" or "user_console"
                 )
 
                 loop = asyncio.get_event_loop()
@@ -359,6 +370,7 @@ class PFCScriptExecutor:
                     "data": {
                         "task_id": task_id,
                         "task_type": "script",
+                        "source": source,
                         "script_name": script_name,
                         "entry_script": script_path,
                         "script_path": script_path,

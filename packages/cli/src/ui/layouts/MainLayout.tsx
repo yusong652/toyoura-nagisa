@@ -34,6 +34,7 @@ import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
 import { useShellCommand } from '../hooks/useShellCommand.js';
+import { usePfcConsoleCommand } from '../hooks/usePfcConsoleCommand.js';
 import { useTextBuffer } from '../utils/text-buffer.js';
 import { MessageType, type AgentProfileType } from '../types.js';
 import { theme, themeManager } from '../colors.js';
@@ -111,8 +112,17 @@ export const MainLayout: React.FC = () => {
     appState.currentProfile
   );
 
+  // PFC console command execution
+  const { executeCode: executePfcCode, isExecuting: isPfcExecuting } = usePfcConsoleCommand(
+    appState.currentSessionId,
+    appState.currentProfile
+  );
+
   // Shell mode state (for UI indicator)
   const [isShellMode, setIsShellMode] = useState(false);
+
+  // PFC console mode state (for UI indicator)
+  const [isPfcConsoleMode, setIsPfcConsoleMode] = useState(false);
 
   // Slash command processor context
   const commandProcessorContext = useMemo(() => ({
@@ -295,6 +305,46 @@ export const MainLayout: React.FC = () => {
       message: 'Shell commands are disabled while AI is responding. Please wait.',
     });
   }, [appActions]);
+
+  // Handle PFC console command blocked during streaming
+  const handlePfcConsoleBlocked = useCallback(() => {
+    appActions.addHistoryItem({
+      type: MessageType.ERROR,
+      message: 'PFC console commands are disabled while AI is responding. Please wait.',
+    });
+  }, [appActions]);
+
+  // Handle PFC console command execution (> prefix)
+  const handlePfcConsoleCommand = useCallback(async (code: string) => {
+    // Add user's PFC Python command to history with distinct styling
+    appActions.addHistoryItem({
+      type: MessageType.PFC_CONSOLE_COMMAND,
+      code: code,
+    });
+
+    // Execute the PFC Python code
+    const result = await executePfcCode(code);
+
+    if (result) {
+      // Add PFC result with distinct styling
+      appActions.addHistoryItem({
+        type: MessageType.PFC_CONSOLE_RESULT,
+        taskId: result.task_id,
+        scriptName: result.script_name,
+        output: result.output,
+        result: result.result,
+        elapsedTime: result.elapsed_time,
+        isError: !result.success,
+        error: result.error,
+        connected: result.connected,
+      });
+    } else {
+      appActions.addHistoryItem({
+        type: MessageType.ERROR,
+        message: 'Failed to execute PFC Python command',
+      });
+    }
+  }, [appActions, executePfcCode]);
 
   // Handle shell command execution (! prefix)
   const handleShellCommand = useCallback(async (command: string) => {
@@ -539,7 +589,7 @@ export const MainLayout: React.FC = () => {
           />
         )}
 
-        {/* Input area with slash command and shell command support */}
+        {/* Input area with slash command, shell command and PFC console support */}
         {appState.isInputActive && !appState.pendingConfirmation && !isDialogActive && (
           <InputPrompt
             buffer={buffer}
@@ -548,17 +598,20 @@ export const MainLayout: React.FC = () => {
             onShellCommand={handleShellCommand}
             onShellModeChange={setIsShellMode}
             onShellBlocked={handleShellBlocked}
+            onPfcConsoleCommand={handlePfcConsoleCommand}
+            onPfcConsoleModeChange={setIsPfcConsoleMode}
+            onPfcConsoleBlocked={handlePfcConsoleBlocked}
             slashCommands={commands}
             commandContext={commandContext}
             agentProfile={appState.currentProfile}
             sessionId={appState.currentSessionId || undefined}
-            disabled={isShellExecuting}
+            disabled={isShellExecuting || isPfcExecuting}
             isStreaming={appState.isStreaming}
           />
         )}
 
             {/* Status bar - below input */}
-            <Header isShellMode={isShellMode} cwd={shellCwd} />
+            <Header isShellMode={isShellMode} isPfcConsoleMode={isPfcConsoleMode} cwd={shellCwd} />
           </Box>
         </>
       )}

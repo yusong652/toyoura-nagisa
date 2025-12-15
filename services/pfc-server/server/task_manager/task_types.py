@@ -25,8 +25,8 @@ class ScriptTask(Task):
     Includes git-based version tracking via git_commit.
     """
 
-    def __init__(self, task_id, session_id, future, script_name, script_path=None, output_buffer=None, description=None, on_status_change=None, git_commit=None):
-        # type: (str, str, Any, str, Optional[str], Any, Optional[str], Any, Optional[str]) -> None
+    def __init__(self, task_id, session_id, future, script_name, script_path=None, output_buffer=None, description=None, on_status_change=None, git_commit=None, source="agent"):
+        # type: (str, str, Any, str, Optional[str], Any, Optional[str], Any, Optional[str], str) -> None
         """
         Initialize script task.
 
@@ -40,6 +40,7 @@ class ScriptTask(Task):
             description: Task description from PFC agent (LLM-provided)
             on_status_change: Optional callback function(task) called when task status changes
             git_commit: Git commit hash on pfc-executions branch (version snapshot)
+            source: Task source identifier ("agent" or "user_console")
         """
         # Use agent-provided description (default to empty string if None)
         super(ScriptTask, self).__init__(task_id, session_id, future, description or "", "script", on_status_change)
@@ -47,6 +48,7 @@ class ScriptTask(Task):
         self.script_path = script_path  # Entry script path
         self.output_buffer = output_buffer
         self.git_commit = git_commit  # Git version snapshot
+        self.source = source  # Task source: "agent" or "user_console"
 
         logger.info("✓ Script task registered: {} (ID: {}, Session: {})".format(
             script_name, task_id, session_id
@@ -75,6 +77,7 @@ class ScriptTask(Task):
                 "task_id": self.task_id,
                 "session_id": self.session_id,
                 "task_type": self.task_type,
+                "source": self.source,
                 "script_name": self.script_name,
                 "entry_script": self.script_path,
                 "script_path": self.script_path,
@@ -147,6 +150,7 @@ class ScriptTask(Task):
                 "task_id": self.task_id,
                 "session_id": self.session_id,
                 "task_type": self.task_type,
+                "source": self.source,
                 "script_name": self.script_name,
                 "entry_script": self.script_path,
                 "script_path": self.script_path,
@@ -192,6 +196,7 @@ class ScriptTask(Task):
                 "task_id": self.task_id,
                 "session_id": self.session_id,
                 "task_type": self.task_type,
+                "source": self.source,
                 "script_name": self.script_name,
                 "entry_script": self.script_path,
                 "script_path": self.script_path,
@@ -217,6 +222,7 @@ class ScriptTask(Task):
             "task_id": self.task_id,
             "session_id": self.session_id,
             "task_type": self.task_type,
+            "source": self.source,  # Task source: "agent" or "user_console"
             "description": self.description,  # Agent-provided task description
             "status": self.status,
             "elapsed_time": self.get_elapsed_time(),

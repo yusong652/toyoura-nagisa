@@ -278,8 +278,8 @@ class PFCWebSocketClient:
                     data = json.loads(message)
                     msg_type = data.get("type")
 
-                    if msg_type == "result":
-                        # Request result received
+                    if msg_type == "result" or msg_type == "quick_python_result":
+                        # Request result received (including quick_python_result)
                         request_id = data.get("request_id")
                         if request_id in self.pending_requests:
                             future = self.pending_requests.pop(request_id)
@@ -853,6 +853,131 @@ class PFCWebSocketClient:
                 return None
 
         return None
+
+    async def send_quick_python(
+        self,
+        code: str,
+        workspace_path: str,
+        session_id: str = "default",
+        timeout_ms: int = 30000,
+        max_retries: int = 2
+    ) -> Dict[str, Any]:
+        """
+        Send quick Python code from user console for execution.
+
+        This method executes user-provided Python code (from `>` prefix in CLI)
+        as a temporary script file. The code is saved to workspace/.quick_console/
+        for traceability.
+
+        Args:
+            code: Python code to execute (single or multi-line)
+                Example: 'itasca.command("ball create id 1 x 0 y 0 z 0 radius 0.5")'
+            workspace_path: Absolute path to PFC workspace directory
+                The temporary script will be saved to {workspace_path}/.quick_console/
+            session_id: Session identifier for task isolation (default: "default")
+            timeout_ms: Execution timeout in milliseconds (default: 30000 = 30s)
+                Quick commands should complete quickly; use scripts for long operations.
+            max_retries: Maximum retry attempts on connection failure (default: 2)
+
+        Returns:
+            Result dictionary from PFC server with structure:
+                - type: "quick_python_result" - Message type identifier
+                - request_id: str - Unique request identifier
+                - status: Literal["success", "error"] - Operation outcome
+                - message: str - User-friendly message with result
+                - data: Dict with execution details:
+                    - task_id: str - Task identifier
+                    - task_type: "script"
+                    - source: "user_console" - Indicates user-initiated execution
+                    - script_name: str - Generated script filename (e.g., "quick_001.py")
+                    - script_path: str - Full path to saved script
+                    - code_preview: str - Truncated code preview
+                    - output: str - Captured stdout
+                    - result: Any - Return value if any
+
+        Raises:
+            ConnectionError: If connection to PFC server fails after retries
+            TimeoutError: If execution times out
+
+        Note:
+            - Code is saved as temporary script for traceability
+            - Always synchronous (no background execution for quick commands)
+            - No git snapshot (unlike agent scripts)
+            - Tasks are tracked with source="user_console" in task history
+        """
+        for attempt in range(max_retries):
+            try:
+                # Wait for reconnection if in progress
+                if self._reconnecting:
+                    logger.info("Waiting for auto-reconnect to complete...")
+                    for _ in range(60):
+                        if not self._reconnecting and self.connected:
+                            break
+                        await asyncio.sleep(0.5)
+
+                    if not self.connected:
+                        raise ConnectionError("Auto-reconnect did not complete in time")
+
+                # Ensure connected
+                if not self.connected:
+                    self._should_stop = False
+                    success = await self.connect()
+                    if not success:
+                        raise ConnectionError("Failed to connect to PFC server")
+
+                request_id = str(uuid4())
+
+                # Calculate WebSocket timeout (execution timeout + buffer)
+                websocket_timeout_ms = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background=False)
+
+                # Create quick_python message
+                message = {
+                    "type": "quick_python",
+                    "request_id": request_id,
+                    "session_id": session_id,
+                    "workspace_path": workspace_path,
+                    "code": code,
+                    "timeout_ms": timeout_ms
+                }
+
+                # Create future for result
+                future = asyncio.get_event_loop().create_future()
+                self.pending_requests[request_id] = future
+
+                try:
+                    # Send quick Python request
+                    await self.websocket.send(json.dumps(message))
+                    logger.debug(f"Quick Python code sent: {request_id}")
+
+                    # Wait for result with timeout
+                    result = await asyncio.wait_for(future, timeout=websocket_timeout_ms / 1000.0)
+                    return result
+
+                except asyncio.TimeoutError:
+                    self.pending_requests.pop(request_id, None)
+                    raise TimeoutError(
+                        f"Quick Python execution timed out after {websocket_timeout_ms}ms "
+                        f"(execution timeout: {timeout_ms}ms + infrastructure buffer)"
+                    )
+
+            except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                self.connected = False
+
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(0.5)
+                    continue
+                else:
+                    raise ConnectionError(
+                        "Failed to execute quick Python after retries. "
+                        "Please ensure PFC server is running."
+                    ) from e
+
+            except Exception as e:
+                logger.error(f"Quick Python execution failed: {e}")
+                raise
+
+        raise RuntimeError("Unexpected code path in send_quick_python")
 
     async def ping(self) -> bool:
         """

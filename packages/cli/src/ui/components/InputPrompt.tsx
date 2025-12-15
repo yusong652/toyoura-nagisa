@@ -49,10 +49,16 @@ interface InputPromptProps {
   onShellModeChange?: (isShellMode: boolean) => void;
   /** Callback when shell command is blocked during streaming */
   onShellBlocked?: () => void;
+  /** Callback for PFC console commands (> prefix) */
+  onPfcConsoleCommand?: (code: string) => void | Promise<void>;
+  /** Callback when PFC console mode changes */
+  onPfcConsoleModeChange?: (isPfcConsoleMode: boolean) => void;
+  /** Callback when PFC console command is blocked during streaming */
+  onPfcConsoleBlocked?: () => void;
   slashCommands?: readonly SlashCommand[];
   commandContext?: CommandContext;
   disabled?: boolean;
-  /** Whether LLM is currently streaming (blocks shell commands) */
+  /** Whether LLM is currently streaming (blocks shell/PFC commands) */
   isStreaming?: boolean;
   placeholder?: string;
   /** Agent profile for file search */
@@ -68,6 +74,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onShellCommand,
   onShellModeChange,
   onShellBlocked,
+  onPfcConsoleCommand,
+  onPfcConsoleModeChange,
+  onPfcConsoleBlocked,
   slashCommands = [],
   commandContext,
   disabled = false,
@@ -76,9 +85,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   agentProfile = 'general',
   sessionId,
 }) => {
-  const prefix = '> ';
-  const continuationPrefix = '  ';  // No dot for continuation lines
-  const prefixWidth = prefix.length;
+  // Default prefix width (all prefixes should have same width for alignment)
+  const prefixWidth = 2;
 
   // Track if last character was backslash (for \ + Enter newline)
   const lastKeyWasBackslash = useRef(false);
@@ -108,10 +116,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     return trimmed.startsWith('!') && trimmed.length >= 1;
   }, [buffer.text]);
 
+  // Detect PFC console mode (input starts with > but not >> for redirect)
+  const isInPfcConsoleMode = useMemo(() => {
+    const trimmed = buffer.text.trim();
+    // > but not >> (shell redirect) and not > (empty)
+    return trimmed.startsWith('>') && !trimmed.startsWith('>>') && trimmed.length >= 1;
+  }, [buffer.text]);
+
+  // Dynamic prefix based on mode (all 2 chars wide)
+  const prefix = useMemo(() => {
+    if (isInShellMode) return '! ';       // Shell mode: ! prefix (yellow)
+    if (isInPfcConsoleMode) return '> ';  // PFC console mode: > prefix (blue)
+    return '> ';                          // Default: > prefix (accent)
+  }, [isInShellMode, isInPfcConsoleMode]);
+
+  const continuationPrefix = '  ';  // Continuation lines (same width as prefix)
+
   // Notify parent when shell mode changes
   useEffect(() => {
     onShellModeChange?.(isInShellMode);
   }, [isInShellMode, onShellModeChange]);
+
+  // Notify parent when PFC console mode changes
+  useEffect(() => {
+    onPfcConsoleModeChange?.(isInPfcConsoleMode);
+  }, [isInPfcConsoleMode, onPfcConsoleModeChange]);
 
   // Check if input is a slash command
   const isSlashCommand = (text: string): boolean => {
@@ -128,6 +157,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Parse shell command from input (remove ! prefix)
   const parseShellCommand = (text: string): string => {
     return text.trim().substring(1);
+  };
+
+  // Check if input is a PFC console command (> prefix, not >>)
+  const isPfcConsoleCommand = (text: string): boolean => {
+    const trimmed = text.trim();
+    return trimmed.startsWith('>') && !trimmed.startsWith('>>') && trimmed.length > 1;
+  };
+
+  // Parse PFC console command from input (remove > prefix)
+  const parsePfcConsoleCommand = (text: string): string => {
+    return text.trim().substring(1).trim();
   };
 
   // Parse slash command from input
@@ -186,6 +226,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Block PFC console commands during LLM streaming
+      if (isPfcConsoleCommand(submittedValue) && isStreaming) {
+        onPfcConsoleBlocked?.();
+        return;
+      }
+
       // Capture mentioned files before clearing
       const mentionedFiles = [...mentionedFilesRef.current];
 
@@ -202,6 +248,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Check for PFC console command (> prefix)
+      if (isPfcConsoleCommand(submittedValue) && onPfcConsoleCommand) {
+        const pfcCode = parsePfcConsoleCommand(submittedValue);
+        onPfcConsoleCommand(pfcCode);
+        return;
+      }
+
       // Check for slash command
       if (isSlashCommand(submittedValue) && onSlashCommand) {
         const parsed = parseSlashCommand(submittedValue);
@@ -213,7 +266,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       onSubmit(submittedValue, mentionedFiles.length > 0 ? mentionedFiles : undefined);
     },
-    [buffer, completion, fileMention, onSubmit, onSlashCommand, onShellCommand, isStreaming, onShellBlocked]
+    [buffer, completion, fileMention, onSubmit, onSlashCommand, onShellCommand, onPfcConsoleCommand, isStreaming, onShellBlocked, onPfcConsoleBlocked]
   );
 
   // Handle submit
@@ -376,23 +429,39 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Use visual cursor for correct cursor positioning in wrapped lines
   const [visualCursorRow, visualCursorCol] = buffer.visualCursor;
 
+  // Prefix color based on mode
+  const prefixColor = useMemo(() => {
+    if (isInShellMode) return theme.status.warning;      // Shell mode: yellow
+    if (isInPfcConsoleMode) return theme.status.info;    // PFC console mode: blue
+    return theme.text.accent;                            // Default
+  }, [isInShellMode, isInPfcConsoleMode]);
+
   // Render a visual line with cursor
   const renderVisualLine = (
     visualLine: string,
     visualLineIndex: number,
     isCurrentLine: boolean
   ) => {
-    // Only show ">" prefix on the very first line
+    // Only show prefix on the very first line
     const isFirstLine = visualLineIndex === 0;
     const linePrefix = isFirstLine ? prefix : continuationPrefix;
-    const codePoints = toCodePoints(visualLine);
+
+    // Hide trigger character on first line in special modes
+    const shouldHideTrigger = isFirstLine && (isInShellMode || isInPfcConsoleMode);
+    const displayLine = shouldHideTrigger ? visualLine.slice(1) : visualLine;
+    const codePoints = toCodePoints(displayLine);
+
+    // Adjust cursor position if trigger is hidden
+    const adjustedCursorCol = shouldHideTrigger && isCurrentLine
+      ? Math.max(0, visualCursorCol - 1)
+      : visualCursorCol;
 
     if (isEmpty && visualLineIndex === 0 && !disabled) {
       // Show placeholder with cursor at start
       return (
         <Box key={visualLineIndex} flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
-            <Text color={theme.text.accent}>{linePrefix}</Text>
+            <Text color={prefixColor}>{linePrefix}</Text>
           </Box>
           <Text inverse> </Text>
           <Text color={theme.text.muted} dimColor>{placeholder.slice(1)}</Text>
@@ -405,24 +474,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       return (
         <Box key={visualLineIndex} flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
-            <Text color={isFirstLine ? theme.text.accent : theme.text.muted}>
+            <Text color={isFirstLine ? prefixColor : theme.text.muted}>
               {linePrefix}
             </Text>
           </Box>
-          <Text color={theme.text.primary}>{visualLine}</Text>
+          <Text color={theme.text.primary}>{displayLine}</Text>
         </Box>
       );
     }
 
     // Active line with cursor
-    const beforeCursor = codePoints.slice(0, visualCursorCol).join('');
-    const atCursor = codePoints[visualCursorCol] || ' ';
-    const afterCursor = codePoints.slice(visualCursorCol + 1).join('');
+    const beforeCursor = codePoints.slice(0, adjustedCursorCol).join('');
+    const atCursor = codePoints[adjustedCursorCol] || ' ';
+    const afterCursor = codePoints.slice(adjustedCursorCol + 1).join('');
 
     return (
       <Box key={visualLineIndex} flexDirection="row">
         <Box width={prefixWidth} flexShrink={0}>
-          <Text color={isFirstLine ? theme.text.accent : theme.text.muted}>
+          <Text color={isFirstLine ? prefixColor : theme.text.muted}>
             {linePrefix}
           </Text>
         </Box>
@@ -438,7 +507,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ? theme.border.default
     : isInShellMode
       ? theme.status.warning
-      : theme.border.focused;
+      : isInPfcConsoleMode
+        ? theme.status.info
+        : theme.border.focused;
 
   return (
     <Box flexDirection="column">

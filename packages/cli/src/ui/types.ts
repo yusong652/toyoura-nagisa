@@ -13,6 +13,8 @@ export enum MessageType {
   INFO = 'info',
   SHELL_COMMAND = 'shell_command',
   SHELL_RESULT = 'shell_result',
+  PFC_CONSOLE_COMMAND = 'pfc_console_command',
+  PFC_CONSOLE_RESULT = 'pfc_console_result',
 }
 
 // Content block types
@@ -124,6 +126,23 @@ export interface ShellResultHistoryItem extends HistoryItemBase {
   isError: boolean;
 }
 
+export interface PfcConsoleCommandHistoryItem extends HistoryItemBase {
+  type: MessageType.PFC_CONSOLE_COMMAND;
+  code: string;
+}
+
+export interface PfcConsoleResultHistoryItem extends HistoryItemBase {
+  type: MessageType.PFC_CONSOLE_RESULT;
+  taskId: string | null;
+  scriptName: string | null;
+  output: string | null;
+  result: unknown;
+  elapsedTime: number | null;
+  isError: boolean;
+  error: string | null;
+  connected: boolean;
+}
+
 export type HistoryItem =
   | UserHistoryItem
   | AssistantHistoryItem
@@ -132,7 +151,9 @@ export type HistoryItem =
   | ErrorHistoryItem
   | InfoHistoryItem
   | ShellCommandHistoryItem
-  | ShellResultHistoryItem;
+  | ShellResultHistoryItem
+  | PfcConsoleCommandHistoryItem
+  | PfcConsoleResultHistoryItem;
 
 // Separate types without id/timestamp for pending items
 export interface UserHistoryItemWithoutId {
@@ -197,6 +218,25 @@ export interface ShellResultHistoryItemWithoutId {
   timestamp?: number;
 }
 
+export interface PfcConsoleCommandHistoryItemWithoutId {
+  type: MessageType.PFC_CONSOLE_COMMAND;
+  code: string;
+  timestamp?: number;
+}
+
+export interface PfcConsoleResultHistoryItemWithoutId {
+  type: MessageType.PFC_CONSOLE_RESULT;
+  taskId: string | null;
+  scriptName: string | null;
+  output: string | null;
+  result: unknown;
+  elapsedTime: number | null;
+  isError: boolean;
+  error: string | null;
+  connected: boolean;
+  timestamp?: number;
+}
+
 // HistoryItemWithoutId is a union of all item types without id
 export type HistoryItemWithoutId =
   | UserHistoryItemWithoutId
@@ -206,7 +246,9 @@ export type HistoryItemWithoutId =
   | ErrorHistoryItemWithoutId
   | InfoHistoryItemWithoutId
   | ShellCommandHistoryItemWithoutId
-  | ShellResultHistoryItemWithoutId;
+  | ShellResultHistoryItemWithoutId
+  | PfcConsoleCommandHistoryItemWithoutId
+  | PfcConsoleResultHistoryItemWithoutId;
 
 // Tool confirmation types
 export type ToolConfirmationType = 'edit' | 'exec' | 'info';

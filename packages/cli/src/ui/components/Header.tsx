@@ -12,6 +12,8 @@ import type { AgentProfileType } from '../types.js';
 interface HeaderProps {
   /** Whether shell mode is active (! prefix detected) */
   isShellMode?: boolean;
+  /** Whether PFC console mode is active (> prefix detected) */
+  isPfcConsoleMode?: boolean;
   /** Current working directory for shell commands */
   cwd?: string | null;
 }
@@ -52,7 +54,7 @@ const formatCwd = (cwd: string | null | undefined, maxLength: number = 30): stri
   return '...' + lastPart.slice(-(maxLength - 3));
 };
 
-export const Header: React.FC<HeaderProps> = ({ isShellMode = false, cwd }) => {
+export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isPfcConsoleMode = false, cwd }) => {
   const appState = useAppState();
 
   const statusColor =
@@ -107,6 +109,12 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, cwd }) => {
           <>
             <Text color={theme.text.muted}> | </Text>
             <Text color={theme.status.warning} bold>SHELL</Text>
+          </>
+        )}
+        {isPfcConsoleMode && (
+          <>
+            <Text color={theme.text.muted}> | </Text>
+            <Text color={theme.status.info} bold>PFC</Text>
           </>
         )}
         {appState.isFullContextMode && (

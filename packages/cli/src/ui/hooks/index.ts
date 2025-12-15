@@ -14,3 +14,5 @@ export * from './useSessionManager.js';
 export * from './useBracketedPaste.js';
 export * from './useMouse.js';
 export * from './useTodoStatus.js';
+export * from './useShellCommand.js';
+export * from './usePfcConsoleCommand.js';

@@ -25,6 +25,8 @@ from .monitors import (
     BackgroundProcessMonitor,
     UserBashMonitor,
     get_user_bash_monitor,
+    UserPfcPythonMonitor,
+    get_user_pfc_python_monitor,
     PfcMonitor,
     TodoMonitor,
     IterationMonitor,
@@ -68,6 +70,7 @@ class StatusMonitor:
         self.queue_monitor = QueueMonitor(session_id)
         self.background_process_monitor = BackgroundProcessMonitor(session_id)
         self.user_bash_monitor = get_user_bash_monitor(session_id)
+        self.user_pfc_python_monitor = get_user_pfc_python_monitor(session_id)
         self.pfc_monitor = PfcMonitor(session_id)
         self.todo_monitor = TodoMonitor(session_id)
         self.iteration_monitor = IterationMonitor(session_id)
@@ -172,6 +175,30 @@ class StatusMonitor:
         self.user_bash_monitor.add_context(command, stdout, stderr)
 
     # -------------------------------------------------------------------------
+    # User PFC Python Monitor Delegation
+    # -------------------------------------------------------------------------
+
+    def add_user_pfc_python_context(
+        self,
+        code: str,
+        task_id: str,
+        output: str,
+        error: str = None
+    ) -> None:
+        """
+        Add a user PFC Python command context for LLM injection.
+
+        Delegates to UserPfcPythonMonitor.
+
+        Args:
+            code: The Python code executed
+            task_id: Task ID assigned to the execution
+            output: Captured stdout from execution
+            error: Error message if execution failed
+        """
+        self.user_pfc_python_monitor.add_context(code, task_id, output, error)
+
+    # -------------------------------------------------------------------------
     # Main Coordination Method
     # -------------------------------------------------------------------------
 
@@ -217,6 +244,10 @@ class StatusMonitor:
         # User bash command context (intent awareness)
         user_bash_reminders = await self.user_bash_monitor.get_reminders()
         reminders.extend(user_bash_reminders)
+
+        # User PFC Python command context (intent awareness)
+        user_pfc_python_reminders = await self.user_pfc_python_monitor.get_reminders()
+        reminders.extend(user_pfc_python_reminders)
 
         # PFC simulation tasks (requires agent_profile)
         pfc_reminders = await self.pfc_monitor.get_reminders(agent_profile)

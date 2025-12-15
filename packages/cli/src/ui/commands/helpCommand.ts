@@ -51,11 +51,12 @@ function formatHelpMessage(): string {
   lines.push('');
   lines.push('  App:');
   lines.push('    Ctrl+C          Cancel request / Quit');
+  lines.push('    Ctrl+O          Toggle full context mode');
   lines.push('    Escape          Cancel request');
   lines.push('');
-  lines.push('  Scrolling:');
-  lines.push('    Shift+Up/Down   Scroll line by line');
-  lines.push('    Page Up/Down    Scroll page by page');
+  lines.push('  Special Modes:');
+  lines.push('    !<command>      Execute shell command (e.g., !ls -la)');
+  lines.push('    ><code>         Execute PFC Python code (e.g., >print(1))');
   lines.push('');
   lines.push('  Suggestions:');
   lines.push('    Up/Down         Navigate suggestions');

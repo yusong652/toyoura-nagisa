@@ -15,6 +15,8 @@ import { InfoMessage } from './InfoMessage.js';
 import { ErrorMessage } from './ErrorMessage.js';
 import { ShellCommandMessage } from './ShellCommandMessage.js';
 import { ShellResultMessage } from './ShellResultMessage.js';
+import { PfcConsoleCommandMessage } from './PfcConsoleCommandMessage.js';
+import { PfcConsoleResultMessage } from './PfcConsoleResultMessage.js';
 import { theme } from '../../colors.js';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 
@@ -54,6 +56,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({ item }) 
 
     case MessageType.SHELL_RESULT:
       return <ShellResultMessage item={item} terminalWidth={terminalWidth} />;
+
+    case MessageType.PFC_CONSOLE_COMMAND:
+      return <PfcConsoleCommandMessage item={item} terminalWidth={terminalWidth} />;
+
+    case MessageType.PFC_CONSOLE_RESULT:
+      return <PfcConsoleResultMessage item={item} terminalWidth={terminalWidth} />;
 
     default:
       return (
