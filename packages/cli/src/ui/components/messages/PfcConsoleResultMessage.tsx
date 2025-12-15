@@ -109,7 +109,7 @@ export const PfcConsoleResultMessage: React.FC<PfcConsoleResultMessageProps> = (
           </Box>
           <Box flexGrow={1}>
             <MarkdownText baseColor={theme.status.success}>
-              {'>>> '}{typeof item.result === 'string' ? item.result : JSON.stringify(item.result)}
+              {`>>> ${typeof item.result === 'string' ? item.result : JSON.stringify(item.result)}`}
             </MarkdownText>
           </Box>
         </Box>
