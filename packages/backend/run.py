@@ -42,6 +42,8 @@ if __name__ == "__main__":
             str(_BACKEND_DIR / "shared"),
             str(_BACKEND_DIR / "app.py"),
         ]
+        # Include .md files for prompt template changes
+        reload_kwargs["reload_includes"] = ["*.py", "*.md"]
 
     uvicorn.run(
         "backend.app:app",

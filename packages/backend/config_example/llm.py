@@ -80,27 +80,6 @@ class KimiConfig(BaseSettings):
     moonshot_api_key: Optional[str] = Field(default="", description="Moonshot 官方 API 密钥")
     openrouter_api_key: Optional[str] = Field(default="", description="OpenRouter API 密钥")
 
-    # 使用哪个服务
-    use_openrouter: bool = Field(default=False, description="是否使用 OpenRouter 中转")
-
-    # OpenRouter 配置
-    openrouter_base_url: str = Field(
-        default="https://openrouter.ai/api/v1",
-        description="OpenRouter API base URL"
-    )
-    openrouter_http_referer: str = Field(
-        default="https://github.com/yusong652/toyoura-nagisa",
-        description="OpenRouter HTTP Referer header"
-    )
-    openrouter_title: str = Field(
-        default="toyoura-nagisa Voice Assistant",
-        description="OpenRouter X-Title header"
-    )
-    openrouter_model: str = Field(
-        default="moonshotai/kimi-k2-thinking",
-        description="OpenRouter 模型名称 (kimi-k2-thinking 支持 reasoning_content)"
-    )
-
     # 有合理默认值的配置
     model: str = Field(default="kimi-k2-thinking", description="模型名称 (直连 Moonshot API)")
     # Direct API models:

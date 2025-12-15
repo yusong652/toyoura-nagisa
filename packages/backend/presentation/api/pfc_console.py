@@ -140,7 +140,7 @@ async def execute_pfc_python(request: ExecuteRequest) -> ExecuteResponse:
         # Execute quick Python code
         result = await client.send_quick_python(
             code=request.code,
-            workspace_path=workspace_path,
+            workspace_path=str(workspace_path),
             session_id=request.session_id,
             timeout_ms=request.timeout_ms or 30000,
         )

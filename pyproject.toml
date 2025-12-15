@@ -89,8 +89,8 @@ dev-dependencies = [
 [tool.uv.workspace]
 members = [
     "packages/backend",
-    "workspace/default/toyoura_nagisa_uv_workspace/toyoura-nagisa-uv-plot"
-, "pfc_workspace"]
+    "workspace/default/toyoura_nagisa_uv_workspace/toyoura-nagisa-uv-plot",
+]
 # Note: services/pfc-server is NOT a workspace member
 # It runs in PFC's embedded Python environment with its own dependencies
 # Install in PFC environment: pip install websockets==9.1
