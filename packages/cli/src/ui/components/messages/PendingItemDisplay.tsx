@@ -94,8 +94,8 @@ const renderContentBlock = (
 const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }> = ({ item }) => {
   const { isFullContextMode } = useAppState();
 
-  // Use ⏺ (ball) prefix - represents Nagisa
-  const prefix = '⏺ ';
+  // Use ● (filled circle) prefix - represents Nagisa
+  const prefix = '● ';
   const prefixWidth = getCachedStringWidth(prefix);
 
   // Determine max lines for thinking blocks based on mode
@@ -119,7 +119,7 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
   return (
     <Box flexDirection="row" marginBottom={1}>
       <Box width={prefixWidth} flexShrink={0}>
-        <Text color={theme.text.accent}>{prefix}</Text>
+        <Text color={theme.text.primary}>{prefix}</Text>
       </Box>
       <Box flexGrow={1} flexDirection="column">
         {content.map((block, index) => {
@@ -137,7 +137,7 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
 };
 
 // Status indicator width (matches ToolCallMessage and ToolResultMessage)
-const STATUS_INDICATOR_WIDTH = 3;
+const STATUS_INDICATOR_WIDTH = 2;  // Match "● " prefix width
 // Maximum lines for tool result content
 const MAX_RESULT_LINES = 10;
 const MAX_RESULT_LINES_FULL = Infinity;
@@ -180,8 +180,8 @@ function getToolDescription(toolName: string, input: Record<string, unknown>): s
 }
 
 // SubAgent Tool Item (nested under invoke_agent)
-// Displayed with additional indentation and dimmer styling
-// Shows BlinkingCircle when executing, checkmark/error when tool completes
+// Displayed with additional indentation
+// Shows BlinkingCircle when executing, colored status when completed
 const SubagentToolItemDisplay: React.FC<{
   toolName: string;
   toolInput: Record<string, unknown>;
@@ -196,7 +196,11 @@ const SubagentToolItemDisplay: React.FC<{
   // Tool is completed if it has its own result, or if parent (invoke_agent) is completed
   const isCompleted = hasResult === true || parentCompleted;
   const statusIcon = isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
-  const statusColor = isError ? theme.status.error : theme.text.muted;
+  // Color based on status: green for success, red for error, secondary for in-progress
+  const statusColor = isError ? theme.status.error : theme.status.success;
+  const textColor = isCompleted
+    ? (isError ? theme.status.error : theme.status.success)
+    : theme.text.secondary;
 
   return (
     <Box paddingLeft={STATUS_INDICATOR_WIDTH + SUBAGENT_INDENT}>
@@ -204,15 +208,15 @@ const SubagentToolItemDisplay: React.FC<{
         {isCompleted ? (
           <Text color={statusColor}>{statusIcon}</Text>
         ) : (
-          <BlinkingCircle color={theme.text.muted} />
+          <BlinkingCircle color={theme.text.secondary} />
         )}
       </Box>
-      <Text wrap="truncate" dimColor>
-        <Text bold color={theme.text.muted}>
+      <Text wrap="truncate">
+        <Text bold color={textColor}>
           {toolName}
         </Text>
         {description && (
-          <Text color={theme.text.muted}> {description}</Text>
+          <Text color={textColor}> {description}</Text>
         )}
       </Text>
     </Box>

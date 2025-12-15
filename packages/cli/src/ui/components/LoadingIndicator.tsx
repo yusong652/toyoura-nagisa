@@ -3,7 +3,7 @@
  * Reference: Gemini CLI ui/components/GeminiRespondingSpinner.tsx
  *
  * Shows a spinner when the AI is responding, with optional thinking content.
- * Uses the ⏺ (ball) prefix to represent Nagisa.
+ * Uses the ● (filled circle) prefix to represent Nagisa.
  */
 
 import React from 'react';
@@ -34,15 +34,15 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   thinkingContent,
   message = 'Thinking...',
 }) => {
-  // Use ⏺ (ball) prefix - represents Nagisa
-  const prefix = '⏺ ';
+  // Use ● (filled circle) prefix - represents Nagisa
+  const prefix = '● ';
   const prefixWidth = 2;
 
   return (
     <Box flexDirection="column" marginY={1}>
       <Box flexDirection="row">
         <Box width={prefixWidth} flexShrink={0}>
-          <Text color={theme.text.accent}>{prefix}</Text>
+          <Text color={theme.text.primary}>{prefix}</Text>
         </Box>
         <Box flexDirection="row">
           <Text color={theme.ui.spinner}>

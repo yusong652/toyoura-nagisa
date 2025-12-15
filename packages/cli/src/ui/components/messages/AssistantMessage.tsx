@@ -2,8 +2,8 @@
  * Assistant Message Component
  * Reference: Gemini CLI ui/components/messages/GeminiMessage.tsx
  *
- * Displays AI assistant responses with Nagisa's ball icon (⏺) prefix.
- * The white ball represents Nagisa's round body shape.
+ * Displays AI assistant responses with Nagisa's filled circle (●) prefix.
+ * The filled circle represents Nagisa's round body shape.
  * Supports text and thinking content blocks.
  */
 
@@ -85,8 +85,8 @@ const renderContentBlock = (
 export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item, terminalWidth }) => {
   const { isFullContextMode } = useAppState();
 
-  // Use ⏺ (white ball) prefix - represents Nagisa's round body shape
-  const prefix = '⏺ ';
+  // Use ● (filled circle) prefix - represents Nagisa's round body shape
+  const prefix = '● ';
   const prefixWidth = getCachedStringWidth(prefix);
 
   // Determine max lines for thinking blocks based on mode
@@ -108,7 +108,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item, termin
   return (
     <Box flexDirection="row" marginBottom={1} width={terminalWidth}>
       <Box width={prefixWidth} flexShrink={0}>
-        <Text color={theme.text.accent}>{prefix}</Text>
+        <Text color={theme.text.primary}>{prefix}</Text>
       </Box>
       <Box flexGrow={1} flexDirection="column">
         {item.content.map((block, index) => {

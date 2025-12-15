@@ -6,7 +6,7 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
-export type ThemeName = 'github' | 'monokai' | 'dracula' | 'nord';
+export type ThemeName = 'github' | 'monokai' | 'dracula' | 'nord' | 'catppuccin' | 'everforest' | 'rosepine';
 
 export interface ThemeColors {
   // Primary colors
@@ -172,6 +172,69 @@ const nordColors: ThemeColors = {
   thinking: '#4c566a',   // Polar night
 };
 
+// Catppuccin Mocha theme (soft pastel colors)
+const catppuccinColors: ThemeColors = {
+  primary: '#89b4fa',    // Blue
+  secondary: '#a6adc8',  // Subtext0
+  accent: '#cba6f7',     // Mauve
+  success: '#a6e3a1',    // Green
+  error: '#f38ba8',      // Red
+  warning: '#f9e2af',    // Yellow
+  info: '#89dceb',       // Sky
+  text: '#cdd6f4',       // Text
+  textDim: '#bac2de',    // Subtext1
+  textMuted: '#6c7086',  // Overlay0
+  bg: '#1e1e2e',         // Base
+  bgLight: '#313244',    // Surface0
+  user: '#89dceb',       // Sky
+  assistant: '#cdd6f4',  // Text
+  system: '#6c7086',     // Overlay0
+  tool: '#f9e2af',       // Yellow
+  thinking: '#6c7086',   // Overlay0
+};
+
+// Everforest theme (green forest, easy on eyes)
+const everforestColors: ThemeColors = {
+  primary: '#a7c080',    // Green
+  secondary: '#859289',  // Grey1
+  accent: '#d699b6',     // Purple
+  success: '#a7c080',    // Green
+  error: '#e67e80',      // Red
+  warning: '#dbbc7f',    // Yellow
+  info: '#7fbbb3',       // Aqua
+  text: '#d3c6aa',       // Fg
+  textDim: '#9da9a0',    // Grey0
+  textMuted: '#5c6a72',  // Grey2
+  bg: '#2d353b',         // Bg0
+  bgLight: '#3d484d',    // Bg1
+  user: '#7fbbb3',       // Aqua
+  assistant: '#d3c6aa',  // Fg
+  system: '#5c6a72',     // Grey2
+  tool: '#dbbc7f',       // Yellow
+  thinking: '#5c6a72',   // Grey2
+};
+
+// Rose Pine theme (soft rose and pine colors)
+const rosepineColors: ThemeColors = {
+  primary: '#9ccfd8',    // Foam
+  secondary: '#908caa',  // Subtle
+  accent: '#c4a7e7',     // Iris
+  success: '#9ccfd8',    // Foam
+  error: '#eb6f92',      // Love
+  warning: '#f6c177',    // Gold
+  info: '#31748f',       // Pine
+  text: '#e0def4',       // Text
+  textDim: '#908caa',    // Subtle
+  textMuted: '#6e6a86',  // Muted
+  bg: '#191724',         // Base
+  bgLight: '#26233a',    // Surface
+  user: '#9ccfd8',       // Foam
+  assistant: '#e0def4',  // Text
+  system: '#6e6a86',     // Muted
+  tool: '#f6c177',       // Gold
+  thinking: '#6e6a86',   // Muted
+};
+
 interface DiffColors {
   addedBg: string;
   removedBg: string;
@@ -251,6 +314,27 @@ export const themes: Record<ThemeName, ThemeDefinition> = {
     description: 'Arctic, north-bluish color palette',
     colors: nordColors,
     semantic: createSemanticTheme(nordColors, ['#88c0d0', '#81a1c1', '#b48ead']),
+  },
+  catppuccin: {
+    name: 'catppuccin',
+    displayName: 'Catppuccin',
+    description: 'Soft pastel colors, easy on the eyes',
+    colors: catppuccinColors,
+    semantic: createSemanticTheme(catppuccinColors, ['#89b4fa', '#cba6f7', '#f38ba8']),
+  },
+  everforest: {
+    name: 'everforest',
+    displayName: 'Everforest',
+    description: 'Green forest theme, nature-inspired',
+    colors: everforestColors,
+    semantic: createSemanticTheme(everforestColors, ['#a7c080', '#7fbbb3', '#d699b6']),
+  },
+  rosepine: {
+    name: 'rosepine',
+    displayName: 'Rosé Pine',
+    description: 'Soft rose and pine colors',
+    colors: rosepineColors,
+    semantic: createSemanticTheme(rosepineColors, ['#9ccfd8', '#c4a7e7', '#eb6f92']),
   },
 };
 

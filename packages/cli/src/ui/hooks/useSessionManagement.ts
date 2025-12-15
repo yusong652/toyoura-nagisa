@@ -155,7 +155,7 @@ function convertBackendHistory(
       }
 
       // Add assistant message if there's text/thinking content OR tool_use
-      // (tool_use-only messages need the ⏺ prefix for visual consistency with streaming)
+      // (tool_use-only messages need the ● prefix for visual consistency with streaming)
       if (contentBlocks.length > 0 || hasToolUse) {
         historyManager.addItem({
           type: MessageType.ASSISTANT,

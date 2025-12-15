@@ -1,12 +1,13 @@
 /**
  * Shell Result Message Component
- * Displays shell command output with distinct styling from INFO messages
+ * Displays shell command output using unified markdown format
  */
 
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ShellResultHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
+import { MarkdownText } from '../MarkdownText.js';
 
 interface ShellResultMessageProps {
   item: ShellResultHistoryItem;
@@ -14,23 +15,20 @@ interface ShellResultMessageProps {
 }
 
 export const ShellResultMessage: React.FC<ShellResultMessageProps> = ({ item, terminalWidth }) => {
-  // Use different prefix to distinguish from INFO (ℹ)
-  const prefix = '  ';  // Indented to align with command output
+  // Use same prefix width as assistant message for alignment
+  const prefix = '  ';  // 2 spaces to align with "● " prefix (width 2)
   const prefixWidth = prefix.length;
 
   // Determine what to display
   const hasStdout = item.stdout && item.stdout.trim();
   const hasStderr = item.stderr && item.stderr.trim();
 
-  // Choose color based on error status
-  const textColor = item.isError ? theme.status.error : theme.text.secondary;
-
   // If no output at all
   if (!hasStdout && !hasStderr) {
     return (
       <Box flexDirection="row" marginBottom={1} width={terminalWidth}>
         <Box width={prefixWidth} flexShrink={0}>
-          <Text color={theme.text.muted}>{prefix}</Text>
+          <Text>{prefix}</Text>
         </Box>
         <Box flexGrow={1}>
           <Text wrap="wrap" color={theme.text.muted} dimColor>
@@ -47,25 +45,25 @@ export const ShellResultMessage: React.FC<ShellResultMessageProps> = ({ item, te
       {hasStdout && (
         <Box flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
-            <Text color={theme.text.muted}>{prefix}</Text>
+            <Text>{prefix}</Text>
           </Box>
           <Box flexGrow={1}>
-            <Text wrap="wrap" color={textColor}>
+            <MarkdownText baseColor={theme.text.secondary}>
               {item.stdout.trim()}
-            </Text>
+            </MarkdownText>
           </Box>
         </Box>
       )}
-      {/* stderr (if present and different from stdout) */}
+      {/* stderr (if present) */}
       {hasStderr && (
         <Box flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
-            <Text color={theme.status.error}>{prefix}</Text>
+            <Text>{prefix}</Text>
           </Box>
           <Box flexGrow={1}>
-            <Text wrap="wrap" color={theme.status.error}>
+            <MarkdownText baseColor={theme.status.error}>
               {item.stderr.trim()}
-            </Text>
+            </MarkdownText>
           </Box>
         </Box>
       )}

@@ -15,8 +15,8 @@ import type { ToolCallHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
 import { TOOL_STATUS } from '../../markers.js';
 
-// Status indicator width (matching Gemini CLI STATUS_INDICATOR_WIDTH = 3)
-const STATUS_INDICATOR_WIDTH = 3;
+// Status indicator width (matching "● " prefix width = 2)
+const STATUS_INDICATOR_WIDTH = 2;
 
 interface ToolCallMessageProps {
   item: ToolCallHistoryItem;

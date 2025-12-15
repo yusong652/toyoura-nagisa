@@ -20,7 +20,7 @@ import { ReadToolResultDisplay } from './ReadToolResultDisplay.js';
 const MAX_RESULT_LINES = 10;
 // No limit when in full context mode
 const MAX_RESULT_LINES_FULL = Infinity;
-const STATUS_INDICATOR_WIDTH = 3;
+const STATUS_INDICATOR_WIDTH = 2;  // Match "● " prefix width
 // Maximum height for diff display
 const MAX_DIFF_HEIGHT = 15;
 const MAX_DIFF_HEIGHT_FULL = Infinity;

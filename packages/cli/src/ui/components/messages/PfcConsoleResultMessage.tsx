@@ -1,12 +1,13 @@
 /**
  * PFC Console Result Message Component
- * Displays PFC Python command output with distinct styling
+ * Displays PFC Python command output using unified markdown format
  */
 
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { PfcConsoleResultHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
+import { MarkdownText } from '../MarkdownText.js';
 
 interface PfcConsoleResultMessageProps {
   item: PfcConsoleResultHistoryItem;
@@ -14,7 +15,7 @@ interface PfcConsoleResultMessageProps {
 }
 
 export const PfcConsoleResultMessage: React.FC<PfcConsoleResultMessageProps> = ({ item, terminalWidth }) => {
-  const prefix = '  ';  // Indented to align with command output
+  const prefix = '  ';  // 2 spaces to align with "● " prefix (width 2)
   const prefixWidth = prefix.length;
 
   // Check connection status first
@@ -90,12 +91,12 @@ export const PfcConsoleResultMessage: React.FC<PfcConsoleResultMessageProps> = (
       {hasOutput && (
         <Box flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
-            <Text color={theme.text.muted}>{prefix}</Text>
+            <Text>{prefix}</Text>
           </Box>
           <Box flexGrow={1}>
-            <Text wrap="wrap" color={textColor}>
+            <MarkdownText baseColor={textColor}>
               {item.output!.trim()}
-            </Text>
+            </MarkdownText>
           </Box>
         </Box>
       )}
@@ -104,12 +105,12 @@ export const PfcConsoleResultMessage: React.FC<PfcConsoleResultMessageProps> = (
       {hasResult && (
         <Box flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
-            <Text color={theme.status.success}>{prefix}</Text>
+            <Text>{prefix}</Text>
           </Box>
           <Box flexGrow={1}>
-            <Text wrap="wrap" color={theme.status.success}>
+            <MarkdownText baseColor={theme.status.success}>
               {'>>> '}{typeof item.result === 'string' ? item.result : JSON.stringify(item.result)}
-            </Text>
+            </MarkdownText>
           </Box>
         </Box>
       )}
@@ -118,12 +119,12 @@ export const PfcConsoleResultMessage: React.FC<PfcConsoleResultMessageProps> = (
       {hasError && (
         <Box flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
-            <Text color={theme.status.error}>{prefix}</Text>
+            <Text>{prefix}</Text>
           </Box>
           <Box flexGrow={1}>
-            <Text wrap="wrap" color={theme.status.error}>
+            <MarkdownText baseColor={theme.status.error}>
               {item.error!.trim()}
-            </Text>
+            </MarkdownText>
           </Box>
         </Box>
       )}

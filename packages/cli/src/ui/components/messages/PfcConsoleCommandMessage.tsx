@@ -14,8 +14,8 @@ interface PfcConsoleCommandMessageProps {
 }
 
 export const PfcConsoleCommandMessage: React.FC<PfcConsoleCommandMessageProps> = ({ item, terminalWidth }) => {
-  // Use "py>" prefix to indicate PFC Python console
-  const prefix = 'py> ';
+  // Use "> " prefix for PFC Python console (width 2, same as "● ")
+  const prefix = '> ';
 
   return (
     <Box marginBottom={1} width={terminalWidth}>
