@@ -307,6 +307,13 @@ export function useStreamHandlers({
   // Adds SubAgent tool to its parent invoke_agent tool pair for display
   const handleSubagentToolUse = useCallback(
     (event: SubagentToolUseEvent) => {
+      // Debug: write to file for Windows troubleshooting
+      // Enable with: DEBUG_SUBAGENT=1
+      if (process.env.DEBUG_SUBAGENT) {
+        const fs = require('fs');
+        const msg = `[${new Date().toISOString()}] SUBAGENT_TOOL_USE: parent=${event.parent_tool_call_id}, tool=${event.tool_name}\n`;
+        fs.appendFileSync('subagent-debug.log', msg);
+      }
       addSubagentTool(event.parent_tool_call_id, {
         toolCallId: event.tool_call_id,
         toolName: event.tool_name,
@@ -320,6 +327,12 @@ export function useStreamHandlers({
   // Marks SubAgent tool as completed (stops blinking indicator)
   const handleSubagentToolResult = useCallback(
     (event: SubagentToolResultEvent) => {
+      // Debug: write to file for Windows troubleshooting
+      if (process.env.DEBUG_SUBAGENT) {
+        const fs = require('fs');
+        const msg = `[${new Date().toISOString()}] SUBAGENT_TOOL_RESULT: parent=${event.parent_tool_call_id}, tool=${event.tool_name}, error=${event.is_error}\n`;
+        fs.appendFileSync('subagent-debug.log', msg);
+      }
       fillSubagentToolResult(
         event.parent_tool_call_id,
         event.tool_call_id,

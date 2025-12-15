@@ -211,6 +211,12 @@ export class ConnectionManager extends WebSocketManager {
         break;
 
       case 'SUBAGENT_TOOL_USE':
+        // Debug: log to file for troubleshooting (enable with DEBUG_SUBAGENT=1)
+        if (typeof process !== 'undefined' && process.env?.DEBUG_SUBAGENT) {
+          const fs = require('fs');
+          fs.appendFileSync('subagent-debug.log',
+            `[${new Date().toISOString()}] ConnectionManager received SUBAGENT_TOOL_USE: ${message.tool_name}\n`);
+        }
         this.emit('subagent_tool_use', {
           type: 'SUBAGENT_TOOL_USE',
           session_id: message.session_id,
@@ -222,6 +228,12 @@ export class ConnectionManager extends WebSocketManager {
         break;
 
       case 'SUBAGENT_TOOL_RESULT':
+        // Debug: log to file for troubleshooting (enable with DEBUG_SUBAGENT=1)
+        if (typeof process !== 'undefined' && process.env?.DEBUG_SUBAGENT) {
+          const fs = require('fs');
+          fs.appendFileSync('subagent-debug.log',
+            `[${new Date().toISOString()}] ConnectionManager received SUBAGENT_TOOL_RESULT: ${message.tool_name}\n`);
+        }
         this.emit('subagent_tool_result', {
           type: 'SUBAGENT_TOOL_RESULT',
           session_id: message.session_id,
