@@ -227,6 +227,7 @@ class BackgroundProcessManager:
                     enhanced_command,
                     shell=True,
                     cwd=str(work_dir),
+                    stdin=subprocess.DEVNULL,  # Prevent blocking on interactive commands
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,

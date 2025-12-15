@@ -162,6 +162,8 @@ Working directory:
         return error_response(str(e))
     except ShellExecutorError as e:
         return error_response(str(e))
+    except Exception as e:
+        return error_response(f"Unexpected error: {e}")
 
 
 def register_bash_tool(mcp: FastMCP):
