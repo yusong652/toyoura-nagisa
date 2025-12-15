@@ -10,7 +10,9 @@ State management (current directory, environment) is handled
 by the application layer.
 """
 
+import asyncio
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Optional
@@ -123,6 +125,10 @@ class ShellExecutor:
         # Enhance Python commands for unbuffered output
         enhanced_command, is_python = enhance_python_command(normalized_command)
 
+        # On Windows, prepend chcp 65001 to force UTF-8 output from CMD
+        if sys.platform == "win32":
+            enhanced_command = f"chcp 65001 >nul && {enhanced_command}"
+
         # Prepare environment with shell-friendly settings
         process_env = prepare_shell_env(base_env=env, force_unbuffered=is_python)
 
@@ -154,8 +160,6 @@ class ShellExecutor:
         Uses asyncio.to_thread to run synchronous subprocess in a thread pool,
         which works reliably on all platforms including Windows.
         """
-        import asyncio
-
         start_time = time.time()
 
         def _run_subprocess():
@@ -168,6 +172,8 @@ class ShellExecutor:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding='utf-8',
+                errors='replace',  # Replace undecodable bytes instead of raising
                 env=env,
             )
             try:

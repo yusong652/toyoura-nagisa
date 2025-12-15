@@ -705,3 +705,24 @@ def cleanup_session_processes(session_id: str) -> None:
     """
     process_manager = get_process_manager()
     process_manager.cleanup_session(session_id)
+
+
+def shutdown_all_processes() -> None:
+    """
+    Shutdown all background processes across all sessions.
+
+    Called during application shutdown to ensure clean termination.
+    """
+    process_manager = get_process_manager()
+
+    for process_id, bg_process in list(process_manager.processes.items()):
+        if bg_process.status == "running":
+            try:
+                bg_process.process.terminate()
+                bg_process.process.wait(timeout=2)
+            except Exception:
+                try:
+                    bg_process.process.kill()
+                except Exception:
+                    pass
+            bg_process.status = "killed"

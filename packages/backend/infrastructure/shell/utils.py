@@ -85,6 +85,7 @@ def prepare_shell_env(
     Creates a copy of the environment with shell-friendly settings:
     - PYTHONUNBUFFERED: Force unbuffered Python output
     - PYTHONIOENCODING: Ensure consistent encoding
+    - PYTHONUTF8: Enable UTF-8 mode for Python (Windows)
 
     Args:
         base_env: Base environment dict (defaults to os.environ)
@@ -101,5 +102,9 @@ def prepare_shell_env(
 
     if encoding:
         env['PYTHONIOENCODING'] = encoding
+
+    # Enable UTF-8 mode on Windows for consistent encoding
+    if sys.platform == "win32":
+        env['PYTHONUTF8'] = '1'
 
     return env

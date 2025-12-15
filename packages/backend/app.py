@@ -80,8 +80,19 @@ async def lifespan(app: FastAPI):
         # Shutdown
         try:
             print("[SHUTDOWN] Starting graceful shutdown...")
+
+            # Shutdown TTS Engine
             await app.state.tts_engine.shutdown()
             print("[SHUTDOWN] TTS Engine shutdown complete")
+
+            # Cleanup background processes
+            try:
+                from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import shutdown_all_processes
+                shutdown_all_processes()
+                print("[SHUTDOWN] Background processes cleanup complete")
+            except Exception as e:
+                print(f"[SHUTDOWN] Background process cleanup error: {e}")
+
         except Exception as e:
             print(f"[ERROR] Shutdown error: {e}")
 
