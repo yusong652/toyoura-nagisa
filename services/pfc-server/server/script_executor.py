@@ -317,9 +317,10 @@ class PFCScriptExecutor:
             # Create git execution snapshot (before running script)
             # This captures the exact code state that will be executed
             # Skip for quick console commands (enable_git_snapshot=False)
+            # Use script_path to find the correct git repository (user's PFC project)
             git_commit = None
             if enable_git_snapshot:
-                git_manager = get_git_manager()
+                git_manager = get_git_manager(script_path)
                 if git_manager.is_git_available():
                     git_commit = git_manager.create_execution_commit(
                         task_id=task_id,

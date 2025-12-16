@@ -35,6 +35,14 @@ Usage Pattern:
 Version Tracking:
     Each pfc_execute_task creates a git snapshot for traceability.
     Use git_commit in task info to trace code versions.
+    Snapshots are stored on a special 'pfc-executions' branch.
+
+IMPORTANT - Git Branch Warning:
+    NEVER checkout or switch to the 'pfc-executions' branch in PFC project repositories.
+    This branch is automatically managed by the version tracking system and contains
+    execution snapshots. Working on this branch will cause git snapshot creation to fail.
+    If you accidentally end up on this branch, switch back to 'master' or 'main':
+        git checkout master
 
 Note: All PFC command execution is done through Python scripts using itasca.command().
 """

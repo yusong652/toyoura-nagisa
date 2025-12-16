@@ -190,6 +190,12 @@ Query Tools      Small-Scale Test   Full Simulation
 
 **Core Pattern**: All PFC commands executed via Python scripts using `itasca.command("...")` pattern.
 
+**Git Version Tracking**:
+- Each `pfc_execute_task` creates a git snapshot on the `pfc-executions` branch
+- **IMPORTANT**: NEVER checkout or work on the `pfc-executions` branch in PFC projects
+- This branch is automatically managed; working on it will break git snapshot creation
+- If accidentally on this branch, switch back: `git checkout master`
+
 **Detailed Documentation**: See `pfc-server/README.md` for implementation details, thread-safety architecture, and usage examples.
 
 **Backend Integration**: `backend/infrastructure/mcp/tools/pfc/` + `backend/infrastructure/pfc/websocket_client.py`

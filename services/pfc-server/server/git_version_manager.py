@@ -228,10 +228,20 @@ class GitVersionManager:
             current_result = self._run_git(["branch", "--show-current"], check=False)
             current_branch = current_result.stdout.strip()
 
+            if not current_branch:
+                # Detached HEAD state - get commit hash instead
+                head_result = self._run_git(["rev-parse", "HEAD"], check=False)
+                current_branch = head_result.stdout.strip() if head_result.returncode == 0 else None
+
+            if not current_branch:
+                logger.error("Cannot determine current branch/commit - aborting branch creation")
+                return False
+
             # Stash any changes
             stash_result = self._run_git(["stash", "push", "-m", "pfc-exec-temp"], check=False)
             stash_created = "No local changes" not in stash_result.stdout
 
+            branch_created = False
             try:
                 # Create orphan branch
                 self._run_git(["checkout", "--orphan", EXECUTION_BRANCH])
@@ -245,17 +255,34 @@ class GitVersionManager:
                     "-m", "Initialize PFC execution tracking\n\nThis branch stores snapshots of code state at each PFC task execution."
                 ])
 
+                branch_created = True
 
             finally:
-                # Always restore original branch
+                # Always restore original branch - this is CRITICAL
                 if current_branch:
-                    self._run_git(["checkout", current_branch], check=False)
+                    checkout_result = self._run_git(["checkout", current_branch], check=False)
+                    if checkout_result.returncode != 0:
+                        # Checkout failed - try force checkout
+                        logger.warning("Normal checkout failed, trying force checkout: {}".format(
+                            checkout_result.stderr.strip()
+                        ))
+                        force_result = self._run_git(["checkout", "-f", current_branch], check=False)
+                        if force_result.returncode != 0:
+                            logger.error(
+                                "CRITICAL: Failed to restore original branch '{}'. "
+                                "Repository may be left on '{}' branch. "
+                                "Please manually run: git checkout {}".format(
+                                    current_branch, EXECUTION_BRANCH, current_branch
+                                )
+                            )
+                            # Don't return False here - branch was created successfully
+                            # User just needs to manually switch back
 
                 # Restore stashed changes
                 if stash_created:
                     self._run_git(["stash", "pop"], check=False)
 
-            return True
+            return branch_created
 
         except Exception as e:
             logger.error("Failed to create execution branch: {}".format(e))
@@ -349,22 +376,74 @@ class GitVersionManager:
         return bool(result.stdout.strip())
 
 
-# Singleton instance for the server
-_manager = None  # type: Optional[GitVersionManager]
+# Cache for git managers per repository root
+_managers = {}  # type: Dict[str, GitVersionManager]
+
+
+def find_git_root(start_path):
+    # type: (str) -> Optional[str]
+    """
+    Find the git repository root directory starting from a given path.
+
+    Walks up the directory tree to find the nearest .git directory.
+
+    Args:
+        start_path: Starting file or directory path
+
+    Returns:
+        Absolute path to git repository root, or None if not found
+    """
+    # Normalize and get absolute path
+    current = os.path.abspath(start_path)
+
+    # If start_path is a file, start from its directory
+    if os.path.isfile(current):
+        current = os.path.dirname(current)
+
+    # Walk up the directory tree
+    while current:
+        git_dir = os.path.join(current, ".git")
+        if os.path.exists(git_dir):
+            return current
+
+        parent = os.path.dirname(current)
+        if parent == current:
+            # Reached filesystem root
+            break
+        current = parent
+
+    return None
 
 
 def get_git_manager(workspace_dir=None):
     # type: (Optional[str]) -> GitVersionManager
     """
-    Get or create the GitVersionManager singleton.
+    Get or create a GitVersionManager for the specified workspace.
+
+    Uses a cache keyed by resolved git repository root to support
+    multiple projects with different git repositories.
 
     Args:
-        workspace_dir: Git repository root directory (default: os.getcwd())
+        workspace_dir: Git repository root directory, or a path within a git repository.
+                       If a file or subdirectory path is provided, the git root will be
+                       automatically discovered. If None, uses os.getcwd().
 
     Returns:
-        GitVersionManager instance
+        GitVersionManager instance for the resolved repository root
     """
-    global _manager
-    if _manager is None:
-        _manager = GitVersionManager(workspace_dir)
-    return _manager
+    global _managers
+
+    # Determine the starting path
+    start_path = workspace_dir or os.getcwd()
+
+    # Find the actual git root
+    git_root = find_git_root(start_path)
+
+    # Use git_root if found, otherwise fall back to provided path or cwd
+    resolved_dir = git_root or os.path.abspath(start_path)
+
+    # Get or create manager for this repository
+    if resolved_dir not in _managers:
+        _managers[resolved_dir] = GitVersionManager(resolved_dir)
+
+    return _managers[resolved_dir]

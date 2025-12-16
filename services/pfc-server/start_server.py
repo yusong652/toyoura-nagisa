@@ -110,21 +110,28 @@ except Exception as e:
     print("⚠ Failed to register interrupt callback: {}".format(e))
 
 # ===== Check Git Version Tracking =====
-# Git is used to create execution snapshots for reproducibility
+# Git snapshots are created in the user's PFC project directory (where script files are located)
+# This check only verifies git is installed; actual repository detection happens at execution time
 try:
-    from server.git_version_manager import get_git_manager
+    from server.git_version_manager import get_git_manager, find_git_root
+    # Check if git is functional (uses current directory for basic check)
     git_manager = get_git_manager()
     git_status = git_manager.diagnose_git_status()
 
     if git_status["available"]:
-        print("✓ Git version tracking enabled")
+        print("✓ Git version tracking available")
+        print("  (Snapshots will be created in script's project repository)")
+    elif git_status["issue"] == "not_initialized":
+        # Not a git repo here is OK - we'll use script's project repo
+        print("✓ Git version tracking available")
+        print("  (Snapshots will be created in script's project repository)")
     else:
         print("")
         print("=" * 70)
-        print("⚠ Git version tracking disabled: {}".format(git_status["message"]))
+        print("⚠ Git version tracking issue: {}".format(git_status["message"]))
         if git_status["action"]:
             print("")
-            print("  To enable, run:")
+            print("  To fix, run:")
             print("    {}".format(git_status["action"]))
         print("=" * 70)
         print("")
