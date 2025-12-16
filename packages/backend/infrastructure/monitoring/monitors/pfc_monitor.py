@@ -87,8 +87,8 @@ class PfcMonitor(BaseMonitor):
                 else:
                     session_marker = f" (session: {task_session_display})"
 
-                # Handle completed/failed tasks
-                if status in ["completed", "failed"]:
+                # Handle completed/failed/interrupted tasks
+                if status in ["completed", "failed", "interrupted"]:
                     if not notified:
                         # Generate one-time completion notification
                         notification = (

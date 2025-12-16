@@ -37,16 +37,8 @@ def register_pfc_interrupt_task_tool(mcp: FastMCP):
         Sends an interrupt signal to stop a long-running simulation gracefully.
         The task will be interrupted at the end of the current cycle.
 
-        Use this when:
-        - A simulation is taking too long and you want to stop it
-        - You need to modify parameters and restart
-        - The user requests to cancel the current task
-
         After calling this, use pfc_check_task_status to verify the task
         was actually interrupted (status will change to "interrupted").
-
-        Note: This does NOT immediately stop the task - interruption is checked
-        at each cycle boundary for clean shutdown.
         """
         try:
             if not task_id or not task_id.strip():
@@ -61,18 +53,18 @@ def register_pfc_interrupt_task_tool(mcp: FastMCP):
             status = result.get("status")
 
             if status == "success":
+                llm_text = (
+                    f"task_id: {task_id}\n"
+                    f"interrupt signal sent\n\n"
+                    f"Next: use pfc_check_task_status to verify"
+                )
+
                 return success_response(
                     message=f"Interrupt requested for task: {task_id}",
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": (
-                                f"**INTERRUPT REQUESTED**: task_id: {task_id}\n\n"
-                                "The interrupt signal has been sent. The task will stop "
-                                "at the end of the current cycle.\n\n"
-                                "**NEXT**: Use `pfc_check_task_status` to verify the task "
-                                "was interrupted (status will be 'interrupted')."
-                            )
+                            "text": llm_text
                         }]
                     },
                     task_id=task_id,
