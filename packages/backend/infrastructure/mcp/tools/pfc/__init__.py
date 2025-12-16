@@ -40,7 +40,7 @@ Note: All PFC command execution is done through Python scripts using itasca.comm
 """
 
 from .pfc_execute_task import register_pfc_task_tool
-from .pfc_task_status import register_pfc_task_status_tool
+from .pfc_check_task_status import register_pfc_task_status_tool
 from .pfc_list_tasks import register_pfc_list_tasks_tool
 from .pfc_interrupt_task import register_pfc_interrupt_task_tool
 from .pfc_query_python_api import register_pfc_query_python_api_tool
