@@ -108,8 +108,8 @@ class ShellStateStorage:
             with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(state.to_dict(), f, indent=2, ensure_ascii=False)
 
-            # Atomic rename
-            temp_file.rename(self.state_file)
+            # Atomic replace (rename doesn't overwrite on Windows)
+            temp_file.replace(self.state_file)
 
         except Exception:
             # Clean up temp file on failure
