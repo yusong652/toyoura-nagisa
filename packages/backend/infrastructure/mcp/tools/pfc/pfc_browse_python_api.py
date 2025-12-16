@@ -517,7 +517,8 @@ def _browse_method(module_path: str, object_name: str, method_name: str, display
             f"Method '{method_name}' not found in {shown_name}"
         )
 
-    content = APIFormatter.format_method(method_doc, shown_name)
+    # Pass both shown_name (for display) and object_name (for component detection)
+    content = APIFormatter.format_method(method_doc, shown_name, actual_object_name=object_name)
 
     full_path = f"{module_path}.{shown_name}"
     navigation = f"""

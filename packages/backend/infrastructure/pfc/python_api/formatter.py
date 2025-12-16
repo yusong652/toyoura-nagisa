@@ -22,6 +22,73 @@ class APIDocFormatter:
     """
 
     @staticmethod
+    def _detect_component_methods(object_name: str, method_name: str) -> List[str]:
+        """Detect if a method has component alternatives (_x, _y, _z).
+
+        Checks the object's method_groups or methods list to see if component
+        methods exist for the given base method.
+
+        Args:
+            object_name: Object class name (e.g., "Ball", "Wall")
+            method_name: Base method name (e.g., "vel", "pos")
+
+        Returns:
+            List of component suffixes (['x', 'y', 'z']) if components exist,
+            empty list otherwise.
+
+        Example:
+            >>> APIDocFormatter._detect_component_methods("Ball", "vel")
+            ['x', 'y', 'z']  # If vel_x, vel_y, vel_z exist
+            >>> APIDocFormatter._detect_component_methods("Ball", "id")
+            []  # No component methods for id()
+        """
+        try:
+            object_doc = DocumentationLoader.load_object(object_name)
+            if not object_doc:
+                return []
+
+            # Collect all method names from both method_groups and methods list
+            all_method_names = set()
+
+            # Strategy 1: Check method_groups (Ball, Clump, etc.)
+            method_groups = object_doc.get("method_groups", {})
+            for group_methods in method_groups.values():
+                if isinstance(group_methods, list):
+                    all_method_names.update(group_methods)
+
+            # Strategy 2: Check flat methods list (Wall, Contact, etc.)
+            methods = object_doc.get("methods", [])
+            for method in methods:
+                if isinstance(method, dict):
+                    all_method_names.add(method.get("name", ""))
+                elif isinstance(method, str):
+                    all_method_names.add(method)
+
+            # Check if base method and component methods exist
+            has_base = method_name in all_method_names
+            has_x = f"{method_name}_x" in all_method_names
+            has_y = f"{method_name}_y" in all_method_names
+            has_z = f"{method_name}_z" in all_method_names
+
+            # If base method exists and at least one component exists, return components
+            if has_base:
+                components = []
+                if has_x:
+                    components.append('x')
+                if has_y:
+                    components.append('y')
+                if has_z:
+                    components.append('z')
+
+                return components
+
+            return []
+
+        except Exception:
+            # If any error occurs during detection, fail silently
+            return []
+
+    @staticmethod
     def format_signature(api_name: str, metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
         """Format brief one-liner signature for quick reference.
 
@@ -337,12 +404,14 @@ class APIDocFormatter:
         return "\n".join(lines)
 
     @staticmethod
-    def format_method(method_doc: Dict[str, Any], object_name: str) -> str:
+    def format_method(method_doc: Dict[str, Any], object_name: str, actual_object_name: str = None) -> str:
         """Format method documentation for browse tool.
 
         Args:
             method_doc: Method documentation dict
-            object_name: Object class name (e.g., "Ball")
+            object_name: Display object name (e.g., "Ball", "BallBallContact")
+            actual_object_name: Actual object name for loading documentation
+                               (e.g., "Contact" when object_name is "BallBallContact")
 
         Returns:
             LLM-friendly formatted markdown
@@ -373,12 +442,32 @@ class APIDocFormatter:
                 lines.append(f"- {pname} ({ptype}, {req_str}): {pdesc}")
             lines.append("")
 
-        # Returns
+        # Returns (with enhanced vec type information)
         returns = method_doc.get("returns", {})
         if returns:
             rtype = returns.get("type", "")
             rdesc = returns.get("description", "")
-            lines.append(f"Returns: {rtype} - {rdesc}")
+
+            # Enhance vec type description with indexing info
+            if rtype == "vec":
+                rdesc_enhanced = f"{rdesc} (indexable: [0]=x, [1]=y, [2]=z)"
+                lines.append(f"Returns: {rtype} - {rdesc_enhanced}")
+            else:
+                lines.append(f"Returns: {rtype} - {rdesc}")
+            lines.append("")
+
+        # Component method detection and hints
+        # Detect if this method has component alternatives (_x, _y, _z)
+        # Use actual_object_name if provided (for Contact type aliases)
+        lookup_name = actual_object_name or object_name
+        components = APIDocFormatter._detect_component_methods(lookup_name, name)
+        if components:
+            component_list = ', '.join([f"`{name}_{c}()`" for c in components])
+            lines.append(f"Component Access: {component_list}")
+            lines.append("")
+            lines.append("This method returns a vector. Individual components can be accessed via:")
+            for c in components:
+                lines.append(f"- `{name}_{c}()` - Get {c}-component only")
             lines.append("")
 
         # Examples
