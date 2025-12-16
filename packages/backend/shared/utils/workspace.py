@@ -46,7 +46,7 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
     if agent_profile.startswith("pfc"):
         # Try to get PFC server's actual working directory
         try:
-            from backend.infrastructure.pfc.websocket_client import get_client
+            from backend.infrastructure.pfc.client import get_client
 
             try:
                 # Query PFC server's working directory

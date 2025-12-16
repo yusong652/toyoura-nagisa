@@ -10,6 +10,6 @@ Provides:
 - Script execution (Python SDK scripts)
 """
 
-from .websocket_client import PFCWebSocketClient, get_client
+from .client import PFCWebSocketClient, get_client
 
 __all__ = ["PFCWebSocketClient", "get_client"]

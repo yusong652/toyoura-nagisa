@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import Optional, Any, Dict
 
-from backend.infrastructure.pfc.websocket_client import get_client, PFCWebSocketClient
+from backend.infrastructure.pfc.client import get_client, PFCWebSocketClient
 from backend.infrastructure.monitoring.status_monitor import get_status_monitor
 from backend.shared.utils.workspace import get_workspace_for_profile
 
