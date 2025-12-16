@@ -71,6 +71,72 @@ class PFCWebSocketClient:
             raise RuntimeError("WebSocket not connected. Call connect() first.")
         return self._websocket
 
+    async def _ensure_connected(self):
+        """
+        Ensure WebSocket is connected, waiting for reconnection if needed.
+
+        This method handles:
+        1. Waiting for auto-reconnect if in progress
+        2. Manual reconnection if not connected
+
+        Raises:
+            ConnectionError: If connection cannot be established
+        """
+        # Wait for reconnection if in progress
+        if self._reconnecting:
+            logger.info("Waiting for auto-reconnect to complete...")
+            for _ in range(60):  # 60 * 0.5s = 30s max wait
+                if not self._reconnecting and self.connected:
+                    break
+                await asyncio.sleep(0.5)
+
+            if not self.connected:
+                raise ConnectionError("Auto-reconnect did not complete in time")
+
+        # Ensure connected (manual reconnect if needed)
+        if not self.connected:
+            self._should_stop = False  # Allow reconnection
+            success = await self.connect()
+            if not success:
+                raise ConnectionError("Failed to connect to PFC server")
+
+    async def _send_request(
+        self,
+        message: Dict[str, Any],
+        timeout: float,
+        operation_name: str
+    ) -> Dict[str, Any]:
+        """
+        Send request and wait for response with timeout.
+
+        Args:
+            message: Request message dict (request_id will be added if missing)
+            timeout: Response timeout in seconds
+            operation_name: Human-readable operation name for logging/errors
+
+        Returns:
+            Response dictionary from server
+
+        Raises:
+            TimeoutError: If response not received within timeout
+        """
+        request_id = message.get("request_id") or str(uuid4())
+        message["request_id"] = request_id
+
+        future = asyncio.get_event_loop().create_future()
+        self.pending_requests[request_id] = future
+
+        try:
+            await self.websocket.send(json.dumps(message))
+            logger.debug(f"{operation_name} sent: {request_id}")
+
+            result = await asyncio.wait_for(future, timeout=timeout)
+            return result
+
+        except asyncio.TimeoutError:
+            self.pending_requests.pop(request_id, None)
+            raise TimeoutError(f"{operation_name} timed out after {timeout}s")
+
     def _calculate_websocket_timeout_ms(self, timeout_ms: int, run_in_background: bool) -> int:
         """
         Calculate WebSocket communication timeout based on command execution timeout.
@@ -377,75 +443,36 @@ class PFCWebSocketClient:
             - Scripts have access to itasca module
             - WebSocket timeout is infrastructure detail, automatically managed
         """
+        # Auto-calculate WebSocket timeout (infrastructure detail)
+        # For scripts with timeout_ms=None (no script timeout), use background mode logic
+        if timeout_ms is None:
+            # No script timeout limit, use quick WebSocket timeout for task_id
+            websocket_timeout_s = 10.0 if run_in_background else 600.0  # 10s or max 10 min
+        else:
+            websocket_timeout_s = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background) / 1000.0
+
         for attempt in range(max_retries):
             try:
-                # Wait for reconnection if in progress
-                if self._reconnecting:
-                    logger.info("Waiting for auto-reconnect to complete...")
-                    # Wait up to 30 seconds for reconnection
-                    for _ in range(60):  # 60 * 0.5s = 30s
-                        if not self._reconnecting and self.connected:
-                            break
-                        await asyncio.sleep(0.5)
-
-                    if not self.connected:
-                        raise ConnectionError("Auto-reconnect did not complete in time")
-
-                # Ensure connected (manual reconnect if needed)
-                if not self.connected:
-                    self._should_stop = False  # Allow reconnection
-                    success = await self.connect()
-                    if not success:
-                        raise ConnectionError("Failed to connect to PFC server")
-
-                request_id = str(uuid4())
-
-                # Auto-calculate WebSocket timeout (infrastructure detail)
-                # For scripts with timeout_ms=None (no script timeout), use background mode logic
-                if timeout_ms is None:
-                    # No script timeout limit, use quick WebSocket timeout for task_id
-                    websocket_timeout_ms = 10000 if run_in_background else 600000  # 10s or max 10 min
-                else:
-                    websocket_timeout_ms = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background)
-
-                # Create script message with file path and description
-                message = {
-                    "type": "script",
-                    "request_id": request_id,
-                    "session_id": session_id,
-                    "script_path": script_path,
-                    "description": description,
-                    "timeout_ms": timeout_ms,
-                    "run_in_background": run_in_background
-                }
-
-                # Create future for result
-                future = asyncio.get_event_loop().create_future()
-                self.pending_requests[request_id] = future
-
-                try:
-                    # Send script path
-                    await self.websocket.send(json.dumps(message))
-                    logger.debug(f"Script path sent: {request_id} - {script_path}")
-
-                    # Wait for result with auto-calculated timeout (convert ms to seconds for asyncio)
-                    result = await asyncio.wait_for(future, timeout=websocket_timeout_ms / 1000.0)
-                    return result
-
-                except asyncio.TimeoutError:
-                    self.pending_requests.pop(request_id, None)
-                    timeout_info = f"no limit" if timeout_ms is None else f"{timeout_ms}ms"
-                    raise TimeoutError(
-                        f"Script '{script_path}' timed out after {websocket_timeout_ms}ms "
-                        f"(script timeout: {timeout_info} + infrastructure buffer)"
-                    )
+                await self._ensure_connected()
+                return await self._send_request(
+                    message={
+                        "type": "script",
+                        "session_id": session_id,
+                        "script_path": script_path,
+                        "description": description,
+                        "timeout_ms": timeout_ms,
+                        "run_in_background": run_in_background
+                    },
+                    timeout=websocket_timeout_s,
+                    operation_name=f"Script execution ({script_path})"
+                )
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
                 logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
                 self.connected = False
 
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(0.5)  # Brief delay before retry
+                    await asyncio.sleep(0.5)
                     continue
                 else:
                     raise ConnectionError(
@@ -453,11 +480,6 @@ class PFCWebSocketClient:
                         "Please ensure PFC server is running."
                     ) from e
 
-            except Exception as e:
-                logger.error(f"Script execution failed: {e}")
-                raise
-
-        # Fallback: should never reach here due to retry logic
         raise RuntimeError("Unexpected code path in send_script")
 
     async def check_task_status(
@@ -475,65 +497,20 @@ class PFCWebSocketClient:
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
-            Result dictionary with structure:
-                - type: "result" - Message type identifier
-                - request_id: str - Unique request identifier
-                - status: Literal["running", "success", "error", "not_found"] - Task status
-                - message: str - Status description with elapsed time
-                - data: Optional[Any] - Task result (when completed) or progress info (when running)
+            Result dictionary with task status and data
 
         Raises:
             ConnectionError: If connection to PFC server fails after retries
             TimeoutError: If status query times out
-
-        Note:
-            This is NOT a PFC command - it queries the TaskManager directly.
         """
         for attempt in range(max_retries):
             try:
-                # Wait for reconnection if in progress
-                if self._reconnecting:
-                    logger.info("Waiting for auto-reconnect to complete...")
-                    for _ in range(60):
-                        if not self._reconnecting and self.connected:
-                            break
-                        await asyncio.sleep(0.5)
-
-                    if not self.connected:
-                        raise ConnectionError("Auto-reconnect did not complete in time")
-
-                # Ensure connected
-                if not self.connected:
-                    self._should_stop = False
-                    success = await self.connect()
-                    if not success:
-                        raise ConnectionError("Failed to connect to PFC server")
-
-                request_id = str(uuid4())
-
-                # Create status query message
-                message = {
-                    "type": "check_task_status",
-                    "request_id": request_id,
-                    "task_id": task_id
-                }
-
-                # Create future for result
-                future = asyncio.get_event_loop().create_future()
-                self.pending_requests[request_id] = future
-
-                try:
-                    # Send query
-                    await self.websocket.send(json.dumps(message))
-                    logger.debug(f"Task status query sent: {request_id} - Task ID: {task_id}")
-
-                    # Wait for result with timeout
-                    result = await asyncio.wait_for(future, timeout=timeout)
-                    return result
-
-                except asyncio.TimeoutError:
-                    self.pending_requests.pop(request_id, None)
-                    raise TimeoutError(f"Task status query timed out after {timeout}s")
+                await self._ensure_connected()
+                return await self._send_request(
+                    message={"type": "check_task_status", "task_id": task_id},
+                    timeout=timeout,
+                    operation_name="Task status query"
+                )
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
                 logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
@@ -547,10 +524,6 @@ class PFCWebSocketClient:
                         "Failed to query task status after retries. "
                         "Please ensure PFC server is running."
                     ) from e
-
-            except Exception as e:
-                logger.error(f"Task status query failed: {e}")
-                raise
 
         raise RuntimeError("Unexpected code path in check_task_status")
 
@@ -573,77 +546,25 @@ class PFCWebSocketClient:
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
-            Result dictionary with structure:
-                - type: "result" - Message type identifier
-                - request_id: str - Unique request identifier
-                - status: "success" - Always success (empty list if no tasks)
-                - message: str - Summary message
-                - data: List[Dict] - List of task info dictionaries (paginated):
-                    - task_id: str
-                    - command: str
-                    - status: Literal["running", "completed", "failed"]
-                    - elapsed_time: float
-                - pagination: Pagination metadata:
-                    - total_count: Total tasks available
-                    - displayed_count: Tasks in this response
-                    - offset: Current offset
-                    - limit: Current limit
-                    - has_more: Whether more tasks exist
+            Result dictionary with task list and pagination metadata
 
         Raises:
             ConnectionError: If connection to PFC server fails after retries
             TimeoutError: If list query times out
-
-        Note:
-            This is NOT a PFC command - it queries the TaskManager directly.
         """
         for attempt in range(max_retries):
             try:
-                # Wait for reconnection if in progress
-                if self._reconnecting:
-                    logger.info("Waiting for auto-reconnect to complete...")
-                    for _ in range(60):
-                        if not self._reconnecting and self.connected:
-                            break
-                        await asyncio.sleep(0.5)
-
-                    if not self.connected:
-                        raise ConnectionError("Auto-reconnect did not complete in time")
-
-                # Ensure connected
-                if not self.connected:
-                    self._should_stop = False
-                    success = await self.connect()
-                    if not success:
-                        raise ConnectionError("Failed to connect to PFC server")
-
-                request_id = str(uuid4())
-
-                # Create list tasks message with pagination
-                message = {
-                    "type": "list_tasks",
-                    "request_id": request_id,
-                    "session_id": session_id,
-                    "offset": offset,
-                    "limit": limit
-                }
-
-                # Create future for result
-                future = asyncio.get_event_loop().create_future()
-                self.pending_requests[request_id] = future
-
-                try:
-                    # Send query
-                    await self.websocket.send(json.dumps(message))
-                    logger.debug(f"List tasks query sent: {request_id}")
-
-                    # Wait for result with timeout
-                    result = await asyncio.wait_for(future, timeout=timeout)
-                    return result
-
-                except asyncio.TimeoutError:
-                    self.pending_requests.pop(request_id, None)
-                    raise TimeoutError(f"List tasks query timed out after {timeout}s")
+                await self._ensure_connected()
+                return await self._send_request(
+                    message={
+                        "type": "list_tasks",
+                        "session_id": session_id,
+                        "offset": offset,
+                        "limit": limit
+                    },
+                    timeout=timeout,
+                    operation_name="List tasks query"
+                )
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
                 logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
@@ -658,10 +579,6 @@ class PFCWebSocketClient:
                         "Please ensure PFC server is running."
                     ) from e
 
-            except Exception as e:
-                logger.error(f"List tasks query failed: {e}")
-                raise
-
         raise RuntimeError("Unexpected code path in list_tasks")
 
     async def mark_task_notified(
@@ -674,7 +591,6 @@ class PFCWebSocketClient:
         Mark a task as notified (completion notification sent to LLM).
 
         This prevents repeated completion notifications for the same task.
-        The notified flag is persisted across PFC server restarts.
 
         Args:
             task_id: Task ID to mark as notified
@@ -682,63 +598,20 @@ class PFCWebSocketClient:
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
-            Result dictionary with structure:
-                - type: "result" - Message type identifier
-                - request_id: str - Unique request identifier
-                - status: "success" or "not_found"
-                - message: str - Result message
+            Result dictionary with status
 
         Raises:
             ConnectionError: If connection to PFC server fails after retries
-            TimeoutError: If mark query times out
-
-        Note:
-            This is NOT a PFC command - it updates TaskManager state directly.
+            TimeoutError: If request times out
         """
         for attempt in range(max_retries):
             try:
-                # Wait for reconnection if in progress
-                if self._reconnecting:
-                    logger.info("Waiting for auto-reconnect to complete...")
-                    for _ in range(60):
-                        if not self._reconnecting and self.connected:
-                            break
-                        await asyncio.sleep(0.5)
-
-                    if not self.connected:
-                        raise ConnectionError("Auto-reconnect did not complete in time")
-
-                # Ensure connected
-                if not self.connected:
-                    self._should_stop = False
-                    success = await self.connect()
-                    if not success:
-                        raise ConnectionError("Failed to connect to PFC server")
-
-                request_id = str(uuid4())
-
-                # Create mark task notified message
-                message = {
-                    "type": "mark_task_notified",
-                    "request_id": request_id,
-                    "task_id": task_id
-                }
-
-                # Create future for result
-                future = asyncio.get_event_loop().create_future()
-                self.pending_requests[request_id] = future
-
-                try:
-                    # Send command
-                    await self.websocket.send(json.dumps(message))
-
-                    # Wait for result with timeout
-                    result = await asyncio.wait_for(future, timeout=timeout)
-                    return result
-
-                except asyncio.TimeoutError:
-                    self.pending_requests.pop(request_id, None)
-                    raise TimeoutError(f"Mark task notified timed out after {timeout}s")
+                await self._ensure_connected()
+                return await self._send_request(
+                    message={"type": "mark_task_notified", "task_id": task_id},
+                    timeout=timeout,
+                    operation_name="Mark task notified"
+                )
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
                 logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
@@ -753,10 +626,6 @@ class PFCWebSocketClient:
                         "Please ensure PFC server is running."
                     ) from e
 
-            except Exception as e:
-                logger.error(f"Mark task notified failed: {e}")
-                raise
-
         raise RuntimeError("Unexpected code path in mark_task_notified")
 
     async def interrupt_task(
@@ -768,78 +637,31 @@ class PFCWebSocketClient:
         """
         Request interrupt for a running PFC task.
 
-        Sends an interrupt request to the PFC server. The server sets an interrupt
-        flag that is checked by the PFC callback during cycle execution. When the
-        callback detects the flag, it raises InterruptedError to stop the simulation.
+        The task will be interrupted at the end of the current cycle.
+        Use check_task_status to verify the task was interrupted.
 
         Args:
-            task_id: Task ID to interrupt (returned by send_script with run_in_background=True)
+            task_id: Task ID to interrupt
             timeout: Request timeout in seconds (default: 5.0)
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
-            Result dictionary with structure:
-                - type: "result" - Message type identifier
-                - request_id: str - Unique request identifier
-                - status: "success" or "error" - Whether interrupt was requested
-                - message: str - Result message
-                - data: Dict with task_id and interrupt_requested flag
+            Result dictionary with status
 
         Raises:
             ConnectionError: If connection to PFC server fails after retries
             TimeoutError: If interrupt request times out
-
-        Note:
-            - This does NOT immediately stop the task
-            - Interrupt is checked at each cycle (position 50.0 in PFC cycle)
-            - Task status will change to "interrupted" once actually stopped
-            - Use check_task_status to verify the task was interrupted
         """
         for attempt in range(max_retries):
             try:
-                # Wait for reconnection if in progress
-                if self._reconnecting:
-                    logger.info("Waiting for auto-reconnect to complete...")
-                    for _ in range(60):
-                        if not self._reconnecting and self.connected:
-                            break
-                        await asyncio.sleep(0.5)
-
-                    if not self.connected:
-                        raise ConnectionError("Auto-reconnect did not complete in time")
-
-                # Ensure connected
-                if not self.connected:
-                    self._should_stop = False
-                    success = await self.connect()
-                    if not success:
-                        raise ConnectionError("Failed to connect to PFC server")
-
-                request_id = str(uuid4())
-
-                # Create interrupt task message
-                message = {
-                    "type": "interrupt_task",
-                    "request_id": request_id,
-                    "task_id": task_id
-                }
-
-                # Create future for result
-                future = asyncio.get_event_loop().create_future()
-                self.pending_requests[request_id] = future
-
-                try:
-                    # Send command
-                    await self.websocket.send(json.dumps(message))
-                    logger.info(f"Interrupt request sent for task: {task_id}")
-
-                    # Wait for result with timeout
-                    result = await asyncio.wait_for(future, timeout=timeout)
-                    return result
-
-                except asyncio.TimeoutError:
-                    self.pending_requests.pop(request_id, None)
-                    raise TimeoutError(f"Interrupt request timed out after {timeout}s")
+                await self._ensure_connected()
+                result = await self._send_request(
+                    message={"type": "interrupt_task", "task_id": task_id},
+                    timeout=timeout,
+                    operation_name="Interrupt request"
+                )
+                logger.info(f"Interrupt request sent for task: {task_id}")
+                return result
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
                 logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
@@ -853,10 +675,6 @@ class PFCWebSocketClient:
                         "Failed to send interrupt request after retries. "
                         "Please ensure PFC server is running."
                     ) from e
-
-            except Exception as e:
-                logger.error(f"Interrupt request failed: {e}")
-                raise
 
         raise RuntimeError("Unexpected code path in interrupt_task")
 
@@ -874,66 +692,24 @@ class PFCWebSocketClient:
 
         Returns:
             str: PFC's current working directory path, or None if query fails
-
-        Raises:
-            ConnectionError: If connection to PFC server fails after retries
-            TimeoutError: If query times out
-
-        Note:
-            This is used to sync agent workspace with PFC's actual working directory.
         """
         for attempt in range(max_retries):
             try:
-                # Wait for reconnection if in progress
-                if self._reconnecting:
-                    logger.info("Waiting for auto-reconnect to complete...")
-                    for _ in range(60):
-                        if not self._reconnecting and self.connected:
-                            break
-                        await asyncio.sleep(0.5)
+                await self._ensure_connected()
+                result = await self._send_request(
+                    message={"type": "get_working_directory"},
+                    timeout=timeout,
+                    operation_name="Working directory query"
+                )
 
-                    if not self.connected:
-                        raise ConnectionError("Auto-reconnect did not complete in time")
-
-                # Ensure connected
-                if not self.connected:
-                    self._should_stop = False
-                    success = await self.connect()
-                    if not success:
-                        raise ConnectionError("Failed to connect to PFC server")
-
-                request_id = str(uuid4())
-
-                # Create working directory query message
-                message = {
-                    "type": "get_working_directory",
-                    "request_id": request_id
-                }
-
-                # Create future for result
-                future = asyncio.get_event_loop().create_future()
-                self.pending_requests[request_id] = future
-
-                try:
-                    # Send query
-                    await self.websocket.send(json.dumps(message))
-                    logger.debug(f"Working directory query sent: {request_id}")
-
-                    # Wait for result with timeout
-                    result = await asyncio.wait_for(future, timeout=timeout)
-
-                    # Extract working directory from result
-                    if result.get("status") == "success" and result.get("data"):
-                        working_dir = result["data"].get("working_directory")
-                        logger.info(f"✓ PFC working directory: {working_dir}")
-                        return working_dir
-                    else:
-                        logger.warning(f"Failed to get working directory: {result.get('message')}")
-                        return None
-
-                except asyncio.TimeoutError:
-                    self.pending_requests.pop(request_id, None)
-                    raise TimeoutError(f"Working directory query timed out after {timeout}s")
+                # Extract working directory from result
+                if result.get("status") == "success" and result.get("data"):
+                    working_dir = result["data"].get("working_directory")
+                    logger.info(f"✓ PFC working directory: {working_dir}")
+                    return working_dir
+                else:
+                    logger.warning(f"Failed to get working directory: {result.get('message')}")
+                    return None
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
                 logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
@@ -966,100 +742,37 @@ class PFCWebSocketClient:
         """
         Send quick Python code from user console for execution.
 
-        This method executes user-provided Python code (from `>` prefix in CLI)
-        as a temporary script file. The code is saved to workspace/.quick_console/
-        for traceability.
-
         Args:
             code: Python code to execute (single or multi-line)
-                Example: 'itasca.command("ball create id 1 x 0 y 0 z 0 radius 0.5")'
             workspace_path: Absolute path to PFC workspace directory
-                The temporary script will be saved to {workspace_path}/.quick_console/
             session_id: Session identifier for task isolation (default: "default")
             timeout_ms: Execution timeout in milliseconds (default: 30000 = 30s)
-                Quick commands should complete quickly; use scripts for long operations.
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
-            Result dictionary from PFC server with structure:
-                - type: "quick_python_result" - Message type identifier
-                - request_id: str - Unique request identifier
-                - status: Literal["success", "error"] - Operation outcome
-                - message: str - User-friendly message with result
-                - data: Dict with execution details:
-                    - task_id: str - Task identifier
-                    - task_type: "script"
-                    - source: "user_console" - Indicates user-initiated execution
-                    - script_name: str - Generated script filename (e.g., "quick_001.py")
-                    - script_path: str - Full path to saved script
-                    - code_preview: str - Truncated code preview
-                    - output: str - Captured stdout
-                    - result: Any - Return value if any
+            Result dictionary with execution details
 
         Raises:
             ConnectionError: If connection to PFC server fails after retries
             TimeoutError: If execution times out
-
-        Note:
-            - Code is saved as temporary script for traceability
-            - Always synchronous (no background execution for quick commands)
-            - No git snapshot (unlike agent scripts)
-            - Tasks are tracked with source="user_console" in task history
         """
+        # Calculate WebSocket timeout (execution timeout + buffer)
+        websocket_timeout_ms = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background=False)
+
         for attempt in range(max_retries):
             try:
-                # Wait for reconnection if in progress
-                if self._reconnecting:
-                    logger.info("Waiting for auto-reconnect to complete...")
-                    for _ in range(60):
-                        if not self._reconnecting and self.connected:
-                            break
-                        await asyncio.sleep(0.5)
-
-                    if not self.connected:
-                        raise ConnectionError("Auto-reconnect did not complete in time")
-
-                # Ensure connected
-                if not self.connected:
-                    self._should_stop = False
-                    success = await self.connect()
-                    if not success:
-                        raise ConnectionError("Failed to connect to PFC server")
-
-                request_id = str(uuid4())
-
-                # Calculate WebSocket timeout (execution timeout + buffer)
-                websocket_timeout_ms = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background=False)
-
-                # Create quick_python message
-                message = {
-                    "type": "quick_python",
-                    "request_id": request_id,
-                    "session_id": session_id,
-                    "workspace_path": workspace_path,
-                    "code": code,
-                    "timeout_ms": timeout_ms
-                }
-
-                # Create future for result
-                future = asyncio.get_event_loop().create_future()
-                self.pending_requests[request_id] = future
-
-                try:
-                    # Send quick Python request
-                    await self.websocket.send(json.dumps(message))
-                    logger.debug(f"Quick Python code sent: {request_id}")
-
-                    # Wait for result with timeout
-                    result = await asyncio.wait_for(future, timeout=websocket_timeout_ms / 1000.0)
-                    return result
-
-                except asyncio.TimeoutError:
-                    self.pending_requests.pop(request_id, None)
-                    raise TimeoutError(
-                        f"Quick Python execution timed out after {websocket_timeout_ms}ms "
-                        f"(execution timeout: {timeout_ms}ms + infrastructure buffer)"
-                    )
+                await self._ensure_connected()
+                return await self._send_request(
+                    message={
+                        "type": "quick_python",
+                        "session_id": session_id,
+                        "workspace_path": workspace_path,
+                        "code": code,
+                        "timeout_ms": timeout_ms
+                    },
+                    timeout=websocket_timeout_ms / 1000.0,
+                    operation_name="Quick Python execution"
+                )
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
                 logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
@@ -1073,10 +786,6 @@ class PFCWebSocketClient:
                         "Failed to execute quick Python after retries. "
                         "Please ensure PFC server is running."
                     ) from e
-
-            except Exception as e:
-                logger.error(f"Quick Python execution failed: {e}")
-                raise
 
         raise RuntimeError("Unexpected code path in send_quick_python")
 
