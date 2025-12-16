@@ -99,7 +99,7 @@ def register_pfc_task_tool(mcp: FastMCP):
             client = await get_client()
 
             # Execute script (server handles git versioning)
-            result = await client.send_script(
+            result = await client.execute_task(
                 script_path=script_path,
                 description=description,
                 timeout_ms=timeout,

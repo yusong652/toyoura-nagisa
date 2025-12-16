@@ -36,7 +36,7 @@ Usage:
 
 Best Practices Shown:
 - Use send_command() for normal PFC commands
-- Use send_script() for long tasks with progress tracking
+- Use execute_task() for long tasks with progress tracking
 - Query task status with check_task_status()
 - Long tasks return immediately with task_id
 - Non-blocking architecture keeps client responsive

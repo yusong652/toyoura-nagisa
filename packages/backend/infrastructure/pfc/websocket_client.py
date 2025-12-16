@@ -394,7 +394,7 @@ class PFCWebSocketClient:
                 if not self._reconnecting and (not self._reconnect_task or self._reconnect_task.done()):
                     self._reconnect_task = asyncio.create_task(self._auto_reconnect())
 
-    async def send_script(
+    async def execute_task(
         self,
         script_path: str,
         description: str,
@@ -464,7 +464,7 @@ class PFCWebSocketClient:
                         "run_in_background": run_in_background
                     },
                     timeout=websocket_timeout_s,
-                    operation_name=f"Script execution ({script_path})"
+                    operation_name=f"Task execution ({script_path})"
                 )
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
@@ -480,7 +480,7 @@ class PFCWebSocketClient:
                         "Please ensure PFC server is running."
                     ) from e
 
-        raise RuntimeError("Unexpected code path in send_script")
+        raise RuntimeError("Unexpected code path in execute_task")
 
     async def check_task_status(
         self,
@@ -830,7 +830,7 @@ async def get_client() -> PFCWebSocketClient:
 
     Example:
         >>> client = await get_client()
-        >>> result = await client.send_script("/path/to/script.py", "Test script")
+        >>> result = await client.execute_task("/path/to/script.py", "Test script")
     """
     global _client_instance
 
