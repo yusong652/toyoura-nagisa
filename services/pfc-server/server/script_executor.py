@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 from .main_thread_executor import MainThreadExecutor
 from .utils import path_to_llm_format
 from .git_version_manager import get_git_manager
+from .interrupt_manager import set_current_task, clear_current_task, clear_interrupt
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
@@ -51,21 +52,23 @@ class PFCScriptExecutor:
             logger.warning("⚠ ITASCA SDK not available for script execution")
             self.itasca = None
 
-    def _execute_script_sync(self, script_path, script_content, output_buffer):
-        # type: (str, str, Any) -> Dict[str, Any]
+    def _execute_script_sync(self, script_path, script_content, output_buffer, task_id):
+        # type: (str, str, Any, str) -> Dict[str, Any]
         """
         Execute Python script synchronously (called in main thread).
 
         Captures stdout during execution for progress tracking using shared buffer.
+        Supports interruption via registered PFC callback.
 
         Args:
             script_path: Path to script (for error messages)
             script_content: Script content to execute
             output_buffer: StringIO buffer for capturing stdout (shared with TaskManager)
+            task_id: Task ID for interrupt checking
 
         Returns:
             Result dictionary with status, message, data, and output:
-                - status: "success" or "error"
+                - status: "success", "error", or "interrupted"
                 - message: User-friendly message
                 - data: Script result (from 'result' variable)
                 - output: Captured stdout content (print statements)
@@ -75,6 +78,9 @@ class PFCScriptExecutor:
         # Use shared output buffer for stdout capture
         old_stdout = sys.stdout
         sys.stdout = output_buffer
+
+        # Set current task for interrupt callback
+        set_current_task(task_id)
 
         try:
 
@@ -117,6 +123,36 @@ class PFCScriptExecutor:
                 "data": serialized_result,
                 "output": output_text  # Include captured output
             }
+
+        except InterruptedError as e:
+            # Task was interrupted by user via callback (direct raise)
+            output_text = output_buffer.getvalue()
+            logger.info("Script interrupted: {} - {}".format(script_path, str(e)))
+
+            return {
+                "status": "interrupted",
+                "message": "Script interrupted by user: {}".format(str(e)),
+                "data": None,
+                "output": output_text  # Include output up to interruption point
+            }
+
+        except ValueError as e:
+            # PFC wraps callback exceptions in ValueError
+            # Check if this is a wrapped InterruptedError from our callback
+            error_str = str(e)
+            if "InterruptedError" in error_str and "_pfc_interrupt_check" in error_str:
+                output_text = output_buffer.getvalue()
+                logger.info("Script interrupted (via PFC callback): {}".format(script_path))
+
+                return {
+                    "status": "interrupted",
+                    "message": "Script interrupted by user",
+                    "data": None,
+                    "output": output_text  # Include output up to interruption point
+                }
+
+            # Not an interrupt - re-raise as regular exception
+            raise
 
         except Exception as e:
             # Get captured output even on error
@@ -175,6 +211,9 @@ class PFCScriptExecutor:
         finally:
             # Always restore stdout
             sys.stdout = old_stdout
+            # Clear current task and interrupt flag
+            clear_current_task()
+            clear_interrupt(task_id)
 
     async def execute_script(self, session_id, script_path, description, timeout_ms=None, run_in_background=True, source="agent", enable_git_snapshot=True):
         # type: (str, str, str, Optional[int], bool, str, bool) -> Dict[str, Any]
@@ -271,6 +310,10 @@ class PFCScriptExecutor:
             # Create shared output buffer for real-time output capture
             output_buffer = StringIO()
 
+            # Generate task_id early (needed for git commit and interrupt tracking)
+            import uuid
+            task_id = uuid.uuid4().hex[:8]
+
             # Create git execution snapshot (before running script)
             # This captures the exact code state that will be executed
             # Skip for quick console commands (enable_git_snapshot=False)
@@ -278,11 +321,8 @@ class PFCScriptExecutor:
             if enable_git_snapshot:
                 git_manager = get_git_manager()
                 if git_manager.is_git_available():
-                    # Generate task_id early for commit message
-                    import uuid
-                    task_id_preview = uuid.uuid4().hex[:8]
                     git_commit = git_manager.create_execution_commit(
-                        task_id=task_id_preview,
+                        task_id=task_id,
                         description=description,
                         entry_script=script_path
                     )
@@ -292,14 +332,15 @@ class PFCScriptExecutor:
                 self._execute_script_sync,
                 script_path,
                 script_content,
-                output_buffer  # Pass shared buffer to executor
+                output_buffer,  # Pass shared buffer to executor
+                task_id  # Pass task_id for interrupt tracking
             )
 
             if run_in_background:
                 # Asynchronous execution: register with task manager and return immediately
 
                 submit_time = time.time()
-                task_id = self.task_manager.create_script_task(
+                self.task_manager.create_script_task(
                     session_id,
                     future,
                     script_name,
@@ -307,7 +348,8 @@ class PFCScriptExecutor:
                     output_buffer,  # Pass buffer reference for live status queries
                     description,  # Agent-provided task description
                     git_commit,  # Git version snapshot
-                    source  # Task source: "agent" or "user_console"
+                    source,  # Task source: "agent" or "user_console"
+                    task_id  # Pre-generated task_id for interrupt tracking
                 )
 
                 return {
@@ -335,7 +377,7 @@ class PFCScriptExecutor:
                 ))
 
                 # Register task BEFORE waiting (enables output caching and post-query)
-                task_id = self.task_manager.create_script_task(
+                self.task_manager.create_script_task(
                     session_id,
                     future,
                     script_name,
@@ -343,7 +385,8 @@ class PFCScriptExecutor:
                     output_buffer,  # Pass buffer reference for output caching
                     description,  # Agent-provided task description
                     git_commit,  # Git version snapshot
-                    source  # Task source: "agent" or "user_console"
+                    source,  # Task source: "agent" or "user_console"
+                    task_id  # Pre-generated task_id for interrupt tracking
                 )
 
                 loop = asyncio.get_event_loop()

@@ -53,14 +53,20 @@ class Task(ABC):
 
     def _on_complete(self, f):
         # type: (Any) -> None
-        """Callback executed when task completes (success or failure)."""
+        """Callback executed when task completes (success, failure, or interruption)."""
         self.end_time = time.time()
         # Update status based on task result
         try:
             result = f.result(timeout=0)
-            # Check result dict status field (for tasks that return error status)
-            if isinstance(result, dict) and result.get("status") == "error":
-                self.status = "failed"
+            # Check result dict status field (for tasks that return error/interrupted status)
+            if isinstance(result, dict):
+                result_status = result.get("status")
+                if result_status == "error":
+                    self.status = "failed"
+                elif result_status == "interrupted":
+                    self.status = "interrupted"
+                else:
+                    self.status = "completed"
             else:
                 self.status = "completed"
         except Exception:

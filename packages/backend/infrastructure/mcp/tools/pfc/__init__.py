@@ -8,6 +8,7 @@ Execution Tools:
 - pfc_execute_task: Execute PFC simulation tasks with version tracking
 - pfc_check_task_status: Query status of long-running tasks
 - pfc_list_tasks: List all tracked long-running tasks
+- pfc_interrupt_task: Request interrupt for running tasks
 
 Documentation Browse Tools (like glob + cat - navigate by path):
 - pfc_browse_commands: Navigate command hierarchy (e.g., "ball create")
@@ -41,6 +42,7 @@ Note: All PFC command execution is done through Python scripts using itasca.comm
 from .pfc_execute_task import register_pfc_task_tool
 from .pfc_task_status import register_pfc_task_status_tool
 from .pfc_list_tasks import register_pfc_list_tasks_tool
+from .pfc_interrupt_task import register_pfc_interrupt_task_tool
 from .pfc_query_python_api import register_pfc_query_python_api_tool
 from .pfc_query_command import register_pfc_query_command_tool
 from .pfc_browse_commands import register_pfc_browse_commands_tool
@@ -51,6 +53,7 @@ __all__ = [
     "register_pfc_task_tool",
     "register_pfc_task_status_tool",
     "register_pfc_list_tasks_tool",
+    "register_pfc_interrupt_task_tool",
     "register_pfc_query_python_api_tool",
     "register_pfc_query_command_tool",
     "register_pfc_browse_commands_tool",

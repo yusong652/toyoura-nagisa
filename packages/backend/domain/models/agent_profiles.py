@@ -84,6 +84,7 @@ PFC_TOOLS: List[str] = [
     "pfc_execute_task",
     "pfc_check_task_status",
     "pfc_list_tasks",
+    "pfc_interrupt_task",
     # SubAgent delegation
     "invoke_agent",
 ]
@@ -126,7 +127,7 @@ GENERAL_TOOLS: List[str] = [
     "web_search", "todo_write",
     # PFC
     "pfc_query_python_api", "pfc_query_command",
-    "pfc_execute_task", "pfc_check_task_status", "pfc_list_tasks",
+    "pfc_execute_task", "pfc_check_task_status", "pfc_list_tasks", "pfc_interrupt_task",
     # SubAgent delegation
     "invoke_agent",
 ]

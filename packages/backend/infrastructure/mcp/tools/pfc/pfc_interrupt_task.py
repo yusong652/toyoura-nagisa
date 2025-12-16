@@ -1,0 +1,95 @@
+"""
+PFC Interrupt Task Tool - MCP tool for interrupting running PFC tasks.
+
+Provides the ability to stop long-running PFC simulations gracefully.
+"""
+
+from fastmcp import FastMCP
+from fastmcp.server.context import Context
+from typing import Dict, Any
+from pydantic import Field
+from backend.infrastructure.pfc import get_client
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+
+
+def register_pfc_interrupt_task_tool(mcp: FastMCP):
+    """
+    Register PFC interrupt task tool with the MCP server.
+
+    Args:
+        mcp: FastMCP server instance
+    """
+
+    @mcp.tool(
+        tags={"pfc", "task", "interrupt", "control"},
+        annotations={"category": "pfc", "tags": ["pfc", "task", "interrupt"]}
+    )
+    async def pfc_interrupt_task(
+        context: Context,
+        task_id: str = Field(
+            ...,
+            description="Task ID to interrupt (from pfc_execute_task, e.g., 'a1b2c3d4')"
+        )
+    ) -> Dict[str, Any]:
+        """
+        Request interrupt for a running PFC task.
+
+        Sends an interrupt signal to stop a long-running simulation gracefully.
+        The task will be interrupted at the end of the current cycle.
+
+        Use this when:
+        - A simulation is taking too long and you want to stop it
+        - You need to modify parameters and restart
+        - The user requests to cancel the current task
+
+        After calling this, use pfc_check_task_status to verify the task
+        was actually interrupted (status will change to "interrupted").
+
+        Note: This does NOT immediately stop the task - interruption is checked
+        at each cycle boundary for clean shutdown.
+        """
+        try:
+            if not task_id or not task_id.strip():
+                return error_response("task_id is required")
+
+            # Get WebSocket client (auto-connects if needed)
+            client = await get_client()
+
+            # Send interrupt request
+            result = await client.interrupt_task(task_id)
+
+            status = result.get("status")
+
+            if status == "success":
+                return success_response(
+                    message=f"Interrupt requested for task: {task_id}",
+                    llm_content={
+                        "parts": [{
+                            "type": "text",
+                            "text": (
+                                f"**INTERRUPT REQUESTED**: task_id: {task_id}\n\n"
+                                "The interrupt signal has been sent. The task will stop "
+                                "at the end of the current cycle.\n\n"
+                                "**NEXT**: Use `pfc_check_task_status` to verify the task "
+                                "was interrupted (status will be 'interrupted')."
+                            )
+                        }]
+                    },
+                    task_id=task_id,
+                    interrupt_requested=True
+                )
+
+            else:
+                error_msg = result.get("message", "Unknown error")
+                return error_response(
+                    message=f"Failed to interrupt task: {error_msg}",
+                    task_id=task_id
+                )
+
+        except ConnectionError as e:
+            return error_response(f"Cannot connect to PFC server: {str(e)}")
+
+        except Exception as e:
+            return error_response(f"System error requesting interrupt: {str(e)}")
+
+    print(f"[DEBUG] Registered PFC interrupt task tool: pfc_interrupt_task")

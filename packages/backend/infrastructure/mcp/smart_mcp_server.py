@@ -24,6 +24,7 @@ from backend.infrastructure.mcp.tools.pfc import (
     register_pfc_task_tool,
     register_pfc_task_status_tool,
     register_pfc_list_tasks_tool,
+    register_pfc_interrupt_task_tool,
     register_pfc_query_python_api_tool,
     register_pfc_query_command_tool,
     register_pfc_browse_commands_tool,
@@ -58,6 +59,7 @@ register_time_tools(mcp)
 register_pfc_task_tool(mcp)
 register_pfc_task_status_tool(mcp)
 register_pfc_list_tasks_tool(mcp)
+register_pfc_interrupt_task_tool(mcp)
 # PFC documentation tools - browse (like glob+cat) and query (like grep)
 register_pfc_browse_commands_tool(mcp)
 register_pfc_browse_contact_models_tool(mcp)

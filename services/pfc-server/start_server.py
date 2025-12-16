@@ -98,6 +98,17 @@ except ImportError:
 except Exception as e:
     print("⚠ Failed to set python-reset-state: {}".format(e))
 
+# ===== Register Interrupt Callback =====
+# Register global callback for task interruption (must be before any script execution)
+try:
+    from server.interrupt_manager import register_interrupt_callback
+    if register_interrupt_callback(it, position=50.0):
+        print("✓ Task interrupt callback registered")
+    else:
+        print("⚠ Interrupt callback registration skipped (already registered)")
+except Exception as e:
+    print("⚠ Failed to register interrupt callback: {}".format(e))
+
 # ===== Check Git Version Tracking =====
 # Git is used to create execution snapshots for reproducibility
 try:

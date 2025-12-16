@@ -169,6 +169,48 @@ class ScriptTask(Task):
                 "data": response_data
             }
 
+        elif self.status == "interrupted":
+            # Script was interrupted by user
+            logger.info("⊘ Script task interrupted: {} (ID: {}, Time: {:.2f}s)".format(
+                self.description, self.task_id, elapsed_time
+            ))
+
+            # Get output from buffer (single source of truth)
+            output_text = self.get_current_output()
+
+            # Build interrupted message with partial output
+            if output_text:
+                message = "Script interrupted by user: {}\nElapsed time: {:.2f}s\n\n=== Partial Output ===\n{}".format(
+                    self.script_name, elapsed_time, output_text
+                )
+            else:
+                message = "Script interrupted by user: {}\nElapsed time: {:.2f}s".format(
+                    self.description, elapsed_time
+                )
+
+            # Build unified response data with all metadata
+            response_data = {
+                "task_id": self.task_id,
+                "session_id": self.session_id,
+                "task_type": self.task_type,
+                "source": self.source,
+                "script_name": self.script_name,
+                "entry_script": self.script_path,
+                "script_path": self.script_path,
+                "description": self.description,
+                "start_time": self.start_time,
+                "end_time": self.end_time,
+                "elapsed_time": elapsed_time,
+                "output": output_text if output_text else "",
+                "git_commit": self.git_commit
+            }
+
+            return {
+                "status": "interrupted",
+                "message": message,
+                "data": response_data
+            }
+
         else:  # status == "failed"
             # Script failed
             logger.error("✗ Script task failed: {} (ID: {})".format(self.description, self.task_id))
@@ -233,7 +275,7 @@ class ScriptTask(Task):
             "git_commit": self.git_commit,  # Git version snapshot
             "notified": self.notified  # Whether completion notification has been sent
         }
-        # Add end_time for completed/failed tasks
-        if self.status in ["completed", "failed"] and self.end_time is not None:
+        # Add end_time for completed/failed/interrupted tasks
+        if self.status in ["completed", "failed", "interrupted"] and self.end_time is not None:
             info["end_time"] = self.end_time
         return info

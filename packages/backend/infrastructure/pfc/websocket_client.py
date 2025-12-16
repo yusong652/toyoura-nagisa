@@ -759,6 +759,107 @@ class PFCWebSocketClient:
 
         raise RuntimeError("Unexpected code path in mark_task_notified")
 
+    async def interrupt_task(
+        self,
+        task_id: str,
+        timeout: float = 5.0,
+        max_retries: int = 2
+    ) -> Dict[str, Any]:
+        """
+        Request interrupt for a running PFC task.
+
+        Sends an interrupt request to the PFC server. The server sets an interrupt
+        flag that is checked by the PFC callback during cycle execution. When the
+        callback detects the flag, it raises InterruptedError to stop the simulation.
+
+        Args:
+            task_id: Task ID to interrupt (returned by send_script with run_in_background=True)
+            timeout: Request timeout in seconds (default: 5.0)
+            max_retries: Maximum retry attempts on connection failure (default: 2)
+
+        Returns:
+            Result dictionary with structure:
+                - type: "result" - Message type identifier
+                - request_id: str - Unique request identifier
+                - status: "success" or "error" - Whether interrupt was requested
+                - message: str - Result message
+                - data: Dict with task_id and interrupt_requested flag
+
+        Raises:
+            ConnectionError: If connection to PFC server fails after retries
+            TimeoutError: If interrupt request times out
+
+        Note:
+            - This does NOT immediately stop the task
+            - Interrupt is checked at each cycle (position 50.0 in PFC cycle)
+            - Task status will change to "interrupted" once actually stopped
+            - Use check_task_status to verify the task was interrupted
+        """
+        for attempt in range(max_retries):
+            try:
+                # Wait for reconnection if in progress
+                if self._reconnecting:
+                    logger.info("Waiting for auto-reconnect to complete...")
+                    for _ in range(60):
+                        if not self._reconnecting and self.connected:
+                            break
+                        await asyncio.sleep(0.5)
+
+                    if not self.connected:
+                        raise ConnectionError("Auto-reconnect did not complete in time")
+
+                # Ensure connected
+                if not self.connected:
+                    self._should_stop = False
+                    success = await self.connect()
+                    if not success:
+                        raise ConnectionError("Failed to connect to PFC server")
+
+                request_id = str(uuid4())
+
+                # Create interrupt task message
+                message = {
+                    "type": "interrupt_task",
+                    "request_id": request_id,
+                    "task_id": task_id
+                }
+
+                # Create future for result
+                future = asyncio.get_event_loop().create_future()
+                self.pending_requests[request_id] = future
+
+                try:
+                    # Send command
+                    await self.websocket.send(json.dumps(message))
+                    logger.info(f"Interrupt request sent for task: {task_id}")
+
+                    # Wait for result with timeout
+                    result = await asyncio.wait_for(future, timeout=timeout)
+                    return result
+
+                except asyncio.TimeoutError:
+                    self.pending_requests.pop(request_id, None)
+                    raise TimeoutError(f"Interrupt request timed out after {timeout}s")
+
+            except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                self.connected = False
+
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(0.5)
+                    continue
+                else:
+                    raise ConnectionError(
+                        "Failed to send interrupt request after retries. "
+                        "Please ensure PFC server is running."
+                    ) from e
+
+            except Exception as e:
+                logger.error(f"Interrupt request failed: {e}")
+                raise
+
+        raise RuntimeError("Unexpected code path in interrupt_task")
+
     async def get_working_directory(
         self,
         timeout: float = 10.0,

@@ -102,7 +102,8 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                     status_text = {
                         "running": "Running",
                         "completed": "Completed",
-                        "failed": "Failed"
+                        "failed": "Failed",
+                        "interrupted": "Interrupted"
                     }.get(status, "Unknown")
 
                     # Mark task ownership: only show session_id for non-current sessions

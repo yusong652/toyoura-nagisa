@@ -72,8 +72,8 @@ class TaskManager:
         except Exception as e:
             logger.error("Failed to load historical tasks: {}".format(e))
 
-    def create_script_task(self, session_id, future, script_name, script_path=None, output_buffer=None, description=None, git_commit=None, source="agent"):
-        # type: (str, Any, str, Optional[str], Any, Optional[str], Optional[str], str) -> str
+    def create_script_task(self, session_id, future, script_name, script_path=None, output_buffer=None, description=None, git_commit=None, source="agent", task_id=None):
+        # type: (str, Any, str, Optional[str], Any, Optional[str], Optional[str], str, Optional[str]) -> str
         """
         Register a new long-running Python script task.
 
@@ -86,11 +86,13 @@ class TaskManager:
             description: Task description from PFC agent (LLM-provided)
             git_commit: Git commit hash on pfc-executions branch (version snapshot)
             source: Task source identifier ("agent" or "user_console")
+            task_id: Optional pre-generated task ID (if None, generates new one)
 
         Returns:
             str: Unique task ID for tracking
         """
-        task_id = uuid.uuid4().hex[:8]
+        if task_id is None:
+            task_id = uuid.uuid4().hex[:8]
         # Pass save callback for automatic persistence on status change
         task = ScriptTask(
             task_id, session_id, future, script_name, script_path,
@@ -204,9 +206,9 @@ class TaskManager:
     def cleanup_completed_tasks(self, session_id=None):
         # type: (Optional[str]) -> int
         """
-        Manually remove completed/failed tasks from tracking.
+        Manually remove completed/failed/interrupted tasks from tracking.
 
-        By default, completed and failed tasks are kept as historical context.
+        By default, completed, failed, and interrupted tasks are kept as historical context.
         Use this method to explicitly clean up old tasks when memory management
         is needed or when the task history becomes too large.
 
@@ -221,13 +223,13 @@ class TaskManager:
             tasks_to_remove = [
                 task_id for task_id, task in self.tasks.items()
                 if (task.session_id == session_id or task.session_id.startswith(session_id))
-                and task.status in ["completed", "failed"]
+                and task.status in ["completed", "failed", "interrupted"]
             ]
         else:
             # Clean up all sessions
             tasks_to_remove = [
                 task_id for task_id, task in self.tasks.items()
-                if task.status in ["completed", "failed"]
+                if task.status in ["completed", "failed", "interrupted"]
             ]
 
         for task_id in tasks_to_remove:

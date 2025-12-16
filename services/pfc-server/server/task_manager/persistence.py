@@ -357,6 +357,34 @@ class HistoricalTask:
                     "script_path": self.script_path,
                     "description": self.description,
                     "elapsed_time": elapsed_time,
+                    "start_time": self.start_time,
+                    "end_time": self.end_time,
+                    "output": output if output else "",
+                    "git_commit": getattr(self, "git_commit", None),
+                    "historical": True
+                }
+            }
+        elif self.status == "interrupted":
+            message = "[Historical] Script interrupted: {}\nElapsed time: {:.2f}s".format(
+                self.script_name, elapsed_time
+            )
+            if output:
+                message += "\n\n=== Partial Output (Snapshot) ===\n{}".format(output)
+
+            return {
+                "status": "interrupted",
+                "message": message,
+                "data": {
+                    "task_id": self.task_id,
+                    "task_type": self.task_type,
+                    "source": self.source,
+                    "script_name": self.script_name,
+                    "entry_script": self.script_path,
+                    "script_path": self.script_path,
+                    "description": self.description,
+                    "elapsed_time": elapsed_time,
+                    "start_time": self.start_time,
+                    "end_time": self.end_time,
                     "output": output if output else "",
                     "git_commit": getattr(self, "git_commit", None),
                     "historical": True
@@ -381,10 +409,11 @@ class HistoricalTask:
                     "script_path": self.script_path,
                     "description": self.description,
                     "elapsed_time": elapsed_time,
+                    "start_time": self.start_time,
+                    "end_time": self.end_time,
                     "output": output if output else "",
                     "git_commit": getattr(self, "git_commit", None),
-                    "historical": True,
-                    "error": "Task failed or interrupted"
+                    "historical": True
                 }
             }
 

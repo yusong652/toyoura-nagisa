@@ -18,6 +18,7 @@ from .script_executor import PFCScriptExecutor
 from .main_thread_executor import MainThreadExecutor
 from .task_manager import TaskManager
 from .quick_console_manager import QuickConsoleManager
+from .interrupt_manager import request_interrupt
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
@@ -310,6 +311,45 @@ class PFCWebSocketServer:
                                 "message": f"Execution failed: {e}",
                                 "data": None
                             }
+
+                        try:
+                            await websocket.send(json.dumps(response))
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send result, connection closed: {request_id}")
+                            break  # Exit message loop
+
+                    elif msg_type == "interrupt_task":
+                        # Request interrupt for a running task
+                        request_id = data.get("request_id", "unknown")
+                        task_id = data.get("task_id", "")
+
+                        if not task_id:
+                            response = {
+                                "type": "result",
+                                "request_id": request_id,
+                                "status": "error",
+                                "message": "task_id is required",
+                                "data": None
+                            }
+                        else:
+                            # Request interrupt (will be checked by PFC callback)
+                            success = request_interrupt(task_id)
+                            if success:
+                                response = {
+                                    "type": "result",
+                                    "request_id": request_id,
+                                    "status": "success",
+                                    "message": "Interrupt requested for task: {}".format(task_id),
+                                    "data": {"task_id": task_id, "interrupt_requested": True}
+                                }
+                            else:
+                                response = {
+                                    "type": "result",
+                                    "request_id": request_id,
+                                    "status": "error",
+                                    "message": "Failed to request interrupt",
+                                    "data": None
+                                }
 
                         try:
                             await websocket.send(json.dumps(response))
