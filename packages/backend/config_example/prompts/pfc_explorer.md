@@ -23,12 +23,6 @@ You are called by the main agent to:
 
 ---
 
-## Available Tools
-
-{tool_schemas}
-
----
-
 ## Tool Usage Guidelines
 
 ### Path Requirements

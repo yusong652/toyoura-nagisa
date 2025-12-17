@@ -85,13 +85,17 @@ async def build_system_prompt(
     include_expression: bool = True,
 ) -> str:
     """
-    Build complete system prompt following Anthropic best practices.
+    Build complete system prompt following modern LLM best practices.
 
     This is the main entry point for creating system prompts with support for:
     - Base identity and instructions (profile-specific)
-    - Tool schemas embedding (Anthropic function calling format)
     - Automatic memory context injection from conversation history
     - Expression/Live2D instructions (MainAgent only)
+
+    Note: Tool schemas are NO LONGER embedded in the system prompt.
+    Modern LLM APIs (Anthropic, Gemini, OpenAI) handle tool definitions natively
+    via the `tools` API parameter. Embedding schemas in the prompt was a legacy
+    practice that caused token waste and potential confusion from duplicate definitions.
 
     Args:
         agent_profile: Agent profile type ("general", "pfc", "coding", "lifestyle", "disabled")
@@ -99,37 +103,25 @@ async def build_system_prompt(
         session_id: Session ID for memory retrieval
         user_id: User ID for memory operations
         enable_memory: Whether to enable memory injection (controlled by frontend)
-        tool_schemas: Pre-fetched tool schemas from LLM provider's tool manager
+        tool_schemas: DEPRECATED - kept for API compatibility but no longer used.
+                     Tools are passed via native API parameter instead.
         include_expression: Whether to include expression/Live2D instructions (default True).
                            Set to False for SubAgents.
 
     Returns:
-        Complete system prompt string following Anthropic format with memory context
+        Complete system prompt string with memory context
     """
     components = []
 
-    # 1. Get base prompt (contains {tool_schemas} and {workspace_root} placeholders)
+    # 1. Get base prompt (contains {workspace_root} and {env} placeholders)
     base = get_base_prompt(profile=agent_profile)
     if not base:
         logger.warning(f"No base prompt found for profile: {agent_profile}")
         base = ""
 
-    # 2. Build tool schemas section (Anthropic function calling format)
-    tool_schemas_section = ""
-    if agent_profile != "disabled" and tool_schemas:
-        sections = [
-            "In this environment you have access to a set of tools you can use to answer the user's question.",
-            "String and scalar parameters should be specified as is, while lists and objects should use JSON format.",
-            "Here are the functions available in JSONSchema format:",
-            "<functions>"
-        ]
-
-        for tool_schema in tool_schemas:
-            tool_json = json.dumps(tool_schema, separators=(',', ':'))
-            sections.append(f'<function>{tool_json}</function>')
-
-        sections.append("</functions>")
-        tool_schemas_section = "\n".join(sections)
+    # 2. Tool schemas are now handled by native LLM API (tools parameter)
+    # No longer embedded in system prompt - this was legacy behavior that caused
+    # duplicate definitions and wasted tokens. See 2025 Anthropic best practices.
 
     # 3. Get workspace root for path substitution (dynamic based on profile and session)
     workspace_root = await _get_workspace_root(agent_profile, session_id)
@@ -142,7 +134,7 @@ async def build_system_prompt(
     env_info = _build_env_info(workspace_root=workspace_root, session_id=session_id)
 
     # 5. Replace placeholders in base prompt
-    base = base.replace("{tool_schemas}", tool_schemas_section)
+    # Note: {tool_schemas} placeholder removed from prompts - tools via native API
     base = base.replace("{workspace_root}", workspace_root)
     base = base.replace("{env}", env_info)
 

@@ -573,5 +573,3 @@ Before executing ANY script:
 Browse first, test small, scale validated workflows.
 
 ---
-
-{tool_schemas}
