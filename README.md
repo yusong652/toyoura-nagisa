@@ -66,13 +66,32 @@ MainAgent can delegate documentation search and codebase exploration to speciali
 
 **PFC Explorer SubAgent**: Queries command documentation, searches Python API examples, and explores the codebase to find relevant patterns - all without bloating the PFC Expert's valuable context
 
-### ⚡ **Real-Time WebSocket Integration**
+### ⚡ **Task Lifecycle Management**
 
-Production-grade architecture solving industrial software integration challenges:
+Complete control over long-running PFC simulations with production-grade reliability:
 
-- **Thread-Safe Execution**: Queue-based main thread coordination for PFC SDK callbacks
-- **Background Task Management**: Long-running simulations don't block user interactions
-- **Progress Monitoring**: Real-time output capture from running simulations
+| Stage | Tool | Capabilities |
+|-------|------|--------------|
+| **Create** | `pfc_execute_task` | Git snapshot before execution, background/foreground modes |
+| **Monitor** | `pfc_check_task_status` | Real-time output streaming, pagination, text filtering |
+| **Interrupt** | `pfc_interrupt_task` | Graceful cancellation via PFC callback mechanism |
+| **Track** | `pfc_list_tasks` | Query historical tasks, filter by status/session |
+
+**Monitoring Features:**
+```
+pfc_check_task_status(
+    task_id="a1b2c3d4",
+    offset=0,           # Skip N newest lines (pagination)
+    limit=20,           # Lines per page (max 100)
+    filter="Error",     # Show only lines containing "Error"
+    wait_seconds=30     # Rate limiting for long simulations
+)
+```
+
+**Architecture Highlights:**
+- **Thread-Safe Execution**: Queue-based main thread coordination for PFC SDK
+- **Git Version Tracking**: Auto-snapshot workspace state with each execution
+- **Task Persistence**: Query completed tasks across sessions
 - **Auto-Reconnection**: Resilient WebSocket client with exponential backoff
 
 ### 🗣️ **Multi-Provider LLM Support**
@@ -337,6 +356,7 @@ exec(open(r'/path/to/toyoura-nagisa/services/pfc-server/start_server.py', encodi
 ```
 
 **PFC Workflow Example**:
+
 ```
 You: "Create a ball settling simulation with 1000 particles"
 
@@ -345,8 +365,15 @@ Nagisa:
 2. Writes test script with 10 particles (small scale)
 3. Executes test → validates syntax
 4. Writes production script with 1000 particles
-5. Executes production → monitors progress
-6. Reports results
+5. Executes production (run_in_background=True) → returns task_id + git commit
+6. Monitors progress with pfc_check_task_status(task_id)
+7. Reports results
+
+You: "Stop the simulation, I need to adjust parameters"
+Nagisa: pfc_interrupt_task("a1b2c3d4") → task gracefully interrupted
+
+You: "Show me only error messages from the last run"
+Nagisa: pfc_check_task_status(task_id, filter="Error") → filtered output
 ```
 
 See `services/pfc-server/README.md` for detailed setup and usage instructions.
