@@ -20,7 +20,7 @@ Python 3.6 compatible implementation.
 
 import threading
 import logging
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
@@ -181,7 +181,7 @@ _callback_registered = False
 
 
 def register_interrupt_callback(itasca_module, position=50.0):
-    # type: (any, float) -> bool
+    # type: (Any, float) -> bool
     """
     Register interrupt callback with PFC.
 
@@ -209,7 +209,7 @@ def register_interrupt_callback(itasca_module, position=50.0):
     try:
         # Inject function into __main__ namespace (required for PFC lookup)
         import __main__
-        __main__._pfc_interrupt_check = _pfc_interrupt_check
+        setattr(__main__, "_pfc_interrupt_check", _pfc_interrupt_check)
 
         # Register with PFC
         itasca_module.set_callback("_pfc_interrupt_check", position)
@@ -224,7 +224,7 @@ def register_interrupt_callback(itasca_module, position=50.0):
 
 
 def unregister_interrupt_callback(itasca_module, position=50.0):
-    # type: (any, float) -> bool
+    # type: (Any, float) -> bool
     """
     Unregister interrupt callback from PFC.
 
