@@ -50,15 +50,13 @@ file_handler.setFormatter(formatter)
 root_logger.addHandler(console_handler)
 root_logger.addHandler(file_handler)
 
-print("Log file: {}".format(log_file))
-
 # Import server components
 from server.main_thread_executor import MainThreadExecutor
 from server.server import create_server
 
 # Load configuration
 try:
-    from config import ( # type: ignore
+    from config import (  # type: ignore
         WEBSOCKET_HOST,
         WEBSOCKET_PORT,
         PING_INTERVAL,
@@ -70,6 +68,7 @@ try:
     PING_INT = PING_INTERVAL
     PING_TO = PING_TIMEOUT
     AUTO_START = AUTO_START_TASK_LOOP
+    _config_loaded = True
 except ImportError:
     # Fallback to defaults if config not found
     HOST = "localhost"
@@ -77,9 +76,16 @@ except ImportError:
     PING_INT = 120  # 2 minutes (long tasks friendly)
     PING_TO = 300   # 5 minutes (prevent disconnection)
     AUTO_START = False
-    print("Warning: config.py not found, using default settings")
+    _config_loaded = False
 
-print("Initializing PFC WebSocket Server...")
+# Track initialization status for summary
+_init_status = {
+    "config": _config_loaded,
+    "pfc_state": False,
+    "interrupt": False,
+    "git": False,
+    "git_issue": None
+}
 
 # ===== Create Main Thread Executor =====
 main_executor = MainThreadExecutor()
@@ -94,48 +100,31 @@ try:
 
     # Prevent PFC from resetting Python state/cache on initialization
     it.command("python-reset-state false")
-    print("✓ Python state preservation enabled (python-reset-state false)")
+    _init_status["pfc_state"] = True
 
     # Register global callback for task interruption (must be before any script execution)
     from server.interrupt_manager import register_interrupt_callback
-    if register_interrupt_callback(it, position=50.0):
-        print("✓ Task interrupt callback registered")
-    else:
-        print("⚠ Interrupt callback registration skipped (already registered)")
+    _init_status["interrupt"] = register_interrupt_callback(it, position=50.0)
 
 except ImportError:
-    print("⚠ itasca module not available - skipping PFC configuration")
+    pass  # itasca not available - will show in summary
 except Exception as e:
-    print("⚠ Failed to configure PFC: {}".format(e))
+    logging.warning("Failed to configure PFC: {}".format(e))
 
 # ===== Check Git Version Tracking =====
 # Git snapshots are created in the user's PFC project directory (where script files are located)
 # This check only verifies git is installed; actual repository detection happens at execution time
 try:
     from server.git_version_manager import get_git_manager
-    # Check if git is functional (uses current directory for basic check)
     git_manager = get_git_manager()
     git_status = git_manager.diagnose_git_status()
 
-    if git_status["available"]:
-        print("✓ Git version tracking available")
-        print("  (Snapshots will be created in script's project repository)")
-    elif git_status["issue"] == "not_initialized":
-        # Not a git repo here is OK - we'll use script's project repo
-        print("✓ Git version tracking available")
-        print("  (Snapshots will be created in script's project repository)")
+    if git_status["available"] or git_status["issue"] == "not_initialized":
+        _init_status["git"] = True
     else:
-        print("")
-        print("=" * 70)
-        print("⚠ Git version tracking issue: {}".format(git_status["message"]))
-        if git_status["action"]:
-            print("")
-            print("  To fix, run:")
-            print("    {}".format(git_status["action"]))
-        print("=" * 70)
-        print("")
+        _init_status["git_issue"] = git_status
 except Exception as e:
-    print("⚠ Git check failed: {}".format(e))
+    _init_status["git_issue"] = {"message": str(e), "action": None}
 
 # ===== Create Server Instance =====
 pfc_server = create_server(
@@ -190,34 +179,15 @@ except ImportError:
 # ===== Utility Functions =====
 def run_task_loop(interval=0.01):
     """
-    Run continuous task processing loop (improved with threading.Event).
-
-    This function provides an alternative task processing mode when
-    IPython hooks are not sufficient or not available.
+    Run continuous task processing loop.
 
     Args:
         interval: Check interval in seconds (default: 0.01 = 100Hz)
 
     Note:
-        This will BLOCK the IPython prompt while running, but uses
-        threading.Event.wait() for better GIL release and GUI responsiveness.
-        Press Ctrl+C to stop, or call stop_task_loop() from another context.
-
-    Example:
-        >>> run_task_loop()  # Start continuous processing
-        >>> # Press Ctrl+C to stop
+        This will BLOCK the IPython prompt. Press Ctrl+C to stop.
     """
-    print("=" * 70)
-    print("Task Processing Loop Mode (Event-based)")
-    print("=" * 70)
-    print("  • Interval: {:.0f}ms".format(interval * 1000))
-    print("  • IPython shell BLOCKED (press Ctrl+C to stop)")
-    print("  • Server continues running in background")
-    print("  • Using threading.Event for better responsiveness")
-    print("=" * 70)
-    print()
-    print("Note: GUI may take a few seconds to stabilize...")
-    print()
+    print("Task loop running (Ctrl+C to stop)...")
 
     # Clear stop event before starting
     stop_event.clear()
@@ -225,14 +195,10 @@ def run_task_loop(interval=0.01):
     try:
         while not stop_event.is_set():
             main_executor.process_tasks()
-            # Use Event.wait() instead of time.sleep() for better GIL release
             stop_event.wait(interval)
     except KeyboardInterrupt:
-        print()
-        print("✓ Loop stopped (Ctrl+C)")
-        print("  → Tasks will now process via IPython hooks")
+        print("\n✓ Loop stopped")
     finally:
-        # Always clear the stop event on exit
         stop_event.clear()
 
 def get_queue_size():
@@ -275,40 +241,68 @@ def server_status():
     Example:
         >>> server_status()
     """
-    print("=" * 70)
-    print("PFC WebSocket Server Status")
-    print("=" * 70)
-    print("Server:")
-    print("  • URL: ws://{}:{}".format(HOST, PORT))
-    print("  • Running: {}".format(server_thread.is_alive()))
-    print("  • Active Connections: {}".format(len(pfc_server.active_connections)))
     print()
-    print("Task Queue:")
-    print("  • Pending Tasks: {}".format(main_executor.queue_size()))
-    print("  • Processing Mode: {}".format(processing_mode))
-    print()
+    print("=" * 60)
+    print("PFC WebSocket Server")
+    print("=" * 60)
+    print("  URL:         ws://{}:{}".format(HOST, PORT))
+    print("  Running:     {}".format(server_thread.is_alive()))
+    print("  Connections: {}".format(len(pfc_server.active_connections)))
+    print("  Queue:       {} pending".format(main_executor.queue_size()))
+    print("  Mode:        {}".format(processing_mode))
+    print("-" * 60)
     print("Commands:")
-    print("  • server_status()      - Show this status")
-    print("  • get_queue_size()     - Get pending task count")
-    print("  • run_task_loop()      - Run continuous processing loop (Event-based)")
-    print("  • stop_task_loop()     - Stop the running loop gracefully")
+    print("  server_status()   - Show this status")
+    print("  run_task_loop()   - Continuous processing (Ctrl+C to stop)")
+    print("=" * 60)
     print()
-    print("Trigger Task Processing:")
-    print("  • Run any IPython command (e.g., pass, 1+1)")
-    print("  • Or use: run_task_loop() for continuous mode")
-    print("  • Improved: Event.wait() for better GUI responsiveness")
-    print("=" * 70)
 
-# ===== Startup Complete =====
-print()
-server_status()
+# ===== Startup Summary =====
+def _print_startup_summary():
+    """Print concise startup summary with status indicators."""
+    print()
+    print("=" * 60)
+    print("PFC WebSocket Server")
+    print("=" * 60)
+    print("  URL:       ws://{}:{}".format(HOST, PORT))
+    print("  Log:       {}".format(log_file))
+
+    # Status indicators
+    status_items = []
+    if _init_status["pfc_state"]:
+        status_items.append("PFC")
+    if _init_status["interrupt"]:
+        status_items.append("Interrupt")
+    if _init_status["git"]:
+        status_items.append("Git")
+
+    if status_items:
+        print("  Features:  {}".format(", ".join(status_items)))
+
+    # Warnings
+    warnings = []
+    if not _init_status["config"]:
+        warnings.append("config.py not found (using defaults)")
+    if not _init_status["pfc_state"]:
+        warnings.append("itasca module not available")
+    if _init_status["git_issue"]:
+        issue = _init_status["git_issue"]
+        warnings.append("Git: {}".format(issue.get("message", "unavailable")))
+
+    if warnings:
+        print("-" * 60)
+        for w in warnings:
+            print("  ⚠ {}".format(w))
+
+    print("-" * 60)
+    print("Commands:  server_status()  run_task_loop()")
+    print("=" * 60)
+    print()
+
+_print_startup_summary()
 
 # ===== Auto-start Task Loop (if enabled) =====
 if AUTO_START and processing_mode == "hook":
-    print()
-    print("=" * 70)
-    print("Auto-starting continuous task processing loop...")
-    print("(Set AUTO_START_TASK_LOOP = False in config.py to disable)")
-    print("=" * 70)
-    time.sleep(1)  # Brief pause to allow reading the message
+    print("Auto-starting task loop... (Ctrl+C to stop)")
+    time.sleep(0.5)
     run_task_loop()
