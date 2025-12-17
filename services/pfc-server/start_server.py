@@ -87,33 +87,32 @@ main_executor = MainThreadExecutor()
 # ===== Create Event for Task Loop Control =====
 stop_event = threading.Event()
 
-# ===== Configure PFC Python State =====
-# Prevent PFC from resetting Python state/cache on initialization
+# ===== Configure PFC Python State & Register Interrupt Callback =====
+# Both require itasca module - combine for cleaner flow
 try:
-    import itasca as it # type: ignore
+    import itasca as it  # type: ignore
+
+    # Prevent PFC from resetting Python state/cache on initialization
     it.command("python-reset-state false")
     print("✓ Python state preservation enabled (python-reset-state false)")
-except ImportError:
-    print("⚠ itasca module not available - skipping python-reset-state")
-except Exception as e:
-    print("⚠ Failed to set python-reset-state: {}".format(e))
 
-# ===== Register Interrupt Callback =====
-# Register global callback for task interruption (must be before any script execution)
-try:
+    # Register global callback for task interruption (must be before any script execution)
     from server.interrupt_manager import register_interrupt_callback
     if register_interrupt_callback(it, position=50.0):
         print("✓ Task interrupt callback registered")
     else:
         print("⚠ Interrupt callback registration skipped (already registered)")
+
+except ImportError:
+    print("⚠ itasca module not available - skipping PFC configuration")
 except Exception as e:
-    print("⚠ Failed to register interrupt callback: {}".format(e))
+    print("⚠ Failed to configure PFC: {}".format(e))
 
 # ===== Check Git Version Tracking =====
 # Git snapshots are created in the user's PFC project directory (where script files are located)
 # This check only verifies git is installed; actual repository detection happens at execution time
 try:
-    from server.git_version_manager import get_git_manager, find_git_root
+    from server.git_version_manager import get_git_manager
     # Check if git is functional (uses current directory for basic check)
     git_manager = get_git_manager()
     git_status = git_manager.diagnose_git_status()
