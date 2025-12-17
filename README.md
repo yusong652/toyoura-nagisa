@@ -16,18 +16,22 @@
 
 ## 💡 Script is Context
 
-**Toyoura Nagisa** pioneers context engineering for LLM-driven discrete element simulations. Every PFC operation becomes a versioned Python script—queryable through git history and task lists, forming persistent cross-session context that the LLM learns from.
+**Toyoura Nagisa** demonstrates context engineering for LLM-driven discrete element simulations.
 
-Traditional simulation tools demand users memorize syntax. We invert this: scripts *are* the context. The LLM queries documentation, generates tested code, and builds understanding from execution history—elegant context engineering at scale.
+Traditional DEM workflows involve repetitive cycles: searching documentation, comparing command syntax with Python APIs, and manually debugging scripts. We automate this: the LLM navigates documentation, understands command-API tradeoffs, generates tested code, and iterates until success.
+
+Every script execution creates a git snapshot with full workspace state. The LLM queries task history, reviews previous approaches, and builds upon past work—forming persistent cross-session context that survives restarts and spans projects.
+
+Scripts *are* the context. Each execution compounds understanding.
 
 ## 🎯 Core Features
 
 ### 🔬 **Documentation-Driven Workflow**
 
-The LLM doesn't guess - it queries before acting:
+The LLM doesn't guess - it queries, navigates, and discovers:
 
-1. **Query Command Documentation** - Get syntax, parameters, and usage examples
-2. **Query Python API** - Understand how to script PFC commands properly
+1. **Query by Keywords** - Search returns documentation paths, not raw content
+2. **Browse by Path** - Navigate to specific docs, or explore parent directories to discover alternatives
 3. **Write Test Script** - Small-scale validation (10 particles, 100 steps)
 4. **Execute Production Script** - Full simulation with progress monitoring
 
@@ -36,186 +40,98 @@ The LLM doesn't guess - it queries before acting:
 User: "Create a ball settling simulation with 1000 particles"
 
 toyoura-nagisa:
-1. Queries 'ball generate' documentation → learns syntax
-2. Queries 'model gravity' API → understands scripting
-3. Writes test script (10 particles) → validates approach
-4. Executes test → catches errors early
-5. Writes production script (1000 particles) → runs full simulation
-6. Monitors progress → reports results
+1. Queries 'ball generate' → returns path: "ball generate"
+2. Browses "ball generate" → learns syntax, sees [no Python API]
+3. Queries 'gravity' → returns path: "model gravity"
+4. Browses "model gravity" → learns scripting pattern
+5. Writes test script (10 particles) → validates approach
+6. Executes production (1000 particles) → monitors progress
 ```
 
-### 🧠 **Agent Profile System**
+**Boundary Discovery**:
+```
+User: "Create walls around the domain"
 
-Different tasks need different tools. toyoura-nagisa loads tool categories based on agent profiles:
+toyoura-nagisa:
+1. Queries "wall create" → returns path: "wall create"
+2. Browses "wall create" → sees [no Python API]
+3. Browses "itasca.wall" → confirms: only find/list/count, no create
+4. Decision: uses itasca.command("wall create ...") wrapper
+```
 
-| Profile | Tools | Token Usage | Purpose |
-|---------|-------|-------------|---------|
-| **PFC Expert** | 14 tools | 3,948 tokens | PFC simulation control |
-| **Coding** | 10 tools | 2,820 tokens | Software development |
-| **General** | 27 tools | 7,614 tokens | Multi-domain tasks |
-| **Lifestyle** | 14 tools | 3,948 tokens | Email, calendar, contacts |
+**Manual Implementation**:
+```
+User: "Apply confining pressure to cylindrical boundary"
 
-**PFC Expert Tools**: Documentation query, script execution, progress monitoring, task status tracking
-
-### 🤖 **SubAgent Delegation**
-
-MainAgent can delegate documentation search and codebase exploration to specialized SubAgents:
-
-- **Token Efficiency**: SubAgent exploration doesn't consume MainAgent's context window
-- **Focused Results**: SubAgents return concise summaries, preserving MainAgent context for simulation work
-
-**PFC Explorer SubAgent**: Queries command documentation, searches Python API examples, and explores the codebase to find relevant patterns - all without bloating the PFC Expert's valuable context
+toyoura-nagisa:
+1. Queries "servo" → finds servo command
+2. Browses "wall servo" → sees limitation: single force direction only
+3. Browses "itasca.wall.Wall" → finds set_vel(), contact force methods
+4. Decision: implements custom radial pressure control loop
+```
 
 ### ⚡ **Task Lifecycle Management**
 
-Complete control over long-running PFC simulations with production-grade reliability:
+Long-running PFC simulations require monitoring, control, and learning from history.
 
-| Stage | Tool | Capabilities |
-|-------|------|--------------|
-| **Create** | `pfc_execute_task` | Git snapshot before execution, background/foreground modes |
-| **Monitor** | `pfc_check_task_status` | Real-time output streaming, pagination, text filtering |
-| **Interrupt** | `pfc_interrupt_task` | Graceful cancellation via PFC callback mechanism |
-| **Track** | `pfc_list_tasks` | Query historical tasks, filter by status/session |
+**Session 1: Compression Test**
 
-**Monitoring Features:**
 ```
-pfc_check_task_status(
-    task_id="a1b2c3d4",
-    offset=0,           # Skip N newest lines (pagination)
-    limit=20,           # Lines per page (max 100)
-    filter="Error",     # Show only lines containing "Error"
-    wait_seconds=30     # Rate limiting for long simulations
-)
+User: "Run isotropic compression to 100kPa confining pressure"
+
+toyoura-nagisa:
+1. Submit: pfc_execute_task → script includes termination condition
+2. Monitor: pfc_check_task_status → tracks progress
+   - "Compression cycles: 50000, stress: 95kPa"
+   - "Target reached, saving checkpoint..."
+3. Result: Task completed normally
+4. (If instability detected: pfc_interrupt_task → stop and adjust)
 ```
 
-**Architecture Highlights:**
-- **Thread-Safe Execution**: Queue-based main thread coordination for PFC SDK
-- **Git Version Tracking**: Auto-snapshot workspace state with each execution
-- **Task Persistence**: Query completed tasks across sessions
-- **Auto-Reconnection**: Resilient WebSocket client with exponential backoff
+**Session 2: Shear Test**
 
-### 🗣️ **Multi-Provider LLM Support**
+```
+User: "Run triaxial shear test on the consolidated sample"
 
-Unified architecture with pluggable LLM providers:
+toyoura-nagisa:
+1. Checks pfc_list_tasks → sees "Isotropic compression" completed
+2. Checks pfc_check_task_status → reviews final output
+   - Checkpoint: "consolidated_100kPa.sav"
+   - Wall IDs: top_wall=1, bottom_wall=2
+3. Reviews compression script → servo settings, contact model
+4. Writes shear script:
+   - model restore "consolidated_100kPa.sav"
+   - References wall IDs for axial loading
+```
 
-**Cloud Providers:**
-- **Google Gemini** - Fast, cost-effective, excellent tool calling
-- **Anthropic Claude** - Superior reasoning for complex workflows
-- **OpenAI GPT** - Reliable general-purpose performance
-- **Moonshot Kimi** - Chinese language optimization with competitive pricing
-- **OpenRouter** - Access to multiple models through unified API
+**Session N: Learn from Failure**
 
-**Self-Hosted:**
-- **vLLM** - High-throughput inference server for local deployments
-- **Ollama** - Easy local model management and deployment
+```
+Previous shear test failed with instability...
 
-All providers share the same tool orchestration engine and conversation management, allowing seamless switching without code changes.
+toyoura-nagisa:
+1. Checks pfc_list_tasks → finds similar shear tasks
+2. Compares outputs: successful runs vs failed runs
+3. Reviews scripts: identifies parameter differences
+4. Applies working approach to complete the task
+```
+
+Every execution—success or failure—becomes context for future decisions.
+
+### 🤖 **SubAgent Delegation**
+
+The main agent can delegate exploration tasks to a specialized SubAgent:
+
+**PFC Explorer**: Queries command documentation, searches Python API examples, explores project history for successful patterns, and searches the web for references—all without consuming the main agent's context window.
 
 ## 🎨 Additional Features
 
 Beyond the core PFC integration, toyoura-nagisa includes:
 
-- **Long-Term Memory** (Mem0 + ChromaDB) - Learns user preferences across sessions
+- **Multi-Provider LLM Support** - Gemini, Claude, OpenAI, Zhipu, Moonshot, OpenRouter, vLLM, Ollama
+- **Long-Term Memory** (ChromaDB) - Learns user preferences across sessions
 - **Live2D Character** - Interactive visual companion that responds to conversations
-- **Voice Input** - Natural speech interaction through the frontend
 - **Text-to-Speech** - Local (GPT-SoVITS) or cloud (Fish Audio) voice output
-- **Clean Architecture** - Strict separation of presentation/domain/infrastructure layers
-
-## 🛠️ Technical Deep Dive
-
-### System Architecture
-
-```
-+------------------------------------------------+
-|                 Frontend (React)               |
-| (Live2D, Chat UI, Geolocation, Voice Input)    |
-+----------------------+-------------------------+
-                       | (WebSocket / HTTP)
-+----------------------v-------------------------+
-|              Backend (Clean Architecture)       |
-| +------------------+  +----------------------+ |
-| |  Presentation    |  |      Domain          | |
-| | (API, WebSocket) |  |  (Business Logic)    | |
-| +------------------+  +----------------------+ |
-|                      |                         |
-| +--------------------v-----------------------+ |
-| |            Infrastructure Layer            | |
-| | +----------------+  +--------------------+ | |
-| | |  Unified LLM   |  |   Tool Execution   | | |
-| | |  Base Client   |  |       (MCP)        | | |
-| | +----------------+  +--------------------+ | |
-| | +----------------+  +--------------------+ | |
-| | | Agent Profile  |  |  Mem0 Memory Mgmt  | | |
-| | |    System      |  | (ChromaDB/Qdrant)  | | |
-| | +----------------+  +--------------------+ | |
-| | +----------------+  +--------------------+ | |
-| | |  PFC WebSocket |  |   PFC Tools (MCP)  | | |
-| | |     Client     |  | (Command/Script)   | | |
-| | +----------------+  +--------------------+ | |
-| +------------------------------------------+ |
-+-------------+----------------------------------+
-              | (WebSocket: ws://localhost:9001)
-+-------------v----------------------------------+
-|        PFC Workspace (External Process)        |
-|  WebSocket Server + Task Manager + Executor    |
-|         ITASCA PFC SDK (Main Thread)           |
-+------------------------------------------------+
-```
-
-### Project Structure (Monorepo Architecture)
-
-```
-toyoura-nagisa/
-├── packages/
-│   ├── backend/                   # Python backend (FastAPI)
-│   │   ├── app.py                 # FastAPI application entrypoint
-│   │   ├── presentation/          # Presentation Layer
-│   │   │   ├── api/               # REST API endpoints
-│   │   │   └── websocket/         # WebSocket connection management
-│   │   ├── domain/                # Domain Layer
-│   │   │   └── models/            # Core business logic and message models
-│   │   ├── infrastructure/        # Infrastructure Layer
-│   │   │   ├── llm/               # Multi-provider LLM architecture
-│   │   │   │   ├── base/          # Unified LLM base classes
-│   │   │   │   └── providers/     # Provider implementations (gemini, anthropic, openai, local)
-│   │   │   ├── mcp/               # Tool Execution (MCP)
-│   │   │   │   ├── smart_mcp_server.py # Main MCP server
-│   │   │   │   └── tools/         # Tool implementations by category
-│   │   │   │       └── agent/     # SubAgent invocation (invoke_agent)
-│   │   │   ├── monitoring/        # Status monitoring system
-│   │   │   │   ├── status_monitor.py  # Unified coordinator
-│   │   │   │   └── monitors/      # Specialized monitors (iteration, todo, bash, pfc)
-│   │   │   ├── pfc/               # PFC WebSocket client integration
-│   │   │   ├── memory/            # Long-term memory system (ChromaDB)
-│   │   │   └── tts/               # Text-to-speech engines
-│   │   └── config/                # Configuration management
-│   │       └── prompts/           # Agent system prompts (pfc_explorer.md)
-│   ├── web/                       # React web frontend
-│   │   ├── src/
-│   │   │   ├── App.tsx            # Main React application
-│   │   │   ├── components/        # UI components (ChatBox, Live2DCanvas, etc.)
-│   │   │   └── contexts/          # React contexts for state management
-│   │   └── public/
-│   │       └── live2d_models/     # Live2D model files
-│   ├── cli/                       # Terminal CLI frontend (Ink/React)
-│   │   └── src/
-│   │       └── ui/                # CLI components and hooks
-│   └── core/                      # Shared TypeScript core library
-│       └── src/
-│           ├── connection/        # WebSocket connection management
-│           ├── session/           # Session management
-│           └── api/               # API client
-├── services/
-│   └── pfc-server/                # PFC WebSocket server (independent service)
-│       ├── server/                # Server implementation (runs in PFC process)
-│       │   ├── server.py          # WebSocket server + routing
-│       │   ├── script_executor.py # Python script execution
-│       │   ├── main_thread_executor.py # Queue-based main thread execution
-│       │   └── task_manager.py    # Long-running task tracking
-│       ├── examples/              # Example PFC projects
-│       └── README.md              # Independent server documentation
-└── ...
-```
 
 ## 🚀 What Makes toyoura-nagisa Different?
 
@@ -237,8 +153,7 @@ Traditional approaches to PFC automation require users to:
 
 **toyoura-nagisa Backend:**
 - **Python 3.10+** with `uv` package manager ([install guide](https://github.com/astral-sh/uv))
-- **Git** - Required for file search tools (glob/grep functionality)
-- **Node.js 16+** - For frontend development
+- **Node.js 18+** - For frontend development
 
 **PFC Integration (Core Feature):**
 - **ITASCA PFC** with embedded Python environment
@@ -253,90 +168,23 @@ Traditional approaches to PFC automation require users to:
   pip install --user websockets==9.1
   ```
 
-**Optional:**
-- **GitHub CLI (`gh`)** - For development workflows (issue/PR management)
-
 ### Quick Start
 
 ```bash
-# Clone the repository
+# Clone and install
 git clone https://github.com/yusong652/toyoura-nagisa.git
 cd toyoura-nagisa
+npm install && uv sync
 
-# Install all dependencies (frontend + backend)
-npm install
-uv sync
-
-# Copy and configure settings
+# Configure
 cp -r packages/backend/config_example/ packages/backend/config/
 # Edit packages/backend/config/llm.py with your API keys
 
-# Start both frontend and backend together
-npm run dev
+# Start
+npm run dev:backend   # Backend API (localhost:8000)
+npm run dev:web       # Web Frontend (localhost:5173)
+npm run dev:cli       # CLI interface
 ```
-
-The application will be available at:
-- Web Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-
-### CLI Mode
-
-For engineers who prefer working in the terminal - run the full agentic PFC workflow without leaving your command line:
-
-```bash
-# Start CLI interface
-npm run dev:cli
-
-# Or start backend separately and run CLI
-npm run dev:backend  # Terminal 1
-npm run dev:cli      # Terminal 2
-```
-
-The CLI provides the same documentation-driven workflow as the web interface: natural language → documentation query → test script → production simulation, all from your terminal.
-
-### Manual Setup
-
-#### Backend Setup
-```bash
-# Install dependencies with uv
-uv sync
-
-# Copy and configure settings
-cp -r packages/backend/config_example/ packages/backend/config/
-# Edit packages/backend/config/llm.py with your API keys
-
-# Start the backend server
-npm run dev:backend
-# Or manually: cd packages/backend && uv run python run.py
-```
-
-#### Web Frontend Setup
-```bash
-# Start web development server
-npm run dev:web
-# Or manually: cd packages/web && npm run dev
-```
-
-#### CLI Setup
-```bash
-# Build and run CLI
-npm run dev:cli
-# Or manually: cd packages/cli && npm run dev
-```
-
-### Configuration
-
-Configure your preferred LLM providers in `packages/backend/config/llm.py`:
-- **Gemini**: Primary provider with full feature support
-- **Anthropic**: Claude integration with tool calling
-- **OpenAI**: GPT models with comprehensive API integration
-- **Local**: vLLM and Ollama support for self-hosted models
-
-Configure additional features in `packages/backend/config/`:
-- **Memory**: `memory.py` - Long-term memory settings (ChromaDB)
-- **TTS**: `tts.py` - Text-to-speech providers (local/cloud)
-- **Email**: `email.py` - Gmail integration for lifestyle agent
-- **Text-to-Image**: `text_to_image.py` - Image generation capabilities
 
 ### PFC Workspace Setup
 
