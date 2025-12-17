@@ -12,11 +12,27 @@ This document provides comprehensive architectural, philosophical, and developme
 - **Unified LLM & Tooling**: A sophisticated abstraction layer allows for seamless switching between different LLM providers (Gemini, Anthropic, OpenAI, local models) and ensures that all tools adhere to a unified contract, regardless of the underlying provider.
 - **Expert Workflows**: For specialized domains like scientific computing, the platform defines expert workflows and mental models (e.g., the PFC three-phase workflow) that guide the AI to behave like a domain expert, not just a tool executor.
 
-## 2. Agent Philosophy & Expert Workflows
+## 2. Core Philosophy: Script is Context
+
+**Script is Context** is the foundational philosophy for PFC integration.
+
+- **Problem**: Traditional DEM workflows involve repetitive cycles of searching documentation, comparing command syntax, and manual debugging.
+- **Solution**: We automate this. The LLM navigates documentation, understands command-API tradeoffs, generates tested code, and iterates until success.
+- **Context Persistence**: Every script execution creates a git snapshot with full workspace state. The LLM queries task history, reviews previous approaches, and builds upon past work—forming persistent cross-session context that survives restarts and spans projects. Scripts *are* the context.
+
+## 3. Heritage & Inspiration
+
+**toyoura-nagisa** follows the architectural patterns established by **gemini-cli**.
+- The `nagisa-cli` (`packages/cli`) is a direct evolution of the `gemini-cli` hook-driven UI architecture.
+- `GEMINI.md` itself serves as the "System Context" for the agent, a pattern inherited from the original project.
+- While `gemini-cli` was a dev-dependency in early versions, `toyoura-nagisa` has now matured into a standalone monorepo with its own evolved core libraries.
+
+
+## 4. Agent Philosophy & Expert Workflows
 
 Understanding the project requires adopting specific mental models, especially for complex domains like the PFC integration.
 
-### 2.1. The PFC Expert: A State-Evolution Mental Model
+### 4.1. The PFC Expert: A State-Evolution Mental Model
 
 The `PFC Expert` profile operates on a principle fundamentally different from typical file-based coding tasks.
 
@@ -25,7 +41,7 @@ The `PFC Expert` profile operates on a principle fundamentally different from ty
 - **Static Mindset (for code)**: Files are static. Reading a file gives the same content. Order of operations is flexible.
 - **Dynamic Mindset (for PFC)**: The simulation is a timeline. Every command permanently changes the state. Order of operations is critical. The agent's primary context is the **evolution of the simulation state**.
 
-### 2.2. The Script-Only PFC Workflow
+### 4.2. The Script-Only PFC Workflow
 
 To manage this stateful interaction, the agent follows a documentation-driven, script-based workflow.
 
@@ -33,9 +49,17 @@ To manage this stateful interaction, the agent follows a documentation-driven, s
 - **Phase 2: TEST (`pfc_execute_task` with small scale)**: Write and execute a small-scale test script to validate the approach.
 - **Phase 3: PRODUCTION (`pfc_execute_task` with `run_in_background=True`)**: Execute a full-scale simulation with git snapshot for reproducibility.
 
-## 3. System Architecture
+### 4.3. Task Lifecycle Management
 
-### 3.1. Backend: Clean Architecture
+Long-running PFC simulations require monitoring, control, and learning from history.
+
+- **Session 1 (Compression)**: Submit task -> Monitor progress (stress/cycles) -> Save checkpoint.
+- **Session 2 (Shear)**: Check list_tasks -> Review previous checkpoint/wall IDs -> Write shear script loading from checkpoint.
+- **Session N (Learning)**: If failure occurs, compare successful vs failed scripts from history -> Apply working patterns.
+
+## 5. System Architecture
+
+### 5.1. Backend: Clean Architecture
 
 The backend follows a strict dependency rule where dependencies point inwards towards the `Domain`.
 
@@ -44,14 +68,14 @@ The backend follows a strict dependency rule where dependencies point inwards to
 - **`Domain` (`/backend/domain`)**: Contains the core, enterprise-wide business models (Entities). It is pure and has no dependencies on any other layer.
 - **`Infrastructure` (`/backend/infrastructure`)**: Implements logic for interacting with external systems (LLMs, databases, tool servers). It depends on the `Domain` and implements interfaces used by the `Application` layer.
 
-### 3.2. The Unified LLM Abstraction
+### 5.2. The Unified LLM Abstraction
 
 This architecture allows the application to treat all LLM providers identically. The system uses a clean separation between infrastructure and application layers.
 
 - **Infrastructure Layer** (`backend/infrastructure/llm/base/client.py`): The `LLMClientBase` abstract class provides stateless API interfaces (`call_api_with_context`, `call_api_with_context_streaming`). Provider-specific subclasses implement the low-level details (API calls, data formatting).
 - **Application Layer** (`backend/application/services/agent.py`): The `Agent` class implements business logic including the tool calling loop, streaming orchestration, and conversation management. This separation follows the **Inversion of Control** pattern.
 
-### 3.3. SubAgent Delegation
+### 5.3. SubAgent Delegation
 
 A key architectural feature is the ability for the main agent (the "MainAgent") to delegate tasks to specialized, lightweight "SubAgents". This is achieved via the `invoke_agent` tool. This pattern is critical for optimizing context window usage and focusing the MainAgent on its core task.
 
@@ -69,11 +93,20 @@ A key architectural feature is the ability for the main agent (the "MainAgent") 
 - **Observability**: The frontend can monitor SubAgent progress. The backend emits `SUBAGENT_TOOL_USE` events via WebSockets, allowing the UI to display nested tool calls in real-time.
 - **Secondary Models**: The system can be configured to use smaller, faster, and more cost-effective LLM models for SubAgents, reserving the more powerful primary model for the MainAgent's complex reasoning tasks.
 
-## 4. Deep Dive: Model Context Protocol (MCP) Architecture
+## 6. Additional Features
+
+Beyond the core PFC integration, **toyoura-nagisa** includes:
+
+- **Multi-Provider LLM Support**: Gemini, Claude, OpenAI, and local models (Ollama, vLLM).
+- **Long-Term Memory**: Uses ChromaDB to learn and recall user preferences across sessions.
+- **Live2D Character**: An interactive visual companion that responds to conversations, adding a layer of engagement.
+- **Text-to-Speech**: Integrated TTS (local GPT-SoVITS or cloud Fish Audio) for voice output.
+
+## 7. Deep Dive: Model Context Protocol (MCP) Architecture
 
 The MCP system is the heart of the agent's tool-use capability. It is a highly modular and scalable system for defining, registering, and executing tools.
 
-### 4.1. The End-to-End Tool Flow
+### 7.1. The End-to-End Tool Flow
 
 1.  **Registration**: On startup, the `smart_mcp_server.py` imports registration functions from each tool category (e.g., `register_coding_tools`) and registers *all* available tools with a central `FastMCP` instance.
 2.  **Profile Definition**: The `ToolProfileManager` defines which tool *names* belong to which agent profile (`CODING`, `PFC`, etc.). This now also includes `SubAgentConfig` definitions.
@@ -82,7 +115,7 @@ The MCP system is the heart of the agent's tool-use capability. It is a highly m
     b. It queries the `FastMCP` server to get the standardized schemas for only those tools.
 4.  **Provider Formatting**: The provider-specific tool manager (e.g., `GeminiToolManager`) converts the standardized schemas into the exact format required by the target LLM API.
 
-### 4.2. Anatomy of a Tool
+### 7.2. Anatomy of a Tool
 
 The `write` tool (`backend/infrastructure/mcp/tools/coding/tools/write.py`) is a perfect example of the standard tool implementation pattern:
 
@@ -109,11 +142,11 @@ The `write` tool (`backend/infrastructure/mcp/tools/coding/tools/write.py`) is a
 
 This modular, registration-based pattern makes the system extremely easy to extend.
 
-## 5. Development Workflow & Commands
+## 8. Development Workflow & Commands
 
 The project is a monorepo. Commands should be run from the project root unless specified otherwise.
 
-### 5.1. Running the Full Application (Web + Backend)
+### 8.1. Running the Full Application (Web + Backend)
 
 To run the web interface and the backend services together for standard development:
 
@@ -124,21 +157,21 @@ npm run dev:all
 
 This uses `concurrently` to start both the React frontend and the Python backend.
 
-### 5.2. Backend Development (Python)
+### 8.2. Backend Development (Python)
 
 - **Running Standalone**: `npm run dev:backend`
 - **Package Management**: `uv` (`uv sync`)
 - **Linting & Formatting**: `ruff` (`ruff check . && ruff format .` in `packages/backend`)
 - **Testing**: `pytest` (`uv run pytest`)
 
-### 5.3. Frontend Development (React)
+### 8.3. Frontend Development (React)
 
 - **Running Standalone**: `npm run dev:web`
 - **Package Management**: `npm`
 - **Linting**: `ESLint` (`npm run lint:web`)
 - **Testing**: `npm run test:web`
 
-### 5.4. CLI Development (React/Ink)
+### 8.4. CLI Development (React/Ink)
 
 The CLI provides a terminal-based interface for interacting with the agent.
 
@@ -146,7 +179,7 @@ The CLI provides a terminal-based interface for interacting with the agent.
 - **Building**: `npm run build:cli`
 - **Running Compiled CLI**: After building, the CLI can be run with `npm -w @toyoura-nagisa/cli run start`. The compiled entry point is `packages/cli/dist/index.js`.
 
-## 6. How to Contribute
+## 9. How to Contribute
 
 ### Adding a New Tool
 
@@ -155,7 +188,7 @@ The CLI provides a terminal-based interface for interacting with the agent.
 3.  In the `__init__.py` for that tool category, import and call your new registration helper inside the aggregate registration function (e.g., `register_coding_tools`).
 4.  Finally, add your new tool's name to the desired profiles in `backend/domain/models/agent_profiles.py`.
 
-## 7. Guiding Principles for Analyzing `toyoura-nagisa`
+## 10. Guiding Principles for Analyzing `toyoura-nagisa`
 
 To effectively contribute to `toyoura-nagisa`, the agent must move beyond surface-level documentation and conversational inference. It must adopt the mindset of a software archaeologist, digging into the codebase to uncover the ground truth. The following principles, derived from analyzing the project's structure, serve as a guide for this deep analysis.
 
