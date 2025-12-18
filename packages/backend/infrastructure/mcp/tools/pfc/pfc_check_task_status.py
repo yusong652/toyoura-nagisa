@@ -218,6 +218,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 # Task failed with error
                 data = result.get("data", {})
                 output = data.get("output", "")
+                error_msg = data.get("error", "")
                 description = data.get("description", "")
                 entry_script = data.get("entry_script", data.get("script_path", "unknown"))
                 start_time = data.get("start_time")
@@ -238,6 +239,9 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 # Build filter info
                 filter_info = f", filtered by '{filter}'" if filter else ""
 
+                # Build error section (after output, as error typically occurs at end)
+                error_section = f"\nError:\n{error_msg}" if error_msg else ""
+
                 # Build LLM-friendly text
                 llm_text = (
                     f"task_id: {task_id}\n"
@@ -248,7 +252,8 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     f"script: {entry_script}\n"
                     f"desc: {description}\n\n"
                     f"Output ({pagination['total_lines']} lines{filter_info}, showing {pagination['line_range']}):\n"
-                    f"{output_text}\n\n"
+                    f"{output_text}"
+                    f"{error_section}\n\n"
                     f"Next: {nav_hint}"
                 )
 
