@@ -40,7 +40,6 @@
   },
   "homepage": "https://github.com/yusong652/toyoura-nagisa#readme",
   "devDependencies": {
-    "@google/gemini-cli": "^0.1.7",
     "concurrently": "^9.2.0",
     "typescript": "^5.3.3"
   },

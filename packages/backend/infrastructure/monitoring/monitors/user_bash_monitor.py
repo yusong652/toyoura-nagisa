@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional
 from .base_monitor import BaseMonitor
+from backend.infrastructure.mcp.utils.shell import truncate_output
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +61,8 @@ class UserBashMonitor(BaseMonitor):
         """
         self._contexts.append(BashContext(
             command=command,
-            stdout=stdout,
-            stderr=stderr,
+            stdout=truncate_output(stdout),
+            stderr=truncate_output(stderr),
         ))
         logger.debug(f"Added bash context for command: {command[:50]}...")
 

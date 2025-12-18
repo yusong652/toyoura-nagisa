@@ -41,11 +41,17 @@
     "dev": "tsc --watch",
     "test": "vitest"
   },
-  "keywords": ["toyoura-nagisa", "core", "shared"],
+  "keywords": [
+    "toyoura-nagisa",
+    "core",
+    "shared"
+  ],
   "author": "toyoura-nagisa Team",
   "license": "MIT",
   "dependencies": {
-    "eventemitter3": "^5.0.1"
+    "@types/uuid": "^10.0.0",
+    "eventemitter3": "^5.0.1",
+    "uuid": "^13.0.0"
   },
   "peerDependencies": {
     "ws": "^8.0.0"
