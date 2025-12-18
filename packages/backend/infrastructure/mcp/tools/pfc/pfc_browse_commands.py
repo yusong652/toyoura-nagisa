@@ -64,12 +64,12 @@ def register_pfc_browse_commands_tool(mcp: FastMCP):
             # Standard category/command navigation
             if len(parts) == 1:
                 return _browse_category(parts[0])
-            elif len(parts) == 2:
-                return _browse_command(parts[0], parts[1])
             else:
-                return error_response(
-                    f"Invalid command: {cmd}. Use format: '<category>' or '<category> <command>'"
-                )
+                # Join all parts after category as command name
+                # This handles commands like "contact cmat add" -> category="contact", command="cmat add"
+                category = parts[0]
+                command_name = " ".join(parts[1:])
+                return _browse_command(category, command_name)
 
         except FileNotFoundError as e:
             return error_response(f"Documentation not found: {str(e)}")
@@ -201,6 +201,53 @@ Navigation:
     )
 
 
+def _browse_subcommand_group(category: str, group_name: str, commands: list) -> Dict[str, Any]:
+    """Level 1.5: Return list of subcommands in a group (e.g., 'cmat' subcommands)."""
+    # Build subcommand list
+    command_lines = []
+    for cmd in commands:
+        name = cmd.get("name", "")
+        # Extract subcommand name (e.g., "cmat add" -> "add")
+        subcommand = name[len(group_name) + 1:] if name.startswith(group_name + " ") else name
+
+        python_avail = cmd.get("python_available", False)
+        if python_avail is True:
+            python_mark = "[py]"
+        elif python_avail == "partial":
+            python_mark = "[py:partial]"
+        else:
+            python_mark = ""
+
+        short_desc = cmd.get("short_description", "")
+        if len(short_desc) > 45:
+            short_desc = short_desc[:42] + "..."
+
+        command_lines.append(f"- {subcommand}{' ' + python_mark if python_mark else ''}: {short_desc}")
+
+    content = f"""## {category} {group_name} ({len(commands)} subcommands)
+
+{chr(10).join(command_lines)}
+
+[py] = Python SDK available, [py:partial] = partial support
+
+Navigation:
+- pfc_browse_commands(command="{category} {group_name} <subcommand>") for full doc
+- pfc_browse_commands(command="{category}") for all {category} commands
+"""
+
+    return success_response(
+        message=f"{category} {group_name}: {len(commands)} subcommands",
+        llm_content={"parts": [{"type": "text", "text": content}]},
+        data={
+            "level": "subcommand_group",
+            "category": category,
+            "group": group_name,
+            "command_count": len(commands),
+            "commands": [cmd.get("name") for cmd in commands]
+        }
+    )
+
+
 def _browse_command(category: str, command_name: str) -> Dict[str, Any]:
     """Level 2: Return full documentation for a specific command."""
     # Load command documentation
@@ -218,7 +265,15 @@ def _browse_command(category: str, command_name: str) -> Dict[str, Any]:
             )
 
         cat_data = categories[category]
-        available_cmds = [cmd.get("name") for cmd in cat_data.get("commands", [])]
+        commands = cat_data.get("commands", [])
+        available_cmds = [cmd.get("name") for cmd in commands]
+
+        # Check if command_name is a subcommand prefix (e.g., "cmat" matches "cmat add", "cmat apply")
+        matching_commands = [cmd for cmd in commands if cmd.get("name", "").startswith(command_name + " ")]
+        if matching_commands:
+            # Treat as subcommand group browsing (like category browsing)
+            return _browse_subcommand_group(category, command_name, matching_commands)
+
         return error_response(
             f"Command '{command_name}' not found in '{category}'. "
             f"Available: {', '.join(available_cmds[:10])}{'...' if len(available_cmds) > 10 else ''}"
