@@ -76,27 +76,24 @@ class AnthropicConfig(BaseSettings):
 class KimiConfig(BaseSettings):
     """Kimi (Moonshot) Configuration"""
 
-    # API Keys - 支持直连或 OpenRouter (至少需要配置一个)
-    moonshot_api_key: Optional[str] = Field(default="", description="Moonshot 官方 API 密钥")
-    openrouter_api_key: Optional[str] = Field(default="", description="OpenRouter API 密钥")
+    # API Key
+    moonshot_api_key: Optional[str] = Field(default="", description="Moonshot API Key")
 
-    # 有合理默认值的配置
-    model: str = Field(default="kimi-k2-thinking", description="模型名称 (直连 Moonshot API)")
-    # Direct API models:
-    #   - kimi-k2-thinking: K2 Thinking model with reasoning_content field (推荐 temperature=0.6)
+    # Model configuration
+    model: str = Field(default="kimi-k2-thinking", description="Model name")
+    # Available models:
+    #   - kimi-k2-thinking: K2 Thinking model with reasoning_content field (recommended temperature=0.6)
     #   - kimi-k2-0905-preview: Standard K2 model
     #   - kimi-k2-turbo-preview: Faster K2 variant
     #   - moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k: Legacy Moonshot models
-    # OpenRouter models:
-    #   - moonshotai/kimi-k2-thinking: K2 Thinking via OpenRouter
-    #   - moonshotai/kimi-k2-0905: Standard K2 via OpenRouter
     # Note: K2 Thinking models expose reasoning_content field with intermediate thinking steps
     # Kimi excels at long-context understanding (up to 200K tokens)
+
     # Secondary model for SubAgents to reduce primary model RPM consumption
     secondary_model: str = Field(default="kimi-k2-0905-preview", description="Secondary model for SubAgent")
-    temperature: float = Field(default=0.6, ge=0.0, le=1.0, description="采样温度 (推荐 0.6)")
-    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
-    max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")
+    temperature: float = Field(default=0.6, ge=0.0, le=1.0, description="Sampling temperature (recommended 0.6)")
+    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
+    max_tokens: Optional[int] = Field(default=None, ge=1, description="Max output tokens")
 
     model_config = SettingsConfigDict(
         env_file='backend/.env',

@@ -4,7 +4,7 @@ Kimi (Moonshot) Client Configuration
 Handles configuration settings for Kimi/Moonshot models including
 model parameters, API settings, and debug options.
 
-Kimi uses OpenAI-compatible API format with base URL: https://api.moonshot.cn/v1
+Kimi uses OpenAI-compatible API format with base URL: https://api.moonshot.ai/v1
 """
 
 from dataclasses import dataclass, field
@@ -45,14 +45,10 @@ class KimiClientConfig:
     """Complete Kimi client configuration"""
     model_settings: KimiModelSettings = field(default_factory=KimiModelSettings)
     api_key: Optional[str] = None
-    base_url: str = "https://api.moonshot.cn/v1"
+    base_url: str = "https://api.moonshot.ai/v1"
     debug: bool = False
     timeout: float = 60.0  # Longer timeout for long-context processing
     max_retries: int = 3
-
-    # OpenRouter support
-    use_openrouter: bool = False
-    openrouter_headers: Optional[Dict[str, str]] = None
 
     def get_api_call_kwargs(
         self,
@@ -89,7 +85,7 @@ class KimiClientConfig:
 
 def get_kimi_client_config(**overrides) -> KimiClientConfig:
     """
-    Get Kimi client configuration with optional overrides
+    Get Kimi client configuration with optional overrides.
 
     Args:
         **overrides: Configuration overrides
@@ -97,58 +93,23 @@ def get_kimi_client_config(**overrides) -> KimiClientConfig:
     Returns:
         KimiClientConfig instance
     """
-    # Get base settings from global config
     llm_settings = get_llm_settings()
 
-    # Initialize kimi_config to avoid unbound variable issues
-    kimi_config = None
-
-    # Check if there's a kimi_config method, otherwise use defaults
+    # Get Kimi config from settings
     try:
         kimi_config = llm_settings.get_kimi_config()
-        # Model will be determined based on use_openrouter later
+        model = kimi_config.model
         temperature = kimi_config.temperature
         max_tokens = kimi_config.max_tokens
         top_p = kimi_config.top_p if kimi_config.top_p is not None else 1.0
         api_key = kimi_config.moonshot_api_key
     except (AttributeError, KeyError):
-        # Fallback to defaults if kimi config not available
-        temperature = 0.7
+        # Fallback to defaults
+        model = "kimi-k2-0905-preview"
+        temperature = 0.6
         max_tokens = None
         top_p = 1.0
         api_key = None
-
-    # Get OpenRouter settings and determine model
-    if kimi_config is not None:
-        try:
-            use_openrouter = kimi_config.use_openrouter
-            if use_openrouter:
-                # Use OpenRouter configuration
-                base_url = kimi_config.openrouter_base_url
-                openrouter_headers = {
-                    "HTTP-Referer": kimi_config.openrouter_http_referer,
-                    "X-Title": kimi_config.openrouter_title,
-                }
-                # Use OpenRouter model and API key
-                model = kimi_config.openrouter_model
-                api_key = kimi_config.openrouter_api_key or api_key
-            else:
-                # Use direct Moonshot API configuration
-                base_url = "https://api.moonshot.ai/v1"
-                openrouter_headers = None
-                model = kimi_config.model
-        except AttributeError:
-            # Fallback if OpenRouter config is incomplete
-            use_openrouter = False
-            base_url = "https://api.moonshot.ai/v1"
-            openrouter_headers = None
-            model = getattr(kimi_config, 'model', "kimi-k2-0905-preview")
-    else:
-        # Fallback when kimi_config is not available
-        use_openrouter = False
-        base_url = "https://api.moonshot.ai/v1"
-        openrouter_headers = None
-        model = "kimi-k2-0905-preview"
 
     # Build model settings
     model_settings_dict = {
@@ -165,15 +126,11 @@ def get_kimi_client_config(**overrides) -> KimiClientConfig:
     model_settings = KimiModelSettings(**model_settings_dict)
 
     # Build client config
-    config_dict = {
-        'model_settings': model_settings,
-        'api_key': overrides.get('api_key', api_key),
-        'base_url': overrides.get('base_url', base_url),
-        'use_openrouter': use_openrouter,
-        'openrouter_headers': openrouter_headers,
-        'debug': overrides.get('debug', llm_settings.debug),
-        'timeout': overrides.get('timeout', 60.0),
-        'max_retries': overrides.get('max_retries', 3)
-    }
-
-    return KimiClientConfig(**config_dict)
+    return KimiClientConfig(
+        model_settings=model_settings,
+        api_key=overrides.get('api_key', api_key),
+        base_url=overrides.get('base_url', "https://api.moonshot.ai/v1"),
+        debug=overrides.get('debug', llm_settings.debug),
+        timeout=overrides.get('timeout', 60.0),
+        max_retries=overrides.get('max_retries', 3)
+    )
