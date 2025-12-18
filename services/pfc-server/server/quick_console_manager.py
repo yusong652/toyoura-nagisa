@@ -13,13 +13,16 @@ Python 3.6 compatible implementation.
 import os
 import logging
 import threading
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
 
 # Default directory for quick console scripts (relative to workspace)
 QUICK_CONSOLE_DIR = ".quick_console"
+
+# Counter persistence file (stores the current script counter)
+COUNTER_FILE = ".counter"
 
 # Maximum code size in characters (safety limit)
 MAX_CODE_SIZE = 10000
@@ -56,24 +59,106 @@ class QuickConsoleManager:
 
     def _init_directory(self):
         # type: () -> None
-        """Create console directory and determine starting counter from existing files."""
-        # Create directory if it doesn't exist
-        is_new_dir = not os.path.exists(self.console_dir)
-        if is_new_dir:
-            os.makedirs(self.console_dir)
-            logger.info("Created quick console directory: {}".format(self.console_dir))
-            # Create README file for LLM context
-            self._create_readme()
+        """Create console directory and initialize counter with three-tier fallback."""
+        self._ensure_directory()
+
+        # Three-tier counter initialization:
+        # 1. Try loading from persistent counter file
+        # 2. Fallback: scan existing script files
+        # 3. Final fallback: start from 0
+
+        counter_from_file = self._load_counter()
+        if counter_from_file is not None:
+            self._counter = counter_from_file
+            logger.info("Quick console counter loaded from file: {}".format(self._counter))
             return
 
-        # Ensure README exists (for existing directories)
-        readme_path = os.path.join(self.console_dir, "README.md")
-        if not os.path.exists(readme_path):
-            self._create_readme()
+        # Fallback: scan existing scripts
+        counter_from_scan = self._scan_existing_scripts()
+        self._counter = counter_from_scan
+        logger.info("Quick console counter initialized from scan: {}".format(self._counter))
 
-        # Find highest existing counter
+        # Persist the scanned counter for future use
+        if counter_from_scan > 0:
+            self._save_counter()
+
+    def _ensure_directory(self):
+        # type: () -> bool
+        """
+        Ensure console directory exists, create if missing.
+
+        Returns:
+            bool: True if directory was newly created, False if already existed
+        """
+        if os.path.exists(self.console_dir):
+            # Ensure README exists (for existing directories)
+            readme_path = os.path.join(self.console_dir, "README.md")
+            if not os.path.exists(readme_path):
+                self._create_readme()
+            return False
+
+        # Create new directory
+        os.makedirs(self.console_dir)
+        logger.info("Created quick console directory: {}".format(self.console_dir))
+        self._create_readme()
+        return True
+
+    def _load_counter(self):
+        # type: () -> Optional[int]
+        """
+        Load counter from persistent file.
+
+        Returns:
+            int: Counter value if file exists and is valid, None otherwise
+        """
+        counter_path = os.path.join(self.console_dir, COUNTER_FILE)
+        if not os.path.exists(counter_path):
+            return None
+
+        try:
+            with open(counter_path, 'r', encoding='utf-8') as f:
+                value = int(f.read().strip())
+                if value >= 0:
+                    return value
+                logger.warning("Invalid counter value in file: {}".format(value))
+                return None
+        except (ValueError, IOError) as e:
+            logger.warning("Failed to load counter from file: {}".format(e))
+            return None
+
+    def _save_counter(self):
+        # type: () -> bool
+        """
+        Persist counter to file (thread-safe, called with lock held).
+
+        Returns:
+            bool: True if save successful, False otherwise
+        """
+        counter_path = os.path.join(self.console_dir, COUNTER_FILE)
+        try:
+            # Atomic write: write to temp file, then rename
+            temp_path = counter_path + ".tmp"
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                f.write(str(self._counter))
+            os.replace(temp_path, counter_path)
+            return True
+        except Exception as e:
+            logger.warning("Failed to save counter: {}".format(e))
+            return False
+
+    def _scan_existing_scripts(self):
+        # type: () -> int
+        """
+        Scan directory to find highest existing script number.
+
+        Returns:
+            int: Highest script number found, or 0 if none
+        """
         max_counter = 0
         try:
+            if not os.path.exists(self.console_dir):
+                return 0
+
             for filename in os.listdir(self.console_dir):
                 if filename.startswith("quick_") and filename.endswith(".py"):
                     try:
@@ -84,12 +169,10 @@ class QuickConsoleManager:
                             max_counter = num
                     except ValueError:
                         continue
-
-            self._counter = max_counter
-            logger.info("Quick console counter initialized at: {}".format(self._counter))
-
         except Exception as e:
             logger.warning("Failed to scan existing quick scripts: {}".format(e))
+
+        return max_counter
 
     def _create_readme(self):
         # type: () -> None
@@ -136,6 +219,8 @@ for traceability and debugging purposes.
         """
         Get next available filename (thread-safe).
 
+        Increments counter and persists to file for recovery after restart.
+
         Returns:
             Tuple of (script_name, script_path):
                 - script_name: "quick_XXX.py"
@@ -145,6 +230,8 @@ for traceability and debugging purposes.
             self._counter += 1
             script_name = "quick_{:03d}.py".format(self._counter)
             script_path = os.path.join(self.console_dir, script_name)
+            # Persist counter after increment
+            self._save_counter()
             return script_name, script_path
 
     def create_script(self, code, description=None):
@@ -173,7 +260,12 @@ for traceability and debugging purposes.
         if len(code) > MAX_CODE_SIZE:
             raise ValueError("Code exceeds maximum size limit ({} chars)".format(MAX_CODE_SIZE))
 
-        # Get next filename
+        # Ensure directory exists (handles manual deletion)
+        was_recreated = self._ensure_directory()
+        if was_recreated:
+            logger.info("Console directory was recreated (possibly manually deleted)")
+
+        # Get next filename (also persists counter)
         script_name, script_path = self._get_next_filename()
 
         # Build script content with header comment
@@ -227,6 +319,9 @@ for traceability and debugging purposes.
         """
         Remove old script files, keeping the most recent N files.
 
+        Note: Only removes quick_*.py files. Counter file (.counter) and
+        README.md are preserved.
+
         Args:
             keep_count: Number of recent scripts to keep
 
@@ -234,7 +329,7 @@ for traceability and debugging purposes.
             Number of files removed
         """
         try:
-            # List all quick scripts with their numbers
+            # List all quick scripts with their numbers (excludes .counter and README)
             scripts = []
             for filename in os.listdir(self.console_dir):
                 if filename.startswith("quick_") and filename.endswith(".py"):
@@ -267,3 +362,52 @@ for traceability and debugging purposes.
         except Exception as e:
             logger.error("Failed to cleanup quick scripts: {}".format(e))
             return 0
+
+    def reset(self):
+        # type: () -> Dict[str, Any]
+        """
+        Completely reset the quick console state.
+
+        Deletes the entire .quick_console directory and resets the counter.
+        Used for testing/development to get a clean slate.
+
+        Returns:
+            Dict with:
+                - success: bool
+                - message: str
+                - deleted_scripts: int
+        """
+        import shutil
+
+        try:
+            deleted_count = 0
+
+            # Count existing scripts before deletion
+            if os.path.exists(self.console_dir):
+                for filename in os.listdir(self.console_dir):
+                    if filename.startswith("quick_") and filename.endswith(".py"):
+                        deleted_count += 1
+
+                # Delete entire directory
+                shutil.rmtree(self.console_dir)
+                logger.info("✓ Deleted quick console directory: {}".format(self.console_dir))
+
+            # Reset counter to 0
+            with self._lock:
+                self._counter = 0
+
+            return {
+                "success": True,
+                "message": "Reset quick console ({} scripts deleted, counter reset to 0)".format(
+                    deleted_count
+                ),
+                "deleted_scripts": deleted_count
+            }
+
+        except Exception as e:
+            logger.error("Failed to reset quick console: {}".format(e))
+            return {
+                "success": False,
+                "message": "Error: {}".format(str(e)),
+                "deleted_scripts": 0
+            }

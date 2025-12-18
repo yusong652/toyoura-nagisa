@@ -809,6 +809,66 @@ class PFCWebSocketClient:
             logger.error(f"Ping failed: {e}")
             return False
 
+    async def reset_workspace(
+        self,
+        workspace_path: str,
+        timeout: float = 30.0,
+        max_retries: int = 2
+    ) -> Dict[str, Any]:
+        """
+        Reset workspace state for testing (clears all history).
+
+        WARNING: This permanently deletes:
+        - Quick console scripts and counter
+        - All task history (memory + disk)
+        - Git pfc-executions branch (all execution snapshots)
+
+        Use only for development/testing to get a clean slate.
+
+        Args:
+            workspace_path: Absolute path to PFC workspace directory
+            timeout: Request timeout in seconds (default: 30.0)
+            max_retries: Maximum retry attempts on connection failure (default: 2)
+
+        Returns:
+            Result dictionary with reset details for each component:
+                - quick_console: Reset status and deleted script count
+                - tasks: Clear status and cleared task count
+                - git: Branch reset status and deleted commit count
+
+        Raises:
+            ConnectionError: If connection to PFC server fails after retries
+            TimeoutError: If reset request times out
+        """
+        for attempt in range(max_retries):
+            try:
+                await self._ensure_connected()
+                result = await self._send_request(
+                    message={
+                        "type": "reset_workspace",
+                        "workspace_path": workspace_path
+                    },
+                    timeout=timeout,
+                    operation_name="Workspace reset"
+                )
+                logger.info(f"✓ Workspace reset completed for: {workspace_path}")
+                return result
+
+            except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                self.connected = False
+
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(0.5)
+                    continue
+                else:
+                    raise ConnectionError(
+                        "Failed to reset workspace after retries. "
+                        "Please ensure PFC server is running."
+                    ) from e
+
+        raise RuntimeError("Unexpected code path in reset_workspace")
+
 
 # Global client instance (singleton pattern with lazy loading)
 _client_instance: Optional[PFCWebSocketClient] = None

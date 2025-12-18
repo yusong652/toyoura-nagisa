@@ -357,6 +357,80 @@ class PFCWebSocketServer:
                             logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
 
+                    elif msg_type == "reset_workspace":
+                        # Reset workspace state for testing (clears all history)
+                        request_id = data.get("request_id", "unknown")
+                        workspace_path = data.get("workspace_path", "")
+
+                        try:
+                            results = []
+
+                            # 1. Reset quick console (if manager exists for workspace)
+                            if workspace_path and workspace_path in self._quick_console_managers:
+                                console_result = self._quick_console_managers[workspace_path].reset()
+                                results.append(console_result)
+                                # Remove from cache after reset
+                                del self._quick_console_managers[workspace_path]
+                            else:
+                                results.append({
+                                    "success": True,
+                                    "message": "No quick console to reset",
+                                    "deleted_scripts": 0
+                                })
+
+                            # 2. Clear all task history
+                            task_result = self.task_manager.clear_all_tasks()
+                            results.append(task_result)
+
+                            # 3. Reset git execution branch
+                            from .git_version_manager import get_git_manager
+                            if workspace_path:
+                                git_manager = get_git_manager(workspace_path)
+                                git_result = git_manager.reset_execution_branch()
+                                results.append(git_result)
+                            else:
+                                results.append({
+                                    "success": True,
+                                    "message": "No workspace path provided, skipping git reset",
+                                    "deleted_commits": 0
+                                })
+
+                            # Build summary
+                            all_success = all(r.get("success", False) for r in results)
+                            summary_parts = [r.get("message", "") for r in results]
+
+                            response = {
+                                "type": "result",
+                                "request_id": request_id,
+                                "status": "success" if all_success else "partial",
+                                "message": "Workspace reset complete:\n- " + "\n- ".join(summary_parts),
+                                "data": {
+                                    "quick_console": results[0],
+                                    "tasks": results[1],
+                                    "git": results[2]
+                                }
+                            }
+
+                            logger.info("✓ Workspace reset completed for: {}".format(
+                                workspace_path or "(no workspace)"
+                            ))
+
+                        except Exception as e:
+                            logger.error(f"Workspace reset failed: {e}")
+                            response = {
+                                "type": "result",
+                                "request_id": request_id,
+                                "status": "error",
+                                "message": f"Reset failed: {e}",
+                                "data": None
+                            }
+
+                        try:
+                            await websocket.send(json.dumps(response))
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send result, connection closed: {request_id}")
+                            break  # Exit message loop
+
                     elif msg_type == "ping":
                         # Respond to ping
                         try:

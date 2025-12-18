@@ -111,18 +111,171 @@ except ImportError:
 except Exception as e:
     logging.warning("Failed to configure PFC: {}".format(e))
 
-# ===== Check Git Version Tracking =====
-# Git snapshots are created in the user's PFC project directory (where script files are located)
-# This check only verifies git is installed; actual repository detection happens at execution time
-try:
-    from server.git_version_manager import get_git_manager
-    git_manager = get_git_manager()
-    git_status = git_manager.diagnose_git_status()
+# ===== Setup Workspace Git =====
+def _setup_workspace_git():
+    """
+    Initialize git repository and .gitignore if needed.
 
-    if git_status["available"] or git_status["issue"] == "not_initialized":
-        _init_status["git"] = True
+    This ensures the PFC workspace is properly set up for version tracking:
+    1. If git is not initialized, run `git init`
+    2. If .gitignore doesn't exist, copy the template
+
+    Returns:
+        dict: Status with 'git_initialized', 'gitignore_created', 'issue' keys
+    """
+    import subprocess
+    import shutil
+
+    result = {
+        "git_initialized": False,
+        "gitignore_created": False,
+        "issue": None
+    }
+
+    cwd = os.getcwd()
+
+    # Check if git is available
+    # Note: Using stdout/stderr=PIPE instead of capture_output for Python 3.6 compatibility
+    try:
+        version_check = subprocess.run(
+            ["git", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=cwd
+        )
+        if version_check.returncode != 0:
+            result["issue"] = "git not installed"
+            return result
+    except FileNotFoundError:
+        result["issue"] = "git not found in PATH"
+        return result
+
+    # Check if git repository exists
+    git_check = subprocess.run(
+        ["git", "rev-parse", "--git-dir"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=cwd
+    )
+
+    if git_check.returncode != 0:
+        # Git not initialized - initialize it
+        stderr = git_check.stderr.decode('utf-8', errors='replace').strip()
+
+        # Check for ownership issue (don't auto-init in this case)
+        if "dubious ownership" in stderr:
+            result["issue"] = "ownership"
+            return result
+
+        # Initialize git
+        init_result = subprocess.run(
+            ["git", "init"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=cwd
+        )
+
+        if init_result.returncode == 0:
+            result["git_initialized"] = True
+            logging.info("Initialized git repository in: {}".format(cwd))
+
+            # Create .gitignore BEFORE initial commit so it's included
+            gitignore_path = os.path.join(cwd, ".gitignore")
+            if not os.path.exists(gitignore_path):
+                _create_gitignore(cwd, gitignore_path, result)
+
+            # Create initial commit (required for pfc-executions branch to work)
+            # Without this, orphan branch creation can't restore to original branch
+            subprocess.run(
+                ["git", "add", "-A"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=cwd
+            )
+            commit_result = subprocess.run(
+                ["git", "commit", "--allow-empty", "-m", "Initial PFC workspace setup"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=cwd
+            )
+            if commit_result.returncode == 0:
+                logging.info("Created initial commit")
+        else:
+            stderr = init_result.stderr.decode('utf-8', errors='replace').strip()
+            result["issue"] = "git init failed: {}".format(stderr)
+            return result
     else:
-        _init_status["git_issue"] = git_status
+        # Git already initialized - just check .gitignore
+        gitignore_path = os.path.join(cwd, ".gitignore")
+        if not os.path.exists(gitignore_path):
+            _create_gitignore(cwd, gitignore_path, result)
+
+    return result
+
+
+def _create_gitignore(cwd, gitignore_path, result):
+    """Create .gitignore file from template or inline minimal version."""
+    import shutil
+
+    # Find template file via sys.path (since __file__ is not available with exec())
+    template_locations = []
+
+    # Search in sys.path for pfc-server module
+    for path in sys.path:
+        if "pfc-server" in path:
+            template_locations.append(
+                os.path.join(path, "workspace_template", ".gitignore")
+            )
+        # Also check parent directories that might contain pfc-server
+        potential = os.path.join(path, "services", "pfc-server", "workspace_template", ".gitignore")
+        if os.path.exists(potential):
+            template_locations.append(potential)
+
+    template_found = None
+    for loc in template_locations:
+        if os.path.exists(loc):
+            template_found = loc
+            break
+
+    if template_found:
+        try:
+            shutil.copy(template_found, gitignore_path)
+            result["gitignore_created"] = True
+            logging.info("Created .gitignore from template")
+        except Exception as e:
+            logging.warning("Failed to copy .gitignore template: {}".format(e))
+    else:
+        # Template not found - create minimal .gitignore inline
+        minimal_gitignore = """# PFC Runtime Files
+errorlog.txt
+*.dmp
+*.temp
+pfc_server.log
+.quick_console/
+"""
+        try:
+            with open(gitignore_path, 'w', encoding='utf-8') as f:
+                f.write(minimal_gitignore)
+            result["gitignore_created"] = True
+            logging.info("Created minimal .gitignore")
+        except Exception as e:
+            logging.warning("Failed to create .gitignore: {}".format(e))
+
+
+# Run workspace git setup
+try:
+    _git_setup = _setup_workspace_git()
+
+    if _git_setup["issue"]:
+        _init_status["git"] = False
+        _init_status["git_issue"] = {"message": _git_setup["issue"], "action": None}
+    else:
+        _init_status["git"] = True
+        if _git_setup["git_initialized"]:
+            _init_status["git_auto_init"] = True
+        if _git_setup["gitignore_created"]:
+            _init_status["gitignore_created"] = True
+
 except Exception as e:
     _init_status["git_issue"] = {"message": str(e), "action": None}
 
@@ -278,6 +431,16 @@ def _print_startup_summary():
 
     if status_items:
         print("  Features:  {}".format(", ".join(status_items)))
+
+    # Auto-setup notifications (positive feedback)
+    auto_setup = []
+    if _init_status.get("git_auto_init"):
+        auto_setup.append("git init")
+    if _init_status.get("gitignore_created"):
+        auto_setup.append(".gitignore")
+
+    if auto_setup:
+        print("  Setup:     Auto-created: {}".format(", ".join(auto_setup)))
 
     # Warnings
     warnings = []

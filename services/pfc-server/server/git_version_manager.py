@@ -375,6 +375,69 @@ class GitVersionManager:
         result = self._run_git(["status", "--porcelain"], check=False)
         return bool(result.stdout.strip())
 
+    def reset_execution_branch(self):
+        # type: () -> Dict[str, Any]
+        """
+        Delete and recreate the pfc-executions branch to clear execution history.
+
+        This removes all execution snapshots, providing a clean slate for testing.
+
+        Returns:
+            Dict with:
+                - success: bool
+                - message: str
+                - deleted_commits: int (approximate, if available)
+        """
+        if not self.is_git_available():
+            return {
+                "success": False,
+                "message": "Git not available",
+                "deleted_commits": 0
+            }
+
+        try:
+            # Check if branch exists
+            result = self._run_git(["rev-parse", "--verify", EXECUTION_BRANCH], check=False)
+            if result.returncode != 0:
+                return {
+                    "success": True,
+                    "message": "Branch '{}' does not exist, nothing to reset".format(EXECUTION_BRANCH),
+                    "deleted_commits": 0
+                }
+
+            # Count commits on the branch (approximate)
+            count_result = self._run_git([
+                "rev-list", "--count", EXECUTION_BRANCH
+            ], check=False)
+            commit_count = int(count_result.stdout.strip()) if count_result.returncode == 0 else 0
+
+            # Delete the branch
+            delete_result = self._run_git(["branch", "-D", EXECUTION_BRANCH], check=False)
+            if delete_result.returncode != 0:
+                return {
+                    "success": False,
+                    "message": "Failed to delete branch: {}".format(delete_result.stderr.strip()),
+                    "deleted_commits": 0
+                }
+
+            logger.info("✓ Deleted '{}' branch ({} commits)".format(EXECUTION_BRANCH, commit_count))
+
+            return {
+                "success": True,
+                "message": "Reset '{}' branch ({} execution snapshots removed)".format(
+                    EXECUTION_BRANCH, commit_count
+                ),
+                "deleted_commits": commit_count
+            }
+
+        except Exception as e:
+            logger.error("Failed to reset execution branch: {}".format(e))
+            return {
+                "success": False,
+                "message": "Error: {}".format(str(e)),
+                "deleted_commits": 0
+            }
+
 
 # Cache for git managers per repository root
 _managers = {}  # type: Dict[str, GitVersionManager]
