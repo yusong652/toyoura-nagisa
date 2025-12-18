@@ -133,20 +133,6 @@ Beyond the core PFC integration, toyoura-nagisa includes:
 - **Live2D Character** - Interactive visual companion that responds to conversations
 - **Text-to-Speech** - Local (GPT-SoVITS) or cloud (Fish Audio) voice output
 
-## 🚀 What Makes toyoura-nagisa Different?
-
-Traditional approaches to PFC automation require users to:
-- ❌ Remember complex command syntax
-- ❌ Manually write and debug scripts
-- ❌ Monitor console output continuously
-- ❌ Context-switch between documentation and coding
-
-**toyoura-nagisa automates this entire workflow:**
-- ✅ LLM queries documentation automatically
-- ✅ Test-first validation catches errors early
-- ✅ Script-based execution creates self-documenting history
-- ✅ Real-time monitoring with background task management
-
 ## 🚀 Getting Started
 
 ### Prerequisites

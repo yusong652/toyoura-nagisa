@@ -30,7 +30,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Technology Stack
 
-- **Backend**: Python 3.11+, FastAPI, uvicorn, ChromaDB, FastMCP
+- **Backend**: Python 3.10+, FastAPI, uvicorn, ChromaDB, FastMCP
 - **Frontend**: React 19, TypeScript, Material-UI, Vite, Live2D (PIXI.js)
 - **AI Infrastructure**: Multi-provider LLM support, real-time streaming, tool orchestration
 - **Scientific Computing**: WebSocket integration with ITASCA PFC Python SDK
