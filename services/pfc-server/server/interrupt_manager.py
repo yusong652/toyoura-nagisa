@@ -124,7 +124,7 @@ def set_current_task(task_id):
     """
     global _current_task_id
     _current_task_id = task_id
-    logger.debug("Current task set: {}".format(task_id))
+    logger.info("Current task set for interrupt: {}".format(task_id))
 
 
 def clear_current_task():
@@ -168,6 +168,11 @@ def _pfc_interrupt_check():
         InterruptedError: If current task has pending interrupt request
     """
     task_id = _current_task_id
+    # Debug: Log when callback is triggered with pending interrupt
+    pending = get_pending_interrupts()
+    if pending:
+        logger.debug("Interrupt check: current_task={}, pending={}".format(task_id, pending))
+
     if task_id and check_interrupt(task_id):
         logger.info("Interrupting task: {}".format(task_id))
         raise InterruptedError("Task {} interrupted by user".format(task_id))
@@ -180,13 +185,32 @@ def _pfc_interrupt_check():
 _callback_registered = False
 
 
+def _re_register_callback(itasca_module, position=50.0):
+    # type: (Any, float) -> None
+    """
+    Re-register interrupt callback with PFC.
+
+    Called after model new/restore commands which clear PFC's callback registry.
+    """
+    import __main__
+    __main__._pfc_interrupt_check = _pfc_interrupt_check
+    itasca_module.set_callback("_pfc_interrupt_check", position)
+    logger.debug("Interrupt callback re-registered after model reset")
+
+
+# Commands that clear PFC's callback registry
+_MODEL_RESET_COMMANDS = ("model new", "model restore")
+
+
 def register_interrupt_callback(itasca_module, position=50.0):
     # type: (Any, float) -> bool
     """
     Register interrupt callback with PFC.
 
-    Must be called once during server startup. Injects _pfc_interrupt_check
-    into __main__ namespace and registers with itasca.set_callback().
+    Must be called once during server startup. This function:
+    1. Injects _pfc_interrupt_check into __main__ namespace
+    2. Registers callback with itasca.set_callback()
+    3. Wraps itasca.command to auto-re-register after model new/restore
 
     Args:
         itasca_module: The itasca module (imported in PFC environment)
@@ -209,10 +233,26 @@ def register_interrupt_callback(itasca_module, position=50.0):
     try:
         # Inject function into __main__ namespace (required for PFC lookup)
         import __main__
-        setattr(__main__, "_pfc_interrupt_check", _pfc_interrupt_check)
+        __main__._pfc_interrupt_check = _pfc_interrupt_check
 
         # Register with PFC
         itasca_module.set_callback("_pfc_interrupt_check", position)
+
+        # Wrap itasca.command to auto-re-register callback after model new/restore
+        # These commands clear PFC's internal callback registry
+        _original_command = itasca_module.command
+
+        def _wrapped_command(cmd):
+            result = _original_command(cmd)
+            # Check if command resets model (clears callback registry)
+            cmd_lower = cmd.strip().lower()
+            for reset_cmd in _MODEL_RESET_COMMANDS:
+                if cmd_lower.startswith(reset_cmd):
+                    _re_register_callback(itasca_module, position)
+                    break
+            return result
+
+        itasca_module.command = _wrapped_command
 
         _callback_registered = True
         logger.info("Interrupt callback registered (position: {})".format(position))

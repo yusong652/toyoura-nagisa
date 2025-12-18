@@ -83,7 +83,6 @@ class PFCScriptExecutor:
         set_current_task(task_id)
 
         try:
-
             # Prepare execution context with itasca module
             # Use single namespace for both globals and locals to ensure imported modules
             # are accessible within function definitions (solves import scoping issue)
