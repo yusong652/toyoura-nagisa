@@ -39,13 +39,14 @@ import { useTextBuffer } from '../utils/text-buffer.js';
 import { MessageType, type AgentProfileType } from '../types.js';
 import { theme, themeManager } from '../colors.js';
 import { themes, type ThemeName } from '../themes/index.js';
+import { apiClient } from '@toyoura-nagisa/core';
 
 // Memoized components for performance
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
 
 // Dialog types
-type ActiveDialog = 'profile' | 'memory' | 'session' | 'session_restore' | 'session_delete' | 'theme' | null;
+type ActiveDialog = 'profile' | 'memory' | 'session' | 'session_restore' | 'session_delete' | 'theme' | 'pfc_reset' | 'pfc_reset_confirm' | null;
 
 // Session action type
 type SessionAction = 'create' | 'restore' | 'delete';
@@ -79,6 +80,12 @@ const THEME_OPTIONS: SelectOption<ThemeName>[] = Object.entries(themes).map(([ke
   label: def.displayName,
   description: def.description,
 }));
+
+// PFC reset confirmation options
+const PFC_RESET_OPTIONS: SelectOption<boolean>[] = [
+  { key: 'cancel', value: false, label: 'Cancel', description: 'Abort reset operation' },
+  { key: 'confirm', value: true, label: 'Confirm Reset', description: 'Delete all PFC history (cannot be undone)' },
+];
 
 export const MainLayout: React.FC = () => {
   const appState = useAppState();
@@ -298,6 +305,71 @@ export const MainLayout: React.FC = () => {
     setActiveDialog(null);
   }, [sessionManager, appActions]);
 
+  // Handle PFC reset confirmation
+  const handlePfcResetConfirm = useCallback(async (confirmed: boolean) => {
+    if (!confirmed) {
+      appActions.addHistoryItem({
+        type: MessageType.INFO,
+        message: 'PFC workspace reset cancelled',
+      });
+      setActiveDialog(null);
+      return;
+    }
+
+    // Execute reset
+    try {
+      appActions.addHistoryItem({
+        type: MessageType.INFO,
+        message: 'Resetting PFC workspace...',
+      });
+
+      interface PfcResetResponse {
+        success: boolean;
+        message: string;
+        quick_console?: { success: boolean; deleted_scripts: number };
+        tasks?: { success: boolean; cleared_count: number };
+        git?: { success: boolean; deleted_commits: number };
+        error?: string;
+      }
+
+      const response = await apiClient.post<PfcResetResponse>('/api/pfc/console/reset', {
+        session_id: appState.currentSessionId || 'unknown',
+        agent_profile: appState.currentProfile,
+      });
+
+      if (response.success) {
+        const parts: string[] = [];
+        if (response.quick_console?.deleted_scripts) {
+          parts.push(`${response.quick_console.deleted_scripts} scripts`);
+        }
+        if (response.tasks?.cleared_count) {
+          parts.push(`${response.tasks.cleared_count} tasks`);
+        }
+        if (response.git?.deleted_commits) {
+          parts.push(`${response.git.deleted_commits} git snapshots`);
+        }
+
+        const summary = parts.length > 0 ? ` (cleared: ${parts.join(', ')})` : '';
+        appActions.addHistoryItem({
+          type: MessageType.INFO,
+          message: `PFC workspace reset complete${summary}`,
+        });
+      } else {
+        appActions.addHistoryItem({
+          type: MessageType.ERROR,
+          message: response.error || response.message || 'Reset failed',
+        });
+      }
+    } catch (err) {
+      appActions.addHistoryItem({
+        type: MessageType.ERROR,
+        message: err instanceof Error ? err.message : 'PFC reset failed',
+      });
+    }
+
+    setActiveDialog(null);
+  }, [appActions, appState.currentSessionId, appState.currentProfile]);
+
   // Handle shell command blocked during streaming
   const handleShellBlocked = useCallback(() => {
     appActions.addHistoryItem({
@@ -411,6 +483,8 @@ export const MainLayout: React.FC = () => {
           setActiveDialog('session');
         } else if (result.dialog === 'theme') {
           setActiveDialog('theme');
+        } else if (result.dialog === 'pfc_reset') {
+          setActiveDialog('pfc_reset_confirm');
         }
         break;
 
@@ -577,6 +651,18 @@ export const MainLayout: React.FC = () => {
             showNumbers={true}
             showDescriptions={false}
             maxItemsToShow={8}
+            borderColor={theme.status.error}
+          />
+        )}
+
+        {/* PFC reset confirmation dialog */}
+        {activeDialog === 'pfc_reset_confirm' && (
+          <SelectDialog
+            title="Reset PFC Workspace"
+            description="This will permanently delete:\n  - Quick console scripts\n  - All task history\n  - Git pfc-executions branch\n\nAre you sure?"
+            options={PFC_RESET_OPTIONS}
+            onSelect={handlePfcResetConfirm}
+            onCancel={handleDialogCancel}
             borderColor={theme.status.error}
           />
         )}

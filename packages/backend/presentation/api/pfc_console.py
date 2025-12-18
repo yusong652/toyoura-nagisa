@@ -45,6 +45,23 @@ class ConnectionStatusResponse(BaseModel):
     message: str
 
 
+class ResetRequest(BaseModel):
+    """Request body for workspace reset."""
+    session_id: str = Field(..., description="Session ID for workspace resolution")
+    agent_profile: str = Field("pfc_expert", description="Agent profile for workspace resolution")
+
+
+class ResetResponse(BaseModel):
+    """Response body for workspace reset."""
+    success: bool
+    message: str
+    quick_console: Optional[Dict[str, Any]] = None
+    tasks: Optional[Dict[str, Any]] = None
+    git: Optional[Dict[str, Any]] = None
+    connected: bool = True
+    error: Optional[str] = None
+
+
 def _format_pfc_python_context(
     code: str,
     task_id: str,
@@ -210,4 +227,73 @@ async def execute_pfc_python(request: ExecuteRequest) -> ExecuteResponse:
             connected=True,
             error=f"Unexpected error: {e}",
             context="",
+        )
+
+
+@router.post("/reset", response_model=ResetResponse)
+async def reset_workspace(request: ResetRequest) -> ResetResponse:
+    """
+    Reset workspace state for testing.
+
+    WARNING: This permanently deletes:
+    - Quick console scripts and counter
+    - All task history (memory + disk)
+    - Git pfc-executions branch (all execution snapshots)
+
+    Use only for development/testing to get a clean slate.
+
+    Returns:
+        ResetResponse with reset details for each component
+    """
+    try:
+        # Get workspace path for the agent profile
+        workspace_path = await get_workspace_for_profile(
+            request.agent_profile,
+            request.session_id
+        )
+
+        # Get PFC client (will auto-connect if needed)
+        try:
+            client = await get_client()
+        except ConnectionError as e:
+            return ResetResponse(
+                success=False,
+                message=f"PFC server not available: {e}",
+                connected=False,
+                error=f"PFC server not available: {e}. Please start PFC server in PFC GUI.",
+            )
+
+        # Execute workspace reset
+        result = await client.reset_workspace(
+            workspace_path=str(workspace_path)
+        )
+
+        # Extract data from result
+        status = result.get("status", "error")
+        message = result.get("message", "")
+        data = result.get("data") or {}
+
+        return ResetResponse(
+            success=(status == "success"),
+            message=message,
+            quick_console=data.get("quick_console"),
+            tasks=data.get("tasks"),
+            git=data.get("git"),
+            connected=True,
+            error=None if status == "success" else message,
+        )
+
+    except ConnectionError as e:
+        return ResetResponse(
+            success=False,
+            message=f"Connection to PFC server lost: {e}",
+            connected=False,
+            error=str(e),
+        )
+    except Exception as e:
+        return ResetResponse(
+            success=False,
+            message=f"Unexpected error: {e}",
+            connected=True,
+            error=str(e),
         )
