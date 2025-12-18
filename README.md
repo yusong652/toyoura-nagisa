@@ -133,28 +133,9 @@ Beyond the core PFC integration, toyoura-nagisa includes:
 - **Live2D Character** - Interactive visual companion that responds to conversations
 - **Text-to-Speech** - Local (GPT-SoVITS) or cloud (Fish Audio) voice output
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
-### Prerequisites
-
-**toyoura-nagisa Backend:**
-- **Python 3.10+** with `uv` package manager ([install guide](https://github.com/astral-sh/uv))
-- **Node.js 18+** - For frontend development
-
-**PFC Integration (Core Feature):**
-- **ITASCA PFC** with embedded Python environment
-- **websockets==9.1** - Install in PFC's Python 3.6 environment:
-  ```python
-  # In PFC GUI IPython console
-  import subprocess
-  subprocess.call(['pip', 'install', '--user', 'websockets==9.1'])
-  ```
-  Or use command line with `--user` flag:
-  ```bash
-  pip install --user websockets==9.1
-  ```
-
-### Quick Start
+**Requirements**: Python 3.10+ with [uv](https://github.com/astral-sh/uv), Node.js 18+
 
 ```bash
 # Clone and install
@@ -168,65 +149,24 @@ cp -r packages/backend/config_example/ packages/backend/config/
 
 # Start
 npm run dev:backend   # Backend API (localhost:8000)
-npm run dev:web       # Web Frontend (localhost:5173)
-npm run dev:cli       # CLI interface
+npm run dev:cli       # CLI (or npm run dev:web for Web UI)
 ```
 
-### PFC Workspace Setup
+### PFC Integration
 
-For ITASCA PFC discrete element simulations:
+For ITASCA PFC simulations, install `websockets==9.1` in PFC's Python environment, then start the server in PFC GUI:
 
-```bash
-# 1. Install websockets in PFC's Python environment
-pip install websockets==9.1
-
-# 2. Start PFC WebSocket server in PFC IPython shell
-import sys
-sys.path.append(r'/path/to/toyoura-nagisa/services/pfc-server')
+```python
 exec(open(r'/path/to/toyoura-nagisa/services/pfc-server/start_server.py', encoding='utf-8').read())
-
-# 3. In toyoura-nagisa, select "PFC Expert" agent profile
-# 4. Interact with PFC through natural language
 ```
 
-**PFC Workflow Example**:
-
-```
-You: "Create a ball settling simulation with 1000 particles"
-
-Nagisa:
-1. Queries command documentation for 'ball generate', 'model gravity', etc.
-2. Writes test script with 10 particles (small scale)
-3. Executes test → validates syntax
-4. Writes production script with 1000 particles
-5. Executes production (run_in_background=True) → returns task_id + git commit
-6. Monitors progress with pfc_check_task_status(task_id)
-7. Reports results
-
-You: "Stop the simulation, I need to adjust parameters"
-Nagisa: pfc_interrupt_task("a1b2c3d4") → task gracefully interrupted
-
-You: "Show me only error messages from the last run"
-Nagisa: pfc_check_task_status(task_id, filter="Error") → filtered output
-```
-
-See `services/pfc-server/README.md` for detailed setup and usage instructions.
+See `services/pfc-server/README.md` for detailed setup.
 
 ## 🤝 Contributing
 
-We are exploring how LLMs can control complex industrial software through documentation-driven workflows. If you work with specialized scientific or engineering tools (CAD, FEA, CFD, etc.), your insights are valuable.
-
-**High-Priority Contributions:**
-- **Industrial Software Integrations**: Extend the "Script is Context" pattern to other specialized tools
-- **PFC Workflow Improvements**: Enhanced error handling, better progress monitoring, smarter documentation queries
-- **Documentation System**: Expand command documentation coverage and API examples
-
-**General Contributions:**
-- **Agent Profile System**: New profiles for domain-specific tool sets
-- **LLM Provider Support**: Additional providers and optimization strategies
-- **Frontend UX**: Better visualization of simulation progress and tool usage
-
-Please check out `CLAUDE.md` for development setup and architecture documentation.
+1. **Open an issue first** - Discuss your idea before implementing
+2. **Fork & PR** - Fork the repo, create a branch, submit PR
+3. **Keep PRs focused** - One feature or fix per PR
 
 ## 📄 License
 
