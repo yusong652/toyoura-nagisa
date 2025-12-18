@@ -231,7 +231,7 @@ class ZhipuClient(LLMClientBase):
         **kwargs
     ) -> AsyncGenerator[StreamingChunk, None]:
         """
-        Execute streaming Zhipu API call with real-time chunk delivery.
+        Execute streaming Zhipu API call with real-time chunk delivery and retry logic.
 
         Args:
             context_contents: Conversation messages in standard format.
@@ -242,6 +242,8 @@ class ZhipuClient(LLMClientBase):
             StreamingChunk: Standardized streaming data chunks.
         """
         debug = self.zhipu_config.debug
+        max_retries = self.zhipu_config.max_retries
+        base_delay = 1.0  # Base delay for exponential backoff
 
         tools = api_config.get("tools", []) or []
 
@@ -289,50 +291,115 @@ class ZhipuClient(LLMClientBase):
         if debug:
             ZhipuDebugger.print_api_request(api_kwargs, messages, tools)
 
-        try:
-            # Create streaming response (synchronous generator)
-            # Type: StreamResponse[ChatCompletionChunk] when stream=True
-            # zai SDK is synchronous, we need to iterate in a thread to avoid blocking
-            stream = await asyncio.to_thread(
-                self.client.chat.completions.create,
-                **api_kwargs
-            )  # type: Any  # StreamResponse not publicly exported by zai SDK
+        # Retry loop for streaming
+        last_exception: Optional[Exception] = None
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt > 0:
+                    # Calculate delay with exponential backoff
+                    delay = base_delay * (2 ** (attempt - 1))
+                    if debug:
+                        print(f"[DEBUG] Zhipu streaming retry attempt {attempt}/{max_retries}, waiting {delay}s...")
+                    await asyncio.sleep(delay)
 
-            # Create stateful streaming processor
-            streaming_processor = self._get_response_processor().create_streaming_processor()
+                # Create streaming response (synchronous generator)
+                # Type: StreamResponse[ChatCompletionChunk] when stream=True
+                # zai SDK is synchronous, we need to iterate in a thread to avoid blocking
+                stream = await asyncio.to_thread(
+                    self.client.chat.completions.create,
+                    **api_kwargs
+                )  # type: Any  # StreamResponse not publicly exported by zai SDK
 
-            # Convert synchronous stream iterator to async
-            # zai SDK returns a sync iterator, we need to iterate in executor
-            # to avoid blocking the event loop
-            loop = asyncio.get_event_loop()
+                # Create stateful streaming processor
+                streaming_processor = self._get_response_processor().create_streaming_processor()
 
-            # Create iterator from stream
-            stream_iter = iter(stream)
+                # Convert synchronous stream iterator to async
+                # zai SDK returns a sync iterator, we need to iterate in executor
+                # to avoid blocking the event loop
+                loop = asyncio.get_event_loop()
 
-            # Helper function to get next chunk (will run in thread pool)
-            def get_next_chunk():
-                try:
-                    return next(stream_iter), False  # (chunk, is_done)
-                except StopIteration:
-                    return None, True  # (None, is_done)
+                # Create iterator from stream
+                stream_iter = iter(stream)
 
-            # Iterate through chunks asynchronously
-            while True:
-                # Run next() in thread pool to avoid blocking
-                chunk, is_done = await loop.run_in_executor(None, get_next_chunk)
+                # Helper function to get next chunk (will run in thread pool)
+                def get_next_chunk():
+                    try:
+                        return next(stream_iter), False  # (chunk, is_done)
+                    except StopIteration:
+                        return None, True  # (None, is_done)
 
-                if is_done or chunk is None:
-                    break
+                # Iterate through chunks asynchronously
+                while True:
+                    # Run next() in thread pool to avoid blocking
+                    chunk, is_done = await loop.run_in_executor(None, get_next_chunk)
 
-                # Delegate chunk processing to streaming processor
-                processed_chunks = streaming_processor.process_event(chunk)
-                for processed_chunk in processed_chunks:
-                    yield processed_chunk
+                    if is_done or chunk is None:
+                        break
 
-        except Exception as e:
-            if debug:
-                print(f"[DEBUG] Zhipu streaming failed: {e}")
-            raise
+                    # Delegate chunk processing to streaming processor
+                    processed_chunks = streaming_processor.process_event(chunk)
+                    for processed_chunk in processed_chunks:
+                        yield processed_chunk
+
+                # Successfully completed streaming, exit retry loop
+                return
+
+            except Exception as e:
+                last_exception = e
+                is_timeout_error = self._is_retryable_error(e)
+
+                if debug:
+                    print(f"[DEBUG] Zhipu streaming failed (attempt {attempt + 1}/{max_retries + 1}): {e}")
+
+                # Only retry on timeout/connection errors, not other errors
+                if not is_timeout_error or attempt >= max_retries:
+                    if debug:
+                        if not is_timeout_error:
+                            print(f"[DEBUG] Error is not retryable, raising immediately")
+                        else:
+                            print(f"[DEBUG] Max retries ({max_retries}) exceeded, raising exception")
+                    raise
+
+        # Should not reach here, but raise last exception if we do
+        if last_exception:
+            raise last_exception
+
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """
+        Check if an error is retryable (timeout or connection related).
+
+        Args:
+            error: The exception to check
+
+        Returns:
+            True if the error is retryable, False otherwise
+        """
+        error_str = str(error).lower()
+        error_type = type(error).__name__.lower()
+
+        retryable_patterns = [
+            'timeout',
+            'timed out',
+            'connection',
+            'network',
+            'reset',
+            'broken pipe',
+            'eof',
+            'read error',
+        ]
+
+        # Check error message
+        for pattern in retryable_patterns:
+            if pattern in error_str:
+                return True
+
+        # Check error type name
+        retryable_types = ['timeout', 'connection', 'network']
+        for pattern in retryable_types:
+            if pattern in error_type:
+                return True
+
+        return False
 
     def get_or_create_context_manager(self, session_id: str):
         """
