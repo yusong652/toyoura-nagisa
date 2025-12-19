@@ -51,8 +51,17 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
   const [activeIndex, setActiveIndex] = useState(0);
   // Input value for option 3 (reject_and_tell)
   const [inputValue, setInputValue] = useState('');
+  // Cursor position for text input
+  const [cursorPosition, setCursorPosition] = useState(0);
   // Cursor blink state
   const [cursorVisible, setCursorVisible] = useState(true);
+
+  // Ensure cursor position stays within bounds
+  React.useEffect(() => {
+    if (cursorPosition > inputValue.length) {
+      setCursorPosition(inputValue.length);
+    }
+  }, [inputValue.length, cursorPosition]);
 
   // Cursor blink effect for option 3
   React.useEffect(() => {
@@ -127,27 +136,66 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
 
       // When on option 3, handle text input
       if (activeIndex === 2) {
-        // Backspace to delete
+        // Left arrow to move cursor left
+        if (key.name === 'left') {
+          setCursorPosition((prev) => Math.max(0, prev - 1));
+          return;
+        }
+
+        // Right arrow to move cursor right
+        if (key.name === 'right') {
+          setCursorPosition((prev) => Math.min(inputValue.length, prev + 1));
+          return;
+        }
+
+        // Home key to move cursor to start
+        if (key.name === 'home' || (key.ctrl && key.name === 'a')) {
+          setCursorPosition(0);
+          return;
+        }
+
+        // End key to move cursor to end
+        if (key.name === 'end' || (key.ctrl && key.name === 'e')) {
+          setCursorPosition(inputValue.length);
+          return;
+        }
+
+        // Backspace to delete character before cursor
         if (key.name === 'backspace') {
-          setInputValue((prev) => prev.slice(0, -1));
+          if (cursorPosition > 0) {
+            setInputValue((prev) => prev.slice(0, cursorPosition - 1) + prev.slice(cursorPosition));
+            setCursorPosition((prev) => prev - 1);
+          }
+          return;
+        }
+
+        // Delete key to delete character at cursor
+        if (key.name === 'delete') {
+          if (cursorPosition < inputValue.length) {
+            setInputValue((prev) => prev.slice(0, cursorPosition) + prev.slice(cursorPosition + 1));
+          }
           return;
         }
 
         // Ctrl+U to clear line
         if (key.ctrl && key.name === 'u') {
           setInputValue('');
+          setCursorPosition(0);
           return;
         }
 
         // Paste
         if (key.paste) {
-          setInputValue((prev) => prev + key.sequence);
+          const pasteText = key.sequence;
+          setInputValue((prev) => prev.slice(0, cursorPosition) + pasteText + prev.slice(cursorPosition));
+          setCursorPosition((prev) => prev + pasteText.length);
           return;
         }
 
-        // Printable characters
+        // Printable characters - insert at cursor position
         if (key.insertable && key.sequence.length > 0) {
-          setInputValue((prev) => prev + key.sequence);
+          setInputValue((prev) => prev.slice(0, cursorPosition) + key.sequence + prev.slice(cursorPosition));
+          setCursorPosition((prev) => prev + key.sequence.length);
           return;
         }
       }
@@ -337,18 +385,12 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
           </Text>
           {/* Inline input area */}
           {activeIndex === 2 ? (
-            <>
-              <Text color={theme.text.primary}>
-                {inputValue || ''}
-              </Text>
-              {/* Cursor: always occupies space, visibility controlled by inverse */}
-              <Text inverse={cursorVisible}>{' '}</Text>
-              {!inputValue && (
-                <Text color={theme.text.muted}>
-                  type instruction...
-                </Text>
-              )}
-            </>
+            <Text>
+              <Text color={theme.text.primary}>{inputValue.slice(0, cursorPosition)}</Text>
+              <Text inverse={cursorVisible}>{cursorPosition < inputValue.length ? inputValue[cursorPosition] : ' '}</Text>
+              <Text color={theme.text.primary}>{inputValue.slice(cursorPosition + 1)}</Text>
+              {!inputValue && <Text color={theme.text.muted}>type instruction...</Text>}
+            </Text>
           ) : (
             <Text color={theme.text.muted}>
               {inputValue || 'type instruction...'}
@@ -361,7 +403,7 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
       <Box marginTop={1} flexShrink={0}>
         <Text color={theme.text.muted}>
           {activeIndex === 2
-            ? '(Enter submit, Esc reject, ↑↓ select)'
+            ? '(Enter submit, Esc reject, ←→ move cursor, ↑↓ select)'
             : '(↑↓ select, Enter confirm, Esc reject)'}
         </Text>
       </Box>
