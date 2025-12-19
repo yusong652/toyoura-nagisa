@@ -186,8 +186,8 @@ def format_task_status_for_llm(
         f"{time_section}\n"
         f"elapsed: {elapsed_str}\n"
         f"git: {git_str}\n"
-        f"script: {data.entry_script or 'n/a'}\n"
-        f"desc: {data.description or 'n/a'}\n"
+        f"entry_script: {data.entry_script or 'n/a'}\n"
+        f"description: {data.description or 'n/a'}\n"
         f"{result_line}\n"
         f"Output ({pagination['total_lines']} lines{filter_info}, showing {pagination['line_range']}):\n"
         f"{output_text}"
@@ -224,7 +224,7 @@ def format_task_status_for_context(data: TaskStatusData) -> str:
         "<pfc-task-status>",
         f"<task_id>{data.task_id}</task_id>",
         f"<status>{data.status}</status>",
-        f"<script>{data.entry_script or 'n/a'}</script>",
+        f"<entry_script>{data.entry_script or 'n/a'}</entry_script>",
         f"<description>{data.description or 'n/a'}</description>",
         f"<elapsed>{elapsed_str}</elapsed>",
         f"<git>{git_str}</git>",

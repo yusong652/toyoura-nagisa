@@ -487,7 +487,7 @@ export const MainLayout: React.FC = () => {
     }
   }, [appActions, appState.currentSessionId]);
 
-  // Build PFC task options for SelectDialog
+  // Build PFC task options for SelectDialog (single-line format)
   const pfcTaskOptions = useMemo(() => {
     const statusEmoji: Record<string, string> = {
       running: '...',
@@ -498,12 +498,13 @@ export const MainLayout: React.FC = () => {
 
     return pfcTasks.map((task) => {
       const emoji = statusEmoji[task.status] || '?';
-      const elapsed = task.elapsed_time ? `${task.elapsed_time.toFixed(1)}s` : '';
+      const elapsed = task.elapsed_time ? `${task.elapsed_time.toFixed(1)}s` : '---';
+      const desc = task.description || task.entry_script || '';
+      // Single-line format: [status] id | elapsed | description
       return {
         key: task.task_id,
         value: task.task_id,
-        label: `[${emoji}] ${task.task_id}`,
-        description: `${elapsed} | ${task.description || task.entry_script}`,
+        label: `[${emoji}] ${task.task_id} | ${elapsed} | ${desc}`,
       };
     });
   }, [pfcTasks]);
@@ -820,6 +821,7 @@ export const MainLayout: React.FC = () => {
             onSelect={handlePfcTaskSelect}
             onCancel={handleDialogCancel}
             showNumbers={false}
+            showDescriptions={false}
             maxItemsToShow={10}
           />
         )}

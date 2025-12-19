@@ -99,6 +99,8 @@ class TaskPersistence:
         # Save output snapshot
         output = task.get_current_output()
         task_data["output"] = output if output else ""
+        # Save error message (for failed tasks)
+        task_data["error"] = getattr(task, "error", None)
 
         return task_data
 
@@ -314,6 +316,7 @@ class HistoricalTask:
         self.script_path = task_data.get("script_path")
         self.git_commit = task_data.get("git_commit")  # Git version snapshot
         self.output_snapshot = task_data.get("output", "")
+        self.error = task_data.get("error")  # Error message (for failed tasks)
 
         # No Future or output_buffer for historical tasks
         self.future = None
@@ -391,8 +394,9 @@ class HistoricalTask:
                 }
             }
         else:  # failed
-            message = "[Historical] Script failed: {}\nElapsed time: {:.2f}s".format(
-                self.script_name, elapsed_time
+            error_msg = self.error or "Task execution failed"
+            message = "[Historical] Script failed: {}\nElapsed time: {:.2f}s\nError: {}".format(
+                self.script_name, elapsed_time, error_msg
             )
             if output:
                 message += "\n\n=== Partial Output (Snapshot) ===\n{}".format(output)
@@ -412,6 +416,7 @@ class HistoricalTask:
                     "start_time": self.start_time,
                     "end_time": self.end_time,
                     "output": output if output else "",
+                    "error": error_msg,
                     "git_commit": getattr(self, "git_commit", None),
                     "historical": True
                 }

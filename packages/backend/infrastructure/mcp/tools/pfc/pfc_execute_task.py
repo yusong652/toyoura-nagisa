@@ -152,27 +152,32 @@ def register_pfc_task_tool(mcp: FastMCP):
 
             else:
                 # ===== Foreground Mode (Synchronous) =====
-                # Use unified formatter for consistent output format
+                # Possible server statuses:
+                #   success     - Script completed successfully
+                #   error       - Script execution failed
+                #   running     - Wait timeout, but task continues in background
+                #   interrupted - Script was interrupted by user
                 task_id = data.get("task_id") if data else None
-
-                # Map status to display status (ensure status is str for type safety)
                 status_str = str(status) if status else "unknown"
-                status_map: dict[str, str] = {
+
+                # Status mapping: server status → display status
+                STATUS_MAP: dict[str, str] = {
                     "success": "completed",
                     "error": "failed",
+                    # running/interrupted stay unchanged
                 }
-                display_status = status_map.get(status_str, status_str)
+                display_status = STATUS_MAP.get(status_str, status_str)
 
-                # Create structured task data using shared formatter
+                # Create structured task data
                 task_data = create_task_status_data(data or {}, task_id or "unknown")
                 task_data.status = display_status
-                task_data.description = description  # Use tool parameter, not server data
+                task_data.description = description
 
-                # Ensure error is set (fallback to result.message if data.error is missing)
-                if not task_data.error and status != "success":
+                # Only set error for actual error states (not running/interrupted)
+                if status == "error" and not task_data.error:
                     task_data.error = result.get("message", "Task execution failed")
 
-                # Format using unified formatter (consistent with pfc_check_task_status)
+                # Format using unified formatter
                 formatted = format_task_status_for_llm(
                     data=task_data,
                     offset=0,
@@ -180,36 +185,22 @@ def register_pfc_task_tool(mcp: FastMCP):
                 )
 
                 # Build response based on status
+                response_kwargs: Dict[str, Any] = {
+                    "message": result.get("message", f"Task {display_status}: {script_path}"),
+                    "llm_content": {"parts": [{"type": "text", "text": formatted.text}]},
+                    "entry_script": script_path,
+                    "task_id": task_id,
+                    "git_commit": task_data.git_commit,
+                    "pagination": formatted.pagination,
+                }
+
+                # Add status-specific fields
                 if status == "success":
-                    return success_response(
-                        message=result.get("message", f"Task completed: {script_path}"),
-                        llm_content={
-                            "parts": [{
-                                "type": "text",
-                                "text": formatted.text
-                            }]
-                        },
-                        entry_script=script_path,
-                        task_id=task_id,
-                        git_commit=task_data.git_commit,
-                        script_result=task_data.result,
-                        pagination=formatted.pagination
-                    )
-                else:
-                    return success_response(
-                        message=result.get("message", f"Task failed: {script_path}"),
-                        llm_content={
-                            "parts": [{
-                                "type": "text",
-                                "text": formatted.text
-                            }]
-                        },
-                        entry_script=script_path,
-                        task_id=task_id,
-                        git_commit=task_data.git_commit,
-                        script_error=task_data.error,
-                        pagination=formatted.pagination
-                    )
+                    response_kwargs["script_result"] = task_data.result
+                elif status == "error":
+                    response_kwargs["script_error"] = task_data.error
+
+                return success_response(**response_kwargs)
 
         except ConnectionError as e:
             return error_response(f"Cannot connect to PFC server: {str(e)}")
