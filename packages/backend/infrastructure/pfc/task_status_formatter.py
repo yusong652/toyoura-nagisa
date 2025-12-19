@@ -142,13 +142,16 @@ def format_task_status_for_llm(
         filter_text=filter_text,
     )
 
-    # Build navigation hint
-    nav_parts = []
-    if pagination["has_later"]:
-        nav_parts.append(f"offset={max(0, offset - limit)} for newer")
-    if pagination["has_earlier"]:
-        nav_parts.append(f"offset={offset + limit} for older")
-    nav_hint = " | ".join(nav_parts) if nav_parts else "all shown"
+    # Build navigation hint (status-aware)
+    if data.status == "submitted":
+        nav_hint = "use pfc_check_task_status to monitor progress"
+    else:
+        nav_parts = []
+        if pagination["has_later"]:
+            nav_parts.append(f"offset={max(0, offset - limit)} for newer")
+        if pagination["has_earlier"]:
+            nav_parts.append(f"offset={offset + limit} for older")
+        nav_hint = " | ".join(nav_parts) if nav_parts else "all shown"
 
     # Build filter info
     filter_info = f", filtered by '{filter_text}'" if filter_text else ""
@@ -160,7 +163,10 @@ def format_task_status_for_llm(
     elapsed_str = f"{data.elapsed_time:.1f}s" if data.elapsed_time else "n/a"
 
     # Build status-specific text
-    if data.status == "running":
+    if data.status == "submitted":
+        # Just submitted, no end time yet
+        time_section = f"submitted: {start_str}"
+    elif data.status == "running":
         import time
         current_str = format_timestamp(time.time())
         time_section = f"started: {start_str}\ncurrent: {current_str}"
