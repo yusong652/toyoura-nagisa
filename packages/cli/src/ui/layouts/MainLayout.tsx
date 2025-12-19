@@ -46,7 +46,7 @@ const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
 
 // Dialog types
-type ActiveDialog = 'profile' | 'memory' | 'session' | 'session_restore' | 'session_delete' | 'theme' | 'pfc_reset' | 'pfc_reset_confirm' | null;
+type ActiveDialog = 'profile' | 'memory' | 'session' | 'session_restore' | 'session_delete' | 'theme' | 'pfc_reset' | 'pfc_reset_confirm' | 'pfc_tasks' | null;
 
 // Session action type
 type SessionAction = 'create' | 'restore' | 'delete';
@@ -130,6 +130,17 @@ export const MainLayout: React.FC = () => {
 
   // PFC console mode state (for UI indicator)
   const [isPfcConsoleMode, setIsPfcConsoleMode] = useState(false);
+
+  // PFC tasks state
+  const [pfcTasks, setPfcTasks] = useState<Array<{
+    task_id: string;
+    status: string;
+    entry_script: string;
+    description: string;
+    start_time: number | null;
+    elapsed_time: number | null;
+  }>>([]);
+  const [isPfcTasksLoading, setIsPfcTasksLoading] = useState(false);
 
   // Slash command processor context
   const commandProcessorContext = useMemo(() => ({
@@ -370,6 +381,131 @@ export const MainLayout: React.FC = () => {
     setActiveDialog(null);
   }, [appActions, appState.currentSessionId, appState.currentProfile]);
 
+  // Load PFC tasks when dialog opens
+  const loadPfcTasks = useCallback(async () => {
+    setIsPfcTasksLoading(true);
+    try {
+      interface TasksListResponse {
+        success: boolean;
+        tasks: Array<{
+          task_id: string;
+          status: string;
+          entry_script: string;
+          description: string;
+          start_time: number | null;
+          elapsed_time: number | null;
+        }>;
+        error?: string;
+      }
+      const response = await apiClient.get<TasksListResponse>('/api/pfc/console/tasks?limit=20&offset=0');
+      if (response.success) {
+        setPfcTasks(response.tasks);
+      } else {
+        appActions.addHistoryItem({
+          type: MessageType.ERROR,
+          message: response.error || 'Failed to load PFC tasks',
+        });
+        setActiveDialog(null);
+      }
+    } catch (err) {
+      appActions.addHistoryItem({
+        type: MessageType.ERROR,
+        message: err instanceof Error ? err.message : 'Failed to load PFC tasks',
+      });
+      setActiveDialog(null);
+    } finally {
+      setIsPfcTasksLoading(false);
+    }
+  }, [appActions]);
+
+  // Handle PFC task selection - fetch details and display
+  const handlePfcTaskSelect = useCallback(async (taskId: string) => {
+    setActiveDialog(null);
+
+    try {
+      interface TaskStatusResponse {
+        success: boolean;
+        task_id: string;
+        status: string;
+        entry_script: string | null;
+        description: string | null;
+        output: string | null;
+        error: string | null;
+        start_time: number | null;
+        end_time: number | null;
+        elapsed_time: number | null;
+        git_commit: string | null;
+      }
+
+      const response = await apiClient.get<TaskStatusResponse>(`/api/pfc/console/tasks/${taskId}`);
+
+      if (!response.success) {
+        appActions.addHistoryItem({
+          type: MessageType.ERROR,
+          message: response.error || `Task ${taskId} not found`,
+        });
+        return;
+      }
+
+      // Format timestamp
+      const formatTime = (ts: number | null) => {
+        if (!ts) return 'n/a';
+        const dt = new Date(ts * 1000);
+        return dt.toLocaleString();
+      };
+
+      // Build output message
+      const lines: string[] = [
+        `Task: ${response.task_id}`,
+        `Status: ${response.status}`,
+        `Script: ${response.entry_script || 'n/a'}`,
+        `Description: ${response.description || 'n/a'}`,
+        `Started: ${formatTime(response.start_time)}`,
+        `Ended: ${formatTime(response.end_time)}`,
+        `Elapsed: ${response.elapsed_time ? `${response.elapsed_time.toFixed(1)}s` : 'n/a'}`,
+        `Git: ${response.git_commit ? response.git_commit.slice(0, 8) : 'n/a'}`,
+        '',
+        '--- Output ---',
+        response.output || '(no output)',
+      ];
+
+      if (response.error) {
+        lines.push('', '--- Error ---', response.error);
+      }
+
+      appActions.addHistoryItem({
+        type: MessageType.INFO,
+        message: lines.join('\n'),
+      });
+    } catch (err) {
+      appActions.addHistoryItem({
+        type: MessageType.ERROR,
+        message: err instanceof Error ? err.message : 'Failed to fetch task details',
+      });
+    }
+  }, [appActions]);
+
+  // Build PFC task options for SelectDialog
+  const pfcTaskOptions = useMemo(() => {
+    const statusEmoji: Record<string, string> = {
+      running: '...',
+      completed: 'OK',
+      failed: 'X',
+      interrupted: '!',
+    };
+
+    return pfcTasks.map((task) => {
+      const emoji = statusEmoji[task.status] || '?';
+      const elapsed = task.elapsed_time ? `${task.elapsed_time.toFixed(1)}s` : '';
+      return {
+        key: task.task_id,
+        value: task.task_id,
+        label: `[${emoji}] ${task.task_id}`,
+        description: `${elapsed} | ${task.description || task.entry_script}`,
+      };
+    });
+  }, [pfcTasks]);
+
   // Handle shell command blocked during streaming
   const handleShellBlocked = useCallback(() => {
     appActions.addHistoryItem({
@@ -485,6 +621,9 @@ export const MainLayout: React.FC = () => {
           setActiveDialog('theme');
         } else if (result.dialog === 'pfc_reset') {
           setActiveDialog('pfc_reset_confirm');
+        } else if (result.dialog === 'pfc_tasks') {
+          setActiveDialog('pfc_tasks');
+          loadPfcTasks();
         }
         break;
 
@@ -664,6 +803,22 @@ export const MainLayout: React.FC = () => {
             onSelect={handlePfcResetConfirm}
             onCancel={handleDialogCancel}
             borderColor={theme.status.error}
+          />
+        )}
+
+        {/* PFC tasks list dialog - hidden when tool confirmation is active */}
+        {activeDialog === 'pfc_tasks' && !appState.pendingConfirmation && (
+          <SelectDialog
+            title="PFC Tasks"
+            description="Select a task to view details:"
+            options={pfcTaskOptions}
+            isLoading={isPfcTasksLoading}
+            loadingMessage="Loading tasks..."
+            emptyMessage="No PFC tasks found."
+            onSelect={handlePfcTaskSelect}
+            onCancel={handleDialogCancel}
+            showNumbers={false}
+            maxItemsToShow={10}
           />
         )}
 

@@ -97,18 +97,20 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
         return;
       }
 
-      // Number keys for quick selection
-      if (key.name === '1') {
-        setActiveIndex(0);
-        return;
-      }
-      if (key.name === '2') {
-        setActiveIndex(1);
-        return;
-      }
-      if (key.name === '3') {
-        setActiveIndex(2);
-        return;
+      // Number keys for quick selection (disabled when typing in option 3)
+      if (activeIndex !== 2) {
+        if (key.name === '1') {
+          setActiveIndex(0);
+          return;
+        }
+        if (key.name === '2') {
+          setActiveIndex(1);
+          return;
+        }
+        if (key.name === '3') {
+          setActiveIndex(2);
+          return;
+        }
       }
 
       // Enter to confirm
