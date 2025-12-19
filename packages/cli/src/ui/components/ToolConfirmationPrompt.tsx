@@ -51,17 +51,33 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
   const [activeIndex, setActiveIndex] = useState(0);
   // Input value for option 3 (reject_and_tell)
   const [inputValue, setInputValue] = useState('');
-  // Cursor position for text input
+  // Cursor position for text input (state for rendering, ref for immediate access)
   const [cursorPosition, setCursorPosition] = useState(0);
+  const cursorPositionRef = React.useRef(0);
+
+  // Helper to update cursor position (both state and ref)
+  const updateCursorPosition = React.useCallback((newPosition: number | ((prev: number) => number)) => {
+    if (typeof newPosition === 'function') {
+      setCursorPosition((prev) => {
+        const next = newPosition(prev);
+        cursorPositionRef.current = next;
+        return next;
+      });
+    } else {
+      cursorPositionRef.current = newPosition;
+      setCursorPosition(newPosition);
+    }
+  }, []);
+
   // Cursor blink state
   const [cursorVisible, setCursorVisible] = useState(true);
 
   // Ensure cursor position stays within bounds
   React.useEffect(() => {
     if (cursorPosition > inputValue.length) {
-      setCursorPosition(inputValue.length);
+      updateCursorPosition(inputValue.length);
     }
-  }, [inputValue.length, cursorPosition]);
+  }, [inputValue.length, cursorPosition, updateCursorPosition]);
 
   // Cursor blink effect for option 3
   React.useEffect(() => {
@@ -138,41 +154,43 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
       if (activeIndex === 2) {
         // Left arrow to move cursor left
         if (key.name === 'left') {
-          setCursorPosition((prev) => Math.max(0, prev - 1));
+          updateCursorPosition((prev) => Math.max(0, prev - 1));
           return;
         }
 
         // Right arrow to move cursor right
         if (key.name === 'right') {
-          setCursorPosition((prev) => Math.min(inputValue.length, prev + 1));
+          updateCursorPosition((prev) => Math.min(inputValue.length, prev + 1));
           return;
         }
 
         // Home key to move cursor to start
         if (key.name === 'home' || (key.ctrl && key.name === 'a')) {
-          setCursorPosition(0);
+          updateCursorPosition(0);
           return;
         }
 
         // End key to move cursor to end
         if (key.name === 'end' || (key.ctrl && key.name === 'e')) {
-          setCursorPosition(inputValue.length);
+          updateCursorPosition(inputValue.length);
           return;
         }
 
         // Backspace to delete character before cursor
         if (key.name === 'backspace') {
-          if (cursorPosition > 0) {
-            setInputValue((prev) => prev.slice(0, cursorPosition - 1) + prev.slice(cursorPosition));
-            setCursorPosition((prev) => prev - 1);
+          const pos = cursorPositionRef.current;
+          if (pos > 0) {
+            setInputValue((prev) => prev.slice(0, pos - 1) + prev.slice(pos));
+            updateCursorPosition(pos - 1);
           }
           return;
         }
 
         // Delete key to delete character at cursor
         if (key.name === 'delete') {
-          if (cursorPosition < inputValue.length) {
-            setInputValue((prev) => prev.slice(0, cursorPosition) + prev.slice(cursorPosition + 1));
+          const pos = cursorPositionRef.current;
+          if (pos < inputValue.length) {
+            setInputValue((prev) => prev.slice(0, pos) + prev.slice(pos + 1));
           }
           return;
         }
@@ -180,22 +198,25 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
         // Ctrl+U to clear line
         if (key.ctrl && key.name === 'u') {
           setInputValue('');
-          setCursorPosition(0);
+          updateCursorPosition(0);
           return;
         }
 
         // Paste
         if (key.paste) {
           const pasteText = key.sequence;
-          setInputValue((prev) => prev.slice(0, cursorPosition) + pasteText + prev.slice(cursorPosition));
-          setCursorPosition((prev) => prev + pasteText.length);
+          const pos = cursorPositionRef.current;
+          setInputValue((prev) => prev.slice(0, pos) + pasteText + prev.slice(pos));
+          updateCursorPosition(pos + pasteText.length);
           return;
         }
 
         // Printable characters - insert at cursor position
+        // Use ref for immediate access to avoid stale closure issues with IME input
         if (key.insertable && key.sequence.length > 0) {
-          setInputValue((prev) => prev.slice(0, cursorPosition) + key.sequence + prev.slice(cursorPosition));
-          setCursorPosition((prev) => prev + key.sequence.length);
+          const pos = cursorPositionRef.current;
+          setInputValue((prev) => prev.slice(0, pos) + key.sequence + prev.slice(pos));
+          updateCursorPosition(pos + key.sequence.length);
           return;
         }
       }
