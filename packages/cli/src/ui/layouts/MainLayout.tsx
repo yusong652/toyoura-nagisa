@@ -437,7 +437,9 @@ export const MainLayout: React.FC = () => {
         git_commit: string | null;
       }
 
-      const response = await apiClient.get<TaskStatusResponse>(`/api/pfc/console/tasks/${taskId}`);
+      // Include session_id for LLM intent awareness
+      const sessionParam = appState.currentSessionId ? `?session_id=${appState.currentSessionId}` : '';
+      const response = await apiClient.get<TaskStatusResponse>(`/api/pfc/console/tasks/${taskId}${sessionParam}`);
 
       if (!response.success) {
         appActions.addHistoryItem({
@@ -483,7 +485,7 @@ export const MainLayout: React.FC = () => {
         message: err instanceof Error ? err.message : 'Failed to fetch task details',
       });
     }
-  }, [appActions]);
+  }, [appActions, appState.currentSessionId]);
 
   // Build PFC task options for SelectDialog
   const pfcTaskOptions = useMemo(() => {

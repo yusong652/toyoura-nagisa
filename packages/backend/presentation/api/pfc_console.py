@@ -437,12 +437,16 @@ async def list_pfc_tasks(
 
 
 @router.get("/tasks/{task_id}", response_model=TaskStatusResponse)
-async def get_task_status(task_id: str) -> TaskStatusResponse:
+async def get_task_status(
+    task_id: str,
+    session_id: Optional[str] = None,
+) -> TaskStatusResponse:
     """
     Get detailed status of a specific PFC task.
 
     Args:
         task_id: Task ID to query
+        session_id: Optional session ID for context injection (intent awareness)
 
     Returns:
         TaskStatusResponse with task details and output
@@ -486,20 +490,42 @@ async def get_task_status(task_id: str) -> TaskStatusResponse:
             "interrupted": "interrupted",
         }
 
+        mapped_status = status_map.get(status) or status
+        entry_script = data.get("entry_script", data.get("script_path"))
+        description = data.get("description")
+        output = data.get("output")
+        error = data.get("error")
+        elapsed_time = data.get("elapsed_time")
+        git_commit = data.get("git_commit")
+
+        # Store context for LLM injection (intent awareness)
+        if session_id:
+            status_monitor = get_status_monitor(session_id)
+            status_monitor.add_user_pfc_task_context(
+                task_id=task_id,
+                status=mapped_status,
+                entry_script=entry_script,
+                description=description,
+                output=output,
+                error=error,
+                elapsed_time=elapsed_time,
+                git_commit=git_commit,
+            )
+
         return TaskStatusResponse(
             success=True,
             message=result.get("message", f"Task {task_id}: {status}"),
             task_id=task_id,
-            status=status_map.get(status) or status,
-            entry_script=data.get("entry_script", data.get("script_path")),
-            description=data.get("description"),
-            output=data.get("output"),
-            error=data.get("error"),
+            status=mapped_status,
+            entry_script=entry_script,
+            description=description,
+            output=output,
+            error=error,
             result=data.get("result"),
             start_time=data.get("start_time"),
             end_time=data.get("end_time"),
-            elapsed_time=data.get("elapsed_time"),
-            git_commit=data.get("git_commit"),
+            elapsed_time=elapsed_time,
+            git_commit=git_commit,
             connected=True,
         )
 
