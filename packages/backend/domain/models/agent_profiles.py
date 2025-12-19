@@ -262,7 +262,7 @@ class SubAgentConfig:
     display_name: str
     description: str
     tools: tuple                 # Explicit tool list (no invoke_agent!)
-    max_iterations: int = 30  # Default for SubAgents (higher than before to handle complex tasks)
+    max_iterations: int = 32  # Default for SubAgents (higher than before to handle complex tasks)
     streaming_enabled: bool = False
     enable_memory: bool = False
 
