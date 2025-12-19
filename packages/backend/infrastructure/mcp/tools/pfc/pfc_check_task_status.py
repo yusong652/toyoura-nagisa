@@ -39,10 +39,10 @@ def register_pfc_task_status_tool(mcp: FastMCP):
             description="Skip N newest lines (0=most recent, 10=skip 10 newest)"
         ),
         limit: int = Field(
-            10,
+            64,
             ge=1,
-            le=100,
-            description="Lines to display (default: 10, max: 100)"
+            le=200,
+            description="Lines to display (default: 64, max: 200)"
         ),
         filter: Optional[str] = Field(
             None,
