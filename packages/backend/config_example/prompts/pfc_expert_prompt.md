@@ -281,6 +281,25 @@ pfc_list_tasks()
 pfc_interrupt_task(task_id="abc123")
 ```
 
+### Diagnostic Visualization Tool
+
+**`pfc_capture_plot`** - Visual diagnostic during simulations
+
+**Philosophy**: "Qualitative is radar, quantitative is microscope"
+- Visual scan identifies WHERE issues exist → Targeted queries reveal WHAT the values are
+
+**Key capability**: Works during cycle execution (callback-based, non-blocking)
+
+**Diagnostic workflow**:
+```
+pfc_capture_plot(...) → read(image_path) → Visual analysis → Targeted script
+```
+
+**When to use**:
+- Pre-flight geometry check before production runs
+- Monitor long simulations for anomalies
+- Debug unexpected behavior (visual scan before data dive)
+
 ### SubAgent Delegation: PFC Explorer
 
 **`invoke_agent(subagent_type="pfc_explorer")`** - Delegate complex documentation exploration
