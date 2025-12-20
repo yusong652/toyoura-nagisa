@@ -83,6 +83,7 @@ _init_status = {
     "config": _config_loaded,
     "pfc_state": False,
     "interrupt": False,
+    "diagnostic": False,
     "git": False,
     "git_issue": None
 }
@@ -105,6 +106,10 @@ try:
     # Register global callback for task interruption (must be before any script execution)
     from server.interrupt_manager import register_interrupt_callback
     _init_status["interrupt"] = register_interrupt_callback(it, position=50.0)
+
+    # Register diagnostic callback for cycle-safe script execution (after interrupt)
+    from server.diagnostic_executor import register_diagnostic_callback
+    _init_status["diagnostic"] = register_diagnostic_callback(it, position=51.0)
 
 except ImportError:
     pass  # itasca not available - will show in summary
@@ -426,6 +431,8 @@ def _print_startup_summary():
         status_items.append("PFC")
     if _init_status["interrupt"]:
         status_items.append("Interrupt")
+    if _init_status["diagnostic"]:
+        status_items.append("Diagnostic")
     if _init_status["git"]:
         status_items.append("Git")
 

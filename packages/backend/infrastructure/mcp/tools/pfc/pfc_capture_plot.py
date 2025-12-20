@@ -191,17 +191,14 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             # Normalize script path for PFC server
             normalized_script_path = normalize_path_separators(script_path, target_platform='linux')
 
-            # Execute script synchronously (blocking)
-            # Use source="diagnostic" to mark as diagnostic operation
-            # (filterable in pfc_list_tasks, no git snapshot)
+            # Execute script via diagnostic executor
+            # This uses smart path selection on server side:
+            # - If PFC idle: queue execution (fast)
+            # - If cycle running: callback execution (between cycles)
             try:
-                result = await client.execute_task(
+                result = await client.execute_diagnostic(
                     script_path=normalized_script_path,
-                    description=f"Capture diagnostic plot",
-                    timeout_ms=30000,  # 30 second timeout
-                    run_in_background=False,  # Synchronous execution
-                    session_id=session_id,
-                    source="diagnostic"
+                    timeout_ms=30000  # 30 second timeout
                 )
             finally:
                 # Always cleanup script file (success or failure)

@@ -19,6 +19,7 @@ from .main_thread_executor import MainThreadExecutor
 from .task_manager import TaskManager
 from .quick_console_manager import QuickConsoleManager
 from .interrupt_manager import request_interrupt
+from .diagnostic_executor import submit_diagnostic, is_callback_registered
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
@@ -359,6 +360,137 @@ class PFCWebSocketServer:
                                     "message": "Failed to request interrupt",
                                     "data": None
                                 }
+
+                        try:
+                            await websocket.send(json.dumps(response))
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send result, connection closed: {request_id}")
+                            break  # Exit message loop
+
+                    elif msg_type == "diagnostic_execute":
+                        # Execute diagnostic script with smart path selection
+                        # Used for quick operations like plot capture that need to run
+                        # even when main thread is blocked by cycle() computation
+                        #
+                        # Execution strategy:
+                        # 1. Try queue execution first (1s timeout) - works when idle
+                        # 2. If queue blocked, use callback execution - works during cycle
+                        request_id = data.get("request_id", "unknown")
+                        script_path = data.get("script_path", "")
+                        timeout_ms = data.get("timeout_ms", 30000)  # Default 30s
+
+                        try:
+                            if not script_path:
+                                raise ValueError("script_path is required")
+
+                            import os
+                            from io import StringIO
+                            import uuid
+
+                            # Read script content
+                            with open(script_path, 'r', encoding='utf-8') as f:
+                                script_content = f.read()
+
+                            # Generate task_id for tracking
+                            task_id = uuid.uuid4().hex[:8]
+                            output_buffer = StringIO()
+
+                            # Strategy 1: Try queue execution with short timeout (1 second)
+                            # This works when PFC is idle (no cycle running)
+                            queue_future = self.main_executor.submit(
+                                self.script_executor._execute_script_sync,
+                                script_path,
+                                script_content,
+                                output_buffer,
+                                task_id
+                            )
+
+                            try:
+                                # Wait 1 second for queue execution
+                                result = queue_future.result(timeout=1.0)
+                                logger.info("Diagnostic executed via queue: {}".format(
+                                    os.path.basename(script_path)
+                                ))
+                                response = {
+                                    "type": "diagnostic_result",
+                                    "request_id": request_id,
+                                    "execution_path": "queue",
+                                    **result
+                                }
+
+                            except Exception as queue_error:
+                                # Queue execution failed or timed out
+                                # Strategy 2: Use callback execution (works during cycle)
+                                import concurrent.futures
+
+                                # Check if it's a timeout (queue blocked) vs actual error
+                                is_timeout = isinstance(queue_error, concurrent.futures.TimeoutError)
+
+                                if is_timeout:
+                                    logger.info("Queue blocked, switching to callback execution")
+
+                                    if not is_callback_registered():
+                                        raise RuntimeError(
+                                            "Diagnostic callback not registered and queue is blocked. "
+                                            "Restart PFC server to enable callback execution."
+                                        )
+
+                                    # Submit to callback executor
+                                    callback_future = submit_diagnostic(script_path)
+
+                                    # Wait for callback execution
+                                    timeout_sec = (timeout_ms - 1000) / 1000.0  # Subtract queue timeout
+                                    timeout_sec = max(timeout_sec, 1.0)  # At least 1 second
+
+                                    try:
+                                        result = callback_future.result(timeout=timeout_sec)
+                                        logger.info("Diagnostic executed via callback: {}".format(
+                                            os.path.basename(script_path)
+                                        ))
+                                        response = {
+                                            "type": "diagnostic_result",
+                                            "request_id": request_id,
+                                            "execution_path": "callback",
+                                            **result
+                                        }
+                                    except concurrent.futures.TimeoutError:
+                                        response = {
+                                            "type": "diagnostic_result",
+                                            "request_id": request_id,
+                                            "status": "timeout",
+                                            "message": "Diagnostic timed out after {}ms. "
+                                                       "Queue blocked and no cycle running.".format(timeout_ms),
+                                            "data": None
+                                        }
+                                else:
+                                    # Actual execution error (not timeout)
+                                    raise queue_error
+
+                        except ValueError as e:
+                            response = {
+                                "type": "diagnostic_result",
+                                "request_id": request_id,
+                                "status": "error",
+                                "message": str(e),
+                                "data": None
+                            }
+                        except RuntimeError as e:
+                            response = {
+                                "type": "diagnostic_result",
+                                "request_id": request_id,
+                                "status": "error",
+                                "message": str(e),
+                                "data": None
+                            }
+                        except Exception as e:
+                            logger.error(f"Diagnostic execution failed: {e}")
+                            response = {
+                                "type": "diagnostic_result",
+                                "request_id": request_id,
+                                "status": "error",
+                                "message": f"Diagnostic execution failed: {e}",
+                                "data": None
+                            }
 
                         try:
                             await websocket.send(json.dumps(response))

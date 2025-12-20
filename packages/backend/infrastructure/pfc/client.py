@@ -344,8 +344,8 @@ class PFCWebSocketClient:
                     data = json.loads(message)
                     msg_type = data.get("type")
 
-                    if msg_type == "result" or msg_type == "quick_python_result":
-                        # Request result received (including quick_python_result)
+                    if msg_type in ("result", "quick_python_result", "diagnostic_result"):
+                        # Request result received (including quick_python_result and diagnostic_result)
                         request_id = data.get("request_id")
                         if request_id in self.pending_requests:
                             future = self.pending_requests.pop(request_id)
@@ -683,6 +683,79 @@ class PFCWebSocketClient:
                     ) from e
 
         raise RuntimeError("Unexpected code path in interrupt_task")
+
+    async def execute_diagnostic(
+        self,
+        script_path: str,
+        timeout_ms: int = 30000,
+        max_retries: int = 2
+    ) -> Dict[str, Any]:
+        """
+        Execute diagnostic script via PFC callback mechanism.
+
+        This method is specifically designed for quick diagnostic operations
+        (like plot capture) that need to execute even when the PFC main thread
+        is blocked by cycle() computation.
+
+        Unlike execute_task which uses a queue processed by process_tasks(),
+        this uses PFC's callback system to execute scripts in the gaps between
+        cycles.
+
+        Args:
+            script_path: Absolute path to Python script file
+                Example: "/path/to/pfc_project/.nagisa/plot_scripts/capture_001.py"
+            timeout_ms: Execution timeout in milliseconds (default: 30000 = 30s)
+                If no cycle is running, the callback won't fire and this will timeout.
+            max_retries: Maximum retry attempts on connection failure (default: 2)
+
+        Returns:
+            Result dictionary from PFC server:
+                - type: "diagnostic_result"
+                - request_id: str
+                - status: "success", "error", or "timeout"
+                - message: str
+                - data: Any (script result)
+
+        Raises:
+            ConnectionError: If connection to PFC server fails after retries
+            TimeoutError: If diagnostic execution times out
+
+        Note:
+            - Scripts are executed via PFC callback (position 51.0)
+            - Works during cycle() execution (unlike execute_task)
+            - Designed for quick operations (< 30s)
+            - If cycle is not running, the script will execute on next cycle start
+        """
+        # WebSocket timeout includes buffer for network overhead
+        websocket_timeout_s = (timeout_ms + 5000) / 1000.0  # 5s buffer
+
+        for attempt in range(max_retries):
+            try:
+                await self._ensure_connected()
+                return await self._send_request(
+                    message={
+                        "type": "diagnostic_execute",
+                        "script_path": script_path,
+                        "timeout_ms": timeout_ms
+                    },
+                    timeout=websocket_timeout_s,
+                    operation_name=f"Diagnostic execution ({script_path})"
+                )
+
+            except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                self.connected = False
+
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(0.5)
+                    continue
+                else:
+                    raise ConnectionError(
+                        "Failed to execute diagnostic after retries. "
+                        "Please ensure PFC server is running."
+                    ) from e
+
+        raise RuntimeError("Unexpected code path in execute_diagnostic")
 
     async def get_working_directory(
         self,
