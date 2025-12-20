@@ -130,13 +130,14 @@ class TaskManager:
 
         return task.get_status_response()
 
-    def list_all_tasks(self, session_id=None, offset=0, limit=None):
-        # type: (Optional[str], int, Optional[int]) -> Dict[str, Any]
+    def list_all_tasks(self, session_id=None, source=None, offset=0, limit=None):
+        # type: (Optional[str], Optional[str], int, Optional[int]) -> Dict[str, Any]
         """
-        List currently tracked tasks, optionally filtered by session with pagination.
+        List currently tracked tasks, optionally filtered by session and source with pagination.
 
         Args:
             session_id: Optional session ID to filter tasks
+            source: Optional source to filter tasks ("agent", "user_console", "diagnostic")
             offset: Skip N most recent tasks (0 = most recent, default: 0)
             limit: Maximum tasks to return (None = all tasks, default: None)
 
@@ -152,15 +153,23 @@ class TaskManager:
                     - limit: Current limit
                     - has_more: Whether more tasks exist
         """
-        # Filter tasks by session if specified
-        # Support both full UUID and 8-char prefix matching
+        # Filter tasks by session and source if specified
+        # Support both full UUID and 8-char prefix matching for session_id
+        filtered_tasks = list(self.tasks.values())
+
+        # Apply session filter
         if session_id:
             filtered_tasks = [
-                task for task in self.tasks.values()
+                task for task in filtered_tasks
                 if task.session_id == session_id or task.session_id.startswith(session_id)
             ]
-        else:
-            filtered_tasks = list(self.tasks.values())
+
+        # Apply source filter
+        if source:
+            filtered_tasks = [
+                task for task in filtered_tasks
+                if getattr(task, 'source', 'agent') == source
+            ]
 
         # Sort by start_time descending (most recent first)
         sorted_tasks = sorted(

@@ -85,6 +85,8 @@ PFC_TOOLS: List[str] = [
     "pfc_check_task_status",
     "pfc_list_tasks",
     "pfc_interrupt_task",
+    # PFC diagnostic (multimodal visual analysis)
+    "pfc_capture_plot",
     # SubAgent delegation
     "invoke_agent",
 ]
@@ -262,7 +264,7 @@ class SubAgentConfig:
     display_name: str
     description: str
     tools: tuple                 # Explicit tool list (no invoke_agent!)
-    max_iterations: int = 30  # Default for SubAgents (higher than before to handle complex tasks)
+    max_iterations: int = 32  # Default for SubAgents (higher than before to handle complex tasks)
     streaming_enabled: bool = False
     enable_memory: bool = False
 

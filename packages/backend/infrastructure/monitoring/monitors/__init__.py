@@ -6,6 +6,7 @@ This package provides modular monitors for various background tasks and system s
 - BackgroundProcessMonitor: Agent background process monitoring
 - UserBashMonitor: User shell command context injection
 - UserPfcPythonMonitor: User PFC Python command context injection
+- UserPfcTaskMonitor: User PFC task status context injection
 - PfcMonitor: PFC simulation task tracking
 - InterruptMonitor: User interrupt status management
 - QueueMonitor: Queue message handling
@@ -17,6 +18,7 @@ from .todo_monitor import TodoMonitor
 from .background_process_monitor import BackgroundProcessMonitor
 from .user_bash_monitor import UserBashMonitor, get_user_bash_monitor, clear_user_bash_monitor
 from .user_pfc_python_monitor import UserPfcPythonMonitor, get_user_pfc_python_monitor, clear_user_pfc_python_monitor
+from .user_pfc_task_monitor import UserPfcTaskMonitor, get_user_pfc_task_monitor, clear_user_pfc_task_monitor
 from .pfc_monitor import PfcMonitor
 from .interrupt_monitor import InterruptMonitor
 from .queue_monitor import QueueMonitor
@@ -32,6 +34,9 @@ __all__ = [
     "UserPfcPythonMonitor",
     "get_user_pfc_python_monitor",
     "clear_user_pfc_python_monitor",
+    "UserPfcTaskMonitor",
+    "get_user_pfc_task_monitor",
+    "clear_user_pfc_task_monitor",
     "PfcMonitor",
     "InterruptMonitor",
     "QueueMonitor",

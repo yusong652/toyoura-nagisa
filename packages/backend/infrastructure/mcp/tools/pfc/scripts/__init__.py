@@ -1,0 +1,20 @@
+"""
+PFC Script Templates
+
+This package contains script generation templates for PFC tools.
+Scripts are generated dynamically and executed in the PFC environment.
+"""
+
+from .plot_capture_template import (
+    generate_plot_capture_script,
+    DEFAULT_PLOT_NAME,
+    DEFAULT_WALL_TRANSPARENCY,
+    DEFAULT_IMAGE_SIZE,
+)
+
+__all__ = [
+    "generate_plot_capture_script",
+    "DEFAULT_PLOT_NAME",
+    "DEFAULT_WALL_TRANSPARENCY",
+    "DEFAULT_IMAGE_SIZE",
+]

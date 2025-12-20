@@ -236,11 +236,13 @@ class PFCScriptExecutor:
                 - True: Asynchronous - return task_id immediately, query via check_task_status
                 - False: Synchronous - wait for completion, return result directly
             source: Task source identifier (default: "agent")
-                - "agent": Script created/executed by LLM agent
-                - "user_console": Script from user Python console (`>` prefix)
+                - "agent": Script created/executed by LLM agent (git snapshot enabled)
+                - "user_console": Script from user Python console (no git snapshot)
+                - "diagnostic": Diagnostic tool operation like plot capture (no git snapshot)
             enable_git_snapshot: Whether to create git snapshot before execution (default: True)
                 - True: Create git commit on pfc-executions branch (for agent scripts)
-                - False: Skip git snapshot (for quick console commands)
+                - False: Skip git snapshot (for quick console commands and diagnostic tools)
+                - Note: Automatically set to False for source="user_console" or "diagnostic"
 
         Returns:
             Result dictionary:
@@ -441,53 +443,65 @@ class PFCScriptExecutor:
             )
 
             if is_timeout:
-                # Script execution timed out - retrieve task info if available
+                # Script execution timed out but task is still running in background
+                # Return "running" status since task continues execution
                 import os
                 script_name_for_error = os.path.basename(script_path)
 
-                logger.error("Script execution timed out: {} (timeout: {}ms)".format(script_path, timeout_ms))
-                logger.error("Exception type: {} - {}".format(type(e).__name__, str(e)))
+                logger.warning("Script execution timed out (still running): {} (timeout: {}ms)".format(script_path, timeout_ms))
+                logger.warning("Exception type: {} - {}".format(type(e).__name__, str(e)))
 
                 # Try to get task info for timing and output
                 task_id_local = locals().get('task_id')
                 task = self.task_manager.tasks.get(task_id_local) if task_id_local else None
 
-                error_message = "Timeout after {}ms executing script '{}'. Increase timeout or use run_in_background=True.".format(
+                timeout_message = "Foreground wait timed out after {}ms. Task '{}' is still running in background. Use pfc_check_task_status to monitor progress.".format(
                     timeout_ms, script_name_for_error
                 )
 
                 return {
-                    "status": "error",
-                    "message": error_message,
+                    "status": "running",
+                    "message": timeout_message,
                     "data": {
                         "task_id": task_id_local,
                         "task_type": "script",
+                        "source": source,
                         "script_name": script_name_for_error,
                         "entry_script": script_path,
                         "script_path": script_path,
                         "description": description,
                         "start_time": task.start_time if task else None,
-                        "output": output_buffer.getvalue() if 'output_buffer' in locals() else "", # type: ignore
-                        "error": error_message,
+                        "elapsed_time": task.get_elapsed_time() if task else None,
+                        "output": output_buffer.getvalue() if 'output_buffer' in locals() else "",  # type: ignore
                         "git_commit": locals().get('git_commit')
                     }
                 }
 
-            # General error handling (pre-execution errors)
-            logger.error("Script submission failed: {}".format(e))
+            # General error handling (execution errors)
+            logger.error("Script execution failed: {}".format(e))
             logger.error("Exception type: {}".format(type(e).__name__))
 
-            error_message = "Script submission failed: {}".format(str(e))
+            error_message = "Script execution failed: {}".format(str(e))
+
+            # Try to get task info if task was created (task is created before execution)
+            task_id_local = locals().get('task_id')
+            task = self.task_manager.tasks.get(task_id_local) if task_id_local else None
+            output_text = output_buffer.getvalue() if 'output_buffer' in locals() else ""
 
             return {
                 "status": "error",
                 "message": error_message,
                 "data": {
+                    "task_id": task_id_local,
                     "task_type": "script",
                     "script_name": os.path.basename(script_path) if script_path else "unknown",
                     "entry_script": script_path,
                     "script_path": script_path,
                     "description": description,
+                    "start_time": task.start_time if task else None,
+                    "end_time": task.end_time if task else None,
+                    "elapsed_time": (task.end_time - task.start_time) if (task and task.start_time and task.end_time) else None,
+                    "output": output_text,
                     "error": error_message,
                     "git_commit": locals().get('git_commit')
                 }

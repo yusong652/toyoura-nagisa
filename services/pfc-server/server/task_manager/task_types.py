@@ -218,10 +218,8 @@ class ScriptTask(Task):
             # Get output from buffer (single source of truth)
             output_text = self.get_current_output()
 
-            # Extract only error message from result
-            error_msg = "Task execution failed"
-            if isinstance(result, dict):
-                error_msg = result.get("message", error_msg)
+            # Use error from task object (extracted in _on_complete and persisted)
+            error_msg = self.error or "Task execution failed"
 
             # Build error message with partial output
             if output_text:

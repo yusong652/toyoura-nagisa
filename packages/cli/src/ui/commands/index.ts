@@ -21,3 +21,6 @@ export { sessionCommand } from './sessionCommand.js';
 
 // PFC reset command for workspace reset (testing/development)
 export { pfcResetCommand } from './pfcResetCommand.js';
+
+// PFC tasks command for listing simulation tasks
+export { pfcTasksCommand } from './pfcTasksCommand.js';

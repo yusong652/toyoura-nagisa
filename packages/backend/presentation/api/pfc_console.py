@@ -62,6 +62,50 @@ class ResetResponse(BaseModel):
     error: Optional[str] = None
 
 
+class TaskItem(BaseModel):
+    """Individual task item in list response."""
+    task_id: str
+    session_id: str
+    status: str
+    entry_script: str
+    description: str
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    elapsed_time: Optional[float] = None
+    git_commit: Optional[str] = None
+    historical: bool = False
+
+
+class TasksListResponse(BaseModel):
+    """Response body for task list query."""
+    success: bool
+    message: str
+    tasks: list[TaskItem] = []
+    total_count: int = 0
+    displayed_count: int = 0
+    has_more: bool = False
+    connected: bool = True
+    error: Optional[str] = None
+
+
+class TaskStatusResponse(BaseModel):
+    """Response body for individual task status query."""
+    success: bool
+    message: str
+    task_id: str
+    status: str  # running, completed, failed, interrupted, not_found
+    entry_script: Optional[str] = None
+    description: Optional[str] = None
+    output: Optional[str] = None
+    error: Optional[str] = None
+    result: Optional[Any] = None
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    elapsed_time: Optional[float] = None
+    git_commit: Optional[str] = None
+    connected: bool = True
+
+
 def _format_pfc_python_context(
     code: str,
     task_id: str,
@@ -190,7 +234,7 @@ async def execute_pfc_python(request: ExecuteRequest) -> ExecuteResponse:
             code=request.code,
             task_id=task_id,
             output=output,
-            error=error_msg
+            error=error_msg or ""
         )
 
         return ExecuteResponse(
@@ -294,6 +338,212 @@ async def reset_workspace(request: ResetRequest) -> ResetResponse:
         return ResetResponse(
             success=False,
             message=f"Unexpected error: {e}",
+            connected=True,
+            error=str(e),
+        )
+
+
+@router.get("/tasks", response_model=TasksListResponse)
+async def list_pfc_tasks(
+    limit: int = 20,
+    offset: int = 0,
+) -> TasksListResponse:
+    """
+    List all PFC tasks with pagination.
+
+    This endpoint provides a user-facing view of PFC task history,
+    reusing pfc-server's persistent task storage.
+
+    Args:
+        limit: Maximum number of tasks to return (default: 20)
+        offset: Number of tasks to skip (default: 0)
+
+    Returns:
+        TasksListResponse with task list and pagination info
+    """
+    try:
+        # Get PFC client (will auto-connect if needed)
+        try:
+            client = await get_client()
+        except ConnectionError as e:
+            return TasksListResponse(
+                success=False,
+                message=f"PFC server not available: {e}",
+                connected=False,
+                error=f"PFC server not available. Please start PFC server in PFC GUI.",
+            )
+
+        # Query task list from pfc-server
+        result = await client.list_tasks(
+            session_id=None,  # All sessions
+            offset=offset,
+            limit=limit,
+        )
+
+        # Extract data
+        status = result.get("status", "error")
+        message = result.get("message", "")
+        data = result.get("data", [])
+        pagination = result.get("pagination", {})
+
+        if status != "success":
+            return TasksListResponse(
+                success=False,
+                message=message,
+                connected=True,
+                error=message,
+            )
+
+        # Convert raw task data to TaskItem models
+        tasks = []
+        for task in data:
+            tasks.append(TaskItem(
+                task_id=task.get("task_id", ""),
+                session_id=task.get("session_id", ""),
+                status=task.get("status", "unknown"),
+                entry_script=task.get("entry_script", task.get("script_path", task.get("name", "unknown"))),
+                description=task.get("description", ""),
+                start_time=task.get("start_time"),
+                end_time=task.get("end_time"),
+                elapsed_time=task.get("elapsed_time"),
+                git_commit=task.get("git_commit"),
+                historical=task.get("historical", False),
+            ))
+
+        return TasksListResponse(
+            success=True,
+            message=message,
+            tasks=tasks,
+            total_count=pagination.get("total_count", len(tasks)),
+            displayed_count=pagination.get("displayed_count", len(tasks)),
+            has_more=pagination.get("has_more", False),
+            connected=True,
+        )
+
+    except ConnectionError as e:
+        return TasksListResponse(
+            success=False,
+            message=f"Connection to PFC server lost: {e}",
+            connected=False,
+            error=str(e),
+        )
+    except Exception as e:
+        return TasksListResponse(
+            success=False,
+            message=f"Unexpected error: {e}",
+            connected=True,
+            error=str(e),
+        )
+
+
+@router.get("/tasks/{task_id}", response_model=TaskStatusResponse)
+async def get_task_status(
+    task_id: str,
+    session_id: Optional[str] = None,
+) -> TaskStatusResponse:
+    """
+    Get detailed status of a specific PFC task.
+
+    Args:
+        task_id: Task ID to query
+        session_id: Optional session ID for context injection (intent awareness)
+
+    Returns:
+        TaskStatusResponse with task details and output
+    """
+    try:
+        # Get PFC client
+        try:
+            client = await get_client()
+        except ConnectionError as e:
+            return TaskStatusResponse(
+                success=False,
+                message=f"PFC server not available: {e}",
+                task_id=task_id,
+                status="error",
+                connected=False,
+                error="PFC server not available. Please start PFC server in PFC GUI.",
+            )
+
+        # Query task status
+        result = await client.check_task_status(task_id)
+        status = result.get("status", "error")
+
+        if status == "not_found":
+            return TaskStatusResponse(
+                success=False,
+                message=f"Task not found: {task_id}",
+                task_id=task_id,
+                status="not_found",
+                connected=True,
+                error=f"Task {task_id} not found or expired.",
+            )
+
+        # Extract data for all other statuses
+        data = result.get("data", {})
+
+        # Map pfc-server status to response status
+        status_map = {
+            "running": "running",
+            "success": "completed",
+            "error": "failed",
+            "interrupted": "interrupted",
+        }
+
+        mapped_status = status_map.get(status) or status
+        entry_script = data.get("entry_script", data.get("script_path"))
+        description = data.get("description")
+        output = data.get("output")
+        error = data.get("error")
+        elapsed_time = data.get("elapsed_time")
+        git_commit = data.get("git_commit")
+
+        # Store context for LLM injection (intent awareness)
+        if session_id:
+            status_monitor = get_status_monitor(session_id)
+            status_monitor.add_user_pfc_task_context(
+                task_id=task_id,
+                status=mapped_status,
+                entry_script=entry_script,
+                description=description,
+                output=output,
+                error=error,
+                elapsed_time=elapsed_time,
+                git_commit=git_commit,
+            )
+
+        return TaskStatusResponse(
+            success=True,
+            message=result.get("message", f"Task {task_id}: {status}"),
+            task_id=task_id,
+            status=mapped_status,
+            entry_script=entry_script,
+            description=description,
+            output=output,
+            error=error,
+            result=data.get("result"),
+            start_time=data.get("start_time"),
+            end_time=data.get("end_time"),
+            elapsed_time=elapsed_time,
+            git_commit=git_commit,
+            connected=True,
+        )
+
+    except ConnectionError as e:
+        return TaskStatusResponse(
+            success=False,
+            message=f"Connection to PFC server lost: {e}",
+            task_id=task_id,
+            status="error",
+            connected=False,
+            error=str(e),
+        )
+    except Exception as e:
+        return TaskStatusResponse(
+            success=False,
+            message=f"Unexpected error: {e}",
+            task_id=task_id,
+            status="error",
             connected=True,
             error=str(e),
         )

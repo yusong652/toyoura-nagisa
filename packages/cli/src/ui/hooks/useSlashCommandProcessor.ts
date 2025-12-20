@@ -21,6 +21,7 @@ import { memoryCommand } from '../commands/memoryCommand.js';
 import { sessionCommand } from '../commands/sessionCommand.js';
 import { themeCommand } from '../commands/themeCommand.js';
 import { pfcResetCommand } from '../commands/pfcResetCommand.js';
+import { pfcTasksCommand } from '../commands/pfcTasksCommand.js';
 
 // Built-in commands (help first for visibility)
 const BUILT_IN_COMMANDS: SlashCommand[] = [
@@ -30,6 +31,7 @@ const BUILT_IN_COMMANDS: SlashCommand[] = [
   sessionCommand,
   themeCommand,
   pfcResetCommand,
+  pfcTasksCommand,
 ];
 
 export interface UseSlashCommandProcessorProps {

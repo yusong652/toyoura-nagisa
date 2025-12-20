@@ -37,10 +37,10 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
             description="Skip N newest tasks (0=most recent, default: 0)"
         ),
         limit: Optional[int] = Field(
-            20,
+            32,
             ge=1,
             le=100,
-            description="Max tasks to return (default: 20, max: 100, None = all)"
+            description="Max tasks to return (default: 32, max: 100, None = all)"
         )
     ) -> Dict[str, Any]:
         """
@@ -50,8 +50,8 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
         Supports filtering by session and pagination for large task histories.
 
         Pagination pattern (same as pfc_check_task_status):
-        - offset=0, limit=20: Most recent 20 tasks
-        - offset=20, limit=20: Next 20 tasks (older)
+        - offset=0, limit=32: Most recent 32 tasks
+        - offset=32, limit=32: Next 32 tasks (older)
 
         Note:
             - Shows tasks submitted via pfc_execute_task

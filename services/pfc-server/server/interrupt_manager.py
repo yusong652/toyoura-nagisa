@@ -191,11 +191,22 @@ def _re_register_callback(itasca_module, position=50.0):
     Re-register interrupt callback with PFC.
 
     Called after model new/restore commands which clear PFC's callback registry.
+    Also re-registers diagnostic callback if it was registered.
     """
     import __main__
     __main__._pfc_interrupt_check = _pfc_interrupt_check
     itasca_module.set_callback("_pfc_interrupt_check", position)
     logger.debug("Interrupt callback re-registered after model reset")
+
+    # Also re-register diagnostic callback if it was registered
+    try:
+        from .diagnostic_executor import _pfc_diagnostic_callback, is_callback_registered
+        if is_callback_registered():
+            __main__._pfc_diagnostic_callback = _pfc_diagnostic_callback
+            itasca_module.set_callback("_pfc_diagnostic_callback", 51.0)
+            logger.debug("Diagnostic callback re-registered after model reset")
+    except ImportError:
+        pass  # diagnostic_executor not available
 
 
 # Commands that clear PFC's callback registry

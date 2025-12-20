@@ -13,9 +13,11 @@ from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
-from backend.infrastructure.mcp.utils.pagination import format_paginated_output
-from backend.infrastructure.mcp.utils.time_utils import format_time_range
-import time
+from backend.infrastructure.pfc.task_status_formatter import (
+    create_task_status_data,
+    format_task_status_for_llm,
+    DEFAULT_OUTPUT_LINES,
+)
 
 
 def register_pfc_task_tool(mcp: FastMCP):
@@ -119,156 +121,86 @@ def register_pfc_task_tool(mcp: FastMCP):
                         f"(expected 'pending'). Server may have changed behavior."
                     )
 
-                # Extract metadata from unified data structure
+                # Use unified formatter for consistent output format
                 task_id = data.get("task_id") if data else None
-                entry_script_display = data.get("entry_script", data.get("script_path", script_path)) if data else script_path
-                submit_time = data.get("start_time", time.time()) if data else time.time()
-                git_commit = data.get("git_commit") if data else None
-                time_info = format_time_range(submit_time)
 
-                # Build version info string
-                version_info = f" | git_commit: {git_commit[:8]}" if git_commit else ""
+                # Create structured task data using shared formatter
+                task_data = create_task_status_data(data or {}, task_id or "unknown")
+                task_data.status = "submitted"  # Map "pending" to "submitted" for display
+                task_data.description = description  # Use tool parameter
+
+                # Format using unified formatter
+                formatted = format_task_status_for_llm(
+                    data=task_data,
+                    offset=0,
+                    limit=DEFAULT_OUTPUT_LINES,
+                )
 
                 return success_response(
                     message=result.get("message", f"Task submitted: {script_path}"),
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": (
-                                f"**STATUS**: Task submitted | task_id: {task_id} | {time_info}{version_info}\n"
-                                f"  Entry: {entry_script_display}\n"
-                                f"  → {description}\n\n"
-                                f"Use pfc_check_task_status to monitor progress."
-                            )
+                            "text": formatted.text
                         }]
                     },
                     entry_script=script_path,
-                    git_commit=git_commit,
-                    result=data
+                    task_id=task_id,
+                    git_commit=task_data.git_commit,
+                    pagination=formatted.pagination
                 )
 
             else:
                 # ===== Foreground Mode (Synchronous) =====
+                # Possible server statuses:
+                #   success     - Script completed successfully
+                #   error       - Script execution failed
+                #   running     - Wait timeout, but task continues in background
+                #   interrupted - Script was interrupted by user
+                task_id = data.get("task_id") if data else None
+                status_str = str(status) if status else "unknown"
+
+                # Status mapping: server status → display status
+                STATUS_MAP: dict[str, str] = {
+                    "success": "completed",
+                    "error": "failed",
+                    # running/interrupted stay unchanged
+                }
+                display_status = STATUS_MAP.get(status_str, status_str)
+
+                # Create structured task data
+                task_data = create_task_status_data(data or {}, task_id or "unknown")
+                task_data.status = display_status
+                task_data.description = description
+
+                # Only set error for actual error states (not running/interrupted)
+                if status == "error" and not task_data.error:
+                    task_data.error = result.get("message", "Task execution failed")
+
+                # Format using unified formatter
+                formatted = format_task_status_for_llm(
+                    data=task_data,
+                    offset=0,
+                    limit=DEFAULT_OUTPUT_LINES,
+                )
+
+                # Build response based on status
+                response_kwargs: Dict[str, Any] = {
+                    "message": result.get("message", f"Task {display_status}: {script_path}"),
+                    "llm_content": {"parts": [{"type": "text", "text": formatted.text}]},
+                    "entry_script": script_path,
+                    "task_id": task_id,
+                    "git_commit": task_data.git_commit,
+                    "pagination": formatted.pagination,
+                }
+
+                # Add status-specific fields
                 if status == "success":
-                    # Task completed successfully
-                    task_id = data.get("task_id") if data else None
-                    entry_script_display = data.get("entry_script", data.get("script_path", script_path)) if data else script_path
-                    output = data.get("output", "") if data else ""
-                    script_result = data.get("result") if data else None
-                    start_time = data.get("start_time") if data else None
-                    end_time = data.get("end_time") if data else None
-                    git_commit = data.get("git_commit") if data else None
+                    response_kwargs["script_result"] = task_data.result
+                elif status == "error":
+                    response_kwargs["script_error"] = task_data.error
 
-                    # Use pagination utility to extract output summary
-                    output_text, pagination = format_paginated_output(output, offset=0, limit=10)
-
-                    # Build navigation hints
-                    nav_hints = []
-                    if pagination["has_earlier"]:
-                        nav_hints.append(f"older: offset={10}")
-                    nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
-
-                    # Build LLM-friendly text
-                    llm_text_parts = []
-
-                    # 1. Success message with version info
-                    time_info = format_time_range(start_time, end_time)
-                    version_info = f" | git_commit: {git_commit[:8]}" if git_commit else ""
-                    llm_text_parts.append(
-                        f"**STATUS**: Completed | task_id: {task_id} | {time_info}{version_info}\n"
-                        f"  Entry: {entry_script_display}\n"
-                        f"  → {description}"
-                    )
-
-                    # 2. Output summary
-                    if output:
-                        llm_text_parts.append(
-                            f"\nOutput: {pagination['total_lines']} lines total | "
-                            f"Showing: last {pagination['displayed_count']} lines\n\n"
-                            f"━━━ Output Summary ━━━\n"
-                            f"{output_text}\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"**NEXT**: {nav_hint}"
-                        )
-
-                    # 3. Structured result
-                    if script_result is not None:
-                        llm_text_parts.append(f"\n\n=== Script Result ===\n{script_result}")
-
-                    llm_text = "".join(llm_text_parts)
-
-                    return success_response(
-                        message=result.get("message", f"Task completed: {script_path}"),
-                        llm_content={
-                            "parts": [{
-                                "type": "text",
-                                "text": llm_text
-                            }]
-                        },
-                        entry_script=script_path,
-                        task_id=task_id,
-                        git_commit=git_commit,
-                        script_result=script_result,
-                        pagination=pagination
-                    )
-
-                else:
-                    # Task execution failed
-                    task_id = data.get("task_id") if data else None
-                    entry_script_display = data.get("entry_script", data.get("script_path", script_path)) if data else script_path
-                    output = data.get("output", "") if data else ""
-                    error_message = data.get("error", result.get("message", "Task execution failed")) if data else result.get("message", "Task execution failed")
-                    start_time = data.get("start_time") if data else None
-                    end_time = data.get("end_time") if data else None
-                    git_commit = data.get("git_commit") if data else None
-
-                    # Use pagination utility
-                    output_text, pagination = format_paginated_output(output, offset=0, limit=10)
-
-                    nav_hints = []
-                    if pagination["has_earlier"]:
-                        nav_hints.append(f"older: offset={10}")
-                    nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
-
-                    llm_text_parts = []
-
-                    # 1. Error message with version info
-                    time_info = format_time_range(start_time, end_time)
-                    version_info = f" | git_commit: {git_commit[:8]}" if git_commit else ""
-                    llm_text_parts.append(
-                        f"**STATUS**: Failed | task_id: {task_id} | {time_info}{version_info}\n"
-                        f"  Entry: {entry_script_display}\n"
-                        f"  → {description}\n\n"
-                        f"Error: {error_message}"
-                    )
-
-                    # 2. Output before error
-                    if output:
-                        llm_text_parts.append(
-                            f"\nOutput: {pagination['total_lines']} lines total | "
-                            f"Showing: last {pagination['displayed_count']} lines\n\n"
-                            f"━━━ Output before error ━━━\n"
-                            f"{output_text}\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"**NEXT**: {nav_hint}"
-                        )
-
-                    llm_text = "".join(llm_text_parts)
-
-                    return success_response(
-                        message=result.get("message", f"Task failed: {script_path}"),
-                        llm_content={
-                            "parts": [{
-                                "type": "text",
-                                "text": llm_text
-                            }]
-                        },
-                        entry_script=script_path,
-                        task_id=task_id,
-                        git_commit=git_commit,
-                        script_error=error_message,
-                        pagination=pagination
-                    )
+                return success_response(**response_kwargs)
 
         except ConnectionError as e:
             return error_response(f"Cannot connect to PFC server: {str(e)}")

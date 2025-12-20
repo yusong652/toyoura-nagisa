@@ -4,7 +4,7 @@ Kimi (Moonshot) client implementation using OpenAI-compatible API.
 This implementation uses the standard OpenAI Chat Completions API format
 since Kimi/Moonshot provides full OpenAI compatibility.
 
-Base URL: https://api.moonshot.cn/v1
+Base URL: https://api.moonshot.ai/v1
 """
 
 import json
@@ -76,38 +76,19 @@ class KimiClient(LLMClientBase):
 
         self.kimi_config = get_kimi_client_config(**config_overrides)
 
-        # Log initialization
-        print(f"Kimi Client initialized")
-        print(f"  Model: {self.kimi_config.model_settings.model}")
-        print(f"  Base URL: {self.kimi_config.base_url}")
-        print(f"  Using OpenRouter: {self.kimi_config.use_openrouter}")
-
-        # Debug: Print masked API key to verify it's passed correctly
-        if self.api_key:
-            masked_key = f"{self.api_key[:8]}...{self.api_key[-4:]}" if len(self.api_key) > 12 else "***"
-            print(f"  API Key (masked): {masked_key}")
-
         # Initialize both sync and async OpenAI clients with Kimi base URL
         client_kwargs: Dict[str, Any] = {
             "api_key": self.api_key,
             "base_url": self.kimi_config.base_url
         }
 
-        # Add OpenRouter headers if using OpenRouter
-        if self.kimi_config.use_openrouter and self.kimi_config.openrouter_headers:
-            client_kwargs['default_headers'] = self.kimi_config.openrouter_headers
-            print(f"  OpenRouter headers: {list(self.kimi_config.openrouter_headers.keys())}")
-
         # Allow custom base URL override
         if 'base_url' in self.extra_config:
             client_kwargs['base_url'] = self.extra_config['base_url']
 
-        # Add custom headers if needed (merge with OpenRouter headers)
+        # Add custom headers if needed
         if 'default_headers' in self.extra_config:
-            if 'default_headers' in client_kwargs:
-                client_kwargs['default_headers'].update(self.extra_config['default_headers'])
-            else:
-                client_kwargs['default_headers'] = self.extra_config['default_headers']
+            client_kwargs['default_headers'] = self.extra_config['default_headers']
 
         self.client = OpenAI(**client_kwargs)
         self.async_client = AsyncOpenAI(**client_kwargs)

@@ -47,6 +47,7 @@ class Task(ABC):
         self.status = "running"  # type: str
         self.notified = False  # type: bool  # Whether completion has been notified to LLM
         self.on_status_change = on_status_change  # Callback for persistence
+        self.error = None  # type: Optional[str]  # Error message (extracted on completion)
 
         # Register completion callback
         future.add_done_callback(self._on_complete)
@@ -63,14 +64,17 @@ class Task(ABC):
                 result_status = result.get("status")
                 if result_status == "error":
                     self.status = "failed"
+                    # Extract error message for persistence
+                    self.error = result.get("message", "Task execution failed")
                 elif result_status == "interrupted":
                     self.status = "interrupted"
                 else:
                     self.status = "completed"
             else:
                 self.status = "completed"
-        except Exception:
+        except Exception as e:
             self.status = "failed"
+            self.error = str(e)
 
         # Notify status change for persistence
         if self.on_status_change:

@@ -10,6 +10,9 @@ Execution Tools:
 - pfc_list_tasks: List all tracked long-running tasks
 - pfc_interrupt_task: Request interrupt for running tasks
 
+Diagnostic Tools:
+- pfc_capture_plot: Capture plot screenshots for multimodal visual diagnosis
+
 Documentation Browse Tools (like glob + cat - navigate by path):
 - pfc_browse_commands: Navigate command hierarchy (e.g., "ball create")
 - pfc_browse_contact_models: Navigate contact model properties (e.g., "linear")
@@ -56,6 +59,7 @@ from .pfc_query_command import register_pfc_query_command_tool
 from .pfc_browse_commands import register_pfc_browse_commands_tool
 from .pfc_browse_contact_models import register_pfc_browse_contact_models_tool
 from .pfc_browse_python_api import register_pfc_browse_python_api_tool
+from .pfc_capture_plot import register_pfc_capture_plot_tool
 
 __all__ = [
     "register_pfc_task_tool",
@@ -67,4 +71,5 @@ __all__ = [
     "register_pfc_browse_commands_tool",
     "register_pfc_browse_contact_models_tool",
     "register_pfc_browse_python_api_tool",
+    "register_pfc_capture_plot_tool",
 ]
