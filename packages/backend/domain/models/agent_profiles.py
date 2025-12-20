@@ -85,6 +85,8 @@ PFC_TOOLS: List[str] = [
     "pfc_check_task_status",
     "pfc_list_tasks",
     "pfc_interrupt_task",
+    # PFC diagnostic (multimodal visual analysis)
+    "pfc_capture_plot",
     # SubAgent delegation
     "invoke_agent",
 ]

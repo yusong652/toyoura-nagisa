@@ -401,6 +401,7 @@ class PFCWebSocketClient:
         timeout_ms: Optional[int] = None,
         run_in_background: bool = True,
         session_id: str = "default",
+        source: str = "agent",
         max_retries: int = 2
     ) -> Dict[str, Any]:
         """
@@ -423,6 +424,10 @@ class PFCWebSocketClient:
                 Affects WebSocket timeout calculation.
             session_id: Session identifier for task isolation (default: "default")
                 Used to separate tasks across different client sessions.
+            source: Task source identifier (default: "agent")
+                - "agent": Script created/executed by LLM agent
+                - "user_console": Script from user Python console
+                - "diagnostic": Diagnostic tool operation (e.g., plot capture)
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
@@ -461,7 +466,8 @@ class PFCWebSocketClient:
                         "script_path": script_path,
                         "description": description,
                         "timeout_ms": timeout_ms,
-                        "run_in_background": run_in_background
+                        "run_in_background": run_in_background,
+                        "source": source
                     },
                     timeout=websocket_timeout_s,
                     operation_name=f"Task execution ({script_path})"

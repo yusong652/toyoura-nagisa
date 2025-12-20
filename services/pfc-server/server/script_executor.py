@@ -236,11 +236,13 @@ class PFCScriptExecutor:
                 - True: Asynchronous - return task_id immediately, query via check_task_status
                 - False: Synchronous - wait for completion, return result directly
             source: Task source identifier (default: "agent")
-                - "agent": Script created/executed by LLM agent
-                - "user_console": Script from user Python console (`>` prefix)
+                - "agent": Script created/executed by LLM agent (git snapshot enabled)
+                - "user_console": Script from user Python console (no git snapshot)
+                - "diagnostic": Diagnostic tool operation like plot capture (no git snapshot)
             enable_git_snapshot: Whether to create git snapshot before execution (default: True)
                 - True: Create git commit on pfc-executions branch (for agent scripts)
-                - False: Skip git snapshot (for quick console commands)
+                - False: Skip git snapshot (for quick console commands and diagnostic tools)
+                - Note: Automatically set to False for source="user_console" or "diagnostic"
 
         Returns:
             Result dictionary:

@@ -122,8 +122,15 @@ class PFCWebSocketServer:
                         description = data.get("description", "")  # Agent-provided task description
                         timeout_ms = data.get("timeout_ms", None)  # Default None (no timeout)
                         run_in_background = data.get("run_in_background", True)  # Default asynchronous
+                        source = data.get("source", "agent")  # Task source: agent, user_console, diagnostic
 
-                        result = await self.script_executor.execute_script(session_id, script_path, description, timeout_ms, run_in_background)
+                        # Only agent tasks get git snapshots
+                        enable_git_snapshot = (source == "agent")
+
+                        result = await self.script_executor.execute_script(
+                            session_id, script_path, description, timeout_ms, run_in_background,
+                            source=source, enable_git_snapshot=enable_git_snapshot
+                        )
 
                         # Truncate message before sending (prevent oversized JSON)
                         if "message" in result:
@@ -170,11 +177,13 @@ class PFCWebSocketServer:
                         # List all tracked long-running tasks (not a PFC command, uses task manager directly)
                         request_id = data.get("request_id", "unknown")
                         session_id = data.get("session_id")  # Optional session filter
+                        source = data.get("source")  # Optional source filter (agent, user_console, diagnostic)
                         offset = data.get("offset", 0)  # Skip N most recent tasks
                         limit = data.get("limit")  # Max tasks to return (None = all)
 
                         result = self.task_manager.list_all_tasks(
                             session_id=session_id,
+                            source=source,
                             offset=offset,
                             limit=limit
                         )
