@@ -112,9 +112,9 @@ class PFCWebSocketServer:
                     # Parse incoming message
                     data = json.loads(message)
 
-                    msg_type = data.get("type", "script")
+                    msg_type = data.get("type", "pfc_task")
 
-                    if msg_type == "script":
+                    if msg_type == "pfc_task":
                         # Execute Python script from file path
                         request_id = data.get("request_id", "unknown")
                         session_id = data.get("session_id", "default")  # Session ID for task isolation

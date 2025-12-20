@@ -461,7 +461,7 @@ class PFCWebSocketClient:
                 await self._ensure_connected()
                 return await self._send_request(
                     message={
-                        "type": "script",
+                        "type": "pfc_task",
                         "session_id": session_id,
                         "script_path": script_path,
                         "description": description,
