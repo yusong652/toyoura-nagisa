@@ -8,17 +8,22 @@ captured images.
 
 Philosophy: "Qualitative is radar, quantitative is microscope"
 - Visual scan (qualitative) → Trigger targeted queries (quantitative)
+
+Design:
+- Creates temporary diagnostic plot to avoid interfering with user's plots
+- Includes sensible defaults (ball, wall with transparency, axes)
+- Auto-cleanup: deletes temporary plot after export
 """
 
 import os
-import tempfile
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple
 from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
+from .scripts import generate_plot_capture_script, DEFAULT_PLOT_NAME, DEFAULT_WALL_TRANSPARENCY
 
 
 def register_pfc_capture_plot_tool(mcp: FastMCP):
@@ -43,37 +48,35 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 "Example: '/path/to/workspace/results/plots/stress_check.png'"
             )
         ),
-        plot_name: str = Field(
-            default="Plot01",
-            description="Name of the plot window in PFC GUI (default: 'Plot01')"
-        ),
         size: Optional[Tuple[int, int]] = Field(
             default=None,
             description="Image dimensions in pixels (width, height). Default: (1920, 1080)"
         ),
+        include_ball: bool = Field(
+            default=True,
+            description="Include ball visualization item"
+        ),
+        include_wall: bool = Field(
+            default=True,
+            description="Include wall visualization item (with transparency)"
+        ),
+        include_axes: bool = Field(
+            default=True,
+            description="Include coordinate axes for reference"
+        ),
+        wall_transparency: int = Field(
+            default=DEFAULT_WALL_TRANSPARENCY,
+            ge=0,
+            le=100,
+            description="Wall transparency 0-100 (0=opaque, 100=invisible). Default: 70"
+        ),
         center: Optional[Tuple[float, float, float]] = Field(
             default=None,
-            description="Camera look-at point (x, y, z). If not specified, uses current view."
+            description="Camera look-at point (x, y, z). If not specified, auto-fit."
         ),
         eye: Optional[Tuple[float, float, float]] = Field(
             default=None,
-            description="Camera position (x, y, z). If not specified, uses current view."
-        ),
-        distance: Optional[float] = Field(
-            default=None,
-            description="Distance from camera to center point."
-        ),
-        dip: Optional[float] = Field(
-            default=None,
-            description="View plane dip angle in degrees."
-        ),
-        dip_direction: Optional[float] = Field(
-            default=None,
-            description="View plane dip direction in degrees."
-        ),
-        roll: Optional[float] = Field(
-            default=None,
-            description="Camera roll angle in degrees."
+            description="Camera position (x, y, z). If not specified, uses default isometric view."
         ),
         magnification: Optional[float] = Field(
             default=None,
@@ -81,11 +84,15 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         ),
         projection: Optional[str] = Field(
             default=None,
-            description="Projection mode: 'perspective' or 'parallel'."
+            description="Projection mode: 'perspective' or 'parallel'. Default: 'perspective'"
         ),
     ) -> Dict[str, Any]:
         """
-        Capture a screenshot of PFC plot window for visual diagnosis.
+        Capture a diagnostic screenshot of PFC model state.
+
+        Creates a temporary plot with ball/wall/axes visualization, exports it
+        as PNG, then deletes the temporary plot. This avoids interfering with
+        any plots the user may have open.
 
         Use this tool to visually inspect simulation state. The captured image
         can be read with the 'read' tool for multimodal analysis to identify:
@@ -99,8 +106,8 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             2. Analyze image: read(result["data"]["output_path"])
             3. Take action based on visual findings
 
-        Note: This tool generates a Python script and executes it synchronously.
-        The script sets view parameters and exports the plot as PNG.
+        Note: This creates a temporary diagnostic plot named "NagisaDiagnostic"
+        which is automatically deleted after the screenshot is captured.
         """
         try:
             # Get session ID from MCP context
@@ -141,25 +148,21 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 view_settings["center"] = list(center)
             if eye is not None:
                 view_settings["eye"] = list(eye)
-            if distance is not None:
-                view_settings["distance"] = distance
-            if dip is not None:
-                view_settings["dip"] = dip
-            if dip_direction is not None:
-                view_settings["dip_direction"] = dip_direction
-            if roll is not None:
-                view_settings["roll"] = roll
             if magnification is not None:
                 view_settings["magnification"] = magnification
             if projection is not None:
                 view_settings["projection"] = projection
 
             # Generate Python script for plot capture
-            script_content = _generate_plot_script(
-                plot_name=plot_name,
+            script_content = generate_plot_capture_script(
                 output_path=normalized_output_path,
+                plot_name=DEFAULT_PLOT_NAME,
                 size=size,
-                view_settings=view_settings
+                view_settings=view_settings if view_settings else None,
+                include_ball=include_ball,
+                include_wall=include_wall,
+                include_axes=include_axes,
+                wall_transparency=wall_transparency,
             )
 
             # Get PFC working directory for script storage
@@ -181,7 +184,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             script_filename = f"capture_plot_{int(time.time() * 1000)}.py"
             script_path = os.path.join(script_dir, script_filename)
 
-            # Write script (use Linux path for cross-platform)
+            # Write script
             with open(script_path, 'w', encoding='utf-8') as f:
                 f.write(script_content)
 
@@ -194,7 +197,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             try:
                 result = await client.execute_task(
                     script_path=normalized_script_path,
-                    description=f"Capture plot: {plot_name}",
+                    description=f"Capture diagnostic plot",
                     timeout_ms=30000,  # 30 second timeout
                     run_in_background=False,  # Synchronous execution
                     session_id=session_id,
@@ -209,7 +212,6 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
 
             # Handle execution result
             status = result.get("status")
-            data = result.get("data", {})
 
             if status == "error":
                 error_msg = result.get("message", "Plot capture failed")
@@ -217,23 +219,30 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
 
             # Build success response
             filename = os.path.basename(output_path)
+            items_included = []
+            if include_ball:
+                items_included.append("ball")
+            if include_wall:
+                items_included.append(f"wall (transparency: {wall_transparency}%)")
+            if include_axes:
+                items_included.append("axes")
+
             return success_response(
                 message=f"Plot captured: {filename}",
                 llm_content={
                     "parts": [{
                         "type": "text",
                         "text": (
-                            f"Plot screenshot saved to: {output_path}\n\n"
+                            f"Diagnostic plot captured: {output_path}\n\n"
+                            f"Items included: {', '.join(items_included)}\n\n"
                             f"To analyze the image, use the read tool:\n"
-                            f"  read(\"{output_path}\")\n\n"
-                            f"The image shows the current state of plot '{plot_name}' "
-                            f"with the specified view settings."
+                            f"  read(\"{output_path}\")"
                         )
                     }]
                 },
                 output_path=output_path,
-                plot_name=plot_name,
                 size=list(size),
+                items=items_included,
                 view_settings=view_settings if view_settings else None
             )
 
@@ -244,93 +253,3 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             return error_response(f"Plot capture error: {str(e)}")
 
     print(f"[DEBUG] Registered PFC plot capture tool: pfc_capture_plot")
-
-
-def _generate_plot_script(
-    plot_name: str,
-    output_path: str,
-    size: Tuple[int, int],
-    view_settings: Dict[str, Any]
-) -> str:
-    """
-    Generate Python script for PFC plot capture.
-
-    The script uses itasca.command() to execute PFC plot commands:
-    1. Set view parameters (if specified)
-    2. Export plot as PNG
-
-    Args:
-        plot_name: Name of the plot window (e.g., "Plot01")
-        output_path: Absolute path for output PNG file
-        size: Image dimensions (width, height)
-        view_settings: View parameters (center, eye, distance, dip, etc.)
-
-    Returns:
-        Python script content as string
-    """
-    lines: List[str] = [
-        '"""',
-        'PFC Plot Capture Script',
-        'Generated by pfc_capture_plot tool',
-        '"""',
-        '',
-        'import itasca',
-        'import os',
-        '',
-        '# Ensure output directory exists',
-        f'output_path = r"{output_path}"',
-        'os.makedirs(os.path.dirname(output_path), exist_ok=True)',
-        '',
-        f'plot_name = "{plot_name}"',
-        '',
-    ]
-
-    # Add view setting commands if any specified
-    if view_settings:
-        lines.append('# Set view parameters')
-
-        # Build view command parts
-        view_parts: List[str] = []
-
-        if "center" in view_settings:
-            c = view_settings["center"]
-            view_parts.append(f"center ({c[0]},{c[1]},{c[2]})")
-
-        if "eye" in view_settings:
-            e = view_settings["eye"]
-            view_parts.append(f"eye ({e[0]},{e[1]},{e[2]})")
-
-        if "distance" in view_settings:
-            view_parts.append(f"distance {view_settings['distance']}")
-
-        if "dip" in view_settings:
-            view_parts.append(f"dip {view_settings['dip']}")
-
-        if "dip_direction" in view_settings:
-            view_parts.append(f"dip-direction {view_settings['dip_direction']}")
-
-        if "roll" in view_settings:
-            view_parts.append(f"roll {view_settings['roll']}")
-
-        if "magnification" in view_settings:
-            view_parts.append(f"magnification {view_settings['magnification']}")
-
-        if "projection" in view_settings:
-            view_parts.append(f"projection {view_settings['projection']}")
-
-        # Generate view command
-        if view_parts:
-            view_params = " ".join(view_parts)
-            lines.append(f'itasca.command(\'plot "{plot_name}" view {view_params}\')')
-            lines.append('')
-
-    # Add export command
-    # Use f-string in generated script to insert output_path variable
-    lines.extend([
-        '# Export plot as PNG',
-        f'itasca.command(f\'plot "{plot_name}" export bitmap filename "{{output_path}}" size {size[0]} {size[1]}\')',
-        '',
-        'print(f"Plot captured successfully: {output_path}")',
-    ])
-
-    return '\n'.join(lines)
