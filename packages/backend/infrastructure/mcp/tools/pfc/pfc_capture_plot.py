@@ -132,7 +132,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
 
             # Default size
             if size is None:
-                size = DEFAULT_IMAGE_SIZE
+                size = list(DEFAULT_IMAGE_SIZE)
 
             # Normalize output path for cross-platform (Linux format for PFC server)
             normalized_output_path = normalize_path_separators(output_path, target_platform='linux')
@@ -152,7 +152,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             script_content = generate_plot_capture_script(
                 output_path=normalized_output_path,
                 plot_name=DEFAULT_PLOT_NAME,
-                size=size,
+                size=(size[0], size[1]),
                 view_settings=view_settings if view_settings else None,
                 include_ball=include_ball,
                 include_wall=include_wall,
