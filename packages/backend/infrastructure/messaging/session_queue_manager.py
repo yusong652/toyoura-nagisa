@@ -106,11 +106,22 @@ class SessionQueueManager:
         messages into a single request (like Claude Code does), improving efficiency
         and user experience.
 
+        Merge window behavior:
+        - First iteration: Wait for merge window to collect rapid consecutive messages
+        - Subsequent iterations: Process immediately (messages already waited during LLM processing)
+
+        This prevents unnecessary delays when users send messages during LLM processing
+        or TTS rendering - those messages should be processed immediately.
+
         Args:
             session_id: Session identifier
             message_processor_callback: Async function to process each message
                 Signature: async def callback(session_id: str, message_data: dict) -> None
         """
+        # Only wait for merge window on first iteration
+        # Messages that arrive during LLM processing have already waited long enough
+        is_first_iteration = True
+
         try:
             while True:
                 # Atomic check: get queue and check if empty inside lock
@@ -128,13 +139,15 @@ class SessionQueueManager:
                         logger.info(f"Queue empty for session {session_id}, stopping processing")
                         break
 
-                # Strategy: Wait a bit to collect multiple messages before processing
-                # This allows rapid consecutive messages to be batched together
-                current_queue_size = queue.qsize()
-
-                if current_queue_size > 0:
-                    # Wait for merge window to allow more messages to arrive
-                    await asyncio.sleep(self._merge_window)
+                # Strategy: Wait for merge window ONLY on first iteration
+                # This allows rapid consecutive messages to be batched together for new conversations
+                # But messages queued during LLM processing are processed immediately
+                if is_first_iteration:
+                    is_first_iteration = False
+                    current_queue_size = queue.qsize()
+                    if current_queue_size > 0:
+                        # Wait for merge window to allow more messages to arrive
+                        await asyncio.sleep(self._merge_window)
 
                 # Collect all messages currently in queue (up to max_merge_count)
                 messages_to_process = []

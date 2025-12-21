@@ -1,6 +1,7 @@
 """
-TTS Factory module for toyoura-nagisa
-用于根据配置动态选择和实例化 TTS 引擎
+TTS Factory module for toyoura-nagisa.
+
+Dynamically selects and instantiates TTS engines based on configuration.
 """
 
 from typing import Optional
@@ -12,15 +13,15 @@ from backend.config import get_tts_settings
 # Global TTS engine instance
 _tts_engine: Optional[BaseTTS] = None
 
+
 def get_tts_engine() -> BaseTTS:
-    """
-    根据配置获取对应的 TTS 引擎实例
-    
+    """Get TTS engine instance based on configuration.
+
     Returns:
-        BaseTTS: TTS 引擎实例
-        
+        BaseTTS: TTS engine instance
+
     Raises:
-        ValueError: 如果配置的 TTS 类型不支持
+        ValueError: If configured TTS type is not supported
     """
     settings = get_tts_settings()
     tts_type = settings.type.lower()

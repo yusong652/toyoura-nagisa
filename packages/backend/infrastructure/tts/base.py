@@ -9,98 +9,99 @@ class TTSRequest(BaseModel):
     text: str
 
 class TTSException(Exception):
-    """TTS 模块的基础异常类"""
+    """Base exception class for TTS module"""
     pass
 
 class TTSInitError(TTSException):
-    """TTS 初始化错误"""
+    """TTS initialization error"""
     pass
 
 class TTSSynthesisError(TTSException):
-    """TTS 合成错误"""
+    """TTS synthesis error"""
     pass
 
 class TTSConfig:
-    """TTS 配置基类
-    
-    用于存储和管理 TTS 引擎的配置参数。
+    """TTS configuration base class.
+
+    Used for storing and managing TTS engine configuration parameters.
     """
-    
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """初始化配置
-        
+        """Initialize configuration.
+
         Args:
-            config: 配置字典，可选
+            config: Configuration dictionary, optional
         """
         self._config = config or {}
-    
+
     def get(self, key: str, default: Any = None) -> Any:
-        """获取配置值
-        
+        """Get configuration value.
+
         Args:
-            key: 配置键
-            default: 默认值
-            
+            key: Configuration key
+            default: Default value
+
         Returns:
-            配置值，如果不存在则返回默认值
+            Configuration value, or default if not found
         """
         return self._config.get(key, default)
-    
+
     def set(self, key: str, value: Any) -> None:
-        """设置配置值
-        
+        """Set configuration value.
+
         Args:
-            key: 配置键
-            value: 配置值
+            key: Configuration key
+            value: Configuration value
         """
         self._config[key] = value
 
 class BaseTTS(ABC):
-    """TTS 引擎的抽象基类
-    
-    定义了所有 TTS 引擎必须实现的基本接口。
+    """Abstract base class for TTS engines.
+
+    Defines the basic interface that all TTS engines must implement.
     """
-    
+
     def __init__(self, config: TTSConfig):
-        """初始化 TTS 引擎
-        
+        """Initialize TTS engine.
+
         Args:
-            config: TTS 配置对象
+            config: TTS configuration object
         """
         self.config = config
         self._is_ready = False
-        self._enabled = True  # 默认启用TTS
-    
+        self._enabled = False  # Disabled by default (CLI has no TTS toggle, will be separated later)
+
     @property
     def enabled(self) -> bool:
-        """获取TTS引擎的启用状态"""
+        """Get TTS engine enabled status."""
         return self._enabled
-    
+
     @enabled.setter
     def enabled(self, value: bool) -> None:
-        """设置TTS引擎的启用状态"""
+        """Set TTS engine enabled status."""
         self._enabled = value
-    
+
     def clean_text(self, text: str) -> str:
-        """清理文本中的颜文字和特殊符号
-        
+        """Clean kaomoji and special symbols from text.
+
         Args:
-            text: 原始文本
-            
+            text: Original text
+
         Returns:
-            str: 清理后的文本
+            str: Cleaned text
         """
         return clean_text_for_tts(text)
     
     def save_audio_to_file(self, audio_bytes: bytes, output_path: Optional[Union[str, Path]] = None, audio_format: str = "mp3") -> Optional[str]:
-        """将音频字节流保存到文件，支持多种音频格式
-        
+        """Save audio bytes to file, supporting multiple audio formats.
+
         Args:
-            audio_bytes: 要保存的音频字节流
-            output_path: 输出文件路径，可选。如果不提供，将自动生成文件名
-            audio_format: 音频格式（如 'mp3', 'wav'），默认 'mp3'
+            audio_bytes: Audio bytes to save
+            output_path: Output file path, optional. Auto-generates filename if not provided
+            audio_format: Audio format (e.g., 'mp3', 'wav'), defaults to 'mp3'
+
         Returns:
-            Optional[str]: 保存的文件路径，如果保存失败则返回 None
+            Optional[str]: Saved file path, or None if save failed
         """
         try:
             if not output_path:
@@ -122,25 +123,25 @@ class BaseTTS(ABC):
     
     @property
     def is_ready(self) -> bool:
-        """检查 TTS 引擎是否已准备就绪
-        
+        """Check if TTS engine is ready.
+
         Returns:
-            bool: 是否已准备就绪
+            bool: Whether the engine is ready
         """
         return self._is_ready
-    
+
     @abstractmethod
     async def initialize(self) -> bool:
-        """初始化 TTS 引擎
-        
+        """Initialize TTS engine.
+
         Returns:
-            bool: 初始化是否成功
-            
+            bool: Whether initialization was successful
+
         Raises:
-            TTSInitError: 初始化失败时抛出
+            TTSInitError: Raised when initialization fails
         """
         pass
-    
+
     @abstractmethod
     async def synthesize(
         self,
@@ -151,30 +152,30 @@ class BaseTTS(ABC):
         speed: float = 1.0,
         **kwargs
     ) -> Union[bytes, str]:
-        """将文本转换为语音
-        
+        """Convert text to speech.
+
         Args:
-            text: 要转换的文本
-            output_path: 输出音频文件的路径，可选
-            reference_id: 说话人ID，可选
-            language: 语言代码，可选
-            speed: 语速，默认1.0
-            **kwargs: 其他参数
-            
+            text: Text to convert
+            output_path: Output audio file path, optional
+            reference_id: Speaker ID, optional
+            language: Language code, optional
+            speed: Speech rate, defaults to 1.0
+            **kwargs: Additional parameters
+
         Returns:
-            Union[bytes, str]: 
-                - 如果提供了output_path，返回保存的文件路径
-                - 如果没有提供output_path，返回音频数据的字节串
-                
+            Union[bytes, str]:
+                - If output_path is provided, returns the saved file path
+                - If output_path is not provided, returns audio data as bytes
+
         Raises:
-            TTSSynthesisError: 合成过程中出现错误时抛出
+            TTSSynthesisError: Raised when synthesis error occurs
         """
         pass
-    
+
     @abstractmethod
     async def shutdown(self) -> None:
-        """关闭 TTS 引擎
-        
-        释放资源并清理状态。
+        """Shutdown TTS engine.
+
+        Release resources and clean up state.
         """
         pass
