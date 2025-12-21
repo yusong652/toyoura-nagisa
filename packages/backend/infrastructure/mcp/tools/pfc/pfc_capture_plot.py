@@ -23,7 +23,7 @@ from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
-from .scripts import generate_plot_capture_script, DEFAULT_PLOT_NAME, DEFAULT_WALL_TRANSPARENCY
+from .scripts import generate_plot_capture_script, DEFAULT_PLOT_NAME, DEFAULT_WALL_TRANSPARENCY, DEFAULT_IMAGE_SIZE
 
 
 def register_pfc_capture_plot_tool(mcp: FastMCP):
@@ -43,71 +43,58 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         output_path: str = Field(
             ...,
             description=(
-                "Absolute path for output image file (must end with .png). "
-                "Parent directory will be created if not exists. "
-                "Example: '/path/to/workspace/results/plots/stress_check.png'"
+                "Absolute path for PNG file. Directory auto-created if not exists. "
+                "Example: '/path/to/project/plots/model_state.png'"
             )
         ),
         size: Optional[Tuple[int, int]] = Field(
             default=None,
-            description="Image dimensions in pixels (width, height). Default: (1920, 1080)"
+            description="Image size (width, height) in pixels. Default: (1280, 720)."
         ),
         include_ball: bool = Field(
             default=True,
-            description="Include ball visualization item"
+            description="Show particles (balls) in the plot."
         ),
         include_wall: bool = Field(
             default=True,
-            description="Include wall visualization item (with transparency)"
+            description="Show boundary walls with transparency."
         ),
         include_axes: bool = Field(
             default=True,
-            description="Include coordinate axes for reference"
+            description="Show coordinate axes (X, Y, Z)."
         ),
         wall_transparency: int = Field(
             default=DEFAULT_WALL_TRANSPARENCY,
             ge=0,
             le=100,
-            description="Wall transparency 0-100 (0=opaque, 100=invisible). Default: 70"
+            description="Wall transparency 0-100 (0=opaque, 100=invisible). Default: 70."
         ),
         center: Optional[Tuple[float, float, float]] = Field(
             default=None,
-            description="Camera look-at point (x, y, z). If not specified, auto-fit."
+            description="Camera look-at point (x, y, z). Auto-fit if not specified."
         ),
         eye: Optional[Tuple[float, float, float]] = Field(
             default=None,
-            description="Camera position (x, y, z). If not specified, uses default isometric view."
+            description="Camera position (x, y, z). Isometric view if not specified."
         ),
         magnification: Optional[float] = Field(
             default=None,
-            description="Zoom level (1.0 = normal)."
+            description="Zoom level (1.0 = normal, 2.0 = 2x closer)."
         ),
         projection: Optional[str] = Field(
             default=None,
-            description="Projection mode: 'perspective' or 'parallel'. Default: 'perspective'"
+            description="'perspective' (default) or 'parallel' (orthographic)."
         ),
     ) -> Dict[str, Any]:
         """
         Capture a diagnostic screenshot of PFC model state.
 
-        Creates a temporary plot with ball/wall/axes visualization, exports it
-        as PNG, then deletes the temporary plot. This avoids interfering with
-        any plots the user may have open.
-
-        Use this tool to visually inspect simulation state. The captured image
-        can be read with the 'read' tool for multimodal analysis to identify:
+        Use this tool to visually inspect simulation state. After capture,
+        use the 'read' tool on output_path for multimodal analysis to identify:
         - Particle clustering or irregular distributions
         - Boundary penetration issues
         - Stress concentration patterns
         - Model geometry problems
-
-        Workflow:
-            1. Capture plot: result = pfc_capture_plot(output_path="...")
-            2. Analyze image: read(result["data"]["output_path"])
-            3. Take action based on visual findings
-
-        Note: This creates a temporary diagnostic plot named "NagisaDiagnostic"
-        which is automatically deleted after the screenshot is captured.
         """
         try:
             # Get session ID from MCP context
@@ -137,7 +124,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
 
             # Default size
             if size is None:
-                size = (1920, 1080)
+                size = DEFAULT_IMAGE_SIZE
 
             # Normalize output path for cross-platform (Linux format for PFC server)
             normalized_output_path = normalize_path_separators(output_path, target_platform='linux')
@@ -215,32 +202,18 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 return error_response(f"Plot capture failed: {error_msg}")
 
             # Build success response
-            filename = os.path.basename(output_path)
-            items_included = []
-            if include_ball:
-                items_included.append("ball")
-            if include_wall:
-                items_included.append(f"wall (transparency: {wall_transparency}%)")
-            if include_axes:
-                items_included.append("axes")
-
             return success_response(
-                message=f"Plot captured: {filename}",
+                message=f"Plot captured: {os.path.basename(output_path)}",
                 llm_content={
                     "parts": [{
                         "type": "text",
                         "text": (
-                            f"Diagnostic plot captured: {output_path}\n\n"
-                            f"Items included: {', '.join(items_included)}\n\n"
-                            f"To analyze the image, use the read tool:\n"
-                            f"  read(\"{output_path}\")"
+                            f"Plot captured: {output_path}\n\n"
+                            f"To analyze, use: read(\"{output_path}\")"
                         )
                     }]
                 },
-                output_path=output_path,
-                size=list(size),
-                items=items_included,
-                view_settings=view_settings if view_settings else None
+                output_path=output_path
             )
 
         except ConnectionError as e:

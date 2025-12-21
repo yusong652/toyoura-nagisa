@@ -17,7 +17,7 @@ from typing import Dict, Any, List, Tuple, Optional
 # Default plot configuration
 DEFAULT_PLOT_NAME = "NagisaDiagnostic"
 DEFAULT_WALL_TRANSPARENCY = 70  # 0-100, 70 = 70% transparent
-DEFAULT_IMAGE_SIZE = (1920, 1080)
+DEFAULT_IMAGE_SIZE = (1280, 720)
 
 
 def generate_plot_capture_script(
