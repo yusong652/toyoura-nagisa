@@ -23,7 +23,7 @@ from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
-from .scripts import generate_plot_capture_script, DEFAULT_PLOT_NAME, DEFAULT_WALL_TRANSPARENCY, DEFAULT_IMAGE_SIZE
+from .scripts import generate_plot_capture_script, DEFAULT_PLOT_NAME, DEFAULT_WALL_TRANSPARENCY, DEFAULT_IMAGE_SIZE, BALL_COLOR_BY_SPECS
 
 
 def register_pfc_capture_plot_tool(mcp: FastMCP):
@@ -54,6 +54,10 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         include_ball: bool = Field(
             default=True,
             description="Show particles (balls) in the plot."
+        ),
+        ball_color_by: Optional[str] = Field(
+            default=None,
+            description=f"Color balls by attribute. Options: {', '.join(BALL_COLOR_BY_SPECS.keys())}. None = default."
         ),
         include_wall: bool = Field(
             default=True,
@@ -126,6 +130,13 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                     f"projection must be 'perspective' or 'parallel', got: '{projection}'"
                 )
 
+            # Validate ball_color_by value
+            if ball_color_by is not None and ball_color_by.lower() not in BALL_COLOR_BY_SPECS:
+                valid_options = ', '.join(BALL_COLOR_BY_SPECS.keys())
+                return error_response(
+                    f"ball_color_by must be one of: {valid_options}. Got: '{ball_color_by}'"
+                )
+
             # Default size
             if size is None:
                 size = list(DEFAULT_IMAGE_SIZE)
@@ -154,6 +165,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 include_wall=include_wall,
                 include_axes=True,
                 wall_transparency=wall_transparency,
+                ball_color_by=ball_color_by,
             )
 
             # Get PFC working directory for script storage

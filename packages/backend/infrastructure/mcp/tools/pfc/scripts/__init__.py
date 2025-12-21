@@ -10,6 +10,7 @@ from .plot_capture_template import (
     DEFAULT_PLOT_NAME,
     DEFAULT_WALL_TRANSPARENCY,
     DEFAULT_IMAGE_SIZE,
+    BALL_COLOR_BY_SPECS,
 )
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "DEFAULT_PLOT_NAME",
     "DEFAULT_WALL_TRANSPARENCY",
     "DEFAULT_IMAGE_SIZE",
+    "BALL_COLOR_BY_SPECS",
 ]

@@ -19,6 +19,67 @@ DEFAULT_PLOT_NAME = "NagisaDiagnostic"
 DEFAULT_WALL_TRANSPARENCY = 70  # 0-100, 70 = 70% transparent
 DEFAULT_IMAGE_SIZE = (720, 480)
 
+# Ball color-by specifications
+# Maps user-friendly keywords to PFC syntax details
+# This encapsulates PFC syntax complexity from the LLM
+BALL_COLOR_BY_SPECS = {
+    "velocity": {
+        "type": "vector",
+        "attribute": "velocity",
+        "quantity": "mag",
+        "description": "Color by velocity magnitude (useful for checking equilibrium)",
+    },
+    "displacement": {
+        "type": "vector",
+        "attribute": "displacement",
+        "quantity": "mag",
+        "description": "Color by displacement magnitude (useful for deformation analysis)",
+    },
+    "radius": {
+        "type": "numeric",
+        "attribute": "radius",
+        "description": "Color by particle radius (useful for size distribution)",
+    },
+}
+
+
+def _build_ball_color_by_command(color_by: Optional[str]) -> str:
+    """
+    Build PFC color-by command string from user keyword.
+
+    Encapsulates PFC syntax differences:
+    - Vector attributes: vector-attribute "name" quantity mag
+    - Numeric attributes: numeric-attribute "name"
+
+    Always includes 'color-options scaled' for continuous color gradients.
+
+    Args:
+        color_by: User keyword ("velocity", "displacement", "radius", or None)
+
+    Returns:
+        PFC color-by command fragment, or empty string if None/invalid
+    """
+    if not color_by:
+        return ""
+
+    spec = BALL_COLOR_BY_SPECS.get(color_by.lower())
+    if not spec:
+        return ""
+
+    # Build color-by part
+    if spec["type"] == "vector":
+        color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {spec["quantity"]}'
+    elif spec["type"] == "numeric":
+        color_by_part = f'color-by numeric-attribute "{spec["attribute"]}"'
+    else:
+        return ""
+
+    # Add color-options for continuous gradient (automatic scaling with rainbow ramp)
+    # legend active on is required to display the color scale
+    color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic legend active on"
+
+    return f"{color_by_part} {color_options}"
+
 
 def generate_plot_capture_script(
     output_path: str,
@@ -29,6 +90,7 @@ def generate_plot_capture_script(
     include_wall: bool = True,
     include_axes: bool = True,
     wall_transparency: int = DEFAULT_WALL_TRANSPARENCY,
+    ball_color_by: Optional[str] = None,
 ) -> str:
     """
     Generate Python script for PFC plot capture.
@@ -53,6 +115,8 @@ def generate_plot_capture_script(
         include_wall: Add wall visualization item with transparency
         include_axes: Add coordinate axes
         wall_transparency: Wall transparency 0-100 (default: 70)
+        ball_color_by: Color balls by attribute ("velocity", "displacement", "radius")
+            None = default coloring
 
     Returns:
         Python script content as string
@@ -73,8 +137,18 @@ def generate_plot_capture_script(
         f'output_path = r"{output_path}"',
         f'plot_name = "{plot_name}"',
         '',
-        '# Ensure output directory exists',
-        'os.makedirs(os.path.dirname(output_path), exist_ok=True)',
+        '# Ensure output directory exists and disable Windows thumbnails',
+        'output_dir = os.path.dirname(output_path)',
+        'os.makedirs(output_dir, exist_ok=True)',
+        '',
+        '# Create desktop.ini to disable Windows thumbnail generation (reduces folder lag)',
+        'desktop_ini_path = os.path.join(output_dir, "desktop.ini")',
+        'if not os.path.exists(desktop_ini_path):',
+        '    with open(desktop_ini_path, "w") as f:',
+        '        f.write("[ViewState]\\nFolderType=Generic\\n")',
+        '    # Set hidden and system attributes (Windows)',
+        '    import subprocess',
+        '    subprocess.run(["attrib", "+H", "+S", desktop_ini_path], capture_output=True)',
         '',
     ]
 
@@ -101,7 +175,12 @@ def generate_plot_capture_script(
     lines.append('# Add visualization items')
 
     if include_ball:
-        lines.append('itasca.command(\'plot item create ball\')')
+        color_by_cmd = _build_ball_color_by_command(ball_color_by)
+        if color_by_cmd:
+            # active on must come right after 'ball' to enable color-by
+            lines.append(f'itasca.command(\'plot item create ball active on {color_by_cmd}\')')
+        else:
+            lines.append('itasca.command(\'plot item create ball\')')
 
     if include_wall:
         lines.append(f'itasca.command(\'plot item create wall transparency {wall_transparency}\')')
