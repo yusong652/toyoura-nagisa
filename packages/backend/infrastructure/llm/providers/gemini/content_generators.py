@@ -238,9 +238,10 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
                 )
                 
         except Exception as e:
+            import traceback
             error_msg = f"An error occurred during web search: {str(e)}"
-            if debug:
-                print(f"[WebSearch] Error: {error_msg}")
+            print(f"[WebSearch] Error: {error_msg}")
+            print(f"[WebSearch] Traceback:\n{traceback.format_exc()}")
             return BaseWebSearchGenerator.format_search_error(query, error_msg)
 
 class GeminiImagePromptGenerator(BaseImagePromptGenerator):

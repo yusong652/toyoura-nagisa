@@ -365,41 +365,68 @@ class GeminiResponseProcessor(BaseResponseProcessor):
     def extract_web_search_sources(response, debug: bool = False) -> List[Dict[str, Any]]:
         """
         Extract web search sources from Gemini response.
-        
+
+        Supports both new API (grounding_metadata.grounding_chunks) and
+        legacy API (groundingMetadata.webSearchQueries) for compatibility.
+
         Args:
             response: Raw Gemini API response object
             debug: Enable debug output
-            
+
         Returns:
             List[Dict[str, Any]]: List of web search sources
         """
         sources = []
-        
+
         if not hasattr(response, 'candidates') or not response.candidates:
             return sources
-        
+
         candidate = response.candidates[0]
-        
-        # Check for grounding metadata (Gemini's search results)
-        if hasattr(candidate, 'groundingMetadata'):
-            grounding = candidate.groundingMetadata
-            if hasattr(grounding, 'webSearchQueries'):
-                for query in grounding.webSearchQueries:
-                    if hasattr(query, 'searchResults'):
-                        for result in query.searchResults:
-                            source = {
-                                'title': getattr(result, 'title', ''),
-                                'url': getattr(result, 'uri', ''),
-                                'snippet': getattr(result, 'snippet', ''),
-                                'type': 'web_search'
-                            }
-                            sources.append(source)
-        
-        # Check for citations in content
-        if hasattr(candidate, 'citationMetadata'):
-            citations = candidate.citationMetadata
-            if hasattr(citations, 'citationSources'):
-                for citation in citations.citationSources:
+
+        # New API: grounding_metadata with grounding_chunks (Gemini 2.0+)
+        grounding = getattr(candidate, 'grounding_metadata', None)
+        if grounding:
+            # Extract sources from grounding_chunks (new structure)
+            chunks = getattr(grounding, 'grounding_chunks', None)
+            if chunks:
+                for chunk in chunks:
+                    web = getattr(chunk, 'web', None)
+                    if web:
+                        source = {
+                            'title': getattr(web, 'title', ''),
+                            'url': getattr(web, 'uri', ''),
+                            'snippet': '',
+                            'type': 'web_search'
+                        }
+                        sources.append(source)
+
+            if debug and chunks:
+                print(f"[WebSearch] Found {len(chunks)} grounding chunks")
+
+        # Legacy API: groundingMetadata with webSearchQueries (older models)
+        if not sources:
+            grounding_legacy = getattr(candidate, 'groundingMetadata', None)
+            if grounding_legacy:
+                queries = getattr(grounding_legacy, 'webSearchQueries', None)
+                if queries:
+                    for query in queries:
+                        results = getattr(query, 'searchResults', None)
+                        if results:
+                            for result in results:
+                                source = {
+                                    'title': getattr(result, 'title', ''),
+                                    'url': getattr(result, 'uri', ''),
+                                    'snippet': getattr(result, 'snippet', ''),
+                                    'type': 'web_search'
+                                }
+                                sources.append(source)
+
+        # Check for citations in content (both APIs)
+        citations = getattr(candidate, 'citationMetadata', None) or getattr(candidate, 'citation_metadata', None)
+        if citations:
+            citation_sources = getattr(citations, 'citationSources', None) or getattr(citations, 'citation_sources', None)
+            if citation_sources:
+                for citation in citation_sources:
                     source = {
                         'title': getattr(citation, 'title', ''),
                         'url': getattr(citation, 'uri', ''),
@@ -407,10 +434,10 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                         'type': 'citation'
                     }
                     sources.append(source)
-        
+
         if debug and sources:
             print(f"[WebSearch] Extracted {len(sources)} sources from Gemini response")
-        
+
         return sources
     
     @staticmethod
