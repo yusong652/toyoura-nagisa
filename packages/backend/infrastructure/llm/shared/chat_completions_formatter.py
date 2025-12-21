@@ -39,14 +39,14 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
     @staticmethod
     def format_messages(
         messages: List[BaseMessage],
-        preserve_thinking: bool = True
     ) -> List[Dict[str, Any]]:
         """
-        Convert internal messages to Chat Completions API format
+        Convert internal messages to Chat Completions API format.
+
+        Always preserves thinking content for cross-turn reasoning continuity.
 
         Args:
             messages: List of internal message objects
-            preserve_thinking: Whether to preserve thinking content in context
 
         Returns:
             List of Chat Completions-formatted message dictionaries
@@ -57,7 +57,7 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
             # Handle regular messages with multimodal content
             if isinstance(msg.content, list):
                 chat_content = ChatCompletionsMessageFormatter._format_multimodal_content(
-                    msg.content, preserve_thinking
+                    msg.content
                 )
                 formatted_messages.append({
                     "role": msg.role, # type: ignore
@@ -76,14 +76,14 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
     @staticmethod
     def format_single_message(
         message: BaseMessage,
-        preserve_thinking: bool = True
     ) -> Dict[str, Any]:
         """
-        Format a single BaseMessage to Chat Completions API format
+        Format a single BaseMessage to Chat Completions API format.
+
+        Always preserves thinking content for cross-turn reasoning continuity.
 
         Args:
             message: Single internal message object
-            preserve_thinking: Whether to preserve thinking content
 
         Returns:
             Dict[str, Any]: Chat Completions-formatted message dictionary
@@ -94,7 +94,7 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
         # Handle regular messages with multimodal content
         if isinstance(message.content, list):
             chat_content = ChatCompletionsMessageFormatter._format_multimodal_content(
-                message.content, preserve_thinking
+                message.content
             )
             return {
                 "role": message.role, # type: ignore
@@ -111,14 +111,14 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
     @staticmethod
     def _format_multimodal_content(
         content: List[Dict[str, Any]],
-        preserve_thinking: bool = True
     ) -> Union[str, List[Dict[str, Any]]]:
         """
-        Format multimodal content for Chat Completions API
+        Format multimodal content for Chat Completions API.
+
+        Always preserves thinking content for cross-turn reasoning continuity.
 
         Args:
             content: List of content blocks
-            preserve_thinking: Whether to preserve thinking content
 
         Returns:
             Chat Completions-formatted content - either string for text-only or array for multimodal
@@ -159,11 +159,9 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
                 formatted_content.append(block)
                 has_non_text_content = True
 
-            # Handle thinking content
-            # Include thinking content directly without tags to prevent few-shot contamination
-            elif block.get("type") == "thinking" and preserve_thinking:
+            # Always preserve thinking content for cross-turn reasoning
+            elif block.get("type") == "thinking":
                 thinking_text = block.get("thinking", "")
-                # Always include thinking content, even if it's just "\n"
                 formatted_content.append({
                     "type": "text",
                     "text": thinking_text

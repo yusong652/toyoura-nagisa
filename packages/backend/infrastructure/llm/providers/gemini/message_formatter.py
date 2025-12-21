@@ -20,7 +20,6 @@ class GeminiMessageFormatter(BaseMessageFormatter):
     @staticmethod
     def format_messages(
         messages: List[BaseMessage],
-        preserve_thinking: Optional[bool] = None
     ) -> List[Dict[str, Any]]:
         """
         Convert toyoura-nagisa BaseMessage objects to Gemini API format.
@@ -28,75 +27,65 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         Handles conversation history messages for context initialization and content generation.
         Tool results are handled separately via add_tool_result pathway.
 
+        Always preserves thinking content and thought_signature for:
+        - Cross-turn reasoning continuity
+        - Tool calling chain validation
+        - Context caching optimization
+
         Args:
             messages: List of BaseMessage objects from toyoura-nagisa's internal format
-            preserve_thinking: Whether to preserve thinking content with thought_signature.
-                             If None, automatically reads from Gemini client configuration.
-                             Explicit True/False values override the configuration.
 
         Returns:
             List[Dict[str, Any]]: Messages formatted for Gemini API
         """
-        # Auto-detect from config if not explicitly specified
-        if preserve_thinking is None:
-            from .config import get_gemini_client_config
-            config = get_gemini_client_config()
-            preserve_thinking = config.model_settings.preserve_thinking_in_history
         from google.genai import types
         import base64
-        
+
         contents = []
-        
+
         for msg in messages:
             if msg is None:
                 continue
-                
+
             parts = []
-            
+
             # Handle message content based on format
             if isinstance(msg.content, list):
                 # Multi-part message (text + optional multimodal content)
                 for item in msg.content:
                     if isinstance(item, dict):
-                        # Handle thinking content based on preserve_thinking flag
+                        # Always preserve thinking content for cross-turn reasoning
                         if item.get("type") == "thinking":
-                            if preserve_thinking:
-                                # Preserve thinking content for cross-turn reasoning
-                                thinking_text = item.get("thinking", "")
-                                if thinking_text:
-                                    # Create thinking part with thought=True flag
-                                    thinking_part = types.Part(text=thinking_text, thought=True)
+                            thinking_text = item.get("thinking", "")
+                            if thinking_text:
+                                thinking_part = types.Part(text=thinking_text, thought=True)
 
-                                    # Restore thought_signature if available (for tool calling chains)
-                                    thought_sig_b64 = item.get("thought_signature")
-                                    if thought_sig_b64:
-                                        try:
-                                            # Decode from base64 string back to bytes
-                                            thought_sig_bytes = base64.b64decode(thought_sig_b64)
-                                            thinking_part.thought_signature = thought_sig_bytes
-                                        except Exception as e:
-                                            print(f"[WARNING] Failed to decode thought_signature: {e}")
+                                # Restore thought_signature if available (for tool calling chains)
+                                thought_sig_b64 = item.get("thought_signature")
+                                if thought_sig_b64:
+                                    try:
+                                        thought_sig_bytes = base64.b64decode(thought_sig_b64)
+                                        thinking_part.thought_signature = thought_sig_bytes
+                                    except Exception as e:
+                                        print(f"[WARNING] Failed to decode thought_signature: {e}")
 
-                                    parts.append(thinking_part)
-                            # else: skip thinking (default behavior)
+                                parts.append(thinking_part)
                             continue
 
-                        # Skip redacted_thinking regardless of preserve_thinking
+                        # Skip redacted_thinking (Anthropic-specific, not applicable to Gemini)
                         if item.get("type") == "redacted_thinking":
                             continue
 
                         if item.get("type") == "text" and item.get("text"):
                             text_part = types.Part(text=item["text"])
-                            # Restore thought_signature if available (Gemini 2.5+ final text parts)
-                            # Only when preserve_thinking is enabled
-                            if preserve_thinking:
-                                thought_sig_b64 = item.get("thought_signature")
-                                if thought_sig_b64:
-                                    try:
-                                        thought_sig_bytes = base64.b64decode(thought_sig_b64)
-                                        text_part.thought_signature = thought_sig_bytes
-                                    except Exception as e:
-                                        print(f"[WARNING] Failed to decode thought_signature for text: {e}")
+                            # Always restore thought_signature if available (Gemini 2.5+ final text parts)
+                            thought_sig_b64 = item.get("thought_signature")
+                            if thought_sig_b64:
+                                try:
+                                    thought_sig_bytes = base64.b64decode(thought_sig_b64)
+                                    text_part.thought_signature = thought_sig_bytes
+                                except Exception as e:
+                                    print(f"[WARNING] Failed to decode thought_signature for text: {e}")
                             parts.append(text_part)
 
                         # Handle tool_use blocks (for assistant messages with tool calls)
@@ -107,17 +96,16 @@ class GeminiMessageFormatter(BaseMessageFormatter):
                             )
                             part = types.Part(function_call=function_call)
 
-                            # Restore thought_signature if available (for tool calling chain validation)
-                            # Only when preserve_thinking is enabled
-                            if preserve_thinking:
-                                thought_sig_b64 = item.get("thought_signature")
-                                if thought_sig_b64:
-                                    try:
-                                        # Decode from base64 string back to bytes
-                                        thought_sig_bytes = base64.b64decode(thought_sig_b64)
-                                        part.thought_signature = thought_sig_bytes
-                                    except Exception as e:
-                                        print(f"[WARNING] Failed to decode thought_signature for tool_use: {e}")
+                            # IMPORTANT: Always restore thought_signature for tool_use
+                            # This is required for Gemini's tool calling chain validation and caching
+                            # Unlike thinking content, tool_use signatures are mandatory for API correctness
+                            thought_sig_b64 = item.get("thought_signature")
+                            if thought_sig_b64:
+                                try:
+                                    thought_sig_bytes = base64.b64decode(thought_sig_b64)
+                                    part.thought_signature = thought_sig_bytes
+                                except Exception as e:
+                                    print(f"[WARNING] Failed to decode thought_signature for tool_use: {e}")
 
                             parts.append(part)
 

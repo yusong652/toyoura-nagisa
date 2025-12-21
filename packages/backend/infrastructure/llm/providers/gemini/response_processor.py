@@ -492,87 +492,98 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         Converts list of StreamingChunk objects back into Gemini's native
         GenerateContentResponse format for tool call detection and context management.
 
+        IMPORTANT: This method merges consecutive chunks of the same type into single
+        parts to ensure consistency with format_response_for_storage(). This is critical
+        for cache hit rates - the working context format must match the stored history
+        format, otherwise Gemini's context caching will not recognize equivalent content.
+
         Args:
             chunks: List of StreamingChunk objects collected during streaming
 
         Returns:
             types.GenerateContentResponse: Complete Gemini response object with
-                                          all parts preserved for tool calling
+                                          merged parts for cache compatibility
 
         Note:
-            This reconstruction preserves all essential fields including:
-            - Thinking content with thought flags
-            - Text content
-            - Function calls with thought_signature
-            - All metadata needed for tool calling logic
+            - Thinking chunks are merged into a single thinking Part
+            - Text chunks are merged into a single text Part
+            - Function call chunks are NOT merged (each is a separate Part)
+            - thought_signature is preserved from the last chunk of each type
         """
-        # Convert StreamingChunk objects to Gemini Part format
-        parts_data = []
+        parts = []
+
+        # Accumulate consecutive chunks of the same type for merging
+        accumulated_thinking = ""
+        accumulated_text = ""
+        thinking_signature: Optional[bytes] = None
+        text_signature: Optional[bytes] = None
+
+        def flush_thinking():
+            """Add accumulated thinking as a Part if non-empty."""
+            nonlocal accumulated_thinking, thinking_signature
+            if accumulated_thinking:
+                part = types.Part(text=accumulated_thinking, thought=True)
+                if thinking_signature:
+                    part.thought_signature = thinking_signature
+                parts.append(part)
+                accumulated_thinking = ""
+                thinking_signature = None
+
+        def flush_text():
+            """Add accumulated text as a Part if non-empty."""
+            nonlocal accumulated_text, text_signature
+            if accumulated_text:
+                part = types.Part(text=accumulated_text)
+                if text_signature:
+                    part.thought_signature = text_signature
+                parts.append(part)
+                accumulated_text = ""
+                text_signature = None
 
         for chunk in chunks:
-            part_dict = {}
-
             if chunk.chunk_type == "thinking":
-                part_dict["text"] = chunk.content
-                part_dict["thought"] = True
+                # Flush any accumulated text first (type transition)
+                flush_text()
+                # Accumulate thinking content
+                accumulated_thinking += chunk.content
+                # Capture thought_signature (last one wins, typically final chunk has it)
                 if chunk.thought_signature:
-                    part_dict["thought_signature"] = chunk.thought_signature
+                    thinking_signature = chunk.thought_signature
 
             elif chunk.chunk_type == "text":
-                part_dict["text"] = chunk.content
-                # Preserve thought_signature for final text parts (Gemini 2.5+)
+                # Flush any accumulated thinking first (type transition)
+                flush_thinking()
+                # Accumulate text content
+                accumulated_text += chunk.content
+                # Capture thought_signature for final text parts (Gemini 2.5+)
                 if chunk.thought_signature:
-                    part_dict["thought_signature"] = chunk.thought_signature
+                    text_signature = chunk.thought_signature
 
             elif chunk.chunk_type == "function_call" and chunk.function_call:
-                # Function call requires special handling
-                # Skip if function_call is None (should not happen for function_call chunks)
-                # Extract name and args with explicit types
+                # Flush all accumulated content before function call
+                flush_thinking()
+                flush_text()
+
+                # Function calls are not merged - each is a separate Part
                 func_name = chunk.function_call.get("name")
                 func_args = chunk.function_call.get("args", {})
 
-                if func_name:  # Only create FunctionCall if name is present
-                    part_dict["function_call"] = types.FunctionCall(
-                        name=func_name,
-                        args=func_args
+                if func_name:
+                    part = types.Part(
+                        function_call=types.FunctionCall(
+                            name=func_name,
+                            args=func_args
+                        )
                     )
                     if chunk.thought_signature:
-                        part_dict["thought_signature"] = chunk.thought_signature
+                        part.thought_signature = chunk.thought_signature
+                    parts.append(part)
 
-            if part_dict:
-                parts_data.append(part_dict)
+        # Flush any remaining accumulated content
+        flush_thinking()
+        flush_text()
 
-        # Build Gemini response structure
-        # Create Part objects
-        parts = []
-        for part_data in parts_data:
-            # Handle different part types appropriately
-            if "function_call" in part_data:
-                # Function call part
-                part = types.Part(
-                    function_call=part_data["function_call"]
-                )
-                # Add thought_signature if present
-                if "thought_signature" in part_data:
-                    part.thought_signature = part_data["thought_signature"]
-            elif "thought" in part_data:
-                # Thinking part
-                part = types.Part(
-                    text=part_data["text"],
-                    thought=True
-                )
-                if "thought_signature" in part_data:
-                    part.thought_signature = part_data["thought_signature"]
-            else:
-                # Regular text part
-                part = types.Part(text=part_data["text"])
-                # Add thought_signature if present (Gemini 2.5+ final text parts)
-                if "thought_signature" in part_data:
-                    part.thought_signature = part_data["thought_signature"]
-
-            parts.append(part)
-
-        # Create Content with parts
+        # Create Content with merged parts
         content = types.Content(parts=parts, role="model")
 
         # Create Candidate with content

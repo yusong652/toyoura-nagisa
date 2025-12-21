@@ -33,14 +33,14 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
     @staticmethod
     def format_messages(
         messages: List[BaseMessage],
-        preserve_thinking: bool = True
     ) -> List[Dict[str, Any]]:
         """
-        Convert internal messages to Zhipu API format
+        Convert internal messages to Zhipu API format.
+
+        Always preserves thinking content for cross-turn reasoning continuity.
 
         Args:
             messages: List of internal message objects
-            preserve_thinking: Whether to preserve thinking content in context
 
         Returns:
             List of Zhipu-formatted message dictionaries
@@ -49,7 +49,7 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
 
         for msg in messages:
             # format_single_message may return a dict or a list (for tool_result blocks)
-            formatted = ZhipuMessageFormatter.format_single_message(msg, preserve_thinking)
+            formatted = ZhipuMessageFormatter.format_single_message(msg)
 
             if isinstance(formatted, list):
                 # Multiple messages (tool_result blocks converted to separate messages)
@@ -63,14 +63,14 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
     @staticmethod
     def format_single_message(
         message: BaseMessage,
-        preserve_thinking: bool = True
     ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
-        Format a single BaseMessage to Zhipu API format
+        Format a single BaseMessage to Zhipu API format.
+
+        Always preserves thinking content for cross-turn reasoning continuity.
 
         Args:
             message: Single internal message object
-            preserve_thinking: Whether to preserve thinking content
 
         Returns:
             Union[Dict[str, Any], List[Dict[str, Any]]]:
@@ -103,11 +103,10 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
             block_type = block.get("type")
 
             if block_type == "thinking":
-                if preserve_thinking:
-                    thinking_content = block.get("thinking", "")
-                    # Only keep thinking if it has non-whitespace content
-                    if thinking_content and thinking_content.strip():
-                        thinking_text = thinking_content
+                # Always preserve thinking content
+                thinking_content = block.get("thinking", "")
+                if thinking_content and thinking_content.strip():
+                    thinking_text = thinking_content
 
             elif block_type == "tool_use":
                 tool_use_blocks.append(block)

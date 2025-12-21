@@ -92,18 +92,8 @@ class GeminiModelConfig(BaseModel):
         default=True,
         description="Whether to include thinking process in the response"
     )
-    preserve_thinking_in_history: bool = Field(
-        default=True,  # ✅ Changed from False to True for PFC agent use case
-        description=(
-            "Whether to preserve thinking content when loading conversation history. "
-            "Benefits: "
-            "(1) Future-proof for cross-turn reasoning support "
-            "(2) Enable 'reasoning resume' after backend restart "
-            "(3) Preserve thought signatures for tool calling chains. "
-            "Note: Working context always preserves thinking during tool calls. "
-            "Recommended: Enable for PFC agent or domain-specific sessions where reasoning continuity is valuable."
-        )
-    )
+    # Note: thinking content and thought_signature are ALWAYS preserved in history
+    # This is required for: cross-turn reasoning, tool calling chain validation, context caching
 
     # Backward compatibility alias
     @property

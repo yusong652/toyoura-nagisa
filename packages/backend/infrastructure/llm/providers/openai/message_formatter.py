@@ -44,7 +44,6 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
     @staticmethod
     def format_messages(
         messages: List[BaseMessage],
-        preserve_thinking: bool = False  # Ignored - OpenAI handles reasoning separately
     ) -> List[Dict[str, Any]]:
         """
         Convert internal messages to Responses API input format.
@@ -52,9 +51,10 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
         This method directly formats BaseMessage objects into OpenAI Responses API
         input format, eliminating the need for intermediate conversion steps.
 
+        Note: OpenAI handles reasoning/thinking separately via its own mechanism.
+
         Args:
             messages: List of internal message objects
-            preserve_thinking: Ignored - OpenAI has separate reasoning mechanism
 
         Returns:
             List of input items for OpenAI Responses API
@@ -74,7 +74,6 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
     @staticmethod
     def format_single_message(
         message: BaseMessage,
-        preserve_thinking: bool = False  # Ignored
     ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
         Format a single BaseMessage to Responses API input format.
@@ -82,9 +81,10 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
         Directly converts BaseMessage to OpenAI Responses API input items.
         Handles text content, tool calls, tool results, and multimodal content.
 
+        Note: OpenAI handles reasoning/thinking separately via its own mechanism.
+
         Args:
             message: Single internal message object
-            preserve_thinking: Ignored - OpenAI handles reasoning separately
 
         Returns:
             - Single Dict for regular messages

@@ -247,29 +247,47 @@ class GeminiDebugger:
 
         # Handle Part objects
         if type_name == "Part":
+            result = {}
+
+            # Check for thought flag (thinking content)
+            if hasattr(obj, 'thought') and obj.thought:
+                result['thought'] = True
+
+            # Check for thought_signature (required for Gemini 3 tool calling)
+            if hasattr(obj, 'thought_signature') and obj.thought_signature:
+                sig = obj.thought_signature
+                # Truncate signature for display (it's usually long base64)
+                if isinstance(sig, bytes):
+                    import base64
+                    sig_b64 = base64.b64encode(sig).decode('utf-8')
+                else:
+                    sig_b64 = str(sig)
+                result['thought_signature'] = GeminiDebugger._truncate(sig_b64, 50, "sig")
+
             if hasattr(obj, 'text') and obj.text:
-                return {"text": GeminiDebugger._truncate(obj.text, 150, "text")}
+                result['text'] = GeminiDebugger._truncate(obj.text, 150, "text")
+                return result
             elif hasattr(obj, 'function_call') and obj.function_call:
                 fc = obj.function_call
                 name = getattr(fc, 'name', 'unknown')
                 args = getattr(fc, 'args', {})
                 args_str = str(args) if args else "{}"
-                return {
-                    "function_call": name,
-                    "args": GeminiDebugger._truncate(args_str, 150, "args")
-                }
+                result['function_call'] = name
+                result['args'] = GeminiDebugger._truncate(args_str, 150, "args")
+                return result
             elif hasattr(obj, 'function_response') and obj.function_response:
                 fr = obj.function_response
                 name = getattr(fr, 'name', 'unknown')
                 response = getattr(fr, 'response', {})
                 response_str = str(response) if response else "{}"
-                return {
-                    "function_response": name,
-                    "response": GeminiDebugger._truncate(response_str, 150, "response")
-                }
+                result['function_response'] = name
+                result['response'] = GeminiDebugger._truncate(response_str, 150, "response")
+                return result
             elif hasattr(obj, 'inline_data') and obj.inline_data:
-                return {"inline_data": "[binary data]"}
-            return "<Part: empty>"
+                result['inline_data'] = "[binary data]"
+                return result
+
+            return result if result else "<Part: empty>"
 
         # Handle Content objects
         if type_name == "Content":
