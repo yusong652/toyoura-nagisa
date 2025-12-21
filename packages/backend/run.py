@@ -50,5 +50,6 @@ if __name__ == "__main__":
         host=dev_config.host,
         port=dev_config.port,
         reload=dev_config.enable_reload,
+        timeout_graceful_shutdown=2,  # Fast shutdown for development
         **reload_kwargs
     ) 

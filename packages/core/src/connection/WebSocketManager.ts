@@ -104,7 +104,13 @@ export class WebSocketManager extends EventEmitter {
       // Wait for connection to establish or fail
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error('Connection timeout'));
+          const error = new Error('Connection timeout');
+          cleanup();
+          // Schedule reconnect on initial connection timeout
+          if (this.options.enableAutoReconnect) {
+            this.scheduleReconnect();
+          }
+          reject(error);
         }, 10000);
 
         const onOpen = () => {
@@ -129,6 +135,10 @@ export class WebSocketManager extends EventEmitter {
       });
     } catch (error) {
       this.handleError(error as Error);
+      // Schedule reconnect on initial connection failure
+      if (this.options.enableAutoReconnect) {
+        this.scheduleReconnect();
+      }
       throw error;
     }
   }
@@ -215,6 +225,7 @@ export class WebSocketManager extends EventEmitter {
     });
 
     this.adapter.onClose((code, reason) => {
+      console.log(`[WebSocketManager] Connection closed: code=${code}, reason=${reason}, intentional=${this.isIntentionalClose}`);
       this.setState(ConnectionState.DISCONNECTED);
       this.clearHeartbeatTimers();
 
@@ -309,6 +320,7 @@ export class WebSocketManager extends EventEmitter {
 
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.options.maxReconnectAttempts!) {
+      console.log('[WebSocketManager] Max reconnect attempts reached');
       this.emit('maxReconnectAttemptsReached');
       return;
     }
@@ -320,13 +332,17 @@ export class WebSocketManager extends EventEmitter {
       this.options.maxReconnectInterval!
     );
 
+    console.log(`[WebSocketManager] Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1})`);
+
     this.reconnectTimer = setTimeout(() => {
       this.reconnectAttempts++;
       this.stats.reconnectAttempts = this.reconnectAttempts;
 
+      console.log(`[WebSocketManager] Reconnecting... (attempt ${this.reconnectAttempts})`);
       this.emit('reconnecting', { attempt: this.reconnectAttempts, delay });
 
       this.connect().catch((error) => {
+        console.log(`[WebSocketManager] Reconnect failed: ${error.message}`);
         this.handleError(error);
         this.scheduleReconnect();
       });

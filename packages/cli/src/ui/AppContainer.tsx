@@ -221,8 +221,36 @@ export const AppContainer: React.FC<AppContainerProps> = ({
           await sessionManager.loadTokenUsage(sessionId);
         }
 
-        // Connect WebSocket
-        await connectionManager.connectToSession(sessionId);
+        // Connect WebSocket with retry handling
+        try {
+          await connectionManager.connectToSession(sessionId);
+        } catch (err) {
+          // Initial connection failed, WebSocketManager will auto-reconnect
+          // Listen for successful reconnection
+          console.log('[AppContainer] Initial connection failed, waiting for reconnection...');
+
+          await new Promise<void>((resolve, reject) => {
+            const onConnected = () => {
+              cleanup();
+              resolve();
+            };
+
+            const onMaxRetries = () => {
+              cleanup();
+              reject(new Error('Max reconnection attempts reached'));
+            };
+
+            const cleanup = () => {
+              connectionManager.off('connected', onConnected);
+              connectionManager.off('maxReconnectAttemptsReached', onMaxRetries);
+            };
+
+            connectionManager.once('connected', onConnected);
+            connectionManager.once('maxReconnectAttemptsReached', onMaxRetries);
+          });
+
+          console.log('[AppContainer] Reconnected successfully');
+        }
 
         // Fetch available profiles
         refreshProfiles();
