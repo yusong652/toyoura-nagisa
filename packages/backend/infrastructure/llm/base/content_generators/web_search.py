@@ -63,16 +63,30 @@ class BaseWebSearchGenerator(BaseContentGenerator):
     ) -> Dict[str, Any]:
         """
         Format web search results into standardized structure.
-        
+
         Args:
             query: Original search query
-            response_text: Synthesized response text
-            sources: List of source dictionaries
+            response_text: Synthesized response text from LLM
+            sources: List of source dictionaries with 'title' and 'url' keys
             error: Optional error message
-            
+
         Returns:
             Standardized search result dictionary
         """
+        # Build response_text with sources appended
+        if response_text:
+            parts = [response_text]
+            if sources:
+                parts.append("\n\n---\n**Sources:**")
+                for i, source in enumerate(sources, 1):
+                    title = source.get('title', 'Unknown')
+                    url = source.get('url', '')
+                    if url:
+                        parts.append(f"{i}. [{title}]({url})")
+                    else:
+                        parts.append(f"{i}. {title}")
+            response_text = "\n".join(parts)
+
         return {
             "query": query,
             "response_text": response_text,

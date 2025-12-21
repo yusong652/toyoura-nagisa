@@ -366,8 +366,9 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         """
         Extract web search sources from Gemini response.
 
-        Supports both new API (grounding_metadata.grounding_chunks) and
-        legacy API (groundingMetadata.webSearchQueries) for compatibility.
+        Supports both naming conventions:
+        - snake_case: grounding_metadata, grounding_chunks (Python SDK)
+        - camelCase: groundingMetadata, groundingChunks (raw API)
 
         Args:
             response: Raw Gemini API response object
@@ -383,11 +384,19 @@ class GeminiResponseProcessor(BaseResponseProcessor):
 
         candidate = response.candidates[0]
 
-        # New API: grounding_metadata with grounding_chunks (Gemini 2.0+)
-        grounding = getattr(candidate, 'grounding_metadata', None)
+        # Try both snake_case and camelCase for grounding metadata
+        grounding = (
+            getattr(candidate, 'grounding_metadata', None) or
+            getattr(candidate, 'groundingMetadata', None)
+        )
+
         if grounding:
-            # Extract sources from grounding_chunks (new structure)
-            chunks = getattr(grounding, 'grounding_chunks', None)
+            # Try both naming conventions for grounding chunks
+            chunks = (
+                getattr(grounding, 'grounding_chunks', None) or
+                getattr(grounding, 'groundingChunks', None)
+            )
+
             if chunks:
                 for chunk in chunks:
                     web = getattr(chunk, 'web', None)
@@ -400,31 +409,19 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                         }
                         sources.append(source)
 
-            if debug and chunks:
-                print(f"[WebSearch] Found {len(chunks)} grounding chunks")
+                if debug:
+                    print(f"[WebSearch] Found {len(chunks)} grounding chunks")
 
-        # Legacy API: groundingMetadata with webSearchQueries (older models)
-        if not sources:
-            grounding_legacy = getattr(candidate, 'groundingMetadata', None)
-            if grounding_legacy:
-                queries = getattr(grounding_legacy, 'webSearchQueries', None)
-                if queries:
-                    for query in queries:
-                        results = getattr(query, 'searchResults', None)
-                        if results:
-                            for result in results:
-                                source = {
-                                    'title': getattr(result, 'title', ''),
-                                    'url': getattr(result, 'uri', ''),
-                                    'snippet': getattr(result, 'snippet', ''),
-                                    'type': 'web_search'
-                                }
-                                sources.append(source)
-
-        # Check for citations in content (both APIs)
-        citations = getattr(candidate, 'citationMetadata', None) or getattr(candidate, 'citation_metadata', None)
+        # Check for citations (both naming conventions)
+        citations = (
+            getattr(candidate, 'citation_metadata', None) or
+            getattr(candidate, 'citationMetadata', None)
+        )
         if citations:
-            citation_sources = getattr(citations, 'citationSources', None) or getattr(citations, 'citation_sources', None)
+            citation_sources = (
+                getattr(citations, 'citation_sources', None) or
+                getattr(citations, 'citationSources', None)
+            )
             if citation_sources:
                 for citation in citation_sources:
                     source = {
@@ -435,8 +432,8 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     }
                     sources.append(source)
 
-        if debug and sources:
-            print(f"[WebSearch] Extracted {len(sources)} sources from Gemini response")
+        if debug:
+            print(f"[WebSearch] Extracted {len(sources)} sources")
 
         return sources
     

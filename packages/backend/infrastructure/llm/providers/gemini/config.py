@@ -30,25 +30,25 @@ class GeminiSafetySettings(BaseModel):
         description="Hate speech blocking threshold"
     )
     
-    def to_gemini_format(self) -> List[Dict[str, Any]]:
+    def to_gemini_format(self) -> List[types.SafetySetting]:
         """Convert to Gemini API format safety settings"""
         return [
-            {
-                "category": types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                "threshold": self.sexually_explicit_threshold
-            },
-            {
-                "category": types.HarmCategory.HARM_CATEGORY_HARASSMENT,
-                "threshold": self.harassment_threshold
-            },
-            {
-                "category": types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                "threshold": self.dangerous_content_threshold
-            },
-            {
-                "category": types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                "threshold": self.hate_speech_threshold
-            }
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold=self.sexually_explicit_threshold
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold=self.harassment_threshold
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold=self.dangerous_content_threshold
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold=self.hate_speech_threshold
+            ),
         ]
 
 

@@ -178,9 +178,17 @@ class GeminiDebugger:
                 continue
 
             tool_copy = tool.copy()
+            # Handle google_search and other special tools
+            if 'google_search' in tool_copy:
+                result.append({'google_search': '<GoogleSearch>'})
+                continue
+            if 'code_execution' in tool_copy:
+                result.append({'code_execution': '<CodeExecution>'})
+                continue
             if 'function_declarations' in tool_copy:
                 decls = []
-                for func in tool_copy.get('function_declarations', []):
+                # Use `or []` to handle None values
+                for func in tool_copy.get('function_declarations') or []:
                     if isinstance(func, dict):
                         func_copy = func.copy()
                         if 'description' in func_copy:

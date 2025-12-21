@@ -65,9 +65,7 @@ async def web_search(
 
         # Get LLM type for message
         llm_type = WebSearchToolFactory.detect_llm_type(llm_client)
-        message = f"Found {len(sources)} sources for query: '{query}' using {llm_type.title()}"
-        if response_text:
-            message += f" (Response: {len(response_text)} chars)"
+        message = f"Found {len(sources)} sources for '{query}'"
 
         # Store full search result in data for reference
         return success_response(

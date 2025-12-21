@@ -18,8 +18,7 @@ from backend.infrastructure.llm.base.content_generators.video_prompt import Base
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
 from backend.infrastructure.llm.shared.constants.defaults import (
     DEFAULT_TITLE_MAX_LENGTH,
-    DEFAULT_TITLE_GENERATION_TEMPERATURE,
-    DEFAULT_WEB_SEARCH_TEMPERATURE)
+    DEFAULT_TITLE_GENERATION_TEMPERATURE)
 from backend.infrastructure.llm.shared.constants.prompts import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
     DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
@@ -161,7 +160,7 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
     ) -> Dict[str, Any]:
         """
         Perform a web search using Google Search via the Gemini API.
-        
+
         Uses Gemini's modern google_search tool with shared result processing.
         """
         try:
@@ -170,28 +169,28 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
 
             # Use base class debug method
             BaseWebSearchGenerator.debug_search_start(query, debug)
-            
+
             # Create user message using base class method
             user_message = BaseWebSearchGenerator.create_search_user_message(query)
-            
-            # Read Gemini configuration
-            gemini_config = get_gemini_client_config()
-            
-            # Configure the Gemini model with the web search tool  
+
+            # Get unified configuration
+            gemini_client_config = get_gemini_client_config()
+            llm_settings = get_llm_settings()
+            gemini_llm_config = llm_settings.get_gemini_config()
+            model = gemini_llm_config.model
+
+            # Web search uses a simpler config:
+            # - No thinking config (google_search tool is a simple retrieval, not reasoning)
+            # - No max_output_tokens limit (let model decide based on search results)
+            # - Include safety settings for content filtering
             search_config = types.GenerateContentConfig(
                 system_instruction=DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
                 tools=[types.Tool(google_search=types.GoogleSearch())],
-                temperature=DEFAULT_WEB_SEARCH_TEMPERATURE,
-                max_output_tokens=gemini_config.model_settings.max_output_tokens
+                safety_settings=gemini_client_config.safety_settings.to_gemini_format(),
             )
-            
+
             # Format message using MessageFormatter
             contents = GeminiMessageFormatter.format_messages([user_message])
-            
-            # Get model from configuration
-            llm_settings = get_llm_settings()
-            gemini_config = llm_settings.get_gemini_config()
-            model = gemini_config.model
 
             if debug:
                 GeminiDebugger.print_request(contents, search_config, model)
