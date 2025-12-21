@@ -149,7 +149,7 @@ Example exploration flow:
 
 | High-Level Feature | Limitations | Low-Level Alternative |
 |--------------------|-------------|----------------------|
-| `servo` command | Fixed axes, no rotation | `wall vertex` + manual control loop |
+| `servo` command | Single force direction only (no cylindrical confining pressure) | `for v in wall.vertices(): v.set_vel()` / `v.set_pos()` + manual control loop |
 | `ball generate` | Predefined patterns | `ball create` + custom positioning |
 | `wall generate` | Simple geometries | `wall create` + vertex specification |
 
