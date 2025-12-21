@@ -188,8 +188,23 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   useEffect(() => {
     const initSession = async () => {
       try {
-        // Initialize session manager (loads stored session ID and session list from backend)
-        await sessionManager.initialize();
+        // Initialize session manager with retry (backend might not be ready yet)
+        let initRetryCount = 0;
+        const maxInitRetries = 10;
+        const initRetryDelay = 2000;
+
+        while (initRetryCount < maxInitRetries) {
+          try {
+            await sessionManager.initialize();
+            break;
+          } catch (err) {
+            initRetryCount++;
+            if (initRetryCount >= maxInitRetries) {
+              throw err;
+            }
+            await new Promise(resolve => setTimeout(resolve, initRetryDelay));
+          }
+        }
 
         // Priority: CLI arg > stored session > create new
         let sessionId = currentSessionId || sessionManager.getCurrentSessionId();

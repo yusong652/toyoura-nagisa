@@ -225,7 +225,7 @@ export class WebSocketManager extends EventEmitter {
     });
 
     this.adapter.onClose((code, reason) => {
-      console.log(`[WebSocketManager] Connection closed: code=${code}, reason=${reason}, intentional=${this.isIntentionalClose}`);
+      this.debugLog(`Connection closed: code=${code}, reason=${reason}, intentional=${this.isIntentionalClose}`);
       this.setState(ConnectionState.DISCONNECTED);
       this.clearHeartbeatTimers();
 
@@ -318,9 +318,16 @@ export class WebSocketManager extends EventEmitter {
     this.clearHeartbeatTimeout();
   }
 
+  private debugLog(message: string): void {
+    if (typeof process !== 'undefined' && process.env?.DEBUG_WEBSOCKET) {
+      const fs = require('fs');
+      fs.appendFileSync('websocket-debug.log', `[${new Date().toISOString()}] ${message}\n`);
+    }
+  }
+
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.options.maxReconnectAttempts!) {
-      console.log('[WebSocketManager] Max reconnect attempts reached');
+      this.debugLog('Max reconnect attempts reached');
       this.emit('maxReconnectAttemptsReached');
       return;
     }
@@ -332,17 +339,17 @@ export class WebSocketManager extends EventEmitter {
       this.options.maxReconnectInterval!
     );
 
-    console.log(`[WebSocketManager] Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1})`);
+    this.debugLog(`Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1})`);
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectAttempts++;
       this.stats.reconnectAttempts = this.reconnectAttempts;
 
-      console.log(`[WebSocketManager] Reconnecting... (attempt ${this.reconnectAttempts})`);
+      this.debugLog(`Reconnecting... (attempt ${this.reconnectAttempts})`);
       this.emit('reconnecting', { attempt: this.reconnectAttempts, delay });
 
       this.connect().catch((error) => {
-        console.log(`[WebSocketManager] Reconnect failed: ${error.message}`);
+        this.debugLog(`Reconnect failed: ${error.message}`);
         this.handleError(error);
         this.scheduleReconnect();
       });
