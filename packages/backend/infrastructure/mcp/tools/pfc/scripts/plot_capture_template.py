@@ -195,6 +195,15 @@ def generate_plot_capture_script(
         '# Export plot as PNG',
         f'itasca.command(f\'plot "{plot_name}" export bitmap filename "{{output_path}}" size {size[0]} {size[1]}\')',
         '',
+        '# Wait for file to be written (export bitmap may be async)',
+        'import time',
+        '_max_wait, _elapsed = 10, 0',
+        'while not os.path.exists(output_path) and _elapsed < _max_wait:',
+        '    time.sleep(0.1)',
+        '    _elapsed += 0.1',
+        'if not os.path.exists(output_path):',
+        '    raise RuntimeError(f"Export failed: file not created after {_max_wait}s")',
+        '',
     ])
 
     # Cleanup section
