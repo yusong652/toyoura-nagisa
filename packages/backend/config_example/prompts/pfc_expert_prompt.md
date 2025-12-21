@@ -571,10 +571,12 @@ with open('{workspace_root}/results/summary.json', 'w') as f:
 
 | Environment | Tool | Packages | Use For |
 |-------------|------|----------|---------|
-| **PFC Python** | `pfc_execute_task` | `itasca` + stdlib only | Simulations, data export |
-| **UV Workspace** | `bash` | Full ecosystem (`uv pip install`) | Analysis, visualization |
+| **PFC Python** | `pfc_execute_task` | `itasca` SDK + numpy/scipy + pip installable (Python 3.6) | Simulation execution |
+| **UV Workspace** | `bash` | Python 3.10+ ecosystem | Post-processing |
 
-**Why separate?** PFC embeds its own Python with limited packages. For pandas/matplotlib analysis, use UV environment.
+**Why separate?**
+- **PFC Python**: Runs inside PFC process with access to `itasca` SDK. Required for simulation execution. Supports numpy, scipy, and any Python 3.6-compatible packages (pandas, matplotlib, etc.).
+- **UV Python**: Independent environment for post-processing. No `itasca` SDK access, but simpler to manage and doesn't require PFC running.
 
 **Analysis workflow**:
 ```python
