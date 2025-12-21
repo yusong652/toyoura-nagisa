@@ -500,6 +500,16 @@ class Agent:
                     inject_reminders=True
                 )
 
+                # Check for user interrupt (use notification_session_id for MainAgent's interrupt flag)
+                # SubAgent uses a temporary session_id, so we must check the parent's session
+                from backend.infrastructure.monitoring import get_status_monitor
+                parent_monitor = get_status_monitor(self._notification_session_id)
+                if parent_monitor.is_user_interrupted():
+                    print(f"[SubAgent] Interrupted by user at iteration {iteration}")
+                    # Reuse rejection flow - treat ESC interrupt same as user rejection
+                    # This will propagate to MainAgent and terminate its execution
+                    return {"_subagent_rejected": True}
+
             # Track tool iteration for periodic todo reminders (both MainAgent and SubAgent)
             # SubAgent also needs this to trigger todo reminders during long searches
             self.status_monitor.todo_monitor.track_iteration()
