@@ -49,7 +49,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         ),
         size: Optional[List[int]] = Field(
             default=None,
-            description="Image size [width, height] in pixels. Default: [1280, 720]."
+            description="Image size [width, height] in pixels. Default: [720, 480]."
         ),
         include_ball: bool = Field(
             default=True,
@@ -58,10 +58,6 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         include_wall: bool = Field(
             default=True,
             description="Show boundary walls with transparency."
-        ),
-        include_axes: bool = Field(
-            default=True,
-            description="Show coordinate axes (X, Y, Z)."
         ),
         wall_transparency: int = Field(
             default=DEFAULT_WALL_TRANSPARENCY,
@@ -156,7 +152,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 view_settings=view_settings if view_settings else None,
                 include_ball=include_ball,
                 include_wall=include_wall,
-                include_axes=include_axes,
+                include_axes=True,
                 wall_transparency=wall_transparency,
             )
 
