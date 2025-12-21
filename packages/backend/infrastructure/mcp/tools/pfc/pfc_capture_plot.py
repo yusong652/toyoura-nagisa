@@ -18,7 +18,7 @@ Design:
 import os
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, List
 from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -47,9 +47,9 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 "Example: '/path/to/project/plots/model_state.png'"
             )
         ),
-        size: Optional[Tuple[int, int]] = Field(
+        size: Optional[List[int]] = Field(
             default=None,
-            description="Image size (width, height) in pixels. Default: (1280, 720)."
+            description="Image size [width, height] in pixels. Default: [1280, 720]."
         ),
         include_ball: bool = Field(
             default=True,
@@ -69,13 +69,13 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             le=100,
             description="Wall transparency 0-100 (0=opaque, 100=invisible). Default: 70."
         ),
-        center: Optional[Tuple[float, float, float]] = Field(
+        center: Optional[List[float]] = Field(
             default=None,
-            description="Camera look-at point (x, y, z). Auto-fit if not specified."
+            description="Camera look-at point [x, y, z]. Auto-fit if not specified."
         ),
-        eye: Optional[Tuple[float, float, float]] = Field(
+        eye: Optional[List[float]] = Field(
             default=None,
-            description="Camera position (x, y, z). Isometric view if not specified."
+            description="Camera position [x, y, z]. Isometric view if not specified."
         ),
         magnification: Optional[float] = Field(
             default=None,
@@ -101,6 +101,14 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             session_id = getattr(context, 'client_id', None) if context else None
             if not session_id:
                 return error_response("Session ID not available")
+
+            # Validate list parameters have correct length
+            if size is not None and len(size) != 2:
+                return error_response("size must have exactly 2 elements [width, height]")
+            if center is not None and len(center) != 3:
+                return error_response("center must have exactly 3 elements [x, y, z]")
+            if eye is not None and len(eye) != 3:
+                return error_response("eye must have exactly 3 elements [x, y, z]")
 
             # Validate output path
             if not output_path or not output_path.strip():
