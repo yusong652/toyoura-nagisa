@@ -11,10 +11,13 @@ Python 3.6 compatible implementation.
 """
 
 import asyncio
+import concurrent.futures
 import logging
+import os
 import sys
 import time
 import traceback
+import uuid
 from io import StringIO
 from typing import Any, Dict, Optional
 
@@ -25,9 +28,6 @@ from .interrupt_manager import set_current_task, clear_current_task, clear_inter
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
-
-# Script execution timeout configuration
-MAX_SCRIPT_TIMEOUT_MS = 600000  # 10 minutes maximum for synchronous scripts
 
 
 class PFCScriptExecutor:
@@ -73,8 +73,6 @@ class PFCScriptExecutor:
                 - data: Script result (from 'result' variable)
                 - output: Captured stdout content (print statements)
         """
-        import os
-
         # Use shared output buffer for stdout capture
         old_stdout = sys.stdout
         sys.stdout = output_buffer
@@ -83,23 +81,34 @@ class PFCScriptExecutor:
         set_current_task(task_id)
 
         try:
-            # Prepare execution context with itasca module
-            # Use single namespace for both globals and locals to ensure imported modules
-            # are accessible within function definitions (solves import scoping issue)
-            exec_context = {"itasca": self.itasca}
+            # Use IPython's global namespace for persistent state across scripts
+            # This enables:
+            # - Variables persist between script executions
+            # - Imports are reused (no repeated import overhead)
+            # - if __name__ == "__main__": works correctly
+            # - Scripts share state with IPython Console
+            import __main__
+            exec_globals = __main__.__dict__
+
+            # Ensure itasca is available in global namespace
+            if "itasca" not in exec_globals:
+                exec_globals["itasca"] = self.itasca
+
+            # Set __file__ to current script path (updates each execution)
+            exec_globals["__file__"] = script_path
 
             # Try to execute as expression first (single line, returns value)
             try:
                 # Use compile() with script_path for better traceback
                 code_obj = compile(script_content, script_path, 'eval')
-                result = eval(code_obj, exec_context, exec_context)
+                result = eval(code_obj, exec_globals, exec_globals)
             except SyntaxError:
                 # If eval fails, try exec (multi-line script)
                 # Use compile() with script_path to show actual file path in traceback
                 code_obj = compile(script_content, script_path, 'exec')
-                exec(code_obj, exec_context, exec_context)
-                # Look for 'result' variable in context
-                result = exec_context.get('result', None)
+                exec(code_obj, exec_globals, exec_globals)
+                # Look for 'result' variable in global namespace
+                result = exec_globals.get('result', None)
 
             # Get captured output from shared buffer
             output_text = output_buffer.getvalue()
@@ -262,57 +271,34 @@ class PFCScriptExecutor:
             - Print statements are captured and available in output
             - Script has access to 'itasca' module in global scope
         """
-        import os
+        # Initialize variables for exception handling
+        task_id = None
+        output_buffer = None
+        git_commit = None
+        script_name = os.path.basename(script_path)
 
         try:
-            if not self.itasca:
-                return {
-                    "status": "error",
-                    "message": "ITASCA SDK not available: Server not running in PFC GUI environment",
-                    "data": None
-                }
-
             # Read script file
-            try:
-                with open(script_path, 'r', encoding='utf-8') as f:
-                    script_content = f.read()
-            except FileNotFoundError:
-                return {
-                    "status": "error",
-                    "message": "Script file not found: {}".format(script_path),
-                    "data": None
-                }
-            except Exception as e:
-                return {
-                    "status": "error",
-                    "message": "Failed to read script file: {}".format(str(e)),
-                    "data": None
-                }
+            with open(script_path, 'r', encoding='utf-8') as f:
+                script_content = f.read()
+        except FileNotFoundError:
+            return {
+                "status": "error",
+                "message": "Script file not found: {}".format(script_path),
+                "data": None
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": "Failed to read script file: {}".format(str(e)),
+                "data": None
+            }
 
-            # Validate timeout if provided for synchronous mode
-            if not run_in_background and timeout_ms is not None:
-                if timeout_ms < 1000:
-                    return {
-                        "status": "error",
-                        "message": "Timeout must be at least 1000ms (1 second)",
-                        "data": None
-                    }
-                elif timeout_ms > MAX_SCRIPT_TIMEOUT_MS:
-                    return {
-                        "status": "error",
-                        "message": "Timeout cannot exceed {}ms ({} minutes)".format(
-                            MAX_SCRIPT_TIMEOUT_MS, MAX_SCRIPT_TIMEOUT_MS // 60000
-                        ),
-                        "data": None
-                    }
-
-            script_name = os.path.basename(script_path)
-
+        try:
             # Create shared output buffer for real-time output capture
             output_buffer = StringIO()
 
             # Generate task_id early (needed for git commit and interrupt tracking)
-            import uuid
             task_id = uuid.uuid4().hex[:8]
 
             # Create git execution snapshot (before running script)
@@ -334,26 +320,26 @@ class PFCScriptExecutor:
                 self._execute_script_sync,
                 script_path,
                 script_content,
-                output_buffer,  # Pass shared buffer to executor
-                task_id  # Pass task_id for interrupt tracking
+                output_buffer,
+                task_id
+            )
+
+            # Register task with manager (both modes need this)
+            submit_time = time.time()
+            self.task_manager.create_script_task(
+                session_id,
+                future,
+                script_name,
+                script_path,
+                output_buffer,
+                description,
+                git_commit,
+                source,
+                task_id
             )
 
             if run_in_background:
-                # Asynchronous execution: register with task manager and return immediately
-
-                submit_time = time.time()
-                self.task_manager.create_script_task(
-                    session_id,
-                    future,
-                    script_name,
-                    script_path,
-                    output_buffer,  # Pass buffer reference for live status queries
-                    description,  # Agent-provided task description
-                    git_commit,  # Git version snapshot
-                    source,  # Task source: "agent" or "user_console"
-                    task_id  # Pre-generated task_id for interrupt tracking
-                )
-
+                # Asynchronous: return immediately
                 return {
                     "status": "pending",
                     "message": "Script submitted: {}".format(script_name),
@@ -370,48 +356,64 @@ class PFCScriptExecutor:
                     }
                 }
 
-            else:
-                # Synchronous execution: wait for completion with optional timeout
-                # BUT still register as task for unified output management
-                timeout_seconds = timeout_ms / 1000.0 if timeout_ms else None
-                logger.debug("Executing script synchronously: {} [timeout={}s]".format(
-                    script_name, timeout_seconds if timeout_seconds else "None"
-                ))
+            # Synchronous: wait for completion
+            timeout_seconds = timeout_ms / 1000.0 if timeout_ms else None
+            logger.debug("Executing script synchronously: {} [timeout={}s]".format(
+                script_name, timeout_seconds if timeout_seconds else "None"
+            ))
 
-                # Register task BEFORE waiting (enables output caching and post-query)
-                self.task_manager.create_script_task(
-                    session_id,
-                    future,
-                    script_name,
-                    script_path,
-                    output_buffer,  # Pass buffer reference for output caching
-                    description,  # Agent-provided task description
-                    git_commit,  # Git version snapshot
-                    source,  # Task source: "agent" or "user_console"
-                    task_id  # Pre-generated task_id for interrupt tracking
+            loop = asyncio.get_event_loop()
+            result_dict = await loop.run_in_executor(
+                None,
+                future.result,
+                timeout_seconds
+            )
+
+            # Get result and timing info
+            full_output = output_buffer.getvalue()
+            task = self.task_manager.tasks.get(task_id)
+            start_time = task.start_time if task else None
+            end_time = task.end_time if task else None
+            elapsed_time = (end_time - start_time) if (start_time and end_time) else 0
+
+            return {
+                "status": result_dict.get("status", "success"),
+                "message": result_dict.get("message", "Script executed"),
+                "data": {
+                    "task_id": task_id,
+                    "task_type": "script",
+                    "source": source,
+                    "script_name": script_name,
+                    "entry_script": script_path,
+                    "script_path": script_path,
+                    "description": description,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "elapsed_time": elapsed_time,
+                    "output": full_output,
+                    "result": result_dict.get("data"),
+                    "git_commit": git_commit
+                }
+            }
+
+        except Exception as e:
+            # Special handling for timeout errors
+            # Python 3.6+: concurrent.futures.TimeoutError is an alias of TimeoutError
+            is_timeout = isinstance(e, (concurrent.futures.TimeoutError, TimeoutError))
+
+            if is_timeout:
+                # Script execution timed out but task is still running in background
+                # Return "running" status since task continues execution
+                logger.warning("Script execution timed out (still running): {} (timeout: {}ms)".format(script_path, timeout_ms))
+
+                task = self.task_manager.tasks.get(task_id) if task_id else None
+                timeout_message = "Foreground wait timed out after {}ms. Task '{}' is still running in background. Use pfc_check_task_status to monitor progress.".format(
+                    timeout_ms, script_name
                 )
 
-                loop = asyncio.get_event_loop()
-                # Wait for script execution with timeout
-                result_dict = await loop.run_in_executor(
-                    None,  # Use default thread pool
-                    future.result,  # Block until main thread processes
-                    timeout_seconds  # Use specified timeout or None for no timeout
-                )
-
-                # Extract cached output from task (single source of truth)
-                full_output = output_buffer.getvalue()
-
-                # Get timing info from task for consistent time display
-                task = self.task_manager.tasks.get(task_id)
-                start_time = task.start_time if task else None
-                end_time = task.end_time if task else None
-                elapsed_time = (end_time - start_time) if (start_time and end_time) else 0
-
-                # Return unified structure with all metadata in data field
                 return {
-                    "status": result_dict.get("status", "success"),
-                    "message": result_dict.get("message", "Script executed"),
+                    "status": "running",
+                    "message": timeout_message,
                     "data": {
                         "task_id": task_id,
                         "task_type": "script",
@@ -420,81 +422,27 @@ class PFCScriptExecutor:
                         "entry_script": script_path,
                         "script_path": script_path,
                         "description": description,
-                        "start_time": start_time,
-                        "end_time": end_time,
-                        "elapsed_time": elapsed_time,
-                        "output": full_output,
-                        "result": result_dict.get("data"),  # Script's 'result' variable
+                        "start_time": task.start_time if task else None,
+                        "elapsed_time": task.get_elapsed_time() if task else None,
+                        "output": output_buffer.getvalue() if output_buffer else "",
                         "git_commit": git_commit
                     }
                 }
 
-        except Exception as e:
-            # Special handling for timeout errors (provide LLM-friendly guidance)
-            # Python 3.6 compatibility: Check both TimeoutError types
-            import concurrent.futures
-
-            # In Python 3.6+, concurrent.futures.TimeoutError is an alias of TimeoutError
-            # Check exception type name to handle both cases
-            exception_type_name = type(e).__name__
-            is_timeout = (
-                isinstance(e, concurrent.futures.TimeoutError) or
-                exception_type_name == 'TimeoutError'
-            )
-
-            if is_timeout:
-                # Script execution timed out but task is still running in background
-                # Return "running" status since task continues execution
-                import os
-                script_name_for_error = os.path.basename(script_path)
-
-                logger.warning("Script execution timed out (still running): {} (timeout: {}ms)".format(script_path, timeout_ms))
-                logger.warning("Exception type: {} - {}".format(type(e).__name__, str(e)))
-
-                # Try to get task info for timing and output
-                task_id_local = locals().get('task_id')
-                task = self.task_manager.tasks.get(task_id_local) if task_id_local else None
-
-                timeout_message = "Foreground wait timed out after {}ms. Task '{}' is still running in background. Use pfc_check_task_status to monitor progress.".format(
-                    timeout_ms, script_name_for_error
-                )
-
-                return {
-                    "status": "running",
-                    "message": timeout_message,
-                    "data": {
-                        "task_id": task_id_local,
-                        "task_type": "script",
-                        "source": source,
-                        "script_name": script_name_for_error,
-                        "entry_script": script_path,
-                        "script_path": script_path,
-                        "description": description,
-                        "start_time": task.start_time if task else None,
-                        "elapsed_time": task.get_elapsed_time() if task else None,
-                        "output": output_buffer.getvalue() if 'output_buffer' in locals() else "",  # type: ignore
-                        "git_commit": locals().get('git_commit')
-                    }
-                }
-
-            # General error handling (execution errors)
+            # General error handling
             logger.error("Script execution failed: {}".format(e))
-            logger.error("Exception type: {}".format(type(e).__name__))
 
             error_message = "Script execution failed: {}".format(str(e))
-
-            # Try to get task info if task was created (task is created before execution)
-            task_id_local = locals().get('task_id')
-            task = self.task_manager.tasks.get(task_id_local) if task_id_local else None
-            output_text = output_buffer.getvalue() if 'output_buffer' in locals() else ""
+            task = self.task_manager.tasks.get(task_id) if task_id else None
+            output_text = output_buffer.getvalue() if output_buffer else ""
 
             return {
                 "status": "error",
                 "message": error_message,
                 "data": {
-                    "task_id": task_id_local,
+                    "task_id": task_id,
                     "task_type": "script",
-                    "script_name": os.path.basename(script_path) if script_path else "unknown",
+                    "script_name": script_name,
                     "entry_script": script_path,
                     "script_path": script_path,
                     "description": description,
@@ -503,7 +451,7 @@ class PFCScriptExecutor:
                     "elapsed_time": (task.end_time - task.start_time) if (task and task.start_time and task.end_time) else None,
                     "output": output_text,
                     "error": error_message,
-                    "git_commit": locals().get('git_commit')
+                    "git_commit": git_commit
                 }
             }
 

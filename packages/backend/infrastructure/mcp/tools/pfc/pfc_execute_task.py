@@ -48,9 +48,11 @@ def register_pfc_task_tool(mcp: FastMCP):
         ),
         timeout: Optional[int] = Field(
             default=None,
+            ge=1000,
+            le=600000,
             description=(
                 "Timeout in milliseconds (None = no limit). "
-                "Range: 1000-600000. Only applies when run_in_background=False. "
+                "Only applies when run_in_background=False. "
                 "Recommended: 60000-120000ms for testing."
             )
         ),
