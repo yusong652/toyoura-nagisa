@@ -139,6 +139,12 @@ def _setup_workspace_git():
 
     cwd = os.getcwd()
 
+    # Windows: hide cmd window when running git commands
+    # CREATE_NO_WINDOW = 0x08000000
+    subprocess_kwargs = {}
+    if sys.platform == "win32":
+        subprocess_kwargs["creationflags"] = 0x08000000
+
     # Check if git is available
     # Note: Using stdout/stderr=PIPE instead of capture_output for Python 3.6 compatibility
     try:
@@ -146,7 +152,8 @@ def _setup_workspace_git():
             ["git", "--version"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            cwd=cwd
+            cwd=cwd,
+            **subprocess_kwargs
         )
         if version_check.returncode != 0:
             result["issue"] = "git not installed"
@@ -160,7 +167,8 @@ def _setup_workspace_git():
         ["git", "rev-parse", "--git-dir"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=cwd
+        cwd=cwd,
+        **subprocess_kwargs
     )
 
     if git_check.returncode != 0:
@@ -177,7 +185,8 @@ def _setup_workspace_git():
             ["git", "init"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            cwd=cwd
+            cwd=cwd,
+            **subprocess_kwargs
         )
 
         if init_result.returncode == 0:
@@ -195,13 +204,15 @@ def _setup_workspace_git():
                 ["git", "add", "-A"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                cwd=cwd
+                cwd=cwd,
+                **subprocess_kwargs
             )
             commit_result = subprocess.run(
                 ["git", "commit", "--allow-empty", "-m", "Initial PFC workspace setup"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                cwd=cwd
+                cwd=cwd,
+                **subprocess_kwargs
             )
             if commit_result.returncode == 0:
                 logging.info("Created initial commit")

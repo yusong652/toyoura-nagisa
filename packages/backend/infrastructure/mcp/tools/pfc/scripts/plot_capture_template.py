@@ -146,9 +146,9 @@ def generate_plot_capture_script(
         'if not os.path.exists(desktop_ini_path):',
         '    with open(desktop_ini_path, "w") as f:',
         '        f.write("[ViewState]\\nFolderType=Generic\\n")',
-        '    # Set hidden and system attributes (Windows)',
+        '    # Set hidden and system attributes (Windows, hide cmd window)',
         '    import subprocess',
-        '    subprocess.run(["attrib", "+H", "+S", desktop_ini_path], capture_output=True)',
+        '    subprocess.run(["attrib", "+H", "+S", desktop_ini_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000)',
         '',
     ]
 
@@ -195,21 +195,19 @@ def generate_plot_capture_script(
         '# Export plot as PNG',
         f'itasca.command(f\'plot "{plot_name}" export bitmap filename "{{output_path}}" size {size[0]} {size[1]}\')',
         '',
-        '# Wait for file to be written (export bitmap may be async)',
+        '# Wait for export to complete (export bitmap is async)',
         'import time',
         '_max_wait, _elapsed = 10, 0',
         'while not os.path.exists(output_path) and _elapsed < _max_wait:',
         '    time.sleep(0.1)',
         '    _elapsed += 0.1',
-        'if not os.path.exists(output_path):',
-        '    raise RuntimeError(f"Export failed: file not created after {_max_wait}s")',
         '',
     ])
 
     # Cleanup section
     # Syntax: plot <name> delete (name before delete keyword)
     lines.extend([
-        '# Delete temporary plot',
+        '# Delete temporary plot (after export completes)',
         f'itasca.command(\'plot "{plot_name}" delete\')',
         '',
         'print(f"Plot captured successfully: {output_path}")',

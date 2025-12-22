@@ -16,6 +16,7 @@ Design:
 """
 
 import os
+import time
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from typing import Dict, Any, Optional, List
@@ -89,8 +90,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         """
         Capture a diagnostic screenshot of PFC model state.
 
-        Use this tool to visually inspect simulation state. After capture,
-        use the 'read' tool on output_path for multimodal analysis to identify:
+        Use this tool to visually inspect simulation state:
         - Particle clustering or irregular distributions
         - Boundary penetration issues
         - Stress concentration patterns
@@ -217,16 +217,24 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 error_msg = result.get("message", "Plot capture failed")
                 return error_response(f"Plot capture failed: {error_msg}")
 
+            # Verify file was created (PFC export bitmap may be async)
+            max_wait, elapsed = 10, 0
+            while not os.path.exists(output_path) and elapsed < max_wait:
+                time.sleep(0.1)
+                elapsed += 0.1
+
+            if not os.path.exists(output_path):
+                return error_response(
+                    f"Export completed but file not found after {max_wait}s: {output_path}"
+                )
+
             # Build success response
             return success_response(
                 message=f"Plot captured: {os.path.basename(output_path)}",
                 llm_content={
                     "parts": [{
                         "type": "text",
-                        "text": (
-                            f"Plot captured: {output_path}\n\n"
-                            f"To analyze, use: read(\"{output_path}\")"
-                        )
+                        "text": f"Plot captured. To analyze, use: read(\"{output_path}\")"
                     }]
                 },
                 output_path=output_path
