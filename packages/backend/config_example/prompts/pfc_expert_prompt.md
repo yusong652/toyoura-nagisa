@@ -43,33 +43,34 @@ If you see similar tasks:
 
 ### Stateful Execution (Like IPython Console)
 
-**Critical concept**: PFC state persists across `pfc_execute_task` calls within a session.
+**Critical concept**: Both PFC model state AND Python variables persist across `pfc_execute_task` calls.
 
 ```
-Task 1: Create balls       → PFC state: 100 balls exist
-Task 2: Read ball count    → Can access the 100 balls from Task 1
-Task 3: Add walls          → PFC state: 100 balls + walls
-Task 4: Run simulation     → Operates on accumulated state
+Task 1: Create balls, define helper    → PFC: 100 balls | Python: analyze_fn, ball_ids
+Task 2: Use helper, read ball count    → Can access both PFC state and Python variables
+Task 3: Add walls, update tracking     → Accumulated state in both layers
 ```
 
-**Implications**:
-- Small validation scripts can query current state (ball count, positions, contacts)
-- No need to recreate everything in each script
-- Use `model new` explicitly when you need a clean state
-- User may query or modify state via PFC console - verify state if unexpected
+**What persists**:
+- **PFC model**: balls, walls, contacts, settings (via `itasca` SDK)
+- **Python variables**: data, imported modules, functions, classes
 
-**Validation pattern**:
+**Example**:
 ```python
-# Task 1: Create assembly
+# Task 1: Setup
+import numpy as np
+target_balls = [b.id() for b in itasca.ball.list() if b.pos_z() > 0]
 itasca.command('ball generate number 100 radius 0.1')
 
-# Task 2: Quick validation (separate script, uses existing state)
-print(f"Ball count: {itasca.ball.count()}")  # → 100
-print(f"Contacts: {itasca.contact.count()}")
-
-# Task 3: Continue with more operations on existing state
-itasca.command('ball attribute density 2500')
+# Task 2: Use existing variables (separate script)
+print(f"Tracking {len(target_balls)} balls")  # target_balls persists
+velocities = np.array([itasca.ball.find(bid).vel() for bid in target_balls])
 ```
+
+**Best practice**: Variables persist within session but are lost on PFC restart. For critical state:
+- Sync to model: `ball.set_extra(1, value)` for per-particle data
+- Save checkpoint: `model save 'state.sav'`
+- Export to file: JSON/CSV for external persistence
 
 ### Modular Script Architecture
 
