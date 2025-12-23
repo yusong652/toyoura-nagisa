@@ -16,10 +16,14 @@ from typing import Dict, Any, List, Literal, Tuple, Optional
 
 # Type definitions for tool parameters (keep in sync with SPECS below)
 BallColorByType = Literal[
+    # Vector attributes
     "position", "velocity", "displacement", "spin",
     "force-contact", "force-applied", "force-unbalanced",
     "moment-contact", "moment-applied", "moment-unbalanced",
+    # Numeric (scalar) attributes
     "radius", "damp", "density", "mass",
+    # Text attributes
+    "id", "group",
 ]
 WallColorByType = Literal[
     "position", "velocity", "displacement", "force-contact",
@@ -54,6 +58,9 @@ BALL_COLOR_BY_SPECS = {
     "damp":              {"type": "numeric", "attribute": "damp"},
     "density":           {"type": "numeric", "attribute": "density"},
     "mass":              {"type": "numeric", "attribute": "mass"},
+    # Text attributes - ball_color_by_quantity is ignored, uses named color mapping
+    "id":                {"type": "text", "attribute": "id"},
+    "group":             {"type": "text", "attribute": "group"},
 }
 
 # Wall color-by specifications (subset of ball attributes applicable to walls)
@@ -75,9 +82,10 @@ def _build_ball_color_by_command(
     Encapsulates PFC syntax:
     - Vector: color-by vector-attribute "name" quantity <mag|x|y|z>
     - Numeric: color-by numeric-attribute "name" (quantity ignored)
+    - Text: color-by text-attribute "name" (quantity ignored, uses named colors)
 
     Args:
-        color_by: Attribute name (e.g., "velocity", "position", "radius")
+        color_by: Attribute name (e.g., "velocity", "position", "radius", "id", "group")
         quantity: Component for vectors: "mag", "x", "y", "z". Default: "mag"
 
     Returns:
@@ -96,15 +104,19 @@ def _build_ball_color_by_command(
         qty = "mag"
 
     # Build color-by command based on attribute type
+    # Note: legend is added separately via "plot item modify" after item creation
     if spec["type"] == "vector":
         color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
+        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
     elif spec["type"] == "numeric":
         color_by_part = f'color-by numeric-attribute "{spec["attribute"]}"'
+        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+    elif spec["type"] == "text":
+        # 'Any' filter means show all values (escaped for Python string)
+        color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
+        color_options = "color-options named maximum-names 1000000 name-controls true"
     else:
         return ""
-
-    # Color options: scaled gradient with rainbow ramp and legend
-    color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic legend active on"
 
     return f"{color_by_part} {color_options}"
 
@@ -138,8 +150,9 @@ def _build_wall_color_by_command(
         qty = "mag"
 
     # Build color-by command (walls only have vector attributes)
+    # Note: legend is added separately via "plot item modify" after item creation
     color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
-    color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic legend active on"
+    color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
 
     return f"{color_by_part} {color_options}"
 
@@ -238,14 +251,16 @@ def generate_plot_capture_script(
         color_by_cmd = _build_ball_color_by_command(ball_color_by, ball_color_by_quantity)
         if color_by_cmd:
             # active on must come right after 'ball' to enable color-by
-            lines.append(f'itasca.command(\'plot item create ball active on {color_by_cmd}\')')
+            # legend active on is added at the end of the item create command
+            lines.append(f'itasca.command(\'plot item create ball active on {color_by_cmd} legend active on\')')
         else:
             lines.append('itasca.command(\'plot item create ball\')')
 
     if include_wall:
         wall_color_by_cmd = _build_wall_color_by_command(wall_color_by, wall_color_by_quantity)
         if wall_color_by_cmd:
-            lines.append(f'itasca.command(\'plot item create wall active on {wall_color_by_cmd} transparency {wall_transparency}\')')
+            # legend active on is added at the end of the item create command
+            lines.append(f'itasca.command(\'plot item create wall active on {wall_color_by_cmd} transparency {wall_transparency} legend active on\')')
         else:
             lines.append(f'itasca.command(\'plot item create wall transparency {wall_transparency}\')')
 
