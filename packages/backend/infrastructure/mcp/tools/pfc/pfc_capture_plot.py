@@ -29,9 +29,6 @@ from .scripts import (
     DEFAULT_PLOT_NAME,
     DEFAULT_WALL_TRANSPARENCY,
     DEFAULT_IMAGE_SIZE,
-    BallColorByType,
-    WallColorByType,
-    ContactColorByType,
     VectorQuantityType,
 )
 
@@ -63,9 +60,13 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             default=True,
             description="Show particles (balls) in the plot."
         ),
-        ball_color_by: Optional[BallColorByType] = Field(
+        ball_color_by: Optional[str] = Field(
             default=None,
-            description="Ball coloring attribute."
+            description=(
+                "Ball coloring attribute. "
+                "Common: position, velocity, displacement, spin, force-contact, force-applied, "
+                "radius, damp, density, mass, id, group, extra-1, extra-2, ..."
+            )
         ),
         ball_color_by_quantity: Optional[VectorQuantityType] = Field(
             default=None,
@@ -75,9 +76,13 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             default=True,
             description="Show boundary walls."
         ),
-        wall_color_by: Optional[WallColorByType] = Field(
+        wall_color_by: Optional[str] = Field(
             default=None,
-            description="Wall coloring attribute."
+            description=(
+                "Wall coloring attribute. "
+                "Common: position, velocity, displacement, force-contact, "
+                "name, id, group, extra-1, extra-2, ..."
+            )
         ),
         wall_color_by_quantity: Optional[VectorQuantityType] = Field(
             default=None,
@@ -93,9 +98,13 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             default=False,
             description="Show contact forces between particles."
         ),
-        contact_color_by: Optional[ContactColorByType] = Field(
+        contact_color_by: Optional[str] = Field(
             default="force",
-            description="Contact coloring attribute (default: force)."
+            description=(
+                "Contact coloring attribute. "
+                "Common: force, id, group, contact-type, model-name, "
+                "fric, kn, ks, emod, kratio, extra-1, extra-2, ..."
+            )
         ),
         contact_color_by_quantity: Optional[VectorQuantityType] = Field(
             default=None,
