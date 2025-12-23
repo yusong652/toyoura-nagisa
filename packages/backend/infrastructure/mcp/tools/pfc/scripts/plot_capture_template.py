@@ -36,6 +36,9 @@ ContactColorByType = Literal[
     "force",
     # Text attributes
     "id", "group", "contact-type", "model-name",
+    # Numeric properties
+    "fric", "kn", "ks", "dp_nratio", "dp_sratio",
+    "emod", "kratio", "rr_fric", "rr_kr", "rr_slip",
 ]
 VectorQuantityType = Literal["mag", "x", "y", "z"]
 
@@ -93,6 +96,17 @@ CONTACT_COLOR_BY_SPECS = {
     "group":        {"type": "text", "attribute": "group"},
     "contact-type": {"type": "text", "attribute": "contact type"},
     "model-name":   {"type": "text", "attribute": "model name"},
+    # Numeric properties (uses numeric-property, not numeric-attribute)
+    "fric":       {"type": "numeric-property", "property": "fric"},
+    "kn":         {"type": "numeric-property", "property": "kn"},
+    "ks":         {"type": "numeric-property", "property": "ks"},
+    "dp_nratio":  {"type": "numeric-property", "property": "dp_nratio"},
+    "dp_sratio":  {"type": "numeric-property", "property": "dp_sratio"},
+    "emod":       {"type": "numeric-property", "property": "emod"},
+    "kratio":     {"type": "numeric-property", "property": "kratio"},
+    "rr_fric":    {"type": "numeric-property", "property": "rr_fric"},
+    "rr_kr":      {"type": "numeric-property", "property": "rr_kr"},
+    "rr_slip":    {"type": "numeric-property", "property": "rr_slip"},
 }
 
 
@@ -118,29 +132,42 @@ def _build_ball_color_by_command(
     if not color_by:
         return ""
 
-    spec = BALL_COLOR_BY_SPECS.get(color_by.lower())
-    if not spec:
-        return ""
-
     # Validate and normalize quantity for vectors
     qty = quantity.lower() if quantity else "mag"
     if qty not in VECTOR_QUANTITY_OPTIONS:
         qty = "mag"
 
+    # Handle "extra-N" pattern (e.g., "extra-1" -> numeric-attribute "extra" 1)
+    color_by_lower = color_by.lower()
+    if color_by_lower.startswith("extra-"):
+        try:
+            extra_index = int(color_by_lower.split("-", 1)[1])
+            color_by_part = f'color-by numeric-attribute "extra" {extra_index}'
+            color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+            return f"{color_by_part} {color_options}"
+        except (IndexError, ValueError):
+            pass  # Fall through to normal handling
+
+    spec = BALL_COLOR_BY_SPECS.get(color_by_lower)
+
     # Build color-by command based on attribute type
-    # Note: legend is added separately via "plot item modify" after item creation
-    if spec["type"] == "vector":
-        color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
-        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
-    elif spec["type"] == "numeric":
-        color_by_part = f'color-by numeric-attribute "{spec["attribute"]}"'
-        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
-    elif spec["type"] == "text":
-        # 'Any' filter means show all values (escaped for Python string)
-        color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
-        color_options = "color-options named maximum-names 1000000 name-controls true"
+    if spec:
+        if spec["type"] == "vector":
+            color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
+            color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+        elif spec["type"] == "numeric":
+            color_by_part = f'color-by numeric-attribute "{spec["attribute"]}"'
+            color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+        elif spec["type"] == "text":
+            # 'Any' filter means show all values (escaped for Python string)
+            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
+            color_options = "color-options named maximum-names 1000000 name-controls true"
+        else:
+            return ""
     else:
-        return ""
+        # Unknown value: treat as custom property (set via ball.set_prop())
+        color_by_part = f'color-by numeric-property "{color_by}"'
+        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
 
     return f"{color_by_part} {color_options}"
 
@@ -155,9 +182,10 @@ def _build_wall_color_by_command(
     Encapsulates PFC syntax:
     - Vector: color-by vector-attribute "name" quantity <mag|x|y|z>
     - Text: color-by text-attribute "name" (quantity ignored, uses named colors)
+    - Custom: Unknown values treated as numeric-property (for wall.set_prop())
 
     Args:
-        color_by: Attribute name (e.g., "velocity", "position", "name", "group")
+        color_by: Attribute name (e.g., "velocity", "position", "name", or custom property)
         quantity: Component for vectors: "mag", "x", "y", "z". Default: "mag"
 
     Returns:
@@ -166,25 +194,39 @@ def _build_wall_color_by_command(
     if not color_by:
         return ""
 
-    spec = WALL_COLOR_BY_SPECS.get(color_by.lower())
-    if not spec:
-        return ""
-
     # Validate and normalize quantity for vectors
     qty = quantity.lower() if quantity else "mag"
     if qty not in VECTOR_QUANTITY_OPTIONS:
         qty = "mag"
 
+    # Handle "extra-N" pattern (e.g., "extra-1" -> numeric-attribute "extra" 1)
+    color_by_lower = color_by.lower()
+    if color_by_lower.startswith("extra-"):
+        try:
+            extra_index = int(color_by_lower.split("-", 1)[1])
+            color_by_part = f'color-by numeric-attribute "extra" {extra_index}'
+            color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+            return f"{color_by_part} {color_options}"
+        except (IndexError, ValueError):
+            pass  # Fall through to normal handling
+
+    spec = WALL_COLOR_BY_SPECS.get(color_by_lower)
+
     # Build color-by command based on attribute type
-    if spec["type"] == "vector":
-        color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
-        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
-    elif spec["type"] == "text":
-        # Wall text attributes use 'Any' piece off filter (escaped for Python string)
-        color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\' piece off"
-        color_options = "color-options named maximum-names 1000000 name-controls true"
+    if spec:
+        if spec["type"] == "vector":
+            color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
+            color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+        elif spec["type"] == "text":
+            # Wall text attributes use 'Any' piece off filter (escaped for Python string)
+            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\' piece off"
+            color_options = "color-options named maximum-names 1000000 name-controls true"
+        else:
+            return ""
     else:
-        return ""
+        # Unknown value: treat as custom property (set via wall.set_prop())
+        color_by_part = f'color-by numeric-property "{color_by}"'
+        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
 
     return f"{color_by_part} {color_options}"
 
@@ -199,9 +241,11 @@ def _build_contact_color_by_command(
     Encapsulates PFC syntax:
     - Vector: color-by vector-attribute "force" quantity <mag|x|y|z>
     - Text: color-by text-attribute "model name" (quantity ignored, uses named colors)
+    - Numeric: color-by numeric-property "fric" (known contact properties)
+    - Custom: Unknown values treated as numeric-property (for contact.set_prop())
 
     Args:
-        color_by: Attribute name (e.g., "force", "model-name", "contact-type")
+        color_by: Attribute name (e.g., "force", "model-name", "fric", or custom property)
         quantity: Component for vectors: "mag", "x", "y", "z". Default: "mag"
 
     Returns:
@@ -210,24 +254,41 @@ def _build_contact_color_by_command(
     if not color_by:
         return ""
 
-    spec = CONTACT_COLOR_BY_SPECS.get(color_by.lower())
-    if not spec:
-        return ""
-
     # Validate and normalize quantity for vectors
     qty = quantity.lower() if quantity else "mag"
     if qty not in VECTOR_QUANTITY_OPTIONS:
         qty = "mag"
 
+    # Handle "extra-N" pattern (e.g., "extra-1" -> numeric-attribute "extra" 1)
+    color_by_lower = color_by.lower()
+    if color_by_lower.startswith("extra-"):
+        try:
+            extra_index = int(color_by_lower.split("-", 1)[1])
+            color_by_part = f'color-by numeric-attribute "extra" {extra_index}'
+            color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+            return f"{color_by_part} {color_options}"
+        except (IndexError, ValueError):
+            pass  # Fall through to normal handling
+
+    spec = CONTACT_COLOR_BY_SPECS.get(color_by_lower)
+
     # Build color-by command based on attribute type
-    if spec["type"] == "vector":
-        color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
-        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
-    elif spec["type"] == "text":
-        color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
-        color_options = "color-options named maximum-names 1000000 name-controls true"
+    if spec:
+        if spec["type"] == "vector":
+            color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
+            color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+        elif spec["type"] == "text":
+            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+            color_options = "color-options named maximum-names 1000000 name-controls true"
+        elif spec["type"] == "numeric-property":
+            color_by_part = f'color-by numeric-property "{spec["property"]}"'
+            color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+        else:
+            return ""
     else:
-        return ""
+        # Unknown value: treat as custom property (set via contact.set_prop())
+        color_by_part = f'color-by numeric-property "{color_by}"'
+        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
 
     return f"{color_by_part} {color_options}"
 
