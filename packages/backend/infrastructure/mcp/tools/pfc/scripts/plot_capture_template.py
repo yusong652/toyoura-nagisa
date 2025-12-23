@@ -34,6 +34,8 @@ WallColorByType = Literal[
 ContactColorByType = Literal[
     # Vector attributes
     "force",
+    # Text attributes
+    "id", "group", "contact-type", "model-name",
 ]
 VectorQuantityType = Literal["mag", "x", "y", "z"]
 
@@ -86,6 +88,11 @@ WALL_COLOR_BY_SPECS = {
 CONTACT_COLOR_BY_SPECS = {
     # Vector attributes
     "force": {"type": "vector", "attribute": "force"},
+    # Text attributes
+    "id":           {"type": "text", "attribute": "id"},
+    "group":        {"type": "text", "attribute": "group"},
+    "contact-type": {"type": "text", "attribute": "contact type"},
+    "model-name":   {"type": "text", "attribute": "model name"},
 }
 
 
@@ -191,9 +198,10 @@ def _build_contact_color_by_command(
 
     Encapsulates PFC syntax:
     - Vector: color-by vector-attribute "force" quantity <mag|x|y|z>
+    - Text: color-by text-attribute "model name" (quantity ignored, uses named colors)
 
     Args:
-        color_by: Attribute name (e.g., "force")
+        color_by: Attribute name (e.g., "force", "model-name", "contact-type")
         quantity: Component for vectors: "mag", "x", "y", "z". Default: "mag"
 
     Returns:
@@ -211,9 +219,15 @@ def _build_contact_color_by_command(
     if qty not in VECTOR_QUANTITY_OPTIONS:
         qty = "mag"
 
-    # Build color-by command (contacts only have vector attributes)
-    color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
-    color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+    # Build color-by command based on attribute type
+    if spec["type"] == "vector":
+        color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
+        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+    elif spec["type"] == "text":
+        color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+        color_options = "color-options named maximum-names 1000000 name-controls true"
+    else:
+        return ""
 
     return f"{color_by_part} {color_options}"
 
