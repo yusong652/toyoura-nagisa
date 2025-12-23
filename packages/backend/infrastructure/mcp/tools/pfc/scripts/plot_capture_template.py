@@ -21,6 +21,9 @@ BallColorByType = Literal[
     "moment-contact", "moment-applied", "moment-unbalanced",
     "radius", "damp", "density", "mass",
 ]
+WallColorByType = Literal[
+    "position", "velocity", "displacement", "force-contact",
+]
 VectorQuantityType = Literal["mag", "x", "y", "z"]
 
 # Default plot configuration
@@ -51,6 +54,14 @@ BALL_COLOR_BY_SPECS = {
     "damp":              {"type": "numeric", "attribute": "damp"},
     "density":           {"type": "numeric", "attribute": "density"},
     "mass":              {"type": "numeric", "attribute": "mass"},
+}
+
+# Wall color-by specifications (subset of ball attributes applicable to walls)
+WALL_COLOR_BY_SPECS = {
+    "position":      {"type": "vector", "attribute": "position"},
+    "velocity":      {"type": "vector", "attribute": "velocity"},
+    "displacement":  {"type": "vector", "attribute": "displacement"},
+    "force-contact": {"type": "vector", "attribute": "force-contact"},
 }
 
 
@@ -98,6 +109,41 @@ def _build_ball_color_by_command(
     return f"{color_by_part} {color_options}"
 
 
+def _build_wall_color_by_command(
+    color_by: Optional[str],
+    quantity: str = "mag",
+) -> str:
+    """
+    Build PFC wall color-by command string from attribute and quantity.
+
+    Wall attributes are all vectors (position, velocity, displacement, force-contact).
+
+    Args:
+        color_by: Attribute name (e.g., "velocity", "position")
+        quantity: Component: "mag", "x", "y", "z". Default: "mag"
+
+    Returns:
+        PFC color-by command fragment, or empty string if invalid
+    """
+    if not color_by:
+        return ""
+
+    spec = WALL_COLOR_BY_SPECS.get(color_by.lower())
+    if not spec:
+        return ""
+
+    # Validate and normalize quantity
+    qty = quantity.lower() if quantity else "mag"
+    if qty not in VECTOR_QUANTITY_OPTIONS:
+        qty = "mag"
+
+    # Build color-by command (walls only have vector attributes)
+    color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
+    color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic legend active on"
+
+    return f"{color_by_part} {color_options}"
+
+
 def generate_plot_capture_script(
     output_path: str,
     plot_name: str = DEFAULT_PLOT_NAME,
@@ -109,6 +155,8 @@ def generate_plot_capture_script(
     wall_transparency: int = DEFAULT_WALL_TRANSPARENCY,
     ball_color_by: Optional[str] = None,
     ball_color_by_quantity: str = "mag",
+    wall_color_by: Optional[str] = None,
+    wall_color_by_quantity: str = "mag",
 ) -> str:
     """
     Generate Python script for PFC plot capture.
@@ -120,21 +168,15 @@ def generate_plot_capture_script(
         output_path: Absolute path for output PNG file (forward slashes)
         plot_name: Name for temporary plot (default: "NagisaDiagnostic")
         size: Image dimensions (width, height)
-        view_settings: Optional view parameters dict with keys:
-            - center: (x, y, z) camera look-at point
-            - eye: (x, y, z) camera position
-            - distance: float, distance from center
-            - dip: float, view plane dip angle in degrees
-            - dip_direction: float, dip direction in degrees
-            - roll: float, camera roll angle in degrees
-            - magnification: float, zoom level (1.0 = normal)
-            - projection: "perspective" or "parallel"
+        view_settings: Optional view parameters dict
         include_ball: Add ball visualization item
-        include_wall: Add wall visualization item with transparency
+        include_wall: Add wall visualization item
         include_axes: Add coordinate axes
         wall_transparency: Wall transparency 0-100 (default: 70)
-        ball_color_by: Attribute for ball coloring (e.g., "velocity", "position")
-        ball_color_by_quantity: Vector component: "mag", "x", "y", "z" (ignored for scalars)
+        ball_color_by: Attribute for ball coloring
+        ball_color_by_quantity: Ball vector component (mag/x/y/z)
+        wall_color_by: Attribute for wall coloring
+        wall_color_by_quantity: Wall vector component (mag/x/y/z)
 
     Returns:
         Python script content as string
@@ -201,7 +243,11 @@ def generate_plot_capture_script(
             lines.append('itasca.command(\'plot item create ball\')')
 
     if include_wall:
-        lines.append(f'itasca.command(\'plot item create wall transparency {wall_transparency}\')')
+        wall_color_by_cmd = _build_wall_color_by_command(wall_color_by, wall_color_by_quantity)
+        if wall_color_by_cmd:
+            lines.append(f'itasca.command(\'plot item create wall active on {wall_color_by_cmd} transparency {wall_transparency}\')')
+        else:
+            lines.append(f'itasca.command(\'plot item create wall transparency {wall_transparency}\')')
 
     if include_axes:
         lines.append('itasca.command(\'plot item create axes\')')

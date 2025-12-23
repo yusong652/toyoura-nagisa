@@ -11,8 +11,10 @@ from .plot_capture_template import (
     DEFAULT_WALL_TRANSPARENCY,
     DEFAULT_IMAGE_SIZE,
     BALL_COLOR_BY_SPECS,
+    WALL_COLOR_BY_SPECS,
     VECTOR_QUANTITY_OPTIONS,
     BallColorByType,
+    WallColorByType,
     VectorQuantityType,
 )
 
@@ -22,7 +24,9 @@ __all__ = [
     "DEFAULT_WALL_TRANSPARENCY",
     "DEFAULT_IMAGE_SIZE",
     "BALL_COLOR_BY_SPECS",
+    "WALL_COLOR_BY_SPECS",
     "VECTOR_QUANTITY_OPTIONS",
     "BallColorByType",
+    "WallColorByType",
     "VectorQuantityType",
 ]

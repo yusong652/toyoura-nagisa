@@ -30,6 +30,7 @@ from .scripts import (
     DEFAULT_WALL_TRANSPARENCY,
     DEFAULT_IMAGE_SIZE,
     BallColorByType,
+    WallColorByType,
     VectorQuantityType,
 )
 
@@ -71,13 +72,21 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         ),
         include_wall: bool = Field(
             default=True,
-            description="Show boundary walls with transparency."
+            description="Show boundary walls."
+        ),
+        wall_color_by: Optional[WallColorByType] = Field(
+            default=None,
+            description="Wall coloring attribute."
+        ),
+        wall_color_by_quantity: Optional[VectorQuantityType] = Field(
+            default=None,
+            description="Vector component filter for wall coloring."
         ),
         wall_transparency: int = Field(
             default=DEFAULT_WALL_TRANSPARENCY,
             ge=0,
             le=100,
-            description="Wall transparency 0-100 (0=opaque, 100=invisible). Default: 70."
+            description="Wall transparency 0-100 (0=opaque, 100=invisible)."
         ),
         center: Optional[Annotated[List[float], Field(min_length=3, max_length=3)]] = Field(
             default=None,
@@ -148,6 +157,8 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 wall_transparency=wall_transparency,
                 ball_color_by=ball_color_by,
                 ball_color_by_quantity=ball_color_by_quantity or "mag",
+                wall_color_by=wall_color_by,
+                wall_color_by_quantity=wall_color_by_quantity or "mag",
             )
 
             # Get PFC client and working directory
