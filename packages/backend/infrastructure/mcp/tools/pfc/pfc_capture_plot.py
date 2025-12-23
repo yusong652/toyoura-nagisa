@@ -190,16 +190,9 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 error_msg = result.get("message", "Plot capture failed")
                 return error_response(f"Plot capture failed: {error_msg}")
 
-            # Verify file was created (PFC export bitmap may be async)
-            max_wait, elapsed = 10, 0
-            while not os.path.exists(output_path) and elapsed < max_wait:
-                time.sleep(0.1)
-                elapsed += 0.1
-
+            # Verify file was created (script already waits for async export)
             if not os.path.exists(output_path):
-                return error_response(
-                    f"Export completed but file not found after {max_wait}s: {output_path}"
-                )
+                return error_response(f"Export completed but file not found: {output_path}")
 
             # Build success response
             return success_response(
