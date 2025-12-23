@@ -12,6 +12,8 @@ from .plot_capture_template import (
     DEFAULT_IMAGE_SIZE,
     BALL_COLOR_BY_SPECS,
     VECTOR_QUANTITY_OPTIONS,
+    BallColorByType,
+    VectorQuantityType,
 )
 
 __all__ = [
@@ -21,4 +23,6 @@ __all__ = [
     "DEFAULT_IMAGE_SIZE",
     "BALL_COLOR_BY_SPECS",
     "VECTOR_QUANTITY_OPTIONS",
+    "BallColorByType",
+    "VectorQuantityType",
 ]

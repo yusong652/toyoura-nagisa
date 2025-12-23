@@ -11,8 +11,17 @@ Design Philosophy:
 - Auto-cleanup temporary plot after export
 """
 
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Literal, Tuple, Optional
 
+
+# Type definitions for tool parameters (keep in sync with SPECS below)
+BallColorByType = Literal[
+    "position", "velocity", "displacement", "spin",
+    "force-contact", "force-applied", "force-unbalanced",
+    "moment-contact", "moment-applied", "moment-unbalanced",
+    "radius", "damp", "density", "mass",
+]
+VectorQuantityType = Literal["mag", "x", "y", "z"]
 
 # Default plot configuration
 DEFAULT_PLOT_NAME = "NagisaDiagnostic"
@@ -240,11 +249,8 @@ def _build_view_command(view_settings: Optional[Dict[str, Any]]) -> str:
 
     parts: List[str] = []
 
-    # Projection mode (perspective or parallel)
-    if "projection" in view_settings:
-        parts.append(f"projection {view_settings['projection']}")
-    else:
-        parts.append("projection perspective")
+    # Projection mode (always provided by tool layer)
+    parts.append(f"projection {view_settings['projection']}")
 
     # Camera position
     if "center" in view_settings:

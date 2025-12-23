@@ -19,7 +19,7 @@ import os
 import time
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any, Optional, List
+from typing import Annotated, Dict, Any, Literal, Optional, List
 from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -29,8 +29,8 @@ from .scripts import (
     DEFAULT_PLOT_NAME,
     DEFAULT_WALL_TRANSPARENCY,
     DEFAULT_IMAGE_SIZE,
-    BALL_COLOR_BY_SPECS,
-    VECTOR_QUANTITY_OPTIONS,
+    BallColorByType,
+    VectorQuantityType,
 )
 
 
@@ -50,33 +50,24 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         context: Context,
         output_path: str = Field(
             ...,
-            description=(
-                "Absolute path for PNG file. Directory auto-created if not exists. "
-                "Example: '/path/to/project/plots/model_state.png'"
-            )
+            pattern=r"(?i).*\.png$",
+            description="Absolute path for PNG file. Directory auto-created if not exists."
         ),
-        size: Optional[List[int]] = Field(
-            default=None,
-            description="Image size [width, height] in pixels. Default: [720, 480]."
+        size: Annotated[List[int], Field(min_length=2, max_length=2)] = Field(
+            default=list(DEFAULT_IMAGE_SIZE),
+            description="Image size [width, height] in pixels."
         ),
         include_ball: bool = Field(
             default=True,
             description="Show particles (balls) in the plot."
         ),
-        ball_color_by: Optional[str] = Field(
+        ball_color_by: Optional[BallColorByType] = Field(
             default=None,
-            description=(
-                "Ball coloring attribute. "
-                f"Vectors: {', '.join(k for k, v in BALL_COLOR_BY_SPECS.items() if v['type'] == 'vector')}. "
-                f"Scalars: {', '.join(k for k, v in BALL_COLOR_BY_SPECS.items() if v['type'] == 'numeric')}."
-            )
+            description="Ball coloring attribute."
         ),
-        ball_color_by_quantity: Optional[str] = Field(
+        ball_color_by_quantity: Optional[VectorQuantityType] = Field(
             default=None,
-            description=(
-                "Vector component filter. Options: mag (magnitude), x, y, z. "
-                "Only applies to vector attributes; ignored for scalars."
-            )
+            description="Vector component filter (ignored for scalars)."
         ),
         include_wall: bool = Field(
             default=True,
@@ -88,21 +79,25 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             le=100,
             description="Wall transparency 0-100 (0=opaque, 100=invisible). Default: 70."
         ),
-        center: Optional[List[float]] = Field(
+        center: Optional[Annotated[List[float], Field(min_length=3, max_length=3)]] = Field(
             default=None,
             description="Camera look-at point [x, y, z]. Auto-fit if not specified."
         ),
-        eye: Optional[List[float]] = Field(
+        eye: Optional[Annotated[List[float], Field(min_length=3, max_length=3)]] = Field(
             default=None,
             description="Camera position [x, y, z]. Isometric view if not specified."
         ),
-        magnification: Optional[float] = Field(
-            default=None,
+        roll: float = Field(
+            default=0.0,
+            description="Camera roll angle in degrees (0 = level). Only applies when eye or center is specified."
+        ),
+        magnification: float = Field(
+            default=1.0,
             description="Zoom level (1.0 = normal, 2.0 = 2x closer)."
         ),
-        projection: Optional[str] = Field(
-            default=None,
-            description="'perspective' (default) or 'parallel' (orthographic)."
+        projection: Literal["perspective", "parallel"] = Field(
+            default="perspective",
+            description="Projection mode. parallel = orthographic view."
         ),
     ) -> Dict[str, Any]:
         """
@@ -120,65 +115,25 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             if not session_id:
                 return error_response("Session ID not available")
 
-            # Validate list parameters have correct length
-            if size is not None and len(size) != 2:
-                return error_response("size must have exactly 2 elements [width, height]")
-            if center is not None and len(center) != 3:
-                return error_response("center must have exactly 3 elements [x, y, z]")
-            if eye is not None and len(eye) != 3:
-                return error_response("eye must have exactly 3 elements [x, y, z]")
-
-            # Validate output path
-            if not output_path or not output_path.strip():
-                return error_response(
-                    "output_path is required. Provide absolute path ending with .png"
-                )
-
             output_path = output_path.strip()
-
-            # Check for .png extension
-            if not output_path.lower().endswith('.png'):
-                return error_response(
-                    f"output_path must end with .png, got: {output_path}"
-                )
-
-            # Validate projection value
-            if projection is not None and projection not in ('perspective', 'parallel'):
-                return error_response(
-                    f"projection must be 'perspective' or 'parallel', got: '{projection}'"
-                )
-
-            # Validate ball_color_by value
-            if ball_color_by is not None and ball_color_by.lower() not in BALL_COLOR_BY_SPECS:
-                valid_options = ', '.join(BALL_COLOR_BY_SPECS.keys())
-                return error_response(
-                    f"ball_color_by must be one of: {valid_options}. Got: '{ball_color_by}'"
-                )
-
-            # Validate ball_color_by_quantity (only for vectors, but accept any valid value)
-            if ball_color_by_quantity is not None:
-                if ball_color_by_quantity.lower() not in VECTOR_QUANTITY_OPTIONS:
-                    return error_response(
-                        f"ball_color_by_quantity must be one of: {', '.join(VECTOR_QUANTITY_OPTIONS)}. "
-                        f"Got: '{ball_color_by_quantity}'"
-                    )
-
-            # Default size
-            if size is None:
-                size = list(DEFAULT_IMAGE_SIZE)
 
             # Normalize output path for cross-platform (Linux format for PFC server)
             normalized_output_path = normalize_path_separators(output_path, target_platform='linux')
 
-            # Build view settings dict (only non-None values)
+            # Build view settings dict
             view_settings: Dict[str, Any] = {}
             if center is not None:
                 view_settings["center"] = list(center)
             if eye is not None:
                 view_settings["eye"] = list(eye)
-            if magnification is not None:
+            # Include roll when custom camera position is used
+            if center is not None or eye is not None:
+                view_settings["roll"] = roll
+            # Include magnification only if not default
+            if magnification != 1.0:
                 view_settings["magnification"] = magnification
-            if projection is not None:
+            # Include projection when custom view settings are used
+            if view_settings:
                 view_settings["projection"] = projection
 
             # Generate Python script for plot capture
@@ -186,7 +141,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 output_path=normalized_output_path,
                 plot_name=DEFAULT_PLOT_NAME,
                 size=(size[0], size[1]),
-                view_settings=view_settings if view_settings else None,
+                view_settings=view_settings,
                 include_ball=include_ball,
                 include_wall=include_wall,
                 include_axes=True,
@@ -195,7 +150,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 ball_color_by_quantity=ball_color_by_quantity or "mag",
             )
 
-            # Get PFC working directory for script storage
+            # Get PFC client and working directory
             client = await get_client()
             working_dir = await client.get_working_directory()
 
@@ -205,37 +160,17 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                     "Ensure PFC server is running with a project open."
                 )
 
-            # Create script file in PFC workspace
-            script_dir = os.path.join(working_dir, ".nagisa", "plot_scripts")
-            os.makedirs(script_dir, exist_ok=True)
-
-            # Generate unique script filename
-            import time
-            script_filename = f"capture_plot_{int(time.time() * 1000)}.py"
-            script_path = os.path.join(script_dir, script_filename)
-
-            # Write script
-            with open(script_path, 'w', encoding='utf-8') as f:
-                f.write(script_content)
-
-            # Normalize script path for PFC server
+            # Create and execute temporary script
+            script_path = _create_temp_script(working_dir, script_content)
             normalized_script_path = normalize_path_separators(script_path, target_platform='linux')
 
-            # Execute script via diagnostic executor
-            # This uses smart path selection on server side:
-            # - If PFC idle: queue execution (fast)
-            # - If cycle running: callback execution (between cycles)
             try:
                 result = await client.execute_diagnostic(
                     script_path=normalized_script_path,
-                    timeout_ms=30000  # 30 second timeout
+                    timeout_ms=30000
                 )
             finally:
-                # Always cleanup script file (success or failure)
-                try:
-                    os.remove(script_path)
-                except OSError:
-                    pass  # Ignore cleanup errors
+                _cleanup_script(script_path)
 
             # Handle execution result
             status = result.get("status")
@@ -274,3 +209,31 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             return error_response(f"Plot capture error: {str(e)}")
 
     print(f"[DEBUG] Registered PFC plot capture tool: pfc_capture_plot")
+
+
+def _create_temp_script(working_dir: str, content: str) -> str:
+    """
+    Create temporary script file in PFC workspace.
+
+    Args:
+        working_dir: PFC working directory
+        content: Script content to write
+
+    Returns:
+        Absolute path to created script file
+    """
+    script_dir = os.path.join(working_dir, ".nagisa", "plot_scripts")
+    os.makedirs(script_dir, exist_ok=True)
+    script_filename = f"capture_plot_{int(time.time() * 1000)}.py"
+    script_path = os.path.join(script_dir, script_filename)
+    with open(script_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    return script_path
+
+
+def _cleanup_script(script_path: str) -> None:
+    """Remove temporary script file, ignoring errors."""
+    try:
+        os.remove(script_path)
+    except OSError:
+        pass
