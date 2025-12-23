@@ -19,45 +19,49 @@ DEFAULT_PLOT_NAME = "NagisaDiagnostic"
 DEFAULT_WALL_TRANSPARENCY = 70  # 0-100, 70 = 70% transparent
 DEFAULT_IMAGE_SIZE = (720, 480)
 
+# Valid quantity options for vector attributes
+# Maps to PFC syntax: vector-attribute "name" quantity <value>
+VECTOR_QUANTITY_OPTIONS = ("mag", "x", "y", "z")
+
 # Ball color-by specifications
-# Maps user-friendly keywords to PFC syntax details
-# This encapsulates PFC syntax complexity from the LLM
+# Maps attribute keywords to PFC command syntax
 BALL_COLOR_BY_SPECS = {
-    "velocity": {
-        "type": "vector",
-        "attribute": "velocity",
-        "quantity": "mag",
-        "description": "Color by velocity magnitude (useful for checking equilibrium)",
-    },
-    "displacement": {
-        "type": "vector",
-        "attribute": "displacement",
-        "quantity": "mag",
-        "description": "Color by displacement magnitude (useful for deformation analysis)",
-    },
-    "radius": {
-        "type": "numeric",
-        "attribute": "radius",
-        "description": "Color by particle radius (useful for size distribution)",
-    },
+    # Vector attributes - use ball_color_by_quantity to select component (mag/x/y/z)
+    "position":          {"type": "vector",  "attribute": "position"},
+    "velocity":          {"type": "vector",  "attribute": "velocity"},
+    "displacement":      {"type": "vector",  "attribute": "displacement"},
+    "spin":              {"type": "vector",  "attribute": "spin"},
+    "force-contact":     {"type": "vector",  "attribute": "force-contact"},
+    "force-applied":     {"type": "vector",  "attribute": "force-applied"},
+    "force-unbalanced":  {"type": "vector",  "attribute": "force-unbalanced"},
+    "moment-contact":    {"type": "vector",  "attribute": "moment-contact"},
+    "moment-applied":    {"type": "vector",  "attribute": "moment-applied"},
+    "moment-unbalanced": {"type": "vector",  "attribute": "moment-unbalanced"},
+    # Numeric (scalar) attributes - ball_color_by_quantity is ignored
+    "radius":            {"type": "numeric", "attribute": "radius"},
+    "damp":              {"type": "numeric", "attribute": "damp"},
+    "density":           {"type": "numeric", "attribute": "density"},
+    "mass":              {"type": "numeric", "attribute": "mass"},
 }
 
 
-def _build_ball_color_by_command(color_by: Optional[str]) -> str:
+def _build_ball_color_by_command(
+    color_by: Optional[str],
+    quantity: str = "mag",
+) -> str:
     """
-    Build PFC color-by command string from user keyword.
+    Build PFC color-by command string from attribute and quantity.
 
-    Encapsulates PFC syntax differences:
-    - Vector attributes: vector-attribute "name" quantity mag
-    - Numeric attributes: numeric-attribute "name"
-
-    Always includes 'color-options scaled' for continuous color gradients.
+    Encapsulates PFC syntax:
+    - Vector: color-by vector-attribute "name" quantity <mag|x|y|z>
+    - Numeric: color-by numeric-attribute "name" (quantity ignored)
 
     Args:
-        color_by: User keyword ("velocity", "displacement", "radius", or None)
+        color_by: Attribute name (e.g., "velocity", "position", "radius")
+        quantity: Component for vectors: "mag", "x", "y", "z". Default: "mag"
 
     Returns:
-        PFC color-by command fragment, or empty string if None/invalid
+        PFC color-by command fragment, or empty string if invalid
     """
     if not color_by:
         return ""
@@ -66,16 +70,20 @@ def _build_ball_color_by_command(color_by: Optional[str]) -> str:
     if not spec:
         return ""
 
-    # Build color-by part
+    # Validate and normalize quantity for vectors
+    qty = quantity.lower() if quantity else "mag"
+    if qty not in VECTOR_QUANTITY_OPTIONS:
+        qty = "mag"
+
+    # Build color-by command based on attribute type
     if spec["type"] == "vector":
-        color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {spec["quantity"]}'
+        color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
     elif spec["type"] == "numeric":
         color_by_part = f'color-by numeric-attribute "{spec["attribute"]}"'
     else:
         return ""
 
-    # Add color-options for continuous gradient (automatic scaling with rainbow ramp)
-    # legend active on is required to display the color scale
+    # Color options: scaled gradient with rainbow ramp and legend
     color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic legend active on"
 
     return f"{color_by_part} {color_options}"
@@ -91,6 +99,7 @@ def generate_plot_capture_script(
     include_axes: bool = True,
     wall_transparency: int = DEFAULT_WALL_TRANSPARENCY,
     ball_color_by: Optional[str] = None,
+    ball_color_by_quantity: str = "mag",
 ) -> str:
     """
     Generate Python script for PFC plot capture.
@@ -115,8 +124,8 @@ def generate_plot_capture_script(
         include_wall: Add wall visualization item with transparency
         include_axes: Add coordinate axes
         wall_transparency: Wall transparency 0-100 (default: 70)
-        ball_color_by: Color balls by attribute ("velocity", "displacement", "radius")
-            None = default coloring
+        ball_color_by: Attribute for ball coloring (e.g., "velocity", "position")
+        ball_color_by_quantity: Vector component: "mag", "x", "y", "z" (ignored for scalars)
 
     Returns:
         Python script content as string
@@ -175,7 +184,7 @@ def generate_plot_capture_script(
     lines.append('# Add visualization items')
 
     if include_ball:
-        color_by_cmd = _build_ball_color_by_command(ball_color_by)
+        color_by_cmd = _build_ball_color_by_command(ball_color_by, ball_color_by_quantity)
         if color_by_cmd:
             # active on must come right after 'ball' to enable color-by
             lines.append(f'itasca.command(\'plot item create ball active on {color_by_cmd}\')')

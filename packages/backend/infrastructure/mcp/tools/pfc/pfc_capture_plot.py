@@ -24,7 +24,14 @@ from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
-from .scripts import generate_plot_capture_script, DEFAULT_PLOT_NAME, DEFAULT_WALL_TRANSPARENCY, DEFAULT_IMAGE_SIZE, BALL_COLOR_BY_SPECS
+from .scripts import (
+    generate_plot_capture_script,
+    DEFAULT_PLOT_NAME,
+    DEFAULT_WALL_TRANSPARENCY,
+    DEFAULT_IMAGE_SIZE,
+    BALL_COLOR_BY_SPECS,
+    VECTOR_QUANTITY_OPTIONS,
+)
 
 
 def register_pfc_capture_plot_tool(mcp: FastMCP):
@@ -58,7 +65,18 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         ),
         ball_color_by: Optional[str] = Field(
             default=None,
-            description=f"Color balls by attribute. Options: {', '.join(BALL_COLOR_BY_SPECS.keys())}. None = default."
+            description=(
+                "Ball coloring attribute. "
+                f"Vectors: {', '.join(k for k, v in BALL_COLOR_BY_SPECS.items() if v['type'] == 'vector')}. "
+                f"Scalars: {', '.join(k for k, v in BALL_COLOR_BY_SPECS.items() if v['type'] == 'numeric')}."
+            )
+        ),
+        ball_color_by_quantity: Optional[str] = Field(
+            default=None,
+            description=(
+                "Vector component filter. Options: mag (magnitude), x, y, z. "
+                "Only applies to vector attributes; ignored for scalars."
+            )
         ),
         include_wall: bool = Field(
             default=True,
@@ -137,6 +155,14 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                     f"ball_color_by must be one of: {valid_options}. Got: '{ball_color_by}'"
                 )
 
+            # Validate ball_color_by_quantity (only for vectors, but accept any valid value)
+            if ball_color_by_quantity is not None:
+                if ball_color_by_quantity.lower() not in VECTOR_QUANTITY_OPTIONS:
+                    return error_response(
+                        f"ball_color_by_quantity must be one of: {', '.join(VECTOR_QUANTITY_OPTIONS)}. "
+                        f"Got: '{ball_color_by_quantity}'"
+                    )
+
             # Default size
             if size is None:
                 size = list(DEFAULT_IMAGE_SIZE)
@@ -166,6 +192,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 include_axes=True,
                 wall_transparency=wall_transparency,
                 ball_color_by=ball_color_by,
+                ball_color_by_quantity=ball_color_by_quantity or "mag",
             )
 
             # Get PFC working directory for script storage
