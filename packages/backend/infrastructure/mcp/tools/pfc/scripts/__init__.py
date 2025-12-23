@@ -12,9 +12,11 @@ from .plot_capture_template import (
     DEFAULT_IMAGE_SIZE,
     BALL_COLOR_BY_SPECS,
     WALL_COLOR_BY_SPECS,
+    CONTACT_COLOR_BY_SPECS,
     VECTOR_QUANTITY_OPTIONS,
     BallColorByType,
     WallColorByType,
+    ContactColorByType,
     VectorQuantityType,
 )
 
@@ -25,8 +27,10 @@ __all__ = [
     "DEFAULT_IMAGE_SIZE",
     "BALL_COLOR_BY_SPECS",
     "WALL_COLOR_BY_SPECS",
+    "CONTACT_COLOR_BY_SPECS",
     "VECTOR_QUANTITY_OPTIONS",
     "BallColorByType",
     "WallColorByType",
+    "ContactColorByType",
     "VectorQuantityType",
 ]

@@ -31,6 +31,7 @@ from .scripts import (
     DEFAULT_IMAGE_SIZE,
     BallColorByType,
     WallColorByType,
+    ContactColorByType,
     VectorQuantityType,
 )
 
@@ -87,6 +88,22 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             ge=0,
             le=100,
             description="Wall transparency 0-100 (0=opaque, 100=invisible)."
+        ),
+        include_contact: bool = Field(
+            default=False,
+            description="Show contact forces between particles."
+        ),
+        contact_color_by: Optional[ContactColorByType] = Field(
+            default="force",
+            description="Contact coloring attribute (default: force)."
+        ),
+        contact_color_by_quantity: Optional[VectorQuantityType] = Field(
+            default=None,
+            description="Vector component filter for contact coloring."
+        ),
+        contact_scale_by_force: bool = Field(
+            default=True,
+            description="Scale contact cylinders by force magnitude."
         ),
         center: Optional[Annotated[List[float], Field(min_length=3, max_length=3)]] = Field(
             default=None,
@@ -153,12 +170,16 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 view_settings=view_settings,
                 include_ball=include_ball,
                 include_wall=include_wall,
+                include_contact=include_contact,
                 include_axes=True,
                 wall_transparency=wall_transparency,
                 ball_color_by=ball_color_by,
                 ball_color_by_quantity=ball_color_by_quantity or "mag",
                 wall_color_by=wall_color_by,
                 wall_color_by_quantity=wall_color_by_quantity or "mag",
+                contact_color_by=contact_color_by,
+                contact_color_by_quantity=contact_color_by_quantity or "mag",
+                contact_scale_by_force=contact_scale_by_force,
             )
 
             # Get PFC client and working directory
