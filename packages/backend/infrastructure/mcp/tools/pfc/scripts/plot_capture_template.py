@@ -26,7 +26,10 @@ BallColorByType = Literal[
     "id", "group",
 ]
 WallColorByType = Literal[
+    # Vector attributes
     "position", "velocity", "displacement", "force-contact",
+    # Text attributes
+    "name", "group",
 ]
 VectorQuantityType = Literal["mag", "x", "y", "z"]
 
@@ -65,10 +68,14 @@ BALL_COLOR_BY_SPECS = {
 
 # Wall color-by specifications (subset of ball attributes applicable to walls)
 WALL_COLOR_BY_SPECS = {
+    # Vector attributes
     "position":      {"type": "vector", "attribute": "position"},
     "velocity":      {"type": "vector", "attribute": "velocity"},
     "displacement":  {"type": "vector", "attribute": "displacement"},
     "force-contact": {"type": "vector", "attribute": "force-contact"},
+    # Text attributes - all use 'Any' piece off filter
+    "name":          {"type": "text", "attribute": "name"},
+    "group":         {"type": "text", "attribute": "group"},
 }
 
 
@@ -128,11 +135,13 @@ def _build_wall_color_by_command(
     """
     Build PFC wall color-by command string from attribute and quantity.
 
-    Wall attributes are all vectors (position, velocity, displacement, force-contact).
+    Encapsulates PFC syntax:
+    - Vector: color-by vector-attribute "name" quantity <mag|x|y|z>
+    - Text: color-by text-attribute "name" (quantity ignored, uses named colors)
 
     Args:
-        color_by: Attribute name (e.g., "velocity", "position")
-        quantity: Component: "mag", "x", "y", "z". Default: "mag"
+        color_by: Attribute name (e.g., "velocity", "position", "name", "group")
+        quantity: Component for vectors: "mag", "x", "y", "z". Default: "mag"
 
     Returns:
         PFC color-by command fragment, or empty string if invalid
@@ -144,15 +153,21 @@ def _build_wall_color_by_command(
     if not spec:
         return ""
 
-    # Validate and normalize quantity
+    # Validate and normalize quantity for vectors
     qty = quantity.lower() if quantity else "mag"
     if qty not in VECTOR_QUANTITY_OPTIONS:
         qty = "mag"
 
-    # Build color-by command (walls only have vector attributes)
-    # Note: legend is added separately via "plot item modify" after item creation
-    color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
-    color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+    # Build color-by command based on attribute type
+    if spec["type"] == "vector":
+        color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
+        color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
+    elif spec["type"] == "text":
+        # Wall text attributes use 'Any' piece off filter (escaped for Python string)
+        color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\' piece off"
+        color_options = "color-options named maximum-names 1000000 name-controls true"
+    else:
+        return ""
 
     return f"{color_by_part} {color_options}"
 
