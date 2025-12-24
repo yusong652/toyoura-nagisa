@@ -423,7 +423,7 @@ Navigation:
     )
 
 
-def _browse_object(module_path: str, object_name: str, display_name: str = None) -> Dict[str, Any]:
+def _browse_object(module_path: str, object_name: str, display_name: Optional[str] = None) -> Dict[str, Any]:
     """Browse an object - list its method groups.
 
     Args:
@@ -496,7 +496,7 @@ Navigation:
     )
 
 
-def _browse_method(module_path: str, object_name: str, method_name: str, display_name: str = None) -> Dict[str, Any]:
+def _browse_method(module_path: str, object_name: str, method_name: str, display_name: Optional[str] = None) -> Dict[str, Any]:
     """Browse a specific method documentation.
 
     Args:
