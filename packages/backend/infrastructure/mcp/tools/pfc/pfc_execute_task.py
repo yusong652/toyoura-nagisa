@@ -8,7 +8,7 @@ for complete traceability ("Script is Context" philosophy).
 
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any
+from typing import Dict, Any, cast
 from backend.infrastructure.pfc import get_pfc_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
@@ -53,7 +53,7 @@ def register_pfc_task_tool(mcp: FastMCP):
         try:
             # Get session ID from MCP context for task isolation
             # Architecture guarantee: tool_manager.py always injects _meta.client_id
-            session_id = context.client_id
+            session_id = cast(str, context.client_id)
 
             # Parameters are pre-validated by Pydantic Annotated types
             # Normalize path separators for cross-platform compatibility
