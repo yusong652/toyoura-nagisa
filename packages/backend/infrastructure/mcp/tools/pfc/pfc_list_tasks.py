@@ -52,9 +52,10 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
             - Use pfc_check_task_status for detailed output of specific scripts
         """
         try:
-            # Get current session ID from context (truncate to 8 chars for display)
-            current_session_id = getattr(context, 'client_id', 'unknown')
-            current_session_id_display = current_session_id[:8] if current_session_id != 'unknown' else 'unknown'
+            # Get caller's session ID from context (truncate to 8 chars for display)
+            # Architecture guarantee: tool_manager.py always injects _meta.client_id
+            caller_session_id = context.client_id
+            caller_session_id_display = caller_session_id[:8] if caller_session_id else 'unknown'
 
             # Get WebSocket client (auto-connects if needed)
             client = await get_client()
@@ -99,7 +100,7 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                     }.get(status, "Unknown")
 
                     # Mark task ownership: only show session_id for non-current sessions
-                    if task_session_id == current_session_id:
+                    if task_session_id == caller_session_id:
                         session_marker = " [Your task]"
                     else:
                         # Show session_id for other sessions (truncated to 8 chars)
@@ -138,7 +139,7 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                 task_summary = (
                     f"Tasks: {total_count} total | Showing: {displayed_count} ({'most recent' if offset == 0 else f'offset {offset}'})\n"
                     f"{filter_info}\n"
-                    f"Your session: {current_session_id_display}\n\n" +
+                    f"Your session: {caller_session_id_display}\n\n" +
                     "\n\n".join(task_lines) +
                     f"\n\n**NEXT**: {nav_hint}"
                 )
@@ -153,7 +154,7 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                 },
                 total_count=total_count,
                 displayed_count=displayed_count,
-                current_session_id=current_session_id,
+                caller_session_id=caller_session_id,
                 tasks=data,
                 pagination=pagination
             )
