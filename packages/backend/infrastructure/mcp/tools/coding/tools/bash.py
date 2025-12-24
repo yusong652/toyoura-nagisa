@@ -6,7 +6,7 @@ designed to match Claude Code's Bash tool interface and behavior.
 Uses the infrastructure layer ShellExecutor for actual command execution.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, cast
 
 from pydantic import Field
 from fastmcp import FastMCP  # type: ignore
@@ -105,7 +105,7 @@ Working directory:
     if run_in_background:
         try:
             # Architecture guarantee: tool_manager.py always injects _meta.client_id
-            session_id = context.client_id
+            session_id = cast(str, context.client_id)
 
             from ..utils.background_process_manager import get_process_manager
             process_manager = get_process_manager()
