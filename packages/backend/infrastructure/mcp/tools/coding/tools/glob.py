@@ -86,7 +86,7 @@ async def glob(
     ),
     path: Optional[str] = Field(
         None,
-        description="The directory to search in (defaults to workspace root if not specified)",
+        description="The directory to search in. If not specified, defaults to workspace root. IMPORTANT: Omit this field for default behavior. DO NOT pass null or empty string.",
     ),
 ) -> Dict[str, Any]:
     """Fast file and directory pattern matching tool.
