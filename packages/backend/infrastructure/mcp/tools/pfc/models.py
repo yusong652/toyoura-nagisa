@@ -18,9 +18,9 @@ from pydantic.functional_validators import AfterValidator
 DESCRIPTION_MIN_LENGTH = 1
 DESCRIPTION_MAX_LENGTH = 200
 
-# Pagination defaults
-DEFAULT_OUTPUT_LINES = 20
-MAX_OUTPUT_LINES = 100
+# Pagination defaults (for task output display)
+DEFAULT_OUTPUT_LINES = 64
+MAX_OUTPUT_LINES = 200
 DEFAULT_TASK_LIST_LIMIT = 32
 MAX_TASK_LIST_LIMIT = 100
 

@@ -11,15 +11,12 @@ Provides unified output format for consistent LLM understanding.
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple, List
 from backend.infrastructure.mcp.utils.time_utils import format_timestamp
+from ..models import DEFAULT_OUTPUT_LINES, MAX_OUTPUT_LINES
 
 
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
-
-# Default output limits
-DEFAULT_OUTPUT_LINES = 64
-MAX_OUTPUT_LINES = 200
 
 # Output truncation for context injection (to avoid token bloat)
 CONTEXT_INJECTION_MAX_CHARS = 2000
