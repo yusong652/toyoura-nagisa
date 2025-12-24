@@ -82,6 +82,7 @@ async def glob(
     context: Context,
     pattern: str = Field(
         ...,
+        min_length=1,
         description="The glob pattern to match files against. Supports **, *, ?, and brace expansion {a,b,c}",
     ),
     path: Optional[str] = Field(
@@ -100,9 +101,7 @@ async def glob(
     if isinstance(path, FieldInfo):
         path = None
 
-    # Validate pattern
-    if not pattern or not pattern.strip():
-        return error_response("Pattern is required and cannot be empty")
+    # pattern is pre-validated by Pydantic (min_length=1)
 
     # Get workspace root dynamically based on current session
     workspace_root = await get_workspace_root_async(context)
