@@ -31,6 +31,7 @@ from .scripts import (
     DEFAULT_IMAGE_SIZE,
     VectorQuantityType,
 )
+from .models import PlotOutputPath
 
 
 def register_pfc_capture_plot_tool(mcp: FastMCP):
@@ -47,11 +48,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
     )
     async def pfc_capture_plot(
         context: Context,
-        output_path: str = Field(
-            ...,
-            pattern=r"(?i).*\.png$",
-            description="Absolute path for PNG file. Directory auto-created if not exists."
-        ),
+        output_path: PlotOutputPath,
         size: Annotated[List[int], Field(min_length=2, max_length=2)] = Field(
             default=list(DEFAULT_IMAGE_SIZE),
             description="Image size [width, height] in pixels."
@@ -150,8 +147,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             if not session_id:
                 return error_response("Session ID not available")
 
-            output_path = output_path.strip()
-
+            # Parameter is pre-validated by Pydantic Annotated type (stripped and .png checked)
             # Normalize output path for cross-platform (Linux format for PFC server)
             normalized_output_path = normalize_path_separators(output_path, target_platform='linux')
 

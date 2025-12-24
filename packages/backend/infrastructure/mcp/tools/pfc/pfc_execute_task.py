@@ -8,8 +8,7 @@ for complete traceability ("Script is Context" philosophy).
 
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any, Optional
-from pydantic import Field
+from typing import Dict, Any
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
@@ -17,6 +16,12 @@ from backend.infrastructure.pfc.task_status_formatter import (
     create_task_status_data,
     format_task_status_for_llm,
     DEFAULT_OUTPUT_LINES,
+)
+from .models import (
+    ScriptPath,
+    TaskDescription,
+    TimeoutMs,
+    RunInBackground,
 )
 
 
@@ -34,36 +39,10 @@ def register_pfc_task_tool(mcp: FastMCP):
     )
     async def pfc_execute_task(
         context: Context,
-        entry_script: str = Field(
-            ...,
-            description="The absolute path to the entry script to execute"
-        ),
-        description: str = Field(
-            ...,
-            description=(
-                "Brief description of what this task does (5-15 words). "
-                "Examples: 'Compression test with 100kPa confining pressure', "
-                "'Triaxial shear test under drained conditions'"
-            )
-        ),
-        timeout: Optional[int] = Field(
-            default=None,
-            ge=1000,
-            le=600000,
-            description=(
-                "Timeout in milliseconds (None = no limit). "
-                "Only applies when run_in_background=False. "
-                "Recommended: 60000-120000ms for testing."
-            )
-        ),
-        run_in_background: bool = Field(
-            default=True,
-            description=(
-                "When true (default), returns task_id immediately without blocking. "
-                "When false, waits for completion. "
-                "Use pfc_check_task_status to monitor background tasks."
-            )
-        )
+        entry_script: ScriptPath,
+        description: TaskDescription,
+        timeout: TimeoutMs = None,
+        run_in_background: RunInBackground = True,
     ) -> Dict[str, Any]:
         """
         Execute a PFC simulation task.
@@ -79,25 +58,9 @@ def register_pfc_task_tool(mcp: FastMCP):
             if not session_id:
                 return error_response("Session ID not available")
 
-            # Validate description length (LLM-friendly guidance)
-            if not description or not description.strip():
-                return error_response(
-                    "description is required. Please provide a brief explanation of what this task does. "
-                    "Example: 'Initial settling simulation with 10k particles'"
-                )
-
-            description = description.strip()
-            if len(description) > 200:
-                return error_response(
-                    f"description is too long ({len(description)} characters). "
-                    "Please keep it concise (recommended: 30-80 characters, max: 200). "
-                    "Focus on the task's purpose rather than implementation details."
-                )
-
+            # Parameters are pre-validated by Pydantic Annotated types
             # Normalize path separators for cross-platform compatibility
-            if not entry_script or not entry_script.strip():
-                return error_response("entry_script is required and cannot be empty")
-            script_path = normalize_path_separators(entry_script.strip(), target_platform='linux')
+            script_path = normalize_path_separators(entry_script, target_platform='linux')
 
             # Get WebSocket client (auto-connects if needed)
             client = await get_client()

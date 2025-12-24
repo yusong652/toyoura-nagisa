@@ -6,11 +6,12 @@ Provides task overview functionality for managing multiple concurrent PFC simula
 
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any, Optional
+from typing import Annotated, Dict, Any, Optional
 from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.time_utils import format_time_range
+from .models import OutputOffset, TaskListLimit
 
 
 def register_pfc_list_tasks_tool(mcp: FastMCP):
@@ -27,21 +28,12 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
     )
     async def pfc_list_tasks(
         context: Context,
-        session_id: Optional[str] = Field(
-            None,
+        session_id: Annotated[Optional[str], Field(
+            default=None,
             description="Filter by session ID (None = all sessions)"
-        ),
-        offset: int = Field(
-            0,
-            ge=0,
-            description="Skip N newest tasks (0=most recent, default: 0)"
-        ),
-        limit: Optional[int] = Field(
-            32,
-            ge=1,
-            le=100,
-            description="Max tasks to return (default: 32, max: 100, None = all)"
-        )
+        )] = None,
+        offset: OutputOffset = 0,
+        limit: TaskListLimit = 32,
     ) -> Dict[str, Any]:
         """
         List tracked PFC tasks with pagination support.

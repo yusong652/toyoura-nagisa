@@ -7,9 +7,9 @@ Provides the ability to stop long-running PFC simulations gracefully.
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from typing import Dict, Any
-from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from .models import TaskId
 
 
 def register_pfc_interrupt_task_tool(mcp: FastMCP):
@@ -26,10 +26,7 @@ def register_pfc_interrupt_task_tool(mcp: FastMCP):
     )
     async def pfc_interrupt_task(
         context: Context,
-        task_id: str = Field(
-            ...,
-            description="Task ID to interrupt (from pfc_execute_task, e.g., 'a1b2c3d4')"
-        )
+        task_id: TaskId,
     ) -> Dict[str, Any]:
         """
         Request interrupt for a running PFC task.
@@ -41,8 +38,7 @@ def register_pfc_interrupt_task_tool(mcp: FastMCP):
         was actually interrupted (status will change to "interrupted").
         """
         try:
-            if not task_id or not task_id.strip():
-                return error_response("task_id is required")
+            # Parameter is pre-validated by Pydantic Annotated type
 
             # Get WebSocket client (auto-connects if needed)
             client = await get_client()

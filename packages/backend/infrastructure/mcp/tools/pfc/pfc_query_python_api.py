@@ -13,7 +13,6 @@ Workflow:
 from typing import Dict, Any
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from pydantic import Field
 
 from backend.infrastructure.pfc.python_api import (
     DocumentationLoader,
@@ -21,10 +20,7 @@ from backend.infrastructure.pfc.python_api import (
 )
 from backend.infrastructure.pfc.shared.query import APISearch
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-
-# Default and maximum limits for search results
-DEFAULT_SEARCH_LIMIT = 10
-MAX_SEARCH_LIMIT = 20
+from .models import SearchQuery, SearchLimit
 
 
 def register_pfc_query_python_api_tool(mcp: FastMCP):
@@ -36,19 +32,8 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
     )
     async def pfc_query_python_api(
         context: Context,
-        query: str = Field(
-            ...,
-            description=(
-                "Search keywords for PFC Python API. Examples: 'ball velocity', "
-                "'create', 'contact force', 'position'. Case-insensitive."
-            )
-        ),
-        limit: int = Field(
-            DEFAULT_SEARCH_LIMIT,
-            description=f"Maximum number of results (1-{MAX_SEARCH_LIMIT}).",
-            ge=1,
-            le=MAX_SEARCH_LIMIT
-        )
+        query: SearchQuery,
+        limit: SearchLimit = 10,
     ) -> Dict[str, Any]:
         """Search PFC Python SDK documentation by keywords (like grep).
 

@@ -8,15 +8,19 @@ Uses shared task_status_formatter for consistent output format.
 import asyncio
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any, Optional
-from pydantic import Field
+from typing import Dict, Any
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.pfc.task_status_formatter import (
     create_task_status_data,
     format_task_status_for_llm,
-    DEFAULT_OUTPUT_LINES,
-    MAX_OUTPUT_LINES,
+)
+from .models import (
+    TaskId,
+    OutputOffset,
+    OutputLimit,
+    FilterText,
+    WaitSeconds,
 )
 
 
@@ -34,31 +38,11 @@ def register_pfc_task_status_tool(mcp: FastMCP):
     )
     async def pfc_check_task_status(
         context: Context,
-        task_id: str = Field(
-            ...,
-            description="Task ID from pfc_execute_task (e.g., 'a1b2c3d4')"
-        ),
-        offset: int = Field(
-            0,
-            ge=0,
-            description="Skip N newest lines (0=most recent, 10=skip 10 newest)"
-        ),
-        limit: int = Field(
-            DEFAULT_OUTPUT_LINES,
-            ge=1,
-            le=MAX_OUTPUT_LINES,
-            description=f"Lines to display (default: {DEFAULT_OUTPUT_LINES}, max: {MAX_OUTPUT_LINES})"
-        ),
-        filter: Optional[str] = Field(
-            None,
-            description="Optional text filter - only show lines containing this text (case-sensitive)"
-        ),
-        wait_seconds: float = Field(
-            1,
-            ge=1,
-            le=3600,
-            description="Wait N seconds before checking status (0-3600s). Use to avoid frequent polling. Example: wait_seconds=30 for long simulations"
-        )
+        task_id: TaskId,
+        offset: OutputOffset = 0,
+        limit: OutputLimit = 20,
+        filter: FilterText = None,
+        wait_seconds: WaitSeconds = 1,
     ) -> Dict[str, Any]:
         """
         Check script status and retrieve output - works for both running and completed tasks.
