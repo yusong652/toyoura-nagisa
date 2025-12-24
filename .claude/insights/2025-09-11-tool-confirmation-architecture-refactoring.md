@@ -10,7 +10,7 @@ User ← Frontend ← WebSocket ← LLM Handler ← LLM Client ← Tool Manager 
 ```
 
 ### Key Components
-- **MCP Server** (`smart_mcp_server.py`): FastMCP server managing all tools
+- **MCP Server** (`mcp_server.py`): FastMCP server managing all tools
 - **Tool Manager** (`base/tool_manager.py`): Handles tool discovery and execution
 - **LLM Client**: Provider-specific implementations (Gemini, Anthropic, etc.)
 - **WebSocket**: Real-time communication between frontend and backend

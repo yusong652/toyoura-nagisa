@@ -462,10 +462,10 @@ packages = ["backend"]
 **示例变更**:
 ```python
 # Before
-from backend.infrastructure.mcp import smart_mcp_server
+from backend.infrastructure.mcp import mcp_server
 
 # After (保持不变，因为 backend 仍然是包名)
-from backend.infrastructure.mcp import smart_mcp_server
+from backend.infrastructure.mcp import mcp_server
 ```
 
 **Note**: Python 导入路径无需修改，因为 `backend` 仍然是顶层包名
@@ -768,7 +768,7 @@ import { ChatService } from '@toyoura-nagisa/core/services'
 **Backend**:
 ```python
 # No change - backend imports remain the same
-from backend.infrastructure.mcp import smart_mcp_server
+from backend.infrastructure.mcp import mcp_server
 ```
 
 ### 4.3 构建输出路径变更

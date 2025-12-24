@@ -37,7 +37,7 @@ uv sync
 uv run pytest
 
 # Run MCP server directly (for debugging)
-uv run python packages/backend/infrastructure/mcp/smart_mcp_server.py
+uv run python packages/backend/infrastructure/mcp/mcp_server.py
 ```
 
 ### Frontend Development
@@ -116,7 +116,7 @@ toyoura-nagisa follows **Clean Architecture** principles with clear separation o
 - Provider-specific implementations handle only API communication
 
 **3. Tool Execution System (MCP)**
-- FastMCP-based tool orchestration at `packages/backend/infrastructure/mcp/smart_mcp_server.py`
+- FastMCP-based tool orchestration at `packages/backend/infrastructure/mcp/mcp_server.py`
 - Profile-based tool loading optimizes token usage per domain
 - Tool categories: builtin, coding, lifestyle, pfc, agent
 - Real-time progress tracking with WebSocket notifications

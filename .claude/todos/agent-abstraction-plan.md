@@ -560,7 +560,7 @@ TOOL_PROFILES[AgentProfile.PFC_EXPLORER] = ToolProfile(
 |------|------|----------|
 | 实现 AgentRegistry | `application/services/agent/registry.py` | P0 |
 | 实现 invoke_agent 工具 | `infrastructure/mcp/tools/agent/invoke_agent.py` | P0 |
-| 注册工具到 MCP server | `infrastructure/mcp/smart_mcp_server.py` | P0 |
+| 注册工具到 MCP server | `infrastructure/mcp/mcp_server.py` | P0 |
 | 实现 WebSocket 通知 | `infrastructure/websocket/notification_service.py` | P1 |
 
 ### Phase 4: Testing & Polish (Week 3)

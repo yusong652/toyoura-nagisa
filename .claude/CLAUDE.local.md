@@ -15,7 +15,7 @@ toyoura-nagisa is an extensible, voice-enabled AI assistant with long-term memor
 uv run python backend/app.py
 
 # Run the MCP server directly
-uv run python backend/infrastructure/mcp/smart_mcp_server.py
+uv run python backend/infrastructure/mcp/mcp_server.py
 
 # Run tests
 uv run pytest
@@ -50,7 +50,7 @@ npm run preview
 - **Domain Layer**: Core business logic and models at `backend/domain/`
 - **Infrastructure Layer**: External concerns at `backend/infrastructure/`:
   - **LLM Infrastructure**: Multi-provider LLM clients (Gemini, Anthropic, OpenAI, Local) with pluggable architecture
-  - **MCP Server**: Dynamic tool orchestration system at `backend/infrastructure/mcp/smart_mcp_server.py`
+  - **MCP Server**: Dynamic tool orchestration system at `backend/infrastructure/mcp/mcp_server.py`
   - **Memory System**: ChromaDB-based long-term memory
   - **TTS System**: Text-to-speech with local and remote providers
   - **Storage**: Image storage and session management
@@ -258,7 +258,7 @@ toyoura-nagisa/
 │   │   │   │   └── local/         # Local LLM support
 │   │   │   └── shared/            # Common utilities
 │   │   ├── mcp/                   # Model Context Protocol system
-│   │   │   ├── smart_mcp_server.py # Main MCP server
+│   │   │   ├── mcp_server.py # Main MCP server
 │   │   │   ├── tool_vectorizer.py  # Tool semantic search
 │   │   │   ├── tools/             # Tool implementations
 │   │   │   └── utils/             # MCP utilities

@@ -186,7 +186,7 @@ Windows服务器上创建启动脚本：
 # C:\Projects\toyoura-nagisa\start_servers.ps1
 
 # 启动MCP服务器
-Start-Process python -ArgumentList "backend\infrastructure\mcp\smart_mcp_server.py" -WorkingDirectory "C:\Projects\toyoura-nagisa"
+Start-Process python -ArgumentList "backend\infrastructure\mcp\mcp_server.py" -WorkingDirectory "C:\Projects\toyoura-nagisa"
 
 # 启动FastAPI后端
 Start-Process python -ArgumentList "backend\app.py" -WorkingDirectory "C:\Projects\toyoura-nagisa"
@@ -201,7 +201,7 @@ Windows服务配置（使用NSSM）：
 choco install nssm -y
 
 # 注册MCP服务
-nssm install AiNagisaMCP "C:\Python39\python.exe" "C:\Projects\toyoura-nagisa\backend\infrastructure\mcp\smart_mcp_server.py"
+nssm install AiNagisaMCP "C:\Python39\python.exe" "C:\Projects\toyoura-nagisa\backend\infrastructure\mcp\mcp_server.py"
 nssm set AiNagisaMCP AppDirectory "C:\Projects\toyoura-nagisa"
 nssm set AiNagisaMCP Start SERVICE_AUTO_START
 

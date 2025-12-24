@@ -169,7 +169,7 @@ code --remote ssh-remote+windows-dev /C/Projects/toyoura-nagisa
 cd C:\Projects\toyoura-nagisa
 
 # 测试MCP服务器
-uv run python backend\infrastructure\mcp\smart_mcp_server.py
+uv run python backend\infrastructure\mcp\mcp_server.py
 
 # 新开一个终端，测试API服务器
 uv run python backend\app.py

@@ -108,7 +108,7 @@ The MCP system is the heart of the agent's tool-use capability. It is a highly m
 
 ### 7.1. The End-to-End Tool Flow
 
-1.  **Registration**: On startup, the `smart_mcp_server.py` imports registration functions from each tool category (e.g., `register_coding_tools`) and registers *all* available tools with a central `FastMCP` instance.
+1.  **Registration**: On startup, the `mcp_server.py` imports registration functions from each tool category (e.g., `register_coding_tools`) and registers *all* available tools with a central `FastMCP` instance.
 2.  **Profile Definition**: The `ToolProfileManager` defines which tool *names* belong to which agent profile (`CODING`, `PFC`, etc.). This now also includes `SubAgentConfig` definitions.
 3.  **Dynamic Selection**: When an LLM call is made:
     a. The `BaseToolManager` gets the list of tool names for the active profile from the `ToolProfileManager`.
@@ -138,7 +138,7 @@ The `write` tool (`backend/infrastructure/mcp/tools/coding/tools/write.py`) is a
         mcp.tool(tags={...}, annotations={...})(write)
     ```
 
-5.  **Category Aggregation**: The `register_write_tool` function is then called by the aggregate `register_coding_tools` function in `backend/infrastructure/mcp/tools/coding/tools/__init__.py`, which is in turn called by the main `smart_mcp_server.py`.
+5.  **Category Aggregation**: The `register_write_tool` function is then called by the aggregate `register_coding_tools` function in `backend/infrastructure/mcp/tools/coding/tools/__init__.py`, which is in turn called by the main `mcp_server.py`.
 
 This modular, registration-based pattern makes the system extremely easy to extend.
 
