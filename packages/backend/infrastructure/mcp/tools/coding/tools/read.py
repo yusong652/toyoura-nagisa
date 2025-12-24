@@ -71,6 +71,7 @@ async def read(
     context: Context,
     path: str = Field(
         ...,
+        min_length=1,
         description="The absolute path to the file to read",
     ),
     offset: Optional[int] = Field(
@@ -120,10 +121,9 @@ Usage:
     # Path validation and security checks
     # ------------------------------------------------------------------
 
+    # path is pre-validated by Pydantic (min_length=1)
     # Normalize path separators for cross-platform compatibility
     # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
-    if not path or not path.strip():
-        return error_response("path is required and cannot be empty")
 
     # Keep original path for LLM-friendly error messages (forward slashes)
     original_path_for_display = path_to_llm_format(path.strip())
