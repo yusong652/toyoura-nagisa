@@ -20,6 +20,7 @@ async def bash_output(
     context: Context,
     bash_id: str = Field(
         ...,
+        min_length=1,
         description="The ID of the background shell to retrieve output from"
     ),
     filter: Optional[str] = Field(
@@ -39,9 +40,7 @@ async def bash_output(
     Supports optional regex filtering to show only lines matching a pattern.
     Use this tool when you need to monitor or check the output of a long-running shell.
     """
-    # Validate bash_id parameter
-    if not bash_id or not bash_id.strip():
-        return error_response("bash_id parameter is required and cannot be empty")
+    # Parameter is pre-validated by Pydantic (min_length=1)
 
     # Wait before checking output (prevents excessive polling, non-blocking)
     if wait > 0:
@@ -56,12 +55,12 @@ async def bash_output(
         process_manager = get_process_manager()
 
         # Verify the process belongs to this session
-        if bash_id.strip() not in [pid for pid in process_manager.processes.keys()
-                                  if process_manager.processes[pid].session_id == session_id]:
+        if bash_id not in [pid for pid in process_manager.processes.keys()
+                          if process_manager.processes[pid].session_id == session_id]:
             return error_response(f"No shell found with ID: {bash_id}")
 
         # Retrieve output from the specified process
-        return process_manager.get_process_output(bash_id.strip(), filter)
+        return process_manager.get_process_output(bash_id, filter)
     except Exception as e:
         return error_response(f"Failed to retrieve process output: {e}")
 

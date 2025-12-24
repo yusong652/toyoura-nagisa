@@ -19,6 +19,7 @@ async def kill_shell(
     context: Context,
     shell_id: str = Field(
         ...,
+        min_length=1,
         description="The ID of the background shell to kill"
     )
 ) -> Dict[str, Any]:
@@ -28,9 +29,7 @@ async def kill_shell(
     Takes a shell_id parameter identifying the shell to kill and returns a success or failure status.
     Use this tool when you need to terminate a long-running shell.
     """
-    # Validate shell_id parameter
-    if not shell_id or not shell_id.strip():
-        return error_response("shell_id parameter is required and cannot be empty")
+    # Parameter is pre-validated by Pydantic (min_length=1)
 
     try:
         # Get session ID from MCP context for session isolation
@@ -41,12 +40,12 @@ async def kill_shell(
         process_manager = get_process_manager()
 
         # Verify the process belongs to this session
-        if shell_id.strip() not in [pid for pid in process_manager.processes.keys()
-                                   if process_manager.processes[pid].session_id == session_id]:
+        if shell_id not in [pid for pid in process_manager.processes.keys()
+                           if process_manager.processes[pid].session_id == session_id]:
             return error_response(f"Process {shell_id} not found in your session")
 
         # Kill the specified process
-        return process_manager.kill_process(shell_id.strip())
+        return process_manager.kill_process(shell_id)
     except Exception as e:
         return error_response(f"Failed to kill process: {e}")
 
