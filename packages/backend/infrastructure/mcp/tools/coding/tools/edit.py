@@ -132,6 +132,7 @@ async def edit(
     context: Context,
     file_path: str = Field(
         ...,
+        min_length=1,
         description="The absolute path to the file to modify",
     ),
     old_string: str = Field(
@@ -177,9 +178,7 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
     if isinstance(replace_all, FieldInfo):
         replace_all = False
 
-    # Validate inputs
-    if not file_path or not file_path.strip():
-        return error_response("file_path is required and cannot be empty")
+    # file_path is pre-validated by Pydantic (min_length=1)
 
     # Normalize path separators for cross-platform compatibility
     # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
