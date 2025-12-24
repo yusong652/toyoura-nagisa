@@ -58,8 +58,8 @@ def register_pfc_task_status_tool(mcp: FastMCP):
         """
         try:
             # Wait before checking (rate limiting for long-running tasks)
-            if wait_seconds > 0:
-                await asyncio.sleep(wait_seconds)
+            # wait_seconds is pre-validated by Pydantic (ge=1)
+            await asyncio.sleep(wait_seconds)
 
             # Get WebSocket client (auto-connects if needed)
             client = await get_pfc_client()
