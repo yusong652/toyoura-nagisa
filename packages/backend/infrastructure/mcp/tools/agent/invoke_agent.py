@@ -88,8 +88,6 @@ Usage notes:
         if req_ctx and hasattr(req_ctx, 'meta') and req_ctx.meta:
             parent_tool_call_id = getattr(req_ctx.meta, 'tool_call_id', "") or ""
 
-        # Execute SubAgent (pass MainAgent's session_id for confirmation routing)
-        logger.info(f"[invoke_agent] Starting SubAgent '{subagent_type}' ({description}) for session {session_id[:8]}")
         result = await agent_service.run_subagent(
             config=config,
             instruction=prompt,
