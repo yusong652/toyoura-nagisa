@@ -428,6 +428,6 @@
   ],
   "python_sdk_alternative": {
     "available": false,
-    "workaround": "itasca.command('model solve ratio 1e-5') - Python SDK does not provide direct solve() function. For custom solve loops in Python:\n\nwhile True:\n    itasca.cycle(100)\n    ratio = itasca.mech_ratio()\n    if ratio < 1e-5:\n        break"
+    "workaround": "itasca.command('model solve ratio 1e-5') - Python SDK does not provide direct solve() function. For custom solve loops in Python, manually compute equilibrium metrics:\n\nimport math\ndef vec_mag(v): return math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)\n\nwhile True:\n    itasca.cycle(100)\n    # Compute unbalanced force ratio manually:\n    unbal_sum = sum(vec_mag(b.force_unbal()) for b in itasca.ball.list())\n    contact_sum = sum(vec_mag(b.force_contact()) for b in itasca.ball.list())\n    ratio = unbal_sum / contact_sum if contact_sum > 0 else 0\n    if ratio < 1e-5:\n        break\n\nNote: Prefer 'model solve' command for standard equilibrium. Custom loops require manual force ratio calculations."
   }
 }

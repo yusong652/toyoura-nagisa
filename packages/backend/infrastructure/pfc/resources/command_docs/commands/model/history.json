@@ -392,6 +392,6 @@
   ],
   "python_sdk_alternative": {
     "available": false,
-    "workaround": "itasca.command('model history mechanical ratio-average') - Python SDK does not provide direct history creation. For monitoring in Python, use loops with itasca.mech_ratio(), itasca.timestep(), etc. and store values manually in lists/arrays"
+    "workaround": "itasca.command('model history mechanical ratio-average') - Python SDK does not provide direct history creation. For monitoring in Python, manually compute and store values in loops:\n\n# Example: track metrics over cycles\nhistory_data = []\nfor _ in range(100):\n    itasca.cycle(100)\n    # itasca.cycle() returns current cycle number\n    history_data.append({'cycle': itasca.cycle(), 'time': itasca.mech_age(), ...})"
   }
 }
