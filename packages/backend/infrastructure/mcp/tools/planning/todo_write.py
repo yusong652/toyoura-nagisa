@@ -291,11 +291,8 @@ The assistant did not use the todo list because this is a single syntax correcti
 When in doubt, use this tool. Being proactive with task management demonstrates attentiveness and ensures you complete all requirements successfully.
     """
     # Extract session ID from context (client_id is the session ID in MCP)
+    # Architecture guarantee: tool_manager.py always injects _meta.client_id
     session_id = context.client_id
-    if not session_id:
-        # Infrastructure error - raise exception for system-level handling
-        # This should never happen in normal operation (backend configuration error)
-        raise RuntimeError("Session ID not found in context - backend configuration error")
 
     try:
         # Get agent_profile from context_manager (set by Agent before tool execution)

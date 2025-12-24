@@ -52,9 +52,8 @@ def register_pfc_task_tool(mcp: FastMCP):
         """
         try:
             # Get session ID from MCP context for task isolation
-            session_id = getattr(context, 'client_id', None) if context else None
-            if not session_id:
-                return error_response("Session ID not available")
+            # Architecture guarantee: tool_manager.py always injects _meta.client_id
+            session_id = context.client_id
 
             # Parameters are pre-validated by Pydantic Annotated types
             # Normalize path separators for cross-platform compatibility

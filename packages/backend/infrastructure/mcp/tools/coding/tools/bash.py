@@ -104,9 +104,8 @@ Working directory:
     # Handle background execution (separate path, not using ShellExecutor)
     if run_in_background:
         try:
-            session_id = getattr(context, 'client_id', None) if context else None
-            if not session_id:
-                return error_response("Session ID not available for background execution")
+            # Architecture guarantee: tool_manager.py always injects _meta.client_id
+            session_id = context.client_id
 
             from ..utils.background_process_manager import get_process_manager
             process_manager = get_process_manager()

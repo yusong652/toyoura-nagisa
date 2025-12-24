@@ -27,9 +27,8 @@ def register_location_tools(mcp: FastMCP):
         Priority: Browser geolocation > Server IP location.
         """
         try:
+            # Architecture guarantee: tool_manager.py always injects _meta.client_id
             session_id = context.client_id
-            if not session_id:
-                return error_response("Session ID missing")
 
             # Get user location using unified function
             print(f"[DEBUG] Getting user location for session {session_id}")

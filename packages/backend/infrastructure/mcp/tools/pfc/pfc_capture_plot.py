@@ -143,9 +143,8 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         """
         try:
             # Get session ID from MCP context
-            session_id = getattr(context, 'client_id', None) if context else None
-            if not session_id:
-                return error_response("Session ID not available")
+            # Architecture guarantee: tool_manager.py always injects _meta.client_id
+            session_id = context.client_id
 
             # Parameter is pre-validated by Pydantic Annotated type (stripped and .png checked)
             # Normalize output path for cross-platform (Linux format for PFC server)

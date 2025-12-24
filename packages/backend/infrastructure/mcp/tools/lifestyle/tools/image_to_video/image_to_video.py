@@ -234,10 +234,9 @@ async def generate_video_from_image(
         motion_style = settings.motion_styles.get("cinematic", "cinematic camera movement")
     
     # Get LLM client for prompt optimization
-    session_id: str | None = getattr(context, "client_id", None)
-    if not session_id:
-        return error_response("Video generation failed: Session ID is missing")
-    
+    # Architecture guarantee: tool_manager.py always injects _meta.client_id
+    session_id = context.client_id
+
     fastapi_app = getattr(getattr(context, "fastmcp", None), "app", None)
     llm_client = None
     if fastapi_app is not None and hasattr(fastapi_app.state, "llm_client"):

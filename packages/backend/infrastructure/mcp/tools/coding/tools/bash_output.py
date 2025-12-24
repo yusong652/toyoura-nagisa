@@ -49,9 +49,8 @@ async def bash_output(
 
     try:
         # Get session ID from MCP context for session isolation
-        session_id = getattr(context, 'client_id', None) if context else None
-        if not session_id:
-            return error_response("Session ID not available")
+        # Architecture guarantee: tool_manager.py always injects _meta.client_id
+        session_id = context.client_id
 
         # Get the background process manager
         process_manager = get_process_manager()

@@ -82,11 +82,8 @@ async def generate_image(context: Context) -> dict[str, Any]:
     start_time = time.time()
 
     # Resolve runtime dependencies (session ID, app, llm client)
-    session_id: str | None = getattr(context, "client_id", None)
-    if not session_id:
-        return error_response(
-            "Image generation failed: Session ID is missing"
-        )
+    # Architecture guarantee: tool_manager.py always injects _meta.client_id
+    session_id = context.client_id
 
     fastapi_app = getattr(getattr(context, "fastmcp", None), "app", None)
     llm_client = None
