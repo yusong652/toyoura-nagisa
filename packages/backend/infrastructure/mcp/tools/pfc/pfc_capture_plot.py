@@ -31,7 +31,7 @@ from .scripts import (
     DEFAULT_IMAGE_SIZE,
     VectorQuantityType,
 )
-from .models import PlotOutputPath
+from .utils import PlotOutputPath
 
 
 def register_pfc_capture_plot_tool(mcp: FastMCP):

@@ -11,7 +11,7 @@ Provides unified output format for consistent LLM understanding.
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple, List
 from backend.infrastructure.mcp.utils.time_utils import format_timestamp
-from ..models import DEFAULT_OUTPUT_LINES, MAX_OUTPUT_LINES
+from .models import DEFAULT_OUTPUT_LINES, MAX_OUTPUT_LINES
 
 
 # -----------------------------------------------------------------------------

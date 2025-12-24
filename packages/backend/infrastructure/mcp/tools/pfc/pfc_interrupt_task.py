@@ -9,7 +9,7 @@ from fastmcp.server.context import Context
 from typing import Dict, Any
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-from .models import TaskId
+from .utils import TaskId
 
 
 def register_pfc_interrupt_task_tool(mcp: FastMCP):

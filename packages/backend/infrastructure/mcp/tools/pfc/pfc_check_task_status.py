@@ -14,8 +14,6 @@ from backend.infrastructure.mcp.utils.tool_result import success_response, error
 from .utils import (
     create_task_status_data,
     format_task_status_for_llm,
-)
-from .models import (
     TaskId,
     OutputOffset,
     OutputLimit,

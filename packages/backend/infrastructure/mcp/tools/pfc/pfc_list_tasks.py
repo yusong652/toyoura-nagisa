@@ -11,7 +11,7 @@ from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.time_utils import format_time_range
-from .models import OutputOffset, TaskListLimit
+from .utils import OutputOffset, TaskListLimit
 
 
 def register_pfc_list_tasks_tool(mcp: FastMCP):

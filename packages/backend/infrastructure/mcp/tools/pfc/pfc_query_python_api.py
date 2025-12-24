@@ -20,7 +20,7 @@ from backend.infrastructure.pfc.python_api import (
 )
 from backend.infrastructure.pfc.shared.query import APISearch
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-from .models import SearchQuery, SearchLimit
+from .utils import SearchQuery, SearchLimit
 
 
 def register_pfc_query_python_api_tool(mcp: FastMCP):

@@ -16,8 +16,6 @@ from .utils import (
     create_task_status_data,
     format_task_status_for_llm,
     DEFAULT_OUTPUT_LINES,
-)
-from .models import (
     ScriptPath,
     TaskDescription,
     TimeoutMs,
