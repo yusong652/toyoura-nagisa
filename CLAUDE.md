@@ -226,7 +226,7 @@ npm run dev:backend
 cd packages/backend && uv run python run.py
 
 # Run the MCP server directly
-uv run python packages/backend/infrastructure/mcp/smart_mcp_server.py
+uv run python packages/backend/infrastructure/mcp/mcp_server.py
 
 # Run tests
 uv run pytest
@@ -318,7 +318,7 @@ toyoura-nagisa/
 │   │   │   │   └── local/
 │   │   │   └── shared/
 │   │   ├── mcp/                   # Model Context Protocol system
-│   │   │   ├── smart_mcp_server.py      # Main MCP server
+│   │   │   ├── mcp_server.py            # Main MCP server
 │   │   │   ├── tools/             # Tool implementations
 │   │   │   │   ├── builtin/
 │   │   │   │   ├── coding/

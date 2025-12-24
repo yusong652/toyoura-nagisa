@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.tts.tts_factory import get_tts_engine
-from backend.infrastructure.mcp.smart_mcp_server import mcp
+from backend.infrastructure.mcp.mcp_server import mcp
 from fastmcp import Client
 from backend.presentation.api import images
 from backend.presentation.api import videos

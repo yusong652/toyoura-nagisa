@@ -18,7 +18,7 @@ async def initialize_backend():
     from fastapi import FastAPI
     from fastmcp import Client
     from backend.infrastructure.llm.base.factory import initialize_factory
-    from backend.infrastructure.mcp.smart_mcp_server import mcp
+    from backend.infrastructure.mcp.mcp_server import mcp
     from backend.shared.utils.app_context import set_app
 
     print("[INIT] Initializing backend for Agent tests...")

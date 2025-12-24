@@ -21,7 +21,7 @@ async def init_app_context():
     """Initialize app context similar to FastAPI lifespan."""
     from fastapi import FastAPI
     from backend.infrastructure.llm.base.factory import initialize_factory
-    from backend.infrastructure.mcp.smart_mcp_server import mcp
+    from backend.infrastructure.mcp.mcp_server import mcp
     from fastmcp import Client
     from backend.shared.utils.app_context import set_app
     import threading
