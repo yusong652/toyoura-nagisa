@@ -11,7 +11,7 @@ from fastmcp.server.context import Context
 from typing import Dict, Any
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-from backend.infrastructure.pfc.task_status_formatter import (
+from .utils import (
     create_task_status_data,
     format_task_status_for_llm,
 )
