@@ -95,22 +95,17 @@ Working directory:
     if isinstance(run_in_background, FieldInfo):
         run_in_background = False
 
-    # Acknowledge description parameter (used in tool interface)
-    _ = description
-
     # Get workspace root dynamically based on current session
     work_dir = await get_workspace_root_async(context)
 
     # Handle background execution (separate path, not using ShellExecutor)
     if run_in_background:
         try:
-            # Architecture guarantee: tool_manager.py always injects _meta.client_id
-            session_id = cast(str, context.client_id)
-
             from ..utils.background_process_manager import get_process_manager
             process_manager = get_process_manager()
+            # Architecture guarantee: tool_manager.py always injects _meta.client_id
             return process_manager.start_process(
-                session_id=session_id,
+                session_id=cast(str, context.client_id),
                 command=command,
                 description=description
             )
