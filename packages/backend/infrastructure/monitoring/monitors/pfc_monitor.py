@@ -42,11 +42,11 @@ class PfcMonitor(BaseMonitor):
             return []
 
         try:
-            from backend.infrastructure.pfc import get_client
+            from backend.infrastructure.pfc import get_pfc_client
             from backend.infrastructure.mcp.utils.time_utils import format_time_range
 
             # Get WebSocket client (auto-connects if needed)
-            client = await get_client()
+            client = await get_pfc_client()
 
             # Query recent tasks (all sessions, limit=3)
             result = await client.list_tasks(

@@ -21,7 +21,7 @@ from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from typing import Annotated, Dict, Any, Literal, Optional, List
 from pydantic import Field
-from backend.infrastructure.pfc import get_client
+from backend.infrastructure.pfc import get_pfc_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
 from .scripts import (
@@ -187,7 +187,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             )
 
             # Get PFC client and working directory
-            client = await get_client()
+            client = await get_pfc_client()
             working_dir = await client.get_working_directory()
 
             if not working_dir:

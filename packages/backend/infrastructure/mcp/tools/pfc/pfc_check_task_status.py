@@ -9,7 +9,7 @@ import asyncio
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from typing import Dict, Any
-from backend.infrastructure.pfc import get_client
+from backend.infrastructure.pfc import get_pfc_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from .utils import (
     create_task_status_data,
@@ -62,7 +62,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 await asyncio.sleep(wait_seconds)
 
             # Get WebSocket client (auto-connects if needed)
-            client = await get_client()
+            client = await get_pfc_client()
 
             # Query task status
             result = await client.check_task_status(task_id)

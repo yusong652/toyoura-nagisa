@@ -8,7 +8,7 @@ from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from typing import Annotated, Dict, Any, Optional
 from pydantic import Field
-from backend.infrastructure.pfc import get_client
+from backend.infrastructure.pfc import get_pfc_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.time_utils import format_time_range
 from .utils import OutputOffset, TaskListLimit
@@ -58,7 +58,7 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
             caller_session_id_display = caller_session_id[:8] if caller_session_id else 'unknown'
 
             # Get WebSocket client (auto-connects if needed)
-            client = await get_client()
+            client = await get_pfc_client()
 
             # Query task list with pagination
             result = await client.list_tasks(

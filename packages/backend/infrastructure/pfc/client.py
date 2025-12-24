@@ -954,7 +954,7 @@ _client_instance: Optional[PFCWebSocketClient] = None
 _client_lock = asyncio.Lock()
 
 
-async def get_client() -> PFCWebSocketClient:
+async def get_pfc_client() -> PFCWebSocketClient:
     """
     Get or create global PFC WebSocket client instance (lazy loading).
 

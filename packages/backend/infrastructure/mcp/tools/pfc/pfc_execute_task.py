@@ -9,7 +9,7 @@ for complete traceability ("Script is Context" philosophy).
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from typing import Dict, Any
-from backend.infrastructure.pfc import get_client
+from backend.infrastructure.pfc import get_pfc_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
 from .utils import (
@@ -60,7 +60,7 @@ def register_pfc_task_tool(mcp: FastMCP):
             script_path = normalize_path_separators(entry_script, target_platform='linux')
 
             # Get WebSocket client (auto-connects if needed)
-            client = await get_client()
+            client = await get_pfc_client()
 
             # Execute script (server handles git versioning)
             result = await client.execute_task(

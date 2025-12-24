@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import Optional, Any, Dict
 
-from backend.infrastructure.pfc.client import get_client, PFCWebSocketClient
+from backend.infrastructure.pfc.client import get_pfc_client, PFCWebSocketClient
 from backend.infrastructure.monitoring.status_monitor import get_status_monitor
 from backend.shared.utils.workspace import get_workspace_for_profile
 
@@ -146,7 +146,7 @@ async def check_connection_status() -> ConnectionStatusResponse:
         ConnectionStatusResponse with connection status and message
     """
     try:
-        client = await get_client()
+        client = await get_pfc_client()
         if client.connected:
             return ConnectionStatusResponse(
                 connected=True,
@@ -189,7 +189,7 @@ async def execute_pfc_python(request: ExecuteRequest) -> ExecuteResponse:
 
         # Get PFC client (will auto-connect if needed)
         try:
-            client = await get_client()
+            client = await get_pfc_client()
         except ConnectionError as e:
             return ExecuteResponse(
                 success=False,
@@ -298,7 +298,7 @@ async def reset_workspace(request: ResetRequest) -> ResetResponse:
 
         # Get PFC client (will auto-connect if needed)
         try:
-            client = await get_client()
+            client = await get_pfc_client()
         except ConnectionError as e:
             return ResetResponse(
                 success=False,
@@ -364,7 +364,7 @@ async def list_pfc_tasks(
     try:
         # Get PFC client (will auto-connect if needed)
         try:
-            client = await get_client()
+            client = await get_pfc_client()
         except ConnectionError as e:
             return TasksListResponse(
                 success=False,
@@ -454,7 +454,7 @@ async def get_task_status(
     try:
         # Get PFC client
         try:
-            client = await get_client()
+            client = await get_pfc_client()
         except ConnectionError as e:
             return TaskStatusResponse(
                 success=False,
