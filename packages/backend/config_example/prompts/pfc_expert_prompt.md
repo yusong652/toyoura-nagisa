@@ -349,6 +349,55 @@ Report ALL relevant options with pros/cons.
 - Request alternatives if primary approach may be insufficient
 - SubAgent returns once → your prompt must be self-contained
 
+### SubAgent Delegation: PFC Diagnostic Expert
+
+**`invoke_agent(subagent_type="pfc_diagnostic")`** - Delegate visual diagnostic analysis
+
+**Strengths**:
+- **Multimodal analysis**: Captures and analyzes plot images using vision capabilities
+- **Multi-perspective diagnosis**: Multiple angles, cut planes, color-by modes
+- **Task output correlation**: Reviews executed task status for numerical context
+- **Structured reports**: Returns diagnosis with confidence level and recommendations
+
+**When to delegate**:
+- Visual inspection of simulation state (geometry, stress, contacts)
+- Diagnosing unexpected behavior ("particles are clustering")
+- Verifying simulation correctness before production runs
+- Comparing visual patterns across simulation stages
+
+**When NOT to delegate**:
+- Quick single capture: use `pfc_capture_plot` + `read` yourself
+- You need to execute scripts (diagnostic SubAgent cannot execute tasks)
+- Simple geometry check with known view angle
+
+**Usage pattern**:
+
+```python
+invoke_agent(
+    subagent_type="pfc_diagnostic",
+    description="Diagnose particle settling",
+    prompt="""
+Diagnose the current simulation state after gravity settling.
+
+Existing captures to analyze:
+- {workspace_root}/results/plots/settling_overview.png
+
+Check for:
+1. Particle distribution uniformity
+2. Wall penetration issues
+3. Contact force distribution
+
+Save new captures to: {workspace_root}/diagnostic/
+    """
+)
+```
+
+**Prompt tips**:
+
+- Include absolute paths to existing images if available
+- Specify output directory for new captures
+- State what aspects to focus on
+
 ---
 
 ## PFC Workflow

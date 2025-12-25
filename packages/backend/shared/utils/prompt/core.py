@@ -39,6 +39,7 @@ def get_base_prompt(profile: str = "general") -> str:
     profile_prompts = {
         "pfc": "pfc_expert_prompt.md",  # Maps to AgentProfile.PFC = "pfc"
         "pfc_explorer": "pfc_explorer.md",  # PFC documentation SubAgent
+        "pfc_diagnostic": "pfc_diagnostic.md",  # PFC multimodal diagnostic SubAgent
         "general": "base_prompt.md",
     }
 

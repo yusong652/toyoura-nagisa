@@ -116,6 +116,30 @@ SUBAGENT_PFC_EXPLORER_TOOLS: List[str] = [
     # Complex execution logic should be handled by MainAgent
 ]
 
+# SubAgent-specific tool list for PFC Diagnostic Expert (multimodal visual analysis)
+# Pure visual analysis + task status inspection - MainAgent handles script execution
+SUBAGENT_PFC_DIAGNOSTIC_TOOLS: List[str] = [
+    # Core diagnostic tools (multimodal)
+    "pfc_capture_plot",  # Visual capture from multiple angles/coloring modes
+    "read",              # Image analysis (multimodal LLM capability)
+    # Task status inspection (read MainAgent's executed tasks)
+    "pfc_check_task_status",  # Query task progress and output
+    "pfc_list_tasks",         # List all tracked tasks with status
+    # Reference tools (understand PFC concepts for diagnosis)
+    "pfc_query_command",
+    "pfc_query_python_api",
+    # Support tools (workspace navigation, read-only)
+    "glob",
+    "grep",
+    "bash",
+    "bash_output",
+    # Workflow tracking
+    "todo_write",
+    # NOTE: No pfc_execute_task - MainAgent handles all script execution
+    # NOTE: No write, no edit - diagnostic agent reports issues, MainAgent fixes
+    # NOTE: No invoke_agent - prevents recursive SubAgent spawning
+]
+
 GENERAL_TOOLS: List[str] = [
     # Coding
     "write", "read", "edit", "bash", "bash_output", "kill_shell", "glob", "grep",
@@ -284,8 +308,19 @@ PFC_EXPLORER = SubAgentConfig(
     enable_memory=False,
 )
 
+PFC_DIAGNOSTIC = SubAgentConfig(
+    name="pfc_diagnostic",
+    display_name="PFC Diagnostic Expert",
+    description="Multimodal visual analysis agent for PFC simulation diagnostics",
+    tools=tuple(SUBAGENT_PFC_DIAGNOSTIC_TOOLS),
+    max_iterations=64,  # Multi-angle analysis may require many capture+read cycles
+    streaming_enabled=False,
+    enable_memory=False,
+)
+
 SUBAGENT_CONFIGS: Dict[str, SubAgentConfig] = {
     "pfc_explorer": PFC_EXPLORER,
+    "pfc_diagnostic": PFC_DIAGNOSTIC,
 }
 
 
