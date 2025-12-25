@@ -115,11 +115,6 @@ Choose strategies based on the diagnostic goal:
 - Correlate visual patterns with quantitative data
 - Useful for: confirming visual observations with measurements
 
-### Current Limitations
-
-- Ball vector arrows (velocity/force arrows) not yet supported - use color-by instead
-- For arrow visualization, MainAgent can execute a custom plot script
-
 ### Issue Detection Patterns
 
 | Visual Pattern | Possible Issue | Verification Approach |
