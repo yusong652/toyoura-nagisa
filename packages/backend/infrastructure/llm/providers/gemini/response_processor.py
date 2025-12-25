@@ -294,10 +294,6 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                         # Capture thought_signature from text parts (final part may have it)
                         if hasattr(part, 'thought_signature') and part.thought_signature:
                             text_thought_signature = part.thought_signature
-                # Empty text part with thought_signature only (Gemini 2.5+)
-                elif hasattr(part, 'text') and not part.text and hasattr(part, 'thought_signature') and part.thought_signature:
-                    # Capture signature from empty text part
-                    text_thought_signature = part.thought_signature
                 elif hasattr(part, 'function_call') and part.function_call:
                     # Use pre-extracted tool call with consistent ID
                     if tool_call_index < len(tool_calls):
@@ -313,6 +309,12 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                             tool_use_block['thought_signature'] = tool_call['thought_signature']
                         content.append(tool_use_block)
                         tool_call_index += 1
+                # Empty text part with thought_signature only (Gemini 2.5+)
+                # Note: This must come AFTER function_call check to avoid skipping tool calls
+                # that have both empty text and thought_signature
+                elif hasattr(part, 'text') and not part.text and hasattr(part, 'thought_signature') and part.thought_signature:
+                    # Capture signature from empty text part
+                    text_thought_signature = part.thought_signature
 
         # Build content list for storage
         if thinking_parts:
