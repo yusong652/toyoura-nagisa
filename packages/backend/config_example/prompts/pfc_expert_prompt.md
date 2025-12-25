@@ -301,6 +301,8 @@ pfc_capture_plot(...) → read(image_path) → Visual analysis → Targeted scri
 - Monitor long simulations for anomalies
 - Debug unexpected behavior (visual scan before data dive)
 
+**Note**: For PFC GUI visualization, prefer this tool over `plot` commands via `pfc_execute_task`. Plot command syntax is complex and not fully documented.
+
 ### SubAgent Delegation: PFC Explorer
 
 **`invoke_agent(subagent_type="pfc_explorer")`** - Delegate complex documentation exploration
