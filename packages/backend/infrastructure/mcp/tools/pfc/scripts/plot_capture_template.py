@@ -42,6 +42,7 @@ ContactColorByType = Literal[
     "emod", "kratio", "rr_fric", "rr_kr", "rr_slip",
 ]
 VectorQuantityType = Literal["mag", "x", "y", "z"]
+BallShapeType = Literal["sphere", "arrow"]
 
 
 class CutPlane(BaseModel):
@@ -178,6 +179,45 @@ def _build_ball_color_by_command(
         color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
 
     return f"{color_by_part} {color_options}"
+
+
+def _build_ball_arrow_command(
+    color_by: str,
+    quantity: str = "mag",
+) -> str:
+    """
+    Build PFC ball arrow shape command for vector visualization.
+
+    Arrow mode displays vectors as directional arrows with color indicating magnitude.
+    Only valid for vector attributes (velocity, displacement, force-contact, etc.).
+
+    PFC syntax:
+        plot item create ball active on
+            shape arrow scale automatic arrow-quality 8
+            color-by vector-attribute "velocity" quantity mag
+            color-options scaled ramp rainbow minimum automatic maximum automatic
+            scale-by-magnitude off
+            legend active on
+
+    Args:
+        color_by: Vector attribute name (e.g., "velocity", "displacement")
+        quantity: Vector component: "mag", "x", "y", "z". Default: "mag"
+
+    Returns:
+        PFC command fragment for arrow visualization
+    """
+    # Validate and normalize quantity
+    qty = quantity.lower() if quantity else "mag"
+    if qty not in VECTOR_QUANTITY_OPTIONS:
+        qty = "mag"
+
+    return (
+        f'shape arrow scale automatic arrow-quality 8 '
+        f'color-by vector-attribute "{color_by}" quantity {qty} '
+        f'color-options scaled ramp rainbow minimum automatic maximum automatic '
+        f'scale-by-magnitude off '
+        f'legend active on'
+    )
 
 
 def _build_wall_color_by_command(
@@ -332,6 +372,7 @@ def generate_plot_capture_script(
     include_contact: bool = False,
     include_axes: bool = True,
     wall_transparency: int = DEFAULT_WALL_TRANSPARENCY,
+    ball_shape: str = "sphere",
     ball_color_by: Optional[str] = None,
     ball_color_by_quantity: str = "mag",
     wall_color_by: Optional[str] = None,
@@ -359,6 +400,7 @@ def generate_plot_capture_script(
         include_contact: Add contact force visualization item
         include_axes: Add coordinate axes
         wall_transparency: Wall transparency 0-100 (default: 70)
+        ball_shape: Ball shape "sphere" or "arrow" (arrow only for vector attributes)
         ball_color_by: Attribute for ball coloring
         ball_color_by_quantity: Ball vector component (mag/x/y/z)
         wall_color_by: Attribute for wall coloring
@@ -427,16 +469,34 @@ def generate_plot_capture_script(
     lines.append('# Add visualization items')
 
     if include_ball:
-        color_by_cmd = _build_ball_color_by_command(ball_color_by, ball_color_by_quantity)
         cut_cmd = _build_cut_command(ball_cut)
-        cmd_parts = ["plot item create ball active on"]
-        if color_by_cmd:
-            cmd_parts.append(color_by_cmd)
-        if cut_cmd:
-            cmd_parts.append(cut_cmd)
-        if color_by_cmd or cut_cmd:
-            cmd_parts.append("legend active on")
-        lines.append(f"itasca.command('{' '.join(cmd_parts)}')")
+
+        # Check if arrow mode is valid (requires vector attribute)
+        use_arrow = False
+        if ball_shape == "arrow" and ball_color_by:
+            spec = BALL_COLOR_BY_SPECS.get(ball_color_by.lower())
+            if spec and spec["type"] == "vector":
+                use_arrow = True
+
+        if use_arrow:
+            # Arrow mode: vector visualization with directional arrows
+            # ball_color_by is guaranteed non-None here (checked in use_arrow condition)
+            arrow_cmd = _build_ball_arrow_command(ball_color_by, ball_color_by_quantity)  # type: ignore[arg-type]
+            cmd_parts = ["plot item create ball active on", arrow_cmd]
+            if cut_cmd:
+                cmd_parts.append(cut_cmd)
+            lines.append(f"itasca.command('{' '.join(cmd_parts)}')")
+        else:
+            # Sphere mode: standard ball visualization
+            color_by_cmd = _build_ball_color_by_command(ball_color_by, ball_color_by_quantity)
+            cmd_parts = ["plot item create ball active on"]
+            if color_by_cmd:
+                cmd_parts.append(color_by_cmd)
+            if cut_cmd:
+                cmd_parts.append(cut_cmd)
+            if color_by_cmd or cut_cmd:
+                cmd_parts.append("legend active on")
+            lines.append(f"itasca.command('{' '.join(cmd_parts)}')")
 
     if include_wall:
         wall_color_by_cmd = _build_wall_color_by_command(wall_color_by, wall_color_by_quantity)

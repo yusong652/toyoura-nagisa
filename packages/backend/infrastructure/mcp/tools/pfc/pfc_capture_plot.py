@@ -29,6 +29,7 @@ from .scripts import (
     DEFAULT_PLOT_NAME,
     DEFAULT_WALL_TRANSPARENCY,
     DEFAULT_IMAGE_SIZE,
+    BallShapeType,
     VectorQuantityType,
     CutPlane,
 )
@@ -57,6 +58,15 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         include_ball: bool = Field(
             default=True,
             description="Show particles (balls) in the plot."
+        ),
+        ball_shape: BallShapeType = Field(
+            default="sphere",
+            description=(
+                "Ball visualization shape. "
+                "'sphere': standard spheres with optional color mapping. "
+                "'arrow': directional arrows for vector attributes (velocity, displacement, etc.). "
+                "Arrow mode requires ball_color_by to be a vector attribute, otherwise falls back to sphere."
+            )
         ),
         ball_color_by: Optional[str] = Field(
             default=None,
@@ -190,6 +200,7 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 include_contact=include_contact,
                 include_axes=True,
                 wall_transparency=wall_transparency,
+                ball_shape=ball_shape,
                 ball_color_by=ball_color_by,
                 ball_color_by_quantity=ball_color_by_quantity or "mag",
                 wall_color_by=wall_color_by,
