@@ -61,15 +61,6 @@ class GenerateTitleRequest(BaseModel):
 
 
 # =====================
-# Feature toggle models
-# =====================
-
-class UpdateTTSEnabledRequest(BaseModel):
-    """Request model for updating TTS enabled status"""
-    enabled: bool
-
-
-# =====================
 # Image generation models
 # =====================
 class GenerateImageRequest(BaseModel):

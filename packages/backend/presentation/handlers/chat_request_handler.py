@@ -79,7 +79,8 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
             # ========== PHASE 3: Content processing pipeline ==========
             if result.status == "success" and result.message:
                 await process_content_pipeline(
-                    result.message, session_id, message_id=result.message_id
+                    result.message, session_id, message_id=result.message_id,
+                    tts_enabled=prepared_message.tts_enabled
                 )
 
             # ========== PHASE 4: Memory persistence ==========

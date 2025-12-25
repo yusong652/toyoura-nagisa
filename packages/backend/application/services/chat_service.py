@@ -26,6 +26,7 @@ class PreparedUserMessage:
     instruction: UserMessage
     agent_profile: str
     enable_memory: bool
+    tts_enabled: bool = False
 
 
 def get_chat_service() -> "ChatService":
@@ -190,14 +191,15 @@ class ChatService:
             timestamp=dt_timestamp
         )
 
-        print(f"[DEBUG] Prepared user message {message_id} for session {session_id}", flush=True)
+        tts_enabled = parsed_data.get('tts_enabled', False)
 
         return PreparedUserMessage(
             session_id=session_id,
             message_id=message_id,
             instruction=instruction,
             agent_profile=parsed_data.get('agent_profile', 'general'),
-            enable_memory=parsed_data.get('enable_memory', True)
+            enable_memory=parsed_data.get('enable_memory', True),
+            tts_enabled=tts_enabled
         )
 
     async def _inject_status_reminders(self, session_id: str, parsed_data: MessageParseResult) -> None:

@@ -10,7 +10,6 @@ import {
   sessionService
 } from '@toyoura-nagisa/core'
 import { useConnection } from '../connection/ConnectionContext'
-import { useTtsEnable } from '../audio/TtsEnableContext'
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined)
 
@@ -41,7 +40,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     connectToSession,
     checkConnection
   } = useConnection()
-  const { ttsEnabled, updateTTSEnabled } = useTtsEnable()
 
   // Create SessionManager instance
   const sessionManagerRef = useRef<SessionManager>()
@@ -113,19 +111,12 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       const newSessionId = await sessionManager.createSession(name)
       console.log('Session created:', newSessionId)
 
-      // 同步 TTS 状态到后端
-      try {
-        await updateTTSEnabled(ttsEnabled)
-      } catch (error) {
-        console.error('同步 TTS 状态失败:', error)
-      }
-
       return newSessionId
     } catch (error) {
       console.error('Error in createNewSession:', error)
       throw error
     }
-  }, [sessionManager, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTTSEnabled])
+  }, [sessionManager, connectionStatus, checkConnection, connectionError])
 
 
   const switchSession = useCallback(async (sessionId: string): Promise<void> => {
@@ -137,19 +128,11 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     }
     try {
       await sessionManager.switchSession(sessionId)
-
-      // 同步 TTS 状态到后端
-      try {
-        await updateTTSEnabled(ttsEnabled)
-      } catch (error) {
-        console.error('同步 TTS 状态失败:', error)
-      }
-
     } catch (error) {
       console.error('切换会话失败:', error)
       throw error
     }
-  }, [sessionManager, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTTSEnabled])
+  }, [sessionManager, connectionStatus, checkConnection, connectionError])
 
 
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {

@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { toolService } from '@toyoura-nagisa/core'
+import React, { createContext, useContext, useState, ReactNode } from 'react'
 
 interface TtsEnableContextType {
   ttsEnabled: boolean
-  updateTTSEnabled: (enabled: boolean) => Promise<void>
+  setTtsEnabled: (enabled: boolean) => void
 }
 
 const TtsEnableContext = createContext<TtsEnableContextType | undefined>(undefined)
@@ -21,25 +20,10 @@ interface TtsEnableProviderProps {
 }
 
 export const TtsEnableProvider: React.FC<TtsEnableProviderProps> = ({ children }) => {
-  // TTS enabled state, default to true
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(true)
 
-  // Update TTS enabled status
-  const updateTTSEnabled = useCallback(async (enabled: boolean): Promise<void> => {
-    try {
-      const data = await toolService.updateTtsEnabled(enabled)
-      setTtsEnabled(data.tts_enabled)
-    } catch (error) {
-      console.error('Error updating TTS status:', error)
-      throw error
-    }
-  }, [])
-
   return (
-    <TtsEnableContext.Provider value={{
-      ttsEnabled,
-      updateTTSEnabled
-    }}>
+    <TtsEnableContext.Provider value={{ ttsEnabled, setTtsEnabled }}>
       {children}
     </TtsEnableContext.Provider>
   )

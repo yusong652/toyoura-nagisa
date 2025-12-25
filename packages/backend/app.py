@@ -14,7 +14,6 @@ from backend.presentation.api import videos
 from backend.presentation.api import sessions
 from backend.presentation.api import messages
 from backend.presentation.api import content
-from backend.presentation.api import settings
 # from backend.presentation.api import chat  # Deprecated: Moved to WebSocket
 from backend.presentation.api import profiles
 from backend.presentation.api import file_search
@@ -155,7 +154,6 @@ app.include_router(videos.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
-app.include_router(settings.router, prefix="/api")
 # app.include_router(chat.router, prefix="/api")  # Deprecated: Moved to WebSocket
 app.include_router(profiles.router)
 app.include_router(file_search.router, prefix="/api")

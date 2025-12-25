@@ -55,10 +55,6 @@ class TTSService:
             return {'text': sentence, 'audio': None}
 
         try:
-            # If TTS engine is disabled, return text only
-            if not tts_engine.enabled:
-                return {'text': sentence, 'audio': None}
-
             # Synthesize audio
             audio_bytes = await tts_engine.synthesize(sentence)
 

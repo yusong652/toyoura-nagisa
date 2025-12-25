@@ -69,17 +69,6 @@ class BaseTTS(ABC):
         """
         self.config = config
         self._is_ready = False
-        self._enabled = False  # Disabled by default (CLI has no TTS toggle, will be separated later)
-
-    @property
-    def enabled(self) -> bool:
-        """Get TTS engine enabled status."""
-        return self._enabled
-
-    @enabled.setter
-    def enabled(self, value: bool) -> None:
-        """Set TTS engine enabled status."""
-        self._enabled = value
 
     def clean_text(self, text: str) -> str:
         """Clean kaomoji and special symbols from text.

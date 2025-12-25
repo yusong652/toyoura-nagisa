@@ -23,7 +23,8 @@ from backend.presentation.websocket.message_sender import send_message_create, s
 async def process_content_pipeline(
     final_message: BaseMessage,  # AssistantMessage with List content
     session_id: str,
-    message_id: Optional[str] = None  # Optional: use existing message ID from streaming
+    message_id: Optional[str] = None,  # Optional: use existing message ID from streaming
+    tts_enabled: bool = True  # TTS processing flag from client
 ) -> None:
     """
     Content processing pipeline for final LLM responses.
@@ -82,32 +83,39 @@ async def process_content_pipeline(
         if emotion_service:
             await emotion_service.notify_emotion_keyword(session_id, extracted_keyword, ai_msg_id)
     
-    # Process TTS pipeline if clean text content is available
+    # Process TTS pipeline if clean text content is available AND TTS is enabled
     if parsed_result['text'].strip():
         # Send MESSAGE_CREATE only if message was not created during streaming
         if not message_id:
             await send_message_create(session_id, ai_msg_id)
 
-        # Get TTS engine from app state
-        from backend.shared.utils.app_context import get_tts_engine
-        tts_engine = get_tts_engine()
+        if tts_enabled:
+            # Get TTS engine from app state
+            from backend.shared.utils.app_context import get_tts_engine
+            tts_engine = get_tts_engine()
 
-        # Dynamic import to avoid circular dependency
-        from backend.presentation.handlers.tts_handler import process_tts_pipeline
-        # Use cleaned text without keyword markers for TTS
-        async for chunk in process_tts_pipeline(parsed_result['text'], tts_engine):
-            # Send TTS chunks via WebSocket
-            # For streaming messages: audio-only (text already displayed)
-            # For non-streaming messages: text+audio (for incremental text display)
+            # Dynamic import to avoid circular dependency
+            from backend.presentation.handlers.tts_handler import process_tts_pipeline
+            # Use cleaned text without keyword markers for TTS
+            async for chunk in process_tts_pipeline(parsed_result['text'], tts_engine):
+                # Send TTS chunks via WebSocket
+                # For streaming messages: audio-only (text already displayed)
+                # For non-streaming messages: text+audio (for incremental text display)
+                is_streaming = bool(message_id)
+                await send_tts_chunk(session_id, chunk, ai_msg_id, is_streaming)
+        else:
+            # Send final TTS chunk without audio to signal completion
+            final_chunk_data = {'text': '', 'audio': None, 'index': 0, 'is_final': True}
+            final_sse_chunk = f"data: {json.dumps(final_chunk_data)}\n\n"
             is_streaming = bool(message_id)
-            await send_tts_chunk(session_id, chunk, ai_msg_id, is_streaming)
+            await send_tts_chunk(session_id, final_sse_chunk, ai_msg_id, is_streaming)
     else:
         # Send MESSAGE_CREATE only if message was not created during streaming
         if not message_id:
             await send_message_create(session_id, ai_msg_id)
 
         # Send empty text chunk for consistency when only keywords are present
-        empty_chunk_data = {'text': '', 'audio': None, 'index': 0}
+        empty_chunk_data = {'text': '', 'audio': None, 'index': 0, 'is_final': True}
         empty_sse_chunk = f"data: {json.dumps(empty_chunk_data)}\n\n"
         is_streaming = bool(message_id)
         await send_tts_chunk(session_id, empty_sse_chunk, ai_msg_id, is_streaming)

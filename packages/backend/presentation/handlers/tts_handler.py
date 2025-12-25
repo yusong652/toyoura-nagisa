@@ -171,15 +171,6 @@ async def process_single_sentence_tts(
             - engine_status: str - TTS engine status indicator
     """
     try:
-        # Validate TTS engine readiness
-        if not tts_engine.enabled:
-            return {
-                'text': restore_emoticons(original_sentence, kaomoji_list, emoji_list),
-                'audio': None,
-                'index': index,
-                'engine_status': 'disabled'
-            }
-        
         # Process TTS with timeout protection
         try:
             tts_result = await asyncio.wait_for(
