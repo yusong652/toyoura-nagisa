@@ -101,6 +101,22 @@ class GeminiStreamingProcessor(BaseStreamingProcessor):
                     }
                 ))
 
+            # Empty text part with thought_signature only
+            # Gemini 2.5+ may send final chunk with empty text but with signature attached
+            # See: https://ai.google.dev/gemini-api/docs/thought-signatures
+            elif hasattr(part, 'text') and not part.text and hasattr(part, 'thought_signature') and part.thought_signature:
+                # Create a text chunk with empty content to carry the signature
+                result.append(StreamingChunk(
+                    chunk_type="text",
+                    content="",
+                    metadata={
+                        "has_signature": True,
+                        "signature_only": True,  # Mark this as signature-only chunk
+                        **usage_info
+                    },
+                    thought_signature=part.thought_signature
+                ))
+
         return result
 
 
@@ -278,6 +294,10 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                         # Capture thought_signature from text parts (final part may have it)
                         if hasattr(part, 'thought_signature') and part.thought_signature:
                             text_thought_signature = part.thought_signature
+                # Empty text part with thought_signature only (Gemini 2.5+)
+                elif hasattr(part, 'text') and not part.text and hasattr(part, 'thought_signature') and part.thought_signature:
+                    # Capture signature from empty text part
+                    text_thought_signature = part.thought_signature
                 elif hasattr(part, 'function_call') and part.function_call:
                     # Use pre-extracted tool call with consistent ID
                     if tool_call_index < len(tool_calls):
@@ -311,9 +331,10 @@ class GeminiResponseProcessor(BaseResponseProcessor):
 
         # Merge all text parts into single block for consistent rendering
         # Note: Multiple text blocks would render as separate lines in frontend
-        if text_parts:
-            combined_text = "".join(text_parts).strip()
-            if combined_text:
+        # Also handle signature-only case (empty text with thought_signature)
+        if text_parts or text_thought_signature:
+            combined_text = "".join(text_parts).strip() if text_parts else ""
+            if combined_text or text_thought_signature:
                 text_block = {
                     "type": "text",
                     "text": combined_text
@@ -554,9 +575,11 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                 thinking_signature = None
 
         def flush_text():
-            """Add accumulated text as a Part if non-empty."""
+            """Add accumulated text as a Part if non-empty or has signature."""
             nonlocal accumulated_text, text_signature
-            if accumulated_text:
+            # Create Part if there's content OR if there's a signature to preserve
+            # Signature-only case: Gemini may send empty final text part with signature
+            if accumulated_text or text_signature:
                 part = types.Part(text=accumulated_text)
                 if text_signature:
                     part.thought_signature = text_signature
