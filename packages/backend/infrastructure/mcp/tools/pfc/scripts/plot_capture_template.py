@@ -11,7 +11,8 @@ Design Philosophy:
 - Auto-cleanup temporary plot after export
 """
 
-from typing import Dict, Any, List, Literal, Tuple, Optional
+from typing import Dict, Any, List, Literal, Tuple, Optional, Annotated
+from pydantic import BaseModel, Field
 
 
 # Type definitions for tool parameters (keep in sync with SPECS below)
@@ -41,6 +42,13 @@ ContactColorByType = Literal[
     "emod", "kratio", "rr_fric", "rr_kr", "rr_slip",
 ]
 VectorQuantityType = Literal["mag", "x", "y", "z"]
+
+
+class CutPlane(BaseModel):
+    """Cut plane definition for clipping plot items."""
+    origin: Annotated[List[float], Field(min_length=3, max_length=3, description="Cut plane origin [x, y, z]")]
+    normal: Annotated[List[float], Field(min_length=3, max_length=3, description="Cut plane normal vector [nx, ny, nz]")]
+
 
 # Default plot configuration
 DEFAULT_PLOT_NAME = "NagisaDiagnostic"
@@ -293,6 +301,27 @@ def _build_contact_color_by_command(
     return f"{color_by_part} {color_options}"
 
 
+def _build_cut_command(cut: Optional["CutPlane"]) -> str:
+    """
+    Build PFC cut command string from CutPlane object.
+
+    PFC syntax:
+        cut active on type plane surface on front on back off origin (x,y,z) normal (nx,ny,nz)
+
+    Args:
+        cut: CutPlane with origin and normal vectors
+
+    Returns:
+        PFC cut command fragment, or empty string if cut is None
+    """
+    if not cut:
+        return ""
+
+    o = cut.origin
+    n = cut.normal
+    return f"cut active on type plane surface on front on back off origin ({o[0]},{o[1]},{o[2]}) normal ({n[0]},{n[1]},{n[2]})"
+
+
 def generate_plot_capture_script(
     output_path: str,
     plot_name: str = DEFAULT_PLOT_NAME,
@@ -310,6 +339,9 @@ def generate_plot_capture_script(
     contact_color_by: Optional[str] = "force",
     contact_color_by_quantity: str = "mag",
     contact_scale_by_force: bool = True,
+    ball_cut: Optional["CutPlane"] = None,
+    wall_cut: Optional["CutPlane"] = None,
+    contact_cut: Optional["CutPlane"] = None,
 ) -> str:
     """
     Generate Python script for PFC plot capture.
@@ -334,6 +366,9 @@ def generate_plot_capture_script(
         contact_color_by: Attribute for contact coloring (default: "force")
         contact_color_by_quantity: Contact vector component (mag/x/y/z)
         contact_scale_by_force: Scale contact cylinders by force magnitude
+        ball_cut: Optional cut plane for balls
+        wall_cut: Optional cut plane for walls
+        contact_cut: Optional cut plane for contacts
 
     Returns:
         Python script content as string
@@ -393,28 +428,42 @@ def generate_plot_capture_script(
 
     if include_ball:
         color_by_cmd = _build_ball_color_by_command(ball_color_by, ball_color_by_quantity)
+        cut_cmd = _build_cut_command(ball_cut)
+        cmd_parts = ["plot item create ball active on"]
         if color_by_cmd:
-            # active on must come right after 'ball' to enable color-by
-            # legend active on is added at the end of the item create command
-            lines.append(f'itasca.command(\'plot item create ball active on {color_by_cmd} legend active on\')')
-        else:
-            lines.append('itasca.command(\'plot item create ball\')')
+            cmd_parts.append(color_by_cmd)
+        if cut_cmd:
+            cmd_parts.append(cut_cmd)
+        if color_by_cmd or cut_cmd:
+            cmd_parts.append("legend active on")
+        lines.append(f"itasca.command('{' '.join(cmd_parts)}')")
 
     if include_wall:
         wall_color_by_cmd = _build_wall_color_by_command(wall_color_by, wall_color_by_quantity)
+        cut_cmd = _build_cut_command(wall_cut)
+        cmd_parts = ["plot item create wall active on"]
         if wall_color_by_cmd:
-            # legend active on is added at the end of the item create command
-            lines.append(f'itasca.command(\'plot item create wall active on {wall_color_by_cmd} transparency {wall_transparency} legend active on\')')
-        else:
-            lines.append(f'itasca.command(\'plot item create wall transparency {wall_transparency}\')')
+            cmd_parts.append(wall_color_by_cmd)
+        cmd_parts.append(f"transparency {wall_transparency}")
+        if cut_cmd:
+            cmd_parts.append(cut_cmd)
+        if wall_color_by_cmd or cut_cmd:
+            cmd_parts.append("legend active on")
+        lines.append(f"itasca.command('{' '.join(cmd_parts)}')")
 
     if include_contact:
         contact_color_by_cmd = _build_contact_color_by_command(contact_color_by, contact_color_by_quantity)
+        cut_cmd = _build_cut_command(contact_cut)
         scale_by_force = "on" if contact_scale_by_force else "off"
+        cmd_parts = ["plot item create contact active on"]
         if contact_color_by_cmd:
-            lines.append(f'itasca.command(\'plot item create contact active on {contact_color_by_cmd} scale-by-force {scale_by_force} legend active on\')')
-        else:
-            lines.append(f'itasca.command(\'plot item create contact scale-by-force {scale_by_force}\')')
+            cmd_parts.append(contact_color_by_cmd)
+        cmd_parts.append(f"scale-by-force {scale_by_force}")
+        if cut_cmd:
+            cmd_parts.append(cut_cmd)
+        if contact_color_by_cmd or cut_cmd:
+            cmd_parts.append("legend active on")
+        lines.append(f"itasca.command('{' '.join(cmd_parts)}')")
 
     if include_axes:
         lines.append('itasca.command(\'plot item create axes\')')

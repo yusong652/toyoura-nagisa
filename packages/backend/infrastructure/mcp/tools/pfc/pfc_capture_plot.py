@@ -30,6 +30,7 @@ from .scripts import (
     DEFAULT_WALL_TRANSPARENCY,
     DEFAULT_IMAGE_SIZE,
     VectorQuantityType,
+    CutPlane,
 )
 from .utils import PlotOutputPath
 
@@ -131,6 +132,18 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             default="perspective",
             description="Projection mode. parallel = orthographic view."
         ),
+        ball_cut: Optional[CutPlane] = Field(
+            default=None,
+            description="Ball cut plane. Shows only balls on front side of the plane."
+        ),
+        wall_cut: Optional[CutPlane] = Field(
+            default=None,
+            description="Wall cut plane. Shows only walls on front side of the plane."
+        ),
+        contact_cut: Optional[CutPlane] = Field(
+            default=None,
+            description="Contact cut plane. Shows only contacts on front side of the plane."
+        ),
     ) -> Dict[str, Any]:
         """
         Capture a diagnostic screenshot of PFC model state.
@@ -184,6 +197,9 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 contact_color_by=contact_color_by,
                 contact_color_by_quantity=contact_color_by_quantity or "mag",
                 contact_scale_by_force=contact_scale_by_force,
+                ball_cut=ball_cut,
+                wall_cut=wall_cut,
+                contact_cut=contact_cut,
             )
 
             # Get PFC client and working directory
