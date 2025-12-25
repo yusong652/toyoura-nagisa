@@ -300,8 +300,8 @@ class SubAgentConfig:
 
 PFC_EXPLORER = SubAgentConfig(
     name="pfc_explorer",
-    display_name="PFC Explorer",
-    description="PFC documentation query agent (read-only)",
+    display_name="Tama (PFC Explorer)",
+    description="Tama - PFC documentation query agent (read-only)",
     tools=tuple(SUBAGENT_PFC_EXPLORER_TOOLS),
     max_iterations=64,  # Reduced: read-only exploration tasks are simpler
     streaming_enabled=False,
@@ -310,8 +310,8 @@ PFC_EXPLORER = SubAgentConfig(
 
 PFC_DIAGNOSTIC = SubAgentConfig(
     name="pfc_diagnostic",
-    display_name="PFC Diagnostic Expert",
-    description="Multimodal visual analysis agent for PFC simulation diagnostics",
+    display_name="Hoshi (PFC Diagnostic)",
+    description="Hoshi - Multimodal visual analysis agent for PFC simulation diagnostics",
     tools=tuple(SUBAGENT_PFC_DIAGNOSTIC_TOOLS),
     max_iterations=64,  # Multi-angle analysis may require many capture+read cycles
     streaming_enabled=False,

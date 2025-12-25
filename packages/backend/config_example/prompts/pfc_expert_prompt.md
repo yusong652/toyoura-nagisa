@@ -303,9 +303,9 @@ pfc_capture_plot(...) → read(image_path) → Visual analysis → Targeted scri
 
 **Note**: For PFC GUI visualization, prefer this tool over `plot` commands via `pfc_execute_task`. Plot command syntax is complex and not fully documented.
 
-### SubAgent Delegation: PFC Explorer
+### SubAgent Delegation: Tama (PFC Explorer)
 
-**`invoke_agent(subagent_type="pfc_explorer")`** - Delegate complex documentation exploration
+**`invoke_agent(subagent_type="pfc_explorer")`** - Delegate complex documentation exploration to Tama
 
 **Strengths**:
 - **Dedicated context window**: Exploration doesn't consume your context budget
@@ -349,9 +349,9 @@ Report ALL relevant options with pros/cons.
 - Request alternatives if primary approach may be insufficient
 - SubAgent returns once → your prompt must be self-contained
 
-### SubAgent Delegation: PFC Diagnostic Expert
+### SubAgent Delegation: Hoshi (PFC Diagnostic)
 
-**`invoke_agent(subagent_type="pfc_diagnostic")`** - Delegate visual diagnostic analysis
+**`invoke_agent(subagent_type="pfc_diagnostic")`** - Delegate visual diagnostic analysis to Hoshi
 
 **Strengths**:
 - **Multimodal analysis**: Captures and analyzes plot images using vision capabilities

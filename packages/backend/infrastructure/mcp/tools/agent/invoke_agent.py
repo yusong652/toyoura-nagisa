@@ -24,8 +24,8 @@ __all__ = ["invoke_agent", "register_invoke_agent_tool"]
 
 # Available SubAgent types (matches SubAgentConfig names in agent_profiles.py)
 AVAILABLE_SUBAGENTS = {
-    "pfc_explorer": "PFC documentation query agent (read-only)",
-    "pfc_diagnostic": "PFC multimodal diagnostic agent (visual analysis + task status inspection)",
+    "pfc_explorer": "Tama - PFC documentation query agent (read-only)",
+    "pfc_diagnostic": "Hoshi - PFC multimodal diagnostic agent (visual analysis)",
 }
 
 
