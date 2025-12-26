@@ -14,8 +14,7 @@ from typing import Dict, Any, Optional, cast
 from fastmcp import FastMCP
 from pydantic import Field
 
-from backend.infrastructure.pfc.commands import DocLoader
-from backend.infrastructure.pfc.commands.reference_formatter import ReferenceFormatter
+from backend.infrastructure.pfc.references import ReferenceLoader, ReferenceFormatter
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.tools.pfc.utils import normalize_input
 
@@ -87,7 +86,7 @@ def register_pfc_browse_reference_tool(mcp: FastMCP):
 
 def _browse_references_root() -> Dict[str, Any]:
     """Level 0: Return overview of all reference categories."""
-    refs_index = DocLoader.load_references_index()
+    refs_index = ReferenceLoader.load_index()
     categories = refs_index.get("categories", {})
 
     # Build category summary
@@ -129,7 +128,7 @@ Related:
 
 def _browse_category(category: str) -> Dict[str, Any]:
     """Level 1: Return list of items in a reference category."""
-    refs_index = DocLoader.load_references_index()
+    refs_index = ReferenceLoader.load_index()
     categories = refs_index.get("categories", {})
 
     if category not in categories:
@@ -139,7 +138,7 @@ def _browse_category(category: str) -> Dict[str, Any]:
         )
 
     # Use unified loader to get category index (category already validated above)
-    cat_index = cast(Dict[str, Any], DocLoader.load_reference_category_index(category))
+    cat_index = cast(Dict[str, Any], ReferenceLoader.load_category_index(category))
 
     # Use unified formatter
     content = ReferenceFormatter.format_index(category, cat_index)
@@ -162,11 +161,11 @@ def _browse_category(category: str) -> Dict[str, Any]:
 def _browse_item(category: str, item: str) -> Dict[str, Any]:
     """Level 2: Return full documentation for a specific item."""
     # Use unified loader
-    item_doc = DocLoader.load_reference_item_doc(category, item)
+    item_doc = ReferenceLoader.load_item_doc(category, item)
 
     if not item_doc:
         # Get available items for error message
-        items = DocLoader.get_reference_item_list(category)
+        items = ReferenceLoader.get_item_list(category)
         available = [i.get("name", "") for i in items]
         return error_response(
             f"Item '{item}' not found in '{category}'. Available: {', '.join(available[:15])}{'...' if len(available) > 15 else ''}"
