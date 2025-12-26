@@ -81,7 +81,6 @@ def register_pfc_browse_reference_tool(mcp: FastMCP):
         except Exception as e:
             return error_response(f"Error browsing references: {str(e)}")
 
-    print("[DEBUG] Registered PFC reference browse tool: pfc_browse_reference")
 
 
 def _browse_references_root() -> Dict[str, Any]:
@@ -89,32 +88,7 @@ def _browse_references_root() -> Dict[str, Any]:
     refs_index = ReferenceLoader.load_index()
     categories = refs_index.get("categories", {})
 
-    # Build category summary
-    category_lines = []
-    for cat_name, cat_data in categories.items():
-        name = cat_data.get("name", cat_name)
-        desc = cat_data.get("description", "")
-        summary = cat_data.get("summary", "")
-        if len(desc) > 50:
-            desc = desc[:47] + "..."
-        category_lines.append(f"- {cat_name}: {desc}")
-        if summary:
-            category_lines.append(f"  ({summary})")
-
-    content = f"""## PFC Reference Documentation
-
-Total: {len(categories)} categories
-
-{chr(10).join(category_lines)}
-
-Navigation:
-- pfc_browse_reference(topic="<category>") to list items
-- pfc_browse_reference(topic="<category> <item>") for full doc
-
-Related:
-- pfc_browse_commands: Command syntax
-- pfc_query_command: Search commands by keywords
-"""
+    content = ReferenceFormatter.format_root(categories)
 
     return success_response(
         message=f"PFC Reference Documentation: {len(categories)} categories",
@@ -137,7 +111,7 @@ def _browse_category(category: str) -> Dict[str, Any]:
             f"Category '{category}' not found. Available: {available}"
         )
 
-    # Use unified loader to get category index (category already validated above)
+    # Category already validated above, loader will return valid index
     cat_index = cast(Dict[str, Any], ReferenceLoader.load_category_index(category))
 
     # Use unified formatter

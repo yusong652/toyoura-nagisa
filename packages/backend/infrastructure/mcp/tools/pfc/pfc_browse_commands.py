@@ -77,7 +77,6 @@ def register_pfc_browse_commands_tool(mcp: FastMCP):
         except Exception as e:
             return error_response(f"Error browsing documentation: {str(e)}")
 
-    print("[DEBUG] Registered PFC command browse tool: pfc_browse_commands")
 
 
 def _browse_root() -> Dict[str, Any]:
@@ -85,33 +84,11 @@ def _browse_root() -> Dict[str, Any]:
     index = CommandLoader.load_index()
     categories = index.get("categories", {})
 
-    # Build category summary
-    category_lines = []
-    total_commands = 0
-    for cat_name, cat_data in categories.items():
-        cmd_count = len(cat_data.get("commands", []))
-        total_commands += cmd_count
-        description = cat_data.get("description", "")
-        # Truncate long descriptions
-        if len(description) > 50:
-            description = description[:47] + "..."
-
-        category_lines.append(f"- {cat_name} ({cmd_count}): {description}")
-
-    content = f"""## PFC Command Documentation
-
-Total: {len(categories)} categories, {total_commands} commands
-
-{chr(10).join(category_lines)}
-
-Navigation:
-- pfc_browse_commands(command="<category>") to list commands
-- pfc_browse_commands(command="<category> <cmd>") for full doc
-
-Search: pfc_query_command(query="...") for keyword search
-
-Contact Models: pfc_browse_reference(topic="contact-models") for model properties
-"""
+    content = CommandFormatter.format_root(categories)
+    total_commands = sum(
+        len(cat_data.get("commands", []))
+        for cat_data in categories.values()
+    )
 
     return success_response(
         message=f"PFC Command Documentation: {len(categories)} categories, {total_commands} commands",
@@ -138,49 +115,8 @@ def _browse_category(category: str) -> Dict[str, Any]:
     cat_data = categories[category]
     commands = cat_data.get("commands", [])
     full_name = cat_data.get("full_name", category.title())
-    description = cat_data.get("description", "")
 
-    # Build command list
-    command_lines = []
-    for cmd in commands:
-        name = cmd.get("name", "")
-        python_avail = cmd.get("python_available", False)
-        if python_avail is True:
-            python_mark = "[py]"
-        elif python_avail == "partial":
-            python_mark = "[py:partial]"
-        else:
-            python_mark = ""
-
-        short_desc = cmd.get("short_description", "")
-        if len(short_desc) > 45:
-            short_desc = short_desc[:42] + "..."
-
-        command_lines.append(f"- {name}{' ' + python_mark if python_mark else ''}: {short_desc}")
-
-    # Related categories
-    related = cat_data.get("related_categories", [])
-    related_text = f"Related: {', '.join(related)}" if related else ""
-
-    # Special note for contact category
-    contact_note = ""
-    if category == "contact":
-        contact_note = '\nContact Models: pfc_browse_reference(topic="contact-models") for model properties'
-
-    content = f"""## {full_name} ({len(commands)} commands)
-
-{description}
-
-{chr(10).join(command_lines)}
-
-[py] = Python SDK available, [py:partial] = partial support
-
-Navigation:
-- pfc_browse_commands(command="{category} <cmd>") for full doc
-- pfc_browse_commands() for categories overview
-{contact_note}
-{related_text}
-"""
+    content = CommandFormatter.format_category(category, cat_data)
 
     return success_response(
         message=f"{full_name}: {len(commands)} commands",
@@ -196,37 +132,7 @@ Navigation:
 
 def _browse_subcommand_group(category: str, group_name: str, commands: list) -> Dict[str, Any]:
     """Level 1.5: Return list of subcommands in a group (e.g., 'cmat' subcommands)."""
-    # Build subcommand list
-    command_lines = []
-    for cmd in commands:
-        name = cmd.get("name", "")
-        # Extract subcommand name (e.g., "cmat add" -> "add")
-        subcommand = name[len(group_name) + 1:] if name.startswith(group_name + " ") else name
-
-        python_avail = cmd.get("python_available", False)
-        if python_avail is True:
-            python_mark = "[py]"
-        elif python_avail == "partial":
-            python_mark = "[py:partial]"
-        else:
-            python_mark = ""
-
-        short_desc = cmd.get("short_description", "")
-        if len(short_desc) > 45:
-            short_desc = short_desc[:42] + "..."
-
-        command_lines.append(f"- {subcommand}{' ' + python_mark if python_mark else ''}: {short_desc}")
-
-    content = f"""## {category} {group_name} ({len(commands)} subcommands)
-
-{chr(10).join(command_lines)}
-
-[py] = Python SDK available, [py:partial] = partial support
-
-Navigation:
-- pfc_browse_commands(command="{category} {group_name} <subcommand>") for full doc
-- pfc_browse_commands(command="{category}") for all {category} commands
-"""
+    content = CommandFormatter.format_subcommand_group(category, group_name, commands)
 
     return success_response(
         message=f"{category} {group_name}: {len(commands)} subcommands",

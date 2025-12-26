@@ -22,6 +22,148 @@ class CommandFormatter:
     """
 
     @staticmethod
+    def format_root(categories: Dict[str, Any]) -> str:
+        """Format command categories overview as markdown.
+
+        Args:
+            categories: Dict of category data from index
+
+        Returns:
+            Formatted markdown string
+        """
+        parts = []
+
+        total_commands = sum(
+            len(cat_data.get("commands", []))
+            for cat_data in categories.values()
+        )
+
+        parts.append("## PFC Command Documentation")
+        parts.append("")
+        parts.append(f"Total: {len(categories)} categories, {total_commands} commands")
+        parts.append("")
+
+        for cat_name, cat_data in categories.items():
+            cmd_count = len(cat_data.get("commands", []))
+            description = cat_data.get("description", "")
+            if len(description) > 50:
+                description = description[:47] + "..."
+            parts.append(f"- {cat_name} ({cmd_count}): {description}")
+
+        parts.append("")
+        parts.append("Navigation:")
+        parts.append('- pfc_browse_commands(command="<category>") to list commands')
+        parts.append('- pfc_browse_commands(command="<category> <cmd>") for full doc')
+        parts.append("")
+        parts.append("Search: pfc_query_command(query=\"...\") for keyword search")
+        parts.append("")
+        parts.append('Contact Models: pfc_browse_reference(topic="contact-models") for model properties')
+
+        return "\n".join(parts)
+
+    @staticmethod
+    def format_category(category: str, cat_data: Dict[str, Any]) -> str:
+        """Format command list in a category as markdown.
+
+        Args:
+            category: Category name
+            cat_data: Category data dict with commands list
+
+        Returns:
+            Formatted markdown string
+        """
+        parts = []
+
+        commands = cat_data.get("commands", [])
+        full_name = cat_data.get("full_name", category.title())
+        description = cat_data.get("description", "")
+        related = cat_data.get("related_categories", [])
+
+        parts.append(f"## {full_name} ({len(commands)} commands)")
+        parts.append("")
+        if description:
+            parts.append(description)
+            parts.append("")
+
+        for cmd in commands:
+            name = cmd.get("name", "")
+            python_avail = cmd.get("python_available", False)
+            if python_avail is True:
+                python_mark = "[py]"
+            elif python_avail == "partial":
+                python_mark = "[py:partial]"
+            else:
+                python_mark = ""
+
+            short_desc = cmd.get("short_description", "")
+            if len(short_desc) > 45:
+                short_desc = short_desc[:42] + "..."
+
+            parts.append(f"- {name}{' ' + python_mark if python_mark else ''}: {short_desc}")
+
+        parts.append("")
+        parts.append("[py] = Python SDK available, [py:partial] = partial support")
+        parts.append("")
+        parts.append("Navigation:")
+        parts.append(f'- pfc_browse_commands(command="{category} <cmd>") for full doc')
+        parts.append("- pfc_browse_commands() for categories overview")
+
+        if category == "contact":
+            parts.append("")
+            parts.append('Contact Models: pfc_browse_reference(topic="contact-models") for model properties')
+
+        if related:
+            parts.append(f"Related: {', '.join(related)}")
+
+        return "\n".join(parts)
+
+    @staticmethod
+    def format_subcommand_group(
+        category: str, group_name: str, commands: List[Dict[str, Any]]
+    ) -> str:
+        """Format subcommand group list as markdown.
+
+        Args:
+            category: Category name
+            group_name: Subcommand group prefix (e.g., "cmat")
+            commands: List of commands in the group
+
+        Returns:
+            Formatted markdown string
+        """
+        parts = []
+
+        parts.append(f"## {category} {group_name} ({len(commands)} subcommands)")
+        parts.append("")
+
+        for cmd in commands:
+            name = cmd.get("name", "")
+            subcommand = name[len(group_name) + 1:] if name.startswith(group_name + " ") else name
+
+            python_avail = cmd.get("python_available", False)
+            if python_avail is True:
+                python_mark = "[py]"
+            elif python_avail == "partial":
+                python_mark = "[py:partial]"
+            else:
+                python_mark = ""
+
+            short_desc = cmd.get("short_description", "")
+            if len(short_desc) > 45:
+                short_desc = short_desc[:42] + "..."
+
+            parts.append(f"- {subcommand}{' ' + python_mark if python_mark else ''}: {short_desc}")
+
+        parts.append("")
+        parts.append("[py] = Python SDK available, [py:partial] = partial support")
+        parts.append("")
+        parts.append("Navigation:")
+        parts.append(f'- pfc_browse_commands(command="{category} {group_name} <subcommand>") for full doc')
+        parts.append(f'- pfc_browse_commands(command="{category}") for all {category} commands')
+
+        return "\n".join(parts)
+
+    @staticmethod
     def format_command(doc: Dict[str, Any], category: str) -> str:
         """Format a full command documentation as markdown.
 

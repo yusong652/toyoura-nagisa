@@ -20,6 +20,43 @@ class ReferenceFormatter:
     """
 
     @staticmethod
+    def format_root(categories: Dict[str, Any]) -> str:
+        """Format reference categories overview as markdown.
+
+        Args:
+            categories: Dict of category data from index
+
+        Returns:
+            Formatted markdown string
+        """
+        parts = []
+
+        parts.append("## PFC Reference Documentation")
+        parts.append("")
+        parts.append(f"Total: {len(categories)} categories")
+        parts.append("")
+
+        for cat_name, cat_data in categories.items():
+            desc = cat_data.get("description", "")
+            summary = cat_data.get("summary", "")
+            if len(desc) > 50:
+                desc = desc[:47] + "..."
+            parts.append(f"- {cat_name}: {desc}")
+            if summary:
+                parts.append(f"  ({summary})")
+
+        parts.append("")
+        parts.append("Navigation:")
+        parts.append('- pfc_browse_reference(topic="<category>") to list items')
+        parts.append('- pfc_browse_reference(topic="<category> <item>") for full doc')
+        parts.append("")
+        parts.append("Related:")
+        parts.append("- pfc_browse_commands: Command syntax")
+        parts.append("- pfc_query_command: Search commands by keywords")
+
+        return "\n".join(parts)
+
+    @staticmethod
     def format_index(category: str, index: Dict[str, Any]) -> str:
         """Format a reference category index as markdown.
 
