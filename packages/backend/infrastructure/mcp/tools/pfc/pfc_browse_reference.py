@@ -103,8 +103,6 @@ def _browse_references_root() -> Dict[str, Any]:
 
     content = f"""## PFC Reference Documentation
 
-References are syntax elements used within commands, not standalone commands.
-
 Total: {len(categories)} categories
 
 {chr(10).join(category_lines)}
