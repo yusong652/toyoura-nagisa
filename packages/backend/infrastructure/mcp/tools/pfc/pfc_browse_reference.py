@@ -5,16 +5,19 @@ which covers syntax elements used within commands (not standalone commands).
 
 Reference Categories:
 - contact-models: Contact model properties (kn, ks, fric, pb_*, etc.)
-- range-elements: Range filtering syntax (future)
+- range-elements: Range filtering syntax (position, cylinder, group, id, etc.)
 
 Use this tool to understand syntax elements that modify command behavior.
 """
 
+import json
+from pathlib import Path
 from typing import Dict, Any, Optional
 from fastmcp import FastMCP
 from pydantic import Field
 
 from backend.infrastructure.pfc.commands import CommandLoader, CommandFormatter
+from backend.infrastructure.pfc.config import PFC_REFERENCES_ROOT
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 
@@ -33,7 +36,8 @@ def register_pfc_browse_reference_tool(mcp: FastMCP):
                 "- None or '': List all reference categories\n"
                 "- 'contact-models': List all contact models\n"
                 "- 'contact-models linear': Linear model properties\n"
-                "- 'contact-models hertz': Hertz model properties"
+                "- 'range-elements': Range filtering syntax overview\n"
+                "- 'range-elements range-phrase': Full range element reference"
             )
         )
     ) -> Dict[str, Any]:
@@ -48,7 +52,9 @@ def register_pfc_browse_reference_tool(mcp: FastMCP):
 
         When to use:
         - Need contact model property names (kn, ks, fric, pb_*)
+        - Need range filtering syntax (position, cylinder, group, id)
         - Setting up "contact cmat add model ... property ..." commands
+        - Using range filters in any PFC command
 
         Related tools:
         - pfc_browse_commands: Command syntax (e.g., "ball create")
@@ -147,6 +153,8 @@ def _browse_category(category: str) -> Dict[str, Any]:
     # Dispatch to category-specific handler
     if category == "contact-models":
         return _browse_contact_models_index()
+    elif category == "range-elements":
+        return _browse_range_elements_index()
     else:
         return error_response(f"Category '{category}' not yet implemented")
 
@@ -207,6 +215,8 @@ def _browse_item(category: str, item: str) -> Dict[str, Any]:
     """Level 2: Return full documentation for a specific item."""
     if category == "contact-models":
         return _browse_contact_model_doc(item)
+    elif category == "range-elements":
+        return _browse_range_element_doc(item)
     else:
         return error_response(f"Category '{category}' not yet implemented")
 
@@ -249,3 +259,203 @@ Usage:
             "item": model_name
         }
     )
+
+
+def _browse_range_elements_index() -> Dict[str, Any]:
+    """Return overview of range elements reference."""
+    index_path = PFC_REFERENCES_ROOT / "range-elements" / "index.json"
+
+    if not index_path.exists():
+        return error_response("Range elements documentation not found")
+
+    with open(index_path, 'r', encoding='utf-8') as f:
+        index_data = json.load(f)
+
+    documents = index_data.get("documents", [])
+    quick_ref = index_data.get("quick_reference", {})
+    examples = index_data.get("common_examples", [])
+
+    # Build content
+    doc_lines = []
+    for doc in documents:
+        name = doc.get("name", "")
+        title = doc.get("title", name)
+        desc = doc.get("description", "")
+        doc_lines.append(f"- {name}: {title}")
+        if desc:
+            doc_lines.append(f"  {desc}")
+
+    # Quick reference by category
+    quick_lines = []
+    for cat, elements in quick_ref.items():
+        quick_lines.append(f"- {cat}: {', '.join(elements)}")
+
+    content = f"""## PFC Range Elements Reference
+
+Range elements filter objects by geometric regions, attributes, or logical conditions.
+Used after the 'range' keyword in PFC commands.
+
+**Usage Pattern**: `<command> ... range <element> [params]`
+
+### Available Documents
+{chr(10).join(doc_lines)}
+
+### Quick Reference
+{chr(10).join(quick_lines)}
+
+### Common Examples
+```
+{chr(10).join(examples)}
+```
+
+Navigation:
+- pfc_browse_reference(topic="range-elements range-phrase") for full reference
+- pfc_browse_reference() for all categories
+
+Usage examples:
+- ball delete range position-x 0 10
+- ball attribute density 2650 range group 'sample'
+- contact property fric 0.5 range cylinder end-1 0 0 0 end-2 0 0 10 radius 5
+"""
+
+    return success_response(
+        message=f"Range Elements: {len(documents)} documents",
+        llm_content={"parts": [{"type": "text", "text": content}]},
+        data={
+            "level": "category",
+            "category": "range-elements",
+            "documents": [d.get("name") for d in documents]
+        }
+    )
+
+
+def _browse_range_element_doc(doc_name: str) -> Dict[str, Any]:
+    """Return full documentation for a specific range element document."""
+    doc_path = PFC_REFERENCES_ROOT / "range-elements" / f"{doc_name}.json"
+
+    if not doc_path.exists():
+        # Try to list available documents
+        index_path = PFC_REFERENCES_ROOT / "range-elements" / "index.json"
+        available = []
+        if index_path.exists():
+            with open(index_path, 'r', encoding='utf-8') as f:
+                index_data = json.load(f)
+                available = [d.get("name") for d in index_data.get("documents", [])]
+        return error_response(
+            f"Document '{doc_name}' not found. Available: {', '.join(available)}"
+        )
+
+    with open(doc_path, 'r', encoding='utf-8') as f:
+        doc_data = json.load(f)
+
+    # Format the range elements documentation
+    content = _format_range_elements_doc(doc_data)
+
+    return success_response(
+        message=f"Range Elements: {doc_data.get('title', doc_name)}",
+        llm_content={"parts": [{"type": "text", "text": content}]},
+        data={
+            "level": "item",
+            "category": "range-elements",
+            "item": doc_name
+        }
+    )
+
+
+def _format_range_elements_doc(doc: Dict[str, Any]) -> str:
+    """Format range elements documentation as markdown."""
+    parts = []
+
+    # Header
+    title = doc.get("title", "Range Elements")
+    parts.append(f"# {title}")
+    parts.append("")
+
+    description = doc.get("description", "")
+    if description:
+        parts.append(description)
+        parts.append("")
+
+    # Usage pattern
+    usage = doc.get("usage_pattern", {})
+    if usage:
+        syntax = usage.get("syntax", "")
+        examples = usage.get("examples", [])
+        notes = usage.get("notes", [])
+
+        parts.append("## Usage Pattern")
+        if syntax:
+            parts.append(f"**Syntax**: `{syntax}`")
+            parts.append("")
+        if examples:
+            parts.append("**Examples**:")
+            parts.append("```")
+            for ex in examples:
+                parts.append(ex)
+            parts.append("```")
+            parts.append("")
+        if notes:
+            parts.append("**Notes**:")
+            for note in notes:
+                parts.append(f"- {note}")
+            parts.append("")
+
+    # Categories
+    categories = doc.get("categories", [])
+    for cat in categories:
+        cat_name = cat.get("name", "")
+        cat_desc = cat.get("description", "")
+        elements = cat.get("elements", [])
+
+        parts.append(f"## {cat_name}")
+        if cat_desc:
+            parts.append(f"*{cat_desc}*")
+            parts.append("")
+
+        for elem in elements:
+            elem_name = elem.get("name", "")
+            elem_syntax = elem.get("syntax", "")
+            alt_syntax = elem.get("alt_syntax", "")
+            elem_desc = elem.get("description", "")
+            elem_examples = elem.get("examples", [])
+            supports_extent = elem.get("supports_extent", False)
+
+            parts.append(f"### {elem_name}")
+            if elem_syntax:
+                parts.append(f"**Syntax**: `{elem_syntax}`")
+            if alt_syntax:
+                parts.append(f"**Alt**: `{alt_syntax}`")
+            if elem_desc:
+                parts.append(f"**Description**: {elem_desc}")
+            if supports_extent:
+                parts.append("*Supports `extent` modifier*")
+            if elem_examples:
+                parts.append("**Examples**:")
+                for ex in elem_examples:
+                    parts.append(f"- `{ex}`")
+            parts.append("")
+
+    # Common patterns
+    patterns = doc.get("common_patterns", [])
+    if patterns:
+        parts.append("## Common Patterns")
+        for pattern in patterns:
+            name = pattern.get("name", "")
+            example = pattern.get("example", "")
+            desc = pattern.get("description", "")
+            parts.append(f"### {name}")
+            if desc:
+                parts.append(desc)
+            if example:
+                parts.append("```")
+                parts.append(example)
+                parts.append("```")
+            parts.append("")
+
+    # Navigation footer
+    parts.append("---")
+    parts.append("Navigation:")
+    parts.append("- pfc_browse_reference(topic=\"range-elements\") for overview")
+    parts.append("- pfc_browse_reference() for all categories")
+
+    return "\n".join(parts)

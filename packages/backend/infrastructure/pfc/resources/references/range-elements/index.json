@@ -1,0 +1,31 @@
+{
+  "type": "range_elements",
+  "description": "Range phrase reference documentation. Range elements filter objects by geometric regions, attributes, or logical conditions. Used after the 'range' keyword in PFC commands.",
+
+  "usage_pattern": "<command> ... range <element1> [params] <element2> [params] ...",
+
+  "documents": [
+    {
+      "name": "range-phrase",
+      "file": "range-phrase.json",
+      "title": "Range Phrase Reference",
+      "description": "Complete reference for all range elements and modifiers",
+      "categories": ["geometric", "attribute", "pfc-specific", "user-defined", "modifiers"]
+    }
+  ],
+
+  "quick_reference": {
+    "geometric": ["position", "position-x", "position-y", "position-z", "sphere", "cylinder", "annulus", "plane", "polygon"],
+    "attribute": ["id", "id-list", "group", "named-range"],
+    "pfc_specific": ["contact"],
+    "user_defined": ["extra", "extra-list", "fish"],
+    "modifiers": ["not", "extent", "all", "by", "union"]
+  },
+
+  "common_examples": [
+    "range position-x 0 10",
+    "range group 'sample'",
+    "range cylinder end-1 0 0 0 end-2 0 0 10 radius 5",
+    "range id 1 100"
+  ]
+}

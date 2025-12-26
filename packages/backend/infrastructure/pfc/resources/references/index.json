@@ -10,6 +10,14 @@
       "index_file": "contact-models/index.json",
       "summary": "5 built-in models: linear, linearcbond, linearpbond, hertz, rrlinear",
       "usage": "contact cmat add model <name> property <prop> <value>"
+    },
+    "range-elements": {
+      "name": "Range Elements",
+      "description": "Range filtering syntax (position, cylinder, group, id, etc.)",
+      "directory": "range-elements",
+      "index_file": "range-elements/index.json",
+      "summary": "Geometric, attribute, and logical range filters",
+      "usage": "<command> ... range <element> [params]"
     }
   },
 
