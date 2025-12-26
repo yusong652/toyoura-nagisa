@@ -16,6 +16,7 @@ from pydantic import Field
 
 from backend.infrastructure.pfc.commands import CommandLoader, CommandFormatter
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.tools.pfc.utils import normalize_input
 
 
 def register_pfc_browse_reference_tool(mcp: FastMCP):
@@ -61,7 +62,7 @@ def register_pfc_browse_reference_tool(mcp: FastMCP):
         """
         try:
             # Normalize topic input
-            topic = _normalize_topic(topic)
+            topic = normalize_input(topic, lowercase=True)
 
             if not topic:
                 return _browse_references_root()
@@ -83,20 +84,9 @@ def register_pfc_browse_reference_tool(mcp: FastMCP):
     print("[DEBUG] Registered PFC reference browse tool: pfc_browse_reference")
 
 
-def _normalize_topic(topic: Optional[str]) -> str:
-    """Normalize topic input."""
-    if topic is None:
-        return ""
-    return " ".join(topic.strip().lower().split())
-
-
 def _browse_references_root() -> Dict[str, Any]:
     """Level 0: Return overview of all reference categories."""
     refs_index = CommandLoader.load_references_index()
-
-    if not refs_index:
-        return error_response("Reference documentation not found")
-
     categories = refs_index.get("categories", {})
 
     # Build category summary
@@ -151,8 +141,6 @@ def _browse_category(category: str) -> Dict[str, Any]:
 
     # Use unified loader to get category index
     cat_index = CommandLoader.load_reference_category_index(category)
-    if not cat_index:
-        return error_response(f"Category '{category}' index not found")
 
     # Dispatch to category-specific formatter
     if category == "contact-models":

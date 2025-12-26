@@ -14,6 +14,7 @@ from pydantic import Field
 
 from backend.infrastructure.pfc.commands import CommandLoader, CommandFormatter
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.tools.pfc.utils import normalize_input
 
 
 def register_pfc_browse_commands_tool(mcp: FastMCP):
@@ -53,7 +54,7 @@ def register_pfc_browse_commands_tool(mcp: FastMCP):
         """
         try:
             # Normalize command input
-            cmd = _normalize_command(command)
+            cmd = normalize_input(command)
 
             # Route to appropriate handler based on command depth
             if not cmd:
@@ -77,14 +78,6 @@ def register_pfc_browse_commands_tool(mcp: FastMCP):
             return error_response(f"Error browsing documentation: {str(e)}")
 
     print("[DEBUG] Registered PFC command browse tool: pfc_browse_commands")
-
-
-def _normalize_command(command: Optional[str]) -> str:
-    """Normalize command input."""
-    if command is None:
-        return ""
-    # Strip whitespace and normalize multiple spaces to single space
-    return " ".join(command.split())
 
 
 def _browse_root() -> Dict[str, Any]:
