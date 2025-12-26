@@ -114,8 +114,11 @@ MainAgent can delegate specialized tasks to lightweight SubAgents via the `invok
 | SubAgent | Tools | Max Iterations | Purpose |
 |----------|-------|----------------|---------|
 | **PFC Explorer** | 9 read-only | 20 | Documentation search, codebase exploration |
+| **PFC Diagnostic** | 11 read-only | 64 | Multimodal visual analysis, task status inspection |
 
 **PFC Explorer Tools**: `read`, `glob`, `grep`, `bash`, `bash_output`, `pfc_query_command`, `pfc_query_python_api`, `web_search`, `todo_write`
+
+**PFC Diagnostic Tools**: `pfc_capture_plot`, `read`, `pfc_check_task_status`, `pfc_list_tasks`, `pfc_query_command`, `pfc_query_python_api`, `glob`, `grep`, `bash`, `bash_output`, `todo_write`
 
 **Architecture**:
 - **Non-Streaming**: SubAgents use synchronous API calls for efficiency
@@ -125,12 +128,12 @@ MainAgent can delegate specialized tasks to lightweight SubAgents via the `invok
 
 **Storage Mode** (determined by `agent_profile`):
 - MainAgent (`general`, `coding`, `pfc_expert`): `persistent=True` → local file (`workspace/todos.json`)
-- SubAgent (`pfc_explorer`): `persistent=False` → in-memory storage
+- SubAgent (`pfc_explorer`, `pfc_diagnostic`): `persistent=False` → in-memory storage
 
 **Implementation**:
 - Tool: `backend/infrastructure/mcp/tools/agent/invoke_agent.py`
-- Config: `backend/domain/models/agent_profiles.py` (`PFC_EXPLORER`, `SUBAGENT_PFC_EXPLORER_TOOLS`)
-- Prompt: `backend/config/prompts/pfc_explorer.md`
+- Config: `backend/domain/models/agent_profiles.py` (`PFC_EXPLORER`, `PFC_DIAGNOSTIC`, `SUBAGENT_*_TOOLS`)
+- Prompts: `backend/config/prompts/pfc_explorer.md`, `backend/config/prompts/pfc_diagnostic.md`
 
 ### MCP Tool System
 
@@ -151,7 +154,7 @@ class ToolResult:
 | `builtin/` | web_search | Internet search |
 | `coding/` | write, read, edit, bash, glob, grep, etc. | Development tools |
 | `lifestyle/` | email, calendar, contacts, location, time, etc. | Productivity tools |
-| `pfc/` | pfc_query_command, pfc_query_python_api, pfc_execute_task, pfc_check_task_status, pfc_list_tasks | PFC simulation control (script-only workflow) |
+| `pfc/` | pfc_query_command, pfc_query_python_api, pfc_execute_task, pfc_check_task_status, pfc_list_tasks, pfc_capture_plot | PFC simulation control and diagnostics |
 
 **Benefits**:
 - Explicit schema for automatic documentation
@@ -179,6 +182,7 @@ Query Tools      Small-Scale Test   Full Simulation
 - **Main Thread Executor**: Queue-based execution ensuring thread safety (`pfc-server/server/main_thread_executor.py`)
 - **Task Manager**: Non-blocking lifecycle tracking (`pfc-server/server/task_manager.py:19`)
 - **Script Executor**: Real-time output capture for progress monitoring (`pfc-server/server/script_executor.py:28`)
+- **Diagnostic Executor**: Callback-based execution for non-blocking diagnostics during simulation cycles (`pfc-server/server/diagnostic_executor.py`)
 - **Documentation System**: Command syntax + Python usage examples (`backend/infrastructure/pfc/commands/`)
 
 **PFC Tools Workflow (Script-Only)**:
@@ -346,7 +350,8 @@ toyoura-nagisa/
 │   │   └── tts/                   # Text-to-speech engines
 │   ├── config/                     # Configuration management
 │   │   └── prompts/               # Agent system prompts
-│   │       └── pfc_explorer.md    # SubAgent prompt template
+│   │       ├── pfc_explorer.md    # PFC Explorer SubAgent prompt
+│   │       └── pfc_diagnostic.md  # PFC Diagnostic SubAgent prompt
 │   ├── shared/                     # Common utilities and exceptions
 │   │   ├── memory_db/                  # ChromaDB persistence
 │   │   └── workspace/                  # Development workspace
@@ -370,7 +375,8 @@ toyoura-nagisa/
 │       │   ├── executor.py            # Command executor + task classification
 │       │   ├── script_executor.py     # Script execution with output capture
 │       │   ├── main_thread_executor.py # Queue-based main thread execution
-│       │   └── task_manager.py        # Long-running task tracking
+│       │   ├── task_manager.py        # Long-running task tracking
+│       │   └── diagnostic_executor.py # Non-blocking diagnostic script execution
 │       ├── examples/                  # Example PFC projects
 │       │   ├── scripts/               # Example simulation scripts
 │       │   └── test_scripts/          # Test scripts
