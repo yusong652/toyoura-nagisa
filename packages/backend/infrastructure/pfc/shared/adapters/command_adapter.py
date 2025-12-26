@@ -1,20 +1,20 @@
 """Command document adapter for PFC search system.
 
-This module converts PFC command documentation from the CommandLoader format
+This module converts PFC command documentation from the DocLoader format
 into unified SearchDocument models for search.
 
 Note: Model properties are handled separately via pfc_browse_reference tool.
 """
 
 from typing import List, Optional
-from backend.infrastructure.pfc.commands.loader import CommandLoader
+from backend.infrastructure.pfc.commands.loader import DocLoader
 from backend.infrastructure.pfc.shared.models.document import SearchDocument, DocumentType
 
 
 class CommandDocumentAdapter:
     """Adapter for PFC command documentation.
 
-    Converts command data from CommandLoader into unified SearchDocument format.
+    Converts command data from DocLoader into unified SearchDocument format.
     This enables:
     - Consistent interface for search engines
     - Separation of data loading and search logic
@@ -43,14 +43,14 @@ class CommandDocumentAdapter:
             <DocumentType.COMMAND: 'command'>
         """
         documents = []
-        all_commands = CommandLoader.get_all_commands()
+        all_commands = DocLoader.get_all_commands()
 
         for cmd_meta in all_commands:
             category = cmd_meta["category"]
             cmd_name = cmd_meta["name"]
 
             # Load full command documentation
-            cmd_doc = CommandLoader.load_command_doc(category, cmd_name)
+            cmd_doc = DocLoader.load_command_doc(category, cmd_name)
             if not cmd_doc:
                 continue
 
@@ -96,7 +96,7 @@ class CommandDocumentAdapter:
             return None
 
         category, cmd_name = doc_id.split(" ", 1)
-        cmd_doc = CommandLoader.load_command_doc(category, cmd_name)
+        cmd_doc = DocLoader.load_command_doc(category, cmd_name)
 
         if not cmd_doc:
             return None

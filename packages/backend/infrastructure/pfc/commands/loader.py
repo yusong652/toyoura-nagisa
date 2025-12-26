@@ -18,11 +18,12 @@ import json
 from backend.infrastructure.pfc.config import PFC_COMMAND_DOCS_ROOT, PFC_CONTACT_MODELS_ROOT, PFC_REFERENCES_ROOT
 
 
-class CommandLoader:
-    """Loads and caches PFC command documentation data.
+class DocLoader:
+    """Loads and caches PFC documentation data.
 
-    This class provides static methods for loading command docs and model
-    properties. All methods use caching to avoid repeated file I/O.
+    This class provides static methods for loading command docs, model
+    properties, and reference documentation. All methods use caching
+    to avoid repeated file I/O.
     """
 
     @staticmethod
@@ -43,7 +44,7 @@ class CommandLoader:
             FileNotFoundError: If index.json doesn't exist
 
         Example:
-            >>> index = CommandLoader.load_index()
+            >>> index = DocLoader.load_index()
             >>> categories = index["categories"]
             >>> len(categories)
             7
@@ -79,13 +80,13 @@ class CommandLoader:
             Returns None if command not found.
 
         Example:
-            >>> doc = CommandLoader.load_command_doc("ball", "create")
+            >>> doc = DocLoader.load_command_doc("ball", "create")
             >>> doc["syntax"]
             "ball create <keyword> ..."
             >>> "description" in doc
             True
         """
-        index = CommandLoader.load_index()
+        index = DocLoader.load_index()
 
         # Find command file path from index
         categories = index.get("categories", {})
@@ -127,7 +128,7 @@ class CommandLoader:
                 - related_documentation: Links to command docs
 
         Example:
-            >>> index = CommandLoader.load_model_properties_index()
+            >>> index = DocLoader.load_model_properties_index()
             >>> models = index["models"]
             >>> len(models)
             5
@@ -161,7 +162,7 @@ class CommandLoader:
             Returns None if model not found.
 
         Example:
-            >>> doc = CommandLoader.load_model_property_doc("linear")
+            >>> doc = DocLoader.load_model_property_doc("linear")
             >>> doc["full_name"]
             "Linear Model"
             >>> len(doc["property_groups"])
@@ -169,7 +170,7 @@ class CommandLoader:
             >>> doc["property_groups"][0]["properties"][0]["keyword"]
             'kn'
         """
-        index = CommandLoader.load_model_properties_index()
+        index = DocLoader.load_model_properties_index()
         if not index:
             return None
 
@@ -206,13 +207,13 @@ class CommandLoader:
                 - python_available: Python SDK availability
 
         Example:
-            >>> commands = CommandLoader.get_all_commands()
+            >>> commands = DocLoader.get_all_commands()
             >>> len(commands)
             115  # Total across all 7 categories
             >>> commands[0]["category"] in ["ball", "wall", "clump", ...]
             True
         """
-        index = CommandLoader.load_index()
+        index = DocLoader.load_index()
         categories = index.get("categories", {})
 
         all_commands = []
@@ -239,13 +240,13 @@ class CommandLoader:
                 - priority: Importance ("high", "medium")
 
         Example:
-            >>> models = CommandLoader.get_all_model_properties()
+            >>> models = DocLoader.get_all_model_properties()
             >>> len(models)
             5  # linear, linearcbond, linearpbond, hertz, rrlinear
             >>> [m["name"] for m in models]
             ['linear', 'linearcbond', 'linearpbond', 'hertz', 'rrlinear']
         """
-        index = CommandLoader.load_model_properties_index()
+        index = DocLoader.load_model_properties_index()
         return index.get("models", [])
 
     @staticmethod
@@ -260,7 +261,7 @@ class CommandLoader:
                 - notes: Usage notes
 
         Example:
-            >>> index = CommandLoader.load_references_index()
+            >>> index = DocLoader.load_references_index()
             >>> categories = index["categories"]
             >>> "contact-models" in categories
             True
@@ -283,14 +284,14 @@ class CommandLoader:
             Category index dict or None if not found
 
         Example:
-            >>> index = CommandLoader.load_reference_category_index("contact-models")
+            >>> index = DocLoader.load_reference_category_index("contact-models")
             >>> len(index["models"])
             5
-            >>> index = CommandLoader.load_reference_category_index("range-elements")
+            >>> index = DocLoader.load_reference_category_index("range-elements")
             >>> len(index["elements"])
             24
         """
-        refs_index = CommandLoader.load_references_index()
+        refs_index = DocLoader.load_references_index()
         categories = refs_index.get("categories", {})
 
         if category not in categories:
@@ -323,14 +324,14 @@ class CommandLoader:
             Item documentation dict or None if not found
 
         Example:
-            >>> doc = CommandLoader.load_reference_item_doc("contact-models", "linear")
+            >>> doc = DocLoader.load_reference_item_doc("contact-models", "linear")
             >>> doc["full_name"]
             "Linear Model"
-            >>> doc = CommandLoader.load_reference_item_doc("range-elements", "cylinder")
+            >>> doc = DocLoader.load_reference_item_doc("range-elements", "cylinder")
             >>> doc["name"]
             "cylinder"
         """
-        refs_index = CommandLoader.load_references_index()
+        refs_index = DocLoader.load_references_index()
         categories = refs_index.get("categories", {})
 
         if category not in categories:
@@ -358,14 +359,14 @@ class CommandLoader:
             List of item metadata dicts
 
         Example:
-            >>> items = CommandLoader.get_reference_item_list("contact-models")
+            >>> items = DocLoader.get_reference_item_list("contact-models")
             >>> len(items)
             5
-            >>> items = CommandLoader.get_reference_item_list("range-elements")
+            >>> items = DocLoader.get_reference_item_list("range-elements")
             >>> len(items)
             24
         """
-        index = CommandLoader.load_reference_category_index(category)
+        index = DocLoader.load_reference_category_index(category)
         if not index:
             return []
 
@@ -383,6 +384,6 @@ class CommandLoader:
 
         Useful for testing or when documentation files are updated.
         """
-        CommandLoader.load_index.cache_clear()
-        CommandLoader.load_model_properties_index.cache_clear()
-        CommandLoader.load_references_index.cache_clear()
+        DocLoader.load_index.cache_clear()
+        DocLoader.load_model_properties_index.cache_clear()
+        DocLoader.load_references_index.cache_clear()

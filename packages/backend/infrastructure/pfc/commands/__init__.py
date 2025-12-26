@@ -1,11 +1,12 @@
 """PFC Command Documentation Query System.
 
 This module provides command documentation loading and formatting capabilities
-for PFC commands, including integrated contact model properties support.
+for PFC commands and reference documentation.
 
 Components:
-    - CommandLoader: Load command docs and model properties from JSON files
+    - DocLoader: Load command docs, model properties, and references from JSON files
     - CommandFormatter: Format command documentation as markdown
+    - ReferenceFormatter: Format reference documentation (contact models, range elements)
 
 Data Models:
     - CommandSearchResult: Search result with score and metadata
@@ -16,8 +17,9 @@ Note:
     - backend.infrastructure.pfc.shared.query.CommandSearch (BM25-based search)
 """
 
-from backend.infrastructure.pfc.commands.loader import CommandLoader
-from backend.infrastructure.pfc.commands.formatter import CommandFormatter
+from backend.infrastructure.pfc.commands.loader import DocLoader
+from backend.infrastructure.pfc.commands.command_formatter import CommandFormatter
+from backend.infrastructure.pfc.commands.reference_formatter import ReferenceFormatter
 from backend.infrastructure.pfc.commands.models import (
     CommandSearchResult,
     DocumentType
@@ -25,8 +27,9 @@ from backend.infrastructure.pfc.commands.models import (
 
 __all__ = [
     # Core components
-    "CommandLoader",
+    "DocLoader",
     "CommandFormatter",
+    "ReferenceFormatter",
     # Data models
     "CommandSearchResult",
     "DocumentType"

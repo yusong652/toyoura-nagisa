@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 from fastmcp import FastMCP
 from pydantic import Field
 
-from backend.infrastructure.pfc.commands import CommandLoader, CommandFormatter
+from backend.infrastructure.pfc.commands import DocLoader, CommandFormatter
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.tools.pfc.utils import normalize_input
 
@@ -82,7 +82,7 @@ def register_pfc_browse_commands_tool(mcp: FastMCP):
 
 def _browse_root() -> Dict[str, Any]:
     """Level 0: Return overview of all command categories."""
-    index = CommandLoader.load_index()
+    index = DocLoader.load_index()
     categories = index.get("categories", {})
 
     # Build category summary
@@ -126,7 +126,7 @@ Contact Models: pfc_browse_reference(topic="contact-models") for model propertie
 
 def _browse_category(category: str) -> Dict[str, Any]:
     """Level 1: Return list of commands in a category."""
-    index = CommandLoader.load_index()
+    index = DocLoader.load_index()
     categories = index.get("categories", {})
 
     if category not in categories:
@@ -244,11 +244,11 @@ Navigation:
 def _browse_command(category: str, command_name: str) -> Dict[str, Any]:
     """Level 2: Return full documentation for a specific command."""
     # Load command documentation
-    cmd_doc = CommandLoader.load_command_doc(category, command_name)
+    cmd_doc = DocLoader.load_command_doc(category, command_name)
 
     if not cmd_doc:
         # Try to provide helpful suggestions
-        index = CommandLoader.load_index()
+        index = DocLoader.load_index()
         categories = index.get("categories", {})
 
         if category not in categories:
