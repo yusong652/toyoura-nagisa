@@ -277,7 +277,7 @@ class CommandLoader:
         """Load index for a specific reference category.
 
         Args:
-            category: Category name (e.g., "contact-models")
+            category: Category name (e.g., "contact-models", "range-elements")
 
         Returns:
             Category index dict or None if not found
@@ -286,6 +286,9 @@ class CommandLoader:
             >>> index = CommandLoader.load_reference_category_index("contact-models")
             >>> len(index["models"])
             5
+            >>> index = CommandLoader.load_reference_category_index("range-elements")
+            >>> len(index["elements"])
+            24
         """
         refs_index = CommandLoader.load_references_index()
         categories = refs_index.get("categories", {})
@@ -304,6 +307,75 @@ class CommandLoader:
 
         with open(index_path, 'r', encoding='utf-8') as f:
             return json.load(f)
+
+    @staticmethod
+    def load_reference_item_doc(category: str, item_name: str) -> Optional[Dict[str, Any]]:
+        """Load documentation for a specific reference item (unified API).
+
+        This is a unified method for loading any reference item, whether it's
+        a contact model or a range element.
+
+        Args:
+            category: Category name (e.g., "contact-models", "range-elements")
+            item_name: Item name (e.g., "linear", "cylinder", "group")
+
+        Returns:
+            Item documentation dict or None if not found
+
+        Example:
+            >>> doc = CommandLoader.load_reference_item_doc("contact-models", "linear")
+            >>> doc["full_name"]
+            "Linear Model"
+            >>> doc = CommandLoader.load_reference_item_doc("range-elements", "cylinder")
+            >>> doc["name"]
+            "cylinder"
+        """
+        refs_index = CommandLoader.load_references_index()
+        categories = refs_index.get("categories", {})
+
+        if category not in categories:
+            return None
+
+        cat_data = categories[category]
+        directory = cat_data.get("directory", category)
+
+        # Try loading the item file directly
+        doc_path = PFC_REFERENCES_ROOT / directory / f"{item_name}.json"
+        if not doc_path.exists():
+            return None
+
+        with open(doc_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+    @staticmethod
+    def get_reference_item_list(category: str) -> List[Dict[str, Any]]:
+        """Get list of items in a reference category.
+
+        Args:
+            category: Category name (e.g., "contact-models", "range-elements")
+
+        Returns:
+            List of item metadata dicts
+
+        Example:
+            >>> items = CommandLoader.get_reference_item_list("contact-models")
+            >>> len(items)
+            5
+            >>> items = CommandLoader.get_reference_item_list("range-elements")
+            >>> len(items)
+            24
+        """
+        index = CommandLoader.load_reference_category_index(category)
+        if not index:
+            return []
+
+        # contact-models uses "models" key, range-elements uses "elements" key
+        if "models" in index:
+            return index["models"]
+        elif "elements" in index:
+            return index["elements"]
+        else:
+            return []
 
     @staticmethod
     def clear_cache():

@@ -1,0 +1,45 @@
+{
+  "name": "group",
+  "category": "attribute",
+  "category_name": "Attribute Elements",
+  "syntax": "group <name> [slot <s>] [and <name>] [or <name>] [only]",
+  "alt_syntax": "group 'slot=name'",
+  "description": "Select by group membership. Supports slot specification and logical combinations.",
+  "parameters": [
+    {
+      "name": "name",
+      "type": "string",
+      "description": "Group name"
+    },
+    {
+      "name": "slot",
+      "type": "string",
+      "description": "Slot name (default slot if omitted)"
+    },
+    {
+      "name": "and",
+      "type": "string",
+      "description": "Additional required group"
+    },
+    {
+      "name": "or",
+      "type": "string",
+      "description": "Alternative group"
+    },
+    {
+      "name": "only",
+      "type": "flag",
+      "description": "Must match specified groups exclusively"
+    }
+  ],
+  "examples": [
+    "range group 'sample'",
+    "range group 'layer1' slot 'geology'",
+    "range group 'top' and 'active'",
+    "range group 'soft' or 'damaged'"
+  ],
+  "search_keywords": [
+    "group",
+    "group"
+  ]
+}
