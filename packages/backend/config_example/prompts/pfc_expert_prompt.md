@@ -134,7 +134,13 @@ itasca.command('model large-strain on')               # REQUIRED for strain calc
 # 3. Contact model (before contacts form)
 itasca.command('contact cmat default model linear property kn 1e8 ks 1e8 fric 0.5')
 
-# 4. Now safe to create geometry, run cycles, etc.
+# 4. Create geometry
+itasca.command('ball generate number 100 radius 0.1')
+
+# 5. Set density (AFTER geometry, BEFORE dynamics)
+itasca.command('ball attribute density 2650')  # Or: ball.set_density(2650)
+
+# 6. Now safe to run cycles, apply forces, etc.
 ```
 
 | Command | Required | Note |
@@ -143,6 +149,7 @@ itasca.command('contact cmat default model linear property kn 1e8 ks 1e8 fric 0.
 | `model domain extent` | Yes | Define before creating balls |
 | `model large-strain on` | Yes | Enables proper strain calculations |
 | `contact cmat default` | Yes | Without CMAT, contacts use null model (no forces) |
+| `ball attribute density` | Yes | **AFTER geometry creation** - required for dynamics |
 
 **Documentation references**: `pfc_browse_commands(command="contact cmat")`, `pfc_browse_contact_models()`
 
