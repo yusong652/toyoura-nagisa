@@ -439,6 +439,45 @@ This pattern prevents:
 
 **Implementation**: `pfc-server/server/task_manager.py:19`
 
+### User Interaction Commands
+
+The CLI supports direct command execution with automatic context injection for intent awareness:
+
+**Shell Command (`!` prefix)**
+```bash
+! git status          # Execute bash command
+! ls -la              # Results become LLM context
+```
+- **API**: `POST /api/shell/execute`
+- **Context**: Command + stdout/stderr injected as `<bash-input>`, `<bash-stdout>`, `<bash-stderr>` tags
+- **State**: Working directory (`cwd`) persisted per session
+- **Implementation**: `backend/presentation/api/shell.py`
+
+**PFC Console Command (`>` prefix)**
+```python
+> print(itasca.ball.count())     # Execute in PFC Python environment
+> itasca.command("model save")   # Results become LLM context
+```
+- **API**: `POST /api/pfc/console/execute`
+- **Context**: Code + output injected as `<pfc-python>` tags with `<input>`, `<task_id>`, `<output>`, `<error>`
+- **Traceability**: Code saved to `workspace/.quick_console/` as timestamped scripts
+- **Requires**: PFC server running (WebSocket port 9001)
+- **Implementation**: `backend/presentation/api/pfc_console.py`
+
+**Intent Awareness Architecture**
+
+Both commands enable the agent to "see" user operations without explicit explanation:
+1. User executes `! git diff` or `> ball.count()`
+2. Command + results captured by status monitor
+3. Context injected into next LLM prompt as system-reminder
+4. Agent understands user's current focus and can respond accordingly
+
+**Key Files**:
+- Parsing: `packages/cli/src/ui/components/InputPrompt.tsx`
+- Shell Hook: `packages/cli/src/ui/hooks/useShellCommand.ts`
+- PFC Hook: `packages/cli/src/ui/hooks/usePfcConsoleCommand.ts`
+- Monitors: `backend/infrastructure/monitoring/monitors/user_bash_monitor.py`, `user_pfc_python_monitor.py`
+
 ## Testing
 
 ### Backend Testing
