@@ -22,6 +22,22 @@ class CommandFormatter:
     """
 
     @staticmethod
+    def format_with_error(error_msg: str, fallback_content: str) -> str:
+        """Prepend error message to fallback content.
+
+        Used when a requested path doesn't exist but we can show the parent level.
+        Format matches pfc_browse_python_api for consistency.
+
+        Args:
+            error_msg: Error message describing what wasn't found
+            fallback_content: Content from parent level to display
+
+        Returns:
+            Formatted markdown with error notice and fallback content
+        """
+        return f"Error: {error_msg}\n\n{fallback_content}"
+
+    @staticmethod
     def format_root(categories: Dict[str, Any]) -> str:
         """Format command categories overview as markdown.
 
@@ -114,52 +130,6 @@ class CommandFormatter:
 
         if related:
             parts.append(f"Related: {', '.join(related)}")
-
-        return "\n".join(parts)
-
-    @staticmethod
-    def format_subcommand_group(
-        category: str, group_name: str, commands: List[Dict[str, Any]]
-    ) -> str:
-        """Format subcommand group list as markdown.
-
-        Args:
-            category: Category name
-            group_name: Subcommand group prefix (e.g., "cmat")
-            commands: List of commands in the group
-
-        Returns:
-            Formatted markdown string
-        """
-        parts = []
-
-        parts.append(f"## {category} {group_name} ({len(commands)} subcommands)")
-        parts.append("")
-
-        for cmd in commands:
-            name = cmd.get("name", "")
-            subcommand = name[len(group_name) + 1:] if name.startswith(group_name + " ") else name
-
-            python_avail = cmd.get("python_available", False)
-            if python_avail is True:
-                python_mark = "[py]"
-            elif python_avail == "partial":
-                python_mark = "[py:partial]"
-            else:
-                python_mark = ""
-
-            short_desc = cmd.get("short_description", "")
-            if len(short_desc) > 45:
-                short_desc = short_desc[:42] + "..."
-
-            parts.append(f"- {subcommand}{' ' + python_mark if python_mark else ''}: {short_desc}")
-
-        parts.append("")
-        parts.append("[py] = Python SDK available, [py:partial] = partial support")
-        parts.append("")
-        parts.append("Navigation:")
-        parts.append(f'- pfc_browse_commands(command="{category} {group_name} <subcommand>") for full doc')
-        parts.append(f'- pfc_browse_commands(command="{category}") for all {category} commands')
 
         return "\n".join(parts)
 

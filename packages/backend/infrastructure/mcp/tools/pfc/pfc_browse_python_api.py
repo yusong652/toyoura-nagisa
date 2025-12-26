@@ -307,8 +307,17 @@ def _browse_function(module_path: str, func_name: str) -> Dict[str, Any]:
     func_doc = APILoader.load_function(index_key, func_name)
 
     if not func_doc:
-        # Fallback to module level
-        return _browse_module_with_error(module_path, f"Function '{func_name}' not found in {module_path}")
+        # Fallback to module level with error status
+        error_msg = f"Function '{func_name}' not found in {module_path}"
+        module_data = APILoader.load_module(index_key)
+        if module_data:
+            module_content = APIFormatter.format_module(module_path, module_data)
+            fallback_content = APIFormatter.format_with_error(error_msg, module_content)
+            return error_response(
+                error_msg,
+                llm_content={"parts": [{"type": "text", "text": fallback_content}]}
+            )
+        return error_response(error_msg)
 
     content = APIFormatter.format_function(func_doc, module_path)
 
@@ -381,11 +390,17 @@ def _browse_method(module_path: str, object_name: str, method_name: str, display
     shown_name = display_name or object_name
 
     if not method_doc:
-        # Fallback to object level
-        return _browse_object_with_error(
-            module_path, object_name,
-            f"Method '{method_name}' not found in {shown_name}"
-        )
+        # Fallback to object level with error status
+        error_msg = f"Method '{method_name}' not found in {shown_name}"
+        object_doc = APILoader.load_object(object_name)
+        if object_doc:
+            object_content = APIFormatter.format_object(module_path, object_name, object_doc, display_name)
+            fallback_content = APIFormatter.format_with_error(error_msg, object_content)
+            return error_response(
+                error_msg,
+                llm_content={"parts": [{"type": "text", "text": fallback_content}]}
+            )
+        return error_response(error_msg)
 
     # Pass both shown_name (for display) and object_name (for component detection)
     content = APIFormatter.format_method(method_doc, shown_name, actual_object_name=object_name)
@@ -413,61 +428,60 @@ Navigation:
 
 
 def _browse_with_fallback(parsed: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle error case by falling back to parent level."""
+    """Handle error case by falling back to parent level with error status."""
     error_msg = parsed.get("error", "Unknown error")
     fallback_path = parsed.get("fallback_path", "")
 
+    # Determine fallback content using formatter
     if not fallback_path:
         # Fall back to root
-        result = _browse_root()
-        # Prepend error message
-        if result.get("status") == "success":
-            llm_content = result.get("llm_content", {})
-            parts = llm_content.get("parts", [])
-            if parts:
-                parts[0]["text"] = f"Error: {error_msg}\n\n{parts[0]['text']}"
-        return result
+        index = APILoader.load_index()
+        modules = index.get("modules", {})
+        objects = index.get("objects", {})
+        fallback_content_raw = APIFormatter.format_root(modules, objects)
     else:
         # Try to browse fallback path
         normalized = _normalize_api_path(fallback_path)
         if not normalized or normalized == "itasca":
-            result = _browse_root()
+            index = APILoader.load_index()
+            modules = index.get("modules", {})
+            objects = index.get("objects", {})
+            fallback_content_raw = APIFormatter.format_root(modules, objects)
         else:
-            # Re-parse and browse
+            # Re-parse and get content
             re_parsed = _parse_api_path(normalized)
             if re_parsed["type"] == "module":
-                result = _browse_module(re_parsed["module_path"])
+                index_key = _path_to_index_key(re_parsed["module_path"])
+                module_data = APILoader.load_module(index_key)
+                if module_data:
+                    fallback_content_raw = APIFormatter.format_module(re_parsed["module_path"], module_data)
+                else:
+                    # Module not found, fall back to root
+                    index = APILoader.load_index()
+                    modules = index.get("modules", {})
+                    objects = index.get("objects", {})
+                    fallback_content_raw = APIFormatter.format_root(modules, objects)
             elif re_parsed["type"] == "object":
-                result = _browse_object(re_parsed["module_path"], re_parsed["name"])
+                object_doc = APILoader.load_object(re_parsed["name"])
+                if object_doc:
+                    fallback_content_raw = APIFormatter.format_object(
+                        re_parsed["module_path"], re_parsed["name"], object_doc
+                    )
+                else:
+                    # Object not found, fall back to root
+                    index = APILoader.load_index()
+                    modules = index.get("modules", {})
+                    objects = index.get("objects", {})
+                    fallback_content_raw = APIFormatter.format_root(modules, objects)
             else:
-                result = _browse_root()
+                index = APILoader.load_index()
+                modules = index.get("modules", {})
+                objects = index.get("objects", {})
+                fallback_content_raw = APIFormatter.format_root(modules, objects)
 
-        # Prepend error message
-        if result.get("status") == "success":
-            llm_content = result.get("llm_content", {})
-            parts = llm_content.get("parts", [])
-            if parts:
-                parts[0]["text"] = f"Error: {error_msg}\n\n{parts[0]['text']}"
-        return result
-
-
-def _browse_module_with_error(module_path: str, error_msg: str) -> Dict[str, Any]:
-    """Browse module with error message prepended."""
-    result = _browse_module(module_path)
-    if result.get("status") == "success":
-        llm_content = result.get("llm_content", {})
-        parts = llm_content.get("parts", [])
-        if parts:
-            parts[0]["text"] = f"Error: {error_msg}\n\n{parts[0]['text']}"
-    return result
-
-
-def _browse_object_with_error(module_path: str, object_name: str, error_msg: str) -> Dict[str, Any]:
-    """Browse object with error message prepended."""
-    result = _browse_object(module_path, object_name)
-    if result.get("status") == "success":
-        llm_content = result.get("llm_content", {})
-        parts = llm_content.get("parts", [])
-        if parts:
-            parts[0]["text"] = f"Error: {error_msg}\n\n{parts[0]['text']}"
-    return result
+    # Format with error and return error response
+    fallback_content = APIFormatter.format_with_error(error_msg, fallback_content_raw)
+    return error_response(
+        error_msg,
+        llm_content={"parts": [{"type": "text", "text": fallback_content}]}
+    )

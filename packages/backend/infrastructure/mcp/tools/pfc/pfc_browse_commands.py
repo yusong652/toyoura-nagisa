@@ -108,8 +108,13 @@ def _browse_category(category: str) -> Dict[str, Any]:
 
     if category not in categories:
         available = ", ".join(categories.keys())
+        error_msg = f"Category '{category}' not found. Available: {available}"
+        # Fallback to root with complete content
+        root_content = CommandFormatter.format_root(categories)
+        fallback_content = CommandFormatter.format_with_error(error_msg, root_content)
         return error_response(
-            f"Category '{category}' not found. Available: {available}"
+            error_msg,
+            llm_content={"parts": [{"type": "text", "text": fallback_content}]}
         )
 
     cat_data = categories[category]
@@ -130,23 +135,6 @@ def _browse_category(category: str) -> Dict[str, Any]:
     )
 
 
-def _browse_subcommand_group(category: str, group_name: str, commands: list) -> Dict[str, Any]:
-    """Level 1.5: Return list of subcommands in a group (e.g., 'cmat' subcommands)."""
-    content = CommandFormatter.format_subcommand_group(category, group_name, commands)
-
-    return success_response(
-        message=f"{category} {group_name}: {len(commands)} subcommands",
-        llm_content={"parts": [{"type": "text", "text": content}]},
-        data={
-            "level": "subcommand_group",
-            "category": category,
-            "group": group_name,
-            "command_count": len(commands),
-            "commands": [cmd.get("name") for cmd in commands]
-        }
-    )
-
-
 def _browse_command(category: str, command_name: str) -> Dict[str, Any]:
     """Level 2: Return full documentation for a specific command."""
     # Load command documentation
@@ -159,23 +147,29 @@ def _browse_command(category: str, command_name: str) -> Dict[str, Any]:
 
         if category not in categories:
             available_cats = ", ".join(categories.keys())
+            error_msg = f"Category '{category}' not found. Available: {available_cats}"
+            # Fallback to root with complete content
+            root_content = CommandFormatter.format_root(categories)
+            fallback_content = CommandFormatter.format_with_error(error_msg, root_content)
             return error_response(
-                f"Category '{category}' not found. Available: {available_cats}"
+                error_msg,
+                llm_content={"parts": [{"type": "text", "text": fallback_content}]}
             )
 
         cat_data = categories[category]
         commands = cat_data.get("commands", [])
+
+        # Command not found - fallback to category with complete content
         available_cmds = [cmd.get("name") for cmd in commands]
-
-        # Check if command_name is a subcommand prefix (e.g., "cmat" matches "cmat add", "cmat apply")
-        matching_commands = [cmd for cmd in commands if cmd.get("name", "").startswith(command_name + " ")]
-        if matching_commands:
-            # Treat as subcommand group browsing (like category browsing)
-            return _browse_subcommand_group(category, command_name, matching_commands)
-
-        return error_response(
+        error_msg = (
             f"Command '{command_name}' not found in '{category}'. "
             f"Available: {', '.join(available_cmds[:10])}{'...' if len(available_cmds) > 10 else ''}"
+        )
+        category_content = CommandFormatter.format_category(category, cat_data)
+        fallback_content = CommandFormatter.format_with_error(error_msg, category_content)
+        return error_response(
+            error_msg,
+            llm_content={"parts": [{"type": "text", "text": fallback_content}]}
         )
 
     # Format the documentation

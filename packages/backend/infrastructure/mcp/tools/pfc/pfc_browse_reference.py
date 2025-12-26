@@ -107,8 +107,13 @@ def _browse_category(category: str) -> Dict[str, Any]:
 
     if category not in categories:
         available = ", ".join(categories.keys())
+        error_msg = f"Category '{category}' not found. Available: {available}"
+        # Fallback to root with complete content
+        root_content = ReferenceFormatter.format_root(categories)
+        fallback_content = ReferenceFormatter.format_with_error(error_msg, root_content)
         return error_response(
-            f"Category '{category}' not found. Available: {available}"
+            error_msg,
+            llm_content={"parts": [{"type": "text", "text": fallback_content}]}
         )
 
     # Category already validated above, loader will return valid index
@@ -141,9 +146,27 @@ def _browse_item(category: str, item: str) -> Dict[str, Any]:
         # Get available items for error message
         items = ReferenceLoader.get_item_list(category)
         available = [i.get("name", "") for i in items]
-        return error_response(
-            f"Item '{item}' not found in '{category}'. Available: {', '.join(available[:15])}{'...' if len(available) > 15 else ''}"
-        )
+        error_msg = f"Item '{item}' not found in '{category}'. Available: {', '.join(available[:15])}{'...' if len(available) > 15 else ''}"
+
+        # Fallback to category with complete content
+        cat_index = ReferenceLoader.load_category_index(category)
+        if cat_index:
+            category_content = ReferenceFormatter.format_index(category, cat_index)
+            fallback_content = ReferenceFormatter.format_with_error(error_msg, category_content)
+            return error_response(
+                error_msg,
+                llm_content={"parts": [{"type": "text", "text": fallback_content}]}
+            )
+        else:
+            # Category doesn't exist either, fallback to root
+            refs_index = ReferenceLoader.load_index()
+            categories = refs_index.get("categories", {})
+            root_content = ReferenceFormatter.format_root(categories)
+            fallback_content = ReferenceFormatter.format_with_error(error_msg, root_content)
+            return error_response(
+                error_msg,
+                llm_content={"parts": [{"type": "text", "text": fallback_content}]}
+            )
 
     # Use unified formatter based on category
     if category == "contact-models":

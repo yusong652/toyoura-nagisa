@@ -20,6 +20,22 @@ class ReferenceFormatter:
     """
 
     @staticmethod
+    def format_with_error(error_msg: str, fallback_content: str) -> str:
+        """Prepend error message to fallback content.
+
+        Used when a requested path doesn't exist but we can show the parent level.
+        Format matches pfc_browse_python_api for consistency.
+
+        Args:
+            error_msg: Error message describing what wasn't found
+            fallback_content: Content from parent level to display
+
+        Returns:
+            Formatted markdown with error notice and fallback content
+        """
+        return f"Error: {error_msg}\n\n{fallback_content}"
+
+    @staticmethod
     def format_root(categories: Dict[str, Any]) -> str:
         """Format reference categories overview as markdown.
 

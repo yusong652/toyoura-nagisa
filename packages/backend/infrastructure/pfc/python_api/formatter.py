@@ -22,6 +22,21 @@ class APIDocFormatter:
     """
 
     @staticmethod
+    def format_with_error(error_msg: str, fallback_content: str) -> str:
+        """Prepend error message to fallback content.
+
+        Used when a requested path doesn't exist but we can show the parent level.
+
+        Args:
+            error_msg: Error message describing what wasn't found
+            fallback_content: Content from parent level to display
+
+        Returns:
+            Formatted markdown with error notice and fallback content
+        """
+        return f"Error: {error_msg}\n\n{fallback_content}"
+
+    @staticmethod
     def _index_key_to_path(index_key: str) -> str:
         """Convert index key to full path.
 
@@ -533,7 +548,7 @@ class APIDocFormatter:
         return api_name
 
     @staticmethod
-    def format_no_results_response(query: str, hints: List[str] = None) -> str:
+    def format_no_results_response(query: str, hints: Optional[List[str]] = None) -> str:
         """Format LLM content when no Python SDK API found.
 
         Args:
@@ -618,7 +633,7 @@ class APIDocFormatter:
         return "\n".join(lines)
 
     @staticmethod
-    def format_method(method_doc: Dict[str, Any], object_name: str, actual_object_name: str = None) -> str:
+    def format_method(method_doc: Dict[str, Any], object_name: str, actual_object_name: Optional[str] = None) -> str:
         """Format method documentation for browse tool.
 
         Args:
