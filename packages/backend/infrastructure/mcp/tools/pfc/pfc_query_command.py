@@ -42,7 +42,7 @@ def register_pfc_query_command_tool(mcp: FastMCP):
 
         Related tools:
         - pfc_browse_commands: Get full documentation for a known command path
-        - pfc_browse_contact_models: Browse contact model properties (linear, rrlinear, etc.)
+        - pfc_browse_reference: Browse reference docs (e.g., "contact-models linear")
         - pfc_query_python_api: Search Python SDK by keywords
         """
         try:

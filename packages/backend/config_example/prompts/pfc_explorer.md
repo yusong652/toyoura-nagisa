@@ -88,7 +88,7 @@ read("/full/path/from/glob/result.md")
 |------|-------|
 | `pfc_browse_commands` | `pfc_browse_commands(command="ball create")` - Full command documentation |
 | `pfc_browse_python_api` | `pfc_browse_python_api(api="itasca.ball.create")` - Full API documentation |
-| `pfc_browse_contact_models` | `pfc_browse_contact_models(model="linear")` - Contact model properties |
+| `pfc_browse_reference` | `pfc_browse_reference(topic="contact-models linear")` - Reference docs |
 
 **Query Tools** - Search when you have keywords:
 
@@ -115,7 +115,7 @@ pfc_browse_python_api()
 # → Returns: itasca, itasca.ball, itasca.wall, itasca.contact, ...
 
 # List all contact models
-pfc_browse_contact_models()
+pfc_browse_reference(topic="contact-models")
 # → Returns: linear, hertz, linearcbond, ...
 ```
 

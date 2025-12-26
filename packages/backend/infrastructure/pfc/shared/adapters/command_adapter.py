@@ -3,7 +3,7 @@
 This module converts PFC command documentation from the CommandLoader format
 into unified SearchDocument models for search.
 
-Note: Model properties are handled separately via pfc_browse_contact_models tool.
+Note: Model properties are handled separately via pfc_browse_reference tool.
 """
 
 from typing import List, Optional
@@ -19,7 +19,7 @@ class CommandDocumentAdapter:
     - Consistent interface for search engines
     - Separation of data loading and search logic
 
-    Note: For contact model properties, use pfc_browse_contact_models tool directly.
+    Note: For contact model properties, use pfc_browse_reference tool directly.
 
     Usage:
         >>> documents = CommandDocumentAdapter.load_commands()

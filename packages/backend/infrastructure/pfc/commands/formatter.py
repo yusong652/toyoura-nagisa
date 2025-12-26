@@ -381,7 +381,7 @@ class CommandFormatter:
 Suggestions:
 - Try simpler keywords (e.g., "ball create" instead of "how to create a ball")
 - Command categories: ball, wall, clump, contact, model, fragment, measure
-- For contact model properties: use pfc_browse_contact_models tool
+- For contact model properties: use pfc_browse_reference tool
 - For Python SDK: use pfc_query_python_api tool
 
 Common commands:

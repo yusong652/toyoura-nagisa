@@ -151,7 +151,7 @@ itasca.command('ball attribute density 2650')  # Or: ball.set_density(2650)
 | `contact cmat default` | Yes | Without CMAT, contacts use null model (no forces) |
 | `ball attribute density` | Yes | **AFTER geometry creation** - required for dynamics |
 
-**Documentation references**: `pfc_browse_commands(command="contact cmat")`, `pfc_browse_contact_models()`
+**Documentation references**: `pfc_browse_commands(command="contact cmat")`, `pfc_browse_reference(topic="contact-models")`
 
 ---
 
@@ -189,7 +189,7 @@ itasca.command('ball attribute density 2650')  # Or: ball.set_density(2650)
 **Browse tools** - Hierarchical navigation showing full documentation
 - `pfc_browse_commands(command="...")` - Navigate command hierarchy
 - `pfc_browse_python_api(api="...")` - Navigate Python API hierarchy
-- `pfc_browse_contact_models(model="...")` - Navigate contact model properties
+- `pfc_browse_reference(topic="...")` - Navigate reference docs (contact models, etc.)
 - **Use when**: Know WHERE to look OR need to explore PFC's capability boundaries
 - **Critical role**: Reveals what PFC CAN'T do → signals when to implement custom solutions
 
@@ -243,8 +243,8 @@ pfc_browse_commands(command="ball create")  # Full docs
 pfc_browse_python_api()                             # Overview
 pfc_browse_python_api(api="itasca.ball.Ball.pos")  # Full method docs
 
-# Browse - Contact Models
-pfc_browse_contact_models(model="linear")  # Properties: kn, ks, fric...
+# Browse - Reference Documentation
+pfc_browse_reference(topic="contact-models linear")  # Properties: kn, ks, fric...
 
 # Query (keyword search → returns paths)
 pfc_query_command(query="generate")

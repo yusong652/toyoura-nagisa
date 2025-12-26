@@ -49,7 +49,7 @@ def register_pfc_browse_commands_tool(mcp: FastMCP):
 
         Related tools:
         - pfc_query_command: Search commands by keywords (when path unknown)
-        - pfc_browse_contact_models: Browse contact model properties (kn, ks, fric)
+        - pfc_browse_reference: Browse reference docs (e.g., "contact-models linear")
         """
         try:
             # Normalize command input
@@ -117,7 +117,7 @@ Navigation:
 
 Search: pfc_query_command(query="...") for keyword search
 
-Contact Models: pfc_browse_contact_models() for model properties (kn, ks, fric)
+Contact Models: pfc_browse_reference(topic="contact-models") for model properties
 """
 
     return success_response(
@@ -172,7 +172,7 @@ def _browse_category(category: str) -> Dict[str, Any]:
     # Special note for contact category
     contact_note = ""
     if category == "contact":
-        contact_note = "\nContact Models: pfc_browse_contact_models() for model properties (kn, ks, fric)"
+        contact_note = '\nContact Models: pfc_browse_reference(topic="contact-models") for model properties'
 
     content = f"""## {full_name} ({len(commands)} commands)
 

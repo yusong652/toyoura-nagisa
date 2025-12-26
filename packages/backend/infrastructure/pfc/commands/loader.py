@@ -15,7 +15,7 @@ from functools import lru_cache
 from pathlib import Path
 import json
 
-from backend.infrastructure.pfc.config import PFC_COMMAND_DOCS_ROOT, PFC_CONTACT_MODELS_ROOT
+from backend.infrastructure.pfc.config import PFC_COMMAND_DOCS_ROOT, PFC_CONTACT_MODELS_ROOT, PFC_REFERENCES_ROOT
 
 
 class CommandLoader:
@@ -249,6 +249,63 @@ class CommandLoader:
         return index.get("models", [])
 
     @staticmethod
+    @lru_cache(maxsize=1)
+    def load_references_index() -> Dict[str, Any]:
+        """Load the main references index file.
+
+        Returns:
+            References index with:
+                - categories: Available reference categories
+                - navigation: Navigation hints
+                - notes: Usage notes
+
+        Example:
+            >>> index = CommandLoader.load_references_index()
+            >>> categories = index["categories"]
+            >>> "contact-models" in categories
+            True
+        """
+        index_path = PFC_REFERENCES_ROOT / "index.json"
+        if not index_path.exists():
+            return {}
+
+        with open(index_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+    @staticmethod
+    def load_reference_category_index(category: str) -> Optional[Dict[str, Any]]:
+        """Load index for a specific reference category.
+
+        Args:
+            category: Category name (e.g., "contact-models")
+
+        Returns:
+            Category index dict or None if not found
+
+        Example:
+            >>> index = CommandLoader.load_reference_category_index("contact-models")
+            >>> len(index["models"])
+            5
+        """
+        refs_index = CommandLoader.load_references_index()
+        categories = refs_index.get("categories", {})
+
+        if category not in categories:
+            return None
+
+        cat_data = categories[category]
+        index_file = cat_data.get("index_file")
+        if not index_file:
+            return None
+
+        index_path = PFC_REFERENCES_ROOT / index_file
+        if not index_path.exists():
+            return None
+
+        with open(index_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+    @staticmethod
     def clear_cache():
         """Clear all cached data.
 
@@ -256,3 +313,4 @@ class CommandLoader:
         """
         CommandLoader.load_index.cache_clear()
         CommandLoader.load_model_properties_index.cache_clear()
+        CommandLoader.load_references_index.cache_clear()

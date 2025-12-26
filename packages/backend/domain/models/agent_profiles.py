@@ -76,7 +76,7 @@ PFC_TOOLS: List[str] = [
     # PFC documentation - Browse (directory listing)
     "pfc_browse_commands",
     "pfc_browse_python_api",
-    "pfc_browse_contact_models",
+    "pfc_browse_reference",
     # PFC documentation - Query (detailed lookup)
     "pfc_query_python_api",
     "pfc_query_command",
@@ -106,7 +106,7 @@ SUBAGENT_PFC_EXPLORER_TOOLS: List[str] = [
     "pfc_browse_python_api",
     "pfc_query_python_api",
     "pfc_query_command",
-    "pfc_browse_contact_models",
+    "pfc_browse_reference",
     # Web search for external docs
     "web_search",
     # Task tracking (consistent with Claude Code Explore agent)
