@@ -36,11 +36,10 @@ def register_pfc_browse_reference_tool(mcp: FastMCP):
                 "- None or '': List all reference categories\n"
                 "- 'contact-models': List all contact models\n"
                 "- 'contact-models linear': Linear model properties\n"
-                "- 'range-elements': Range elements overview\n"
+                "- 'range-elements': Range elements overview (24 elements)\n"
                 "- 'range-elements position': Position range syntax\n"
                 "- 'range-elements cylinder': Cylinder range syntax\n"
-                "- 'range-elements group': Group range syntax\n"
-                "- 'range-elements range-phrase': Full reference (all elements)"
+                "- 'range-elements group': Group range syntax"
             )
         )
     ) -> Dict[str, Any]:
@@ -315,9 +314,6 @@ Browse specific element:
 - pfc_browse_reference(topic="range-elements position")
 - pfc_browse_reference(topic="range-elements cylinder")
 - pfc_browse_reference(topic="range-elements group")
-
-Full reference:
-- pfc_browse_reference(topic="range-elements range-phrase")
 """
 
     return success_response(
@@ -332,11 +328,10 @@ Full reference:
 
 
 def _browse_range_element_doc(element_name: str) -> Dict[str, Any]:
-    """Return documentation for a specific range element or full reference.
+    """Return documentation for a specific range element.
 
     Args:
-        element_name: Either 'range-phrase' for full doc, or element keyword
-                      like 'position', 'cylinder', 'group', etc.
+        element_name: Element keyword like 'position', 'cylinder', 'group', etc.
     """
     doc_path = PFC_REFERENCES_ROOT / "range-elements" / "range-phrase.json"
 
@@ -345,19 +340,6 @@ def _browse_range_element_doc(element_name: str) -> Dict[str, Any]:
 
     with open(doc_path, 'r', encoding='utf-8') as f:
         doc_data = json.load(f)
-
-    # If requesting full document
-    if element_name == "range-phrase":
-        content = _format_range_elements_doc(doc_data)
-        return success_response(
-            message=f"Range Elements: {doc_data.get('title', 'Range Phrase Reference')}",
-            llm_content={"parts": [{"type": "text", "text": content}]},
-            data={
-                "level": "item",
-                "category": "range-elements",
-                "item": "range-phrase"
-            }
-        )
 
     # Search for specific element in categories
     found_element = None
@@ -492,105 +474,5 @@ def _format_single_range_element(element: Dict[str, Any], category_name: str, do
     parts.append("---")
     parts.append("Navigation:")
     parts.append('- pfc_browse_reference(topic="range-elements") for overview')
-    parts.append('- pfc_browse_reference(topic="range-elements range-phrase") for full reference')
-
-    return "\n".join(parts)
-
-
-def _format_range_elements_doc(doc: Dict[str, Any]) -> str:
-    """Format range elements documentation as markdown."""
-    parts = []
-
-    # Header
-    title = doc.get("title", "Range Elements")
-    parts.append(f"# {title}")
-    parts.append("")
-
-    description = doc.get("description", "")
-    if description:
-        parts.append(description)
-        parts.append("")
-
-    # Usage pattern
-    usage = doc.get("usage_pattern", {})
-    if usage:
-        syntax = usage.get("syntax", "")
-        examples = usage.get("examples", [])
-        notes = usage.get("notes", [])
-
-        parts.append("## Usage Pattern")
-        if syntax:
-            parts.append(f"**Syntax**: `{syntax}`")
-            parts.append("")
-        if examples:
-            parts.append("**Examples**:")
-            parts.append("```")
-            for ex in examples:
-                parts.append(ex)
-            parts.append("```")
-            parts.append("")
-        if notes:
-            parts.append("**Notes**:")
-            for note in notes:
-                parts.append(f"- {note}")
-            parts.append("")
-
-    # Categories
-    categories = doc.get("categories", [])
-    for cat in categories:
-        cat_name = cat.get("name", "")
-        cat_desc = cat.get("description", "")
-        elements = cat.get("elements", [])
-
-        parts.append(f"## {cat_name}")
-        if cat_desc:
-            parts.append(f"*{cat_desc}*")
-            parts.append("")
-
-        for elem in elements:
-            elem_name = elem.get("name", "")
-            elem_syntax = elem.get("syntax", "")
-            alt_syntax = elem.get("alt_syntax", "")
-            elem_desc = elem.get("description", "")
-            elem_examples = elem.get("examples", [])
-            supports_extent = elem.get("supports_extent", False)
-
-            parts.append(f"### {elem_name}")
-            if elem_syntax:
-                parts.append(f"**Syntax**: `{elem_syntax}`")
-            if alt_syntax:
-                parts.append(f"**Alt**: `{alt_syntax}`")
-            if elem_desc:
-                parts.append(f"**Description**: {elem_desc}")
-            if supports_extent:
-                parts.append("*Supports `extent` modifier*")
-            if elem_examples:
-                parts.append("**Examples**:")
-                for ex in elem_examples:
-                    parts.append(f"- `{ex}`")
-            parts.append("")
-
-    # Common patterns
-    patterns = doc.get("common_patterns", [])
-    if patterns:
-        parts.append("## Common Patterns")
-        for pattern in patterns:
-            name = pattern.get("name", "")
-            example = pattern.get("example", "")
-            desc = pattern.get("description", "")
-            parts.append(f"### {name}")
-            if desc:
-                parts.append(desc)
-            if example:
-                parts.append("```")
-                parts.append(example)
-                parts.append("```")
-            parts.append("")
-
-    # Navigation footer
-    parts.append("---")
-    parts.append("Navigation:")
-    parts.append("- pfc_browse_reference(topic=\"range-elements\") for overview")
-    parts.append("- pfc_browse_reference() for all categories")
 
     return "\n".join(parts)
