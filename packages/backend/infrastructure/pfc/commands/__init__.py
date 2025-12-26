@@ -20,7 +20,7 @@ Note:
 """
 
 from backend.infrastructure.pfc.commands.loader import CommandLoader
-from backend.infrastructure.pfc.commands.command_formatter import CommandFormatter
+from backend.infrastructure.pfc.commands.formatter import CommandFormatter
 from backend.infrastructure.pfc.commands.models import (
     CommandSearchResult,
     DocumentType
