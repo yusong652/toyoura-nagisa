@@ -98,7 +98,6 @@ def register_pfc_browse_python_api_tool(mcp: FastMCP):
         except Exception as e:
             return error_response(f"Error browsing documentation: {str(e)}")
 
-    print("[DEBUG] Registered PFC Python API browse tool: pfc_browse_python_api")
 
 
 def _normalize_api_path(api: Optional[str]) -> str:
@@ -247,77 +246,19 @@ def _browse_root() -> Dict[str, Any]:
     modules = index.get("modules", {})
     objects = index.get("objects", {})
 
-    # Build modules list
-    module_lines = []
-    for key, data in modules.items():
-        full_path = _index_key_to_path(key)
-        func_count = len(data.get("functions", []))
-        desc = data.get("description", "")
-        if len(desc) > 50:
-            desc = desc[:47] + "..."
-        module_lines.append(f"- {full_path} ({func_count} funcs): {desc}")
+    content = APIFormatter.format_root(modules, objects)
 
-    # Build objects list
-    object_lines = []
+    # Count objects for message (Contact types expand to multiple)
+    object_count = 0
     for name, data in objects.items():
-        method_count = len(data.get("methods", data.get("method_groups", {}).keys()))
-        desc = data.get("description", "")
-        if len(desc) > 50:
-            desc = desc[:47] + "..."
-        # Find which module contains this object
-        file_path = data.get("file", "")
-        if "ball" in file_path:
-            obj_path = f"itasca.ball.{name}"
-        elif "clump/pebble" in file_path:
-            obj_path = f"itasca.clump.pebble.{name}"
-        elif "clump/template" in file_path:
-            obj_path = f"itasca.clump.template.{name}"
-        elif "clump" in file_path:
-            obj_path = f"itasca.clump.{name}"
-        elif "wall/facet" in file_path:
-            obj_path = f"itasca.wall.facet.{name}"
-        elif "wall/vertex" in file_path:
-            obj_path = f"itasca.wall.vertex.{name}"
-        elif "wall" in file_path:
-            obj_path = f"itasca.wall.{name}"
-        elif "measure" in file_path:
-            obj_path = f"itasca.measure.{name}"
-        else:
-            obj_path = name
-
-        # Handle Contact types - they are in itasca root namespace
         if name == "Contact":
-            # Contact is a base interface, actual types are BallBallContact, etc.
             contact_types = data.get("types", [])
-            if contact_types:
-                # Add each contact type as itasca.XxxContact
-                for ct in contact_types:
-                    object_lines.append(f"- itasca.{ct}: {desc}")
-                continue  # Skip the generic Contact entry
-            else:
-                obj_path = f"itasca.{name}"
-
-        object_lines.append(f"- {obj_path}: {desc}")
-
-    content = f"""## PFC Python SDK Documentation
-
-Modules ({len(modules)}):
-{chr(10).join(module_lines)}
-
-Objects ({len(object_lines)}):
-{chr(10).join(object_lines)}
-
-Navigation:
-- pfc_browse_python_api(api="itasca.ball") for module functions
-- pfc_browse_python_api(api="itasca.ball.Ball") for object methods
-- pfc_browse_python_api(api="itasca.ball.create") for function doc
-- pfc_browse_python_api(api="itasca.ball.Ball.pos") for method doc
-
-Search: pfc_query_python_api(query="...") for keyword search
-"""
+            object_count += len(contact_types) if contact_types else 1
+        else:
+            object_count += 1
 
     return success_response(
-        message=f"PFC Python SDK: {len(modules)} modules, {len(object_lines)} objects",
+        message=f"PFC Python SDK: {len(modules)} modules, {object_count} objects",
         llm_content={"parts": [{"type": "text", "text": content}]},
         data={
             "level": "root",
@@ -336,21 +277,6 @@ def _browse_module(module_path: str) -> Dict[str, Any]:
         return error_response(f"Module not found: {module_path}")
 
     functions = module_data.get("functions", [])
-    description = module_data.get("description", "")
-
-    # Build function list
-    func_lines = []
-    for func in functions:
-        if isinstance(func, dict):
-            name = func.get("name", "")
-            sig = func.get("signature", "")
-            desc = func.get("description", "")
-            if len(desc) > 60:
-                desc = desc[:57] + "..."
-            func_lines.append(f"- {name}: {desc}")
-        else:
-            # Just function name from index
-            func_lines.append(f"- {func}")
 
     # Find related objects in this module
     index = APILoader.load_index()
@@ -361,31 +287,15 @@ def _browse_module(module_path: str) -> Dict[str, Any]:
         if index_key in file_path or (index_key == "itasca" and "/" not in file_path):
             related_objects.append(obj_name)
 
-    object_note = ""
-    if related_objects:
-        obj_paths = [f"{module_path}.{obj}" for obj in related_objects]
-        object_note = f"\nRelated Objects: {', '.join(obj_paths)}"
-
-    content = f"""## {module_path}
-
-{description}
-
-Functions ({len(func_lines)}):
-{chr(10).join(func_lines)}
-{object_note}
-
-Navigation:
-- pfc_browse_python_api(api="{module_path}.<func>") for function doc
-- pfc_browse_python_api() for root overview
-"""
+    content = APIFormatter.format_module(module_path, module_data, related_objects)
 
     return success_response(
-        message=f"{module_path}: {len(func_lines)} functions",
+        message=f"{module_path}: {len(functions)} functions",
         llm_content={"parts": [{"type": "text", "text": content}]},
         data={
             "level": "module",
             "module_path": module_path,
-            "function_count": len(func_lines),
+            "function_count": len(functions),
             "functions": [f.get("name") if isinstance(f, dict) else f for f in functions]
         }
     )
@@ -436,52 +346,12 @@ def _browse_object(module_path: str, object_name: str, display_name: Optional[st
     if not object_doc:
         return error_response(f"Object not found: {object_name}")
 
-    # Use display_name if provided (for Contact type aliases)
     shown_name = display_name or object_name
-    description = object_doc.get("description", "")
-    note = object_doc.get("note", "")
     method_groups = object_doc.get("method_groups", {})
     methods = object_doc.get("methods", [])
-
-    # Build method groups or list
-    method_lines = []
-    if method_groups:
-        for group_name, group_methods in method_groups.items():
-            if isinstance(group_methods, list):
-                method_list = ", ".join(group_methods[:5])
-                if len(group_methods) > 5:
-                    method_list += f", ... (+{len(group_methods)-5})"
-                method_lines.append(f"- {group_name}: {method_list}")
-            else:
-                method_lines.append(f"- {group_name}: {group_methods}")
-    elif methods:
-        # Methods can be list of strings or list of dicts
-        method_names = []
-        for m in methods:
-            if isinstance(m, dict):
-                method_names.append(m.get("name", str(m)))
-            else:
-                method_names.append(str(m))
-        # List methods in chunks
-        for i in range(0, len(method_names), 5):
-            chunk = method_names[i:i+5]
-            method_lines.append(f"  {', '.join(chunk)}")
-
-    note_text = f"\nNote: {note}" if note else ""
     full_path = f"{module_path}.{shown_name}"
 
-    content = f"""## {full_path}
-
-{description}
-{note_text}
-
-Method Groups:
-{chr(10).join(method_lines)}
-
-Navigation:
-- pfc_browse_python_api(api="{full_path}.<method>") for method doc
-- pfc_browse_python_api(api="{module_path}") for module overview
-"""
+    content = APIFormatter.format_object(module_path, object_name, object_doc, display_name)
 
     return success_response(
         message=f"{full_path}: {len(method_groups) or len(methods)} method groups/methods",
