@@ -64,7 +64,6 @@
       "elements": [
         "not",
         "extent",
-        "all",
         "by"
       ]
     },
@@ -201,12 +200,6 @@
       "name": "extent",
       "file": "extent.json",
       "short_description": "Require entire object extent inside region (not ju...",
-      "category": "element_modifiers"
-    },
-    {
-      "name": "all",
-      "file": "all.json",
-      "short_description": "Require ALL sub-objects to match (default: any sub...",
       "category": "element_modifiers"
     },
     {
