@@ -59,6 +59,7 @@ Usage notes:
 - The agent's outputs should generally be trusted
 - Clearly tell the agent whether you expect it to write code or just to do research
 - Each agent invocation is stateless. You will not be able to send additional messages to the agent, nor will the agent be able to communicate with you outside of its final report. Therefore, your prompt should contain a highly detailed task description for the agent to perform autonomously and you should specify exactly what information the agent should return back to you in its final and only message to you.
+- Describe the problem context clearly: what you observed, what you suspect, and what you need the agent to investigate or confirm.
     """
     # Architecture guarantee: tool_manager.py always injects _meta.client_id
     session_id = context.client_id

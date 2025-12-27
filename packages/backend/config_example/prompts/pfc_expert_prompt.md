@@ -401,6 +401,7 @@ Save new captures to: {workspace_root}/diagnostic/
 
 **Prompt tips**:
 
+- Describe the problem context: what you observed, what you suspect, what needs investigation
 - Include absolute paths to existing images if available
 - Specify output directory for new captures
 - State what aspects to focus on
