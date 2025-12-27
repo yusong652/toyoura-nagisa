@@ -134,7 +134,13 @@ itasca.command('model large-strain on')               # REQUIRED for strain calc
 # 3. Contact model (before contacts form)
 itasca.command('contact cmat default model linear property kn 1e8 ks 1e8 fric 0.5')
 
-# 4. Now safe to create geometry, run cycles, etc.
+# 4. Create geometry
+itasca.command('ball generate number 100 radius 0.1')
+
+# 5. Set density (AFTER geometry, BEFORE dynamics)
+itasca.command('ball attribute density 2650')  # Or: ball.set_density(2650)
+
+# 6. Now safe to run cycles, apply forces, etc.
 ```
 
 | Command | Required | Note |
@@ -143,8 +149,9 @@ itasca.command('contact cmat default model linear property kn 1e8 ks 1e8 fric 0.
 | `model domain extent` | Yes | Define before creating balls |
 | `model large-strain on` | Yes | Enables proper strain calculations |
 | `contact cmat default` | Yes | Without CMAT, contacts use null model (no forces) |
+| `ball attribute density` | Yes | **AFTER geometry creation** - required for dynamics |
 
-**Documentation references**: `pfc_browse_commands(command="contact cmat")`, `pfc_browse_contact_models()`
+**Documentation references**: `pfc_browse_commands(command="contact cmat")`, `pfc_browse_reference(topic="contact-models")`
 
 ---
 
@@ -182,7 +189,7 @@ itasca.command('contact cmat default model linear property kn 1e8 ks 1e8 fric 0.
 **Browse tools** - Hierarchical navigation showing full documentation
 - `pfc_browse_commands(command="...")` - Navigate command hierarchy
 - `pfc_browse_python_api(api="...")` - Navigate Python API hierarchy
-- `pfc_browse_contact_models(model="...")` - Navigate contact model properties
+- `pfc_browse_reference(topic="...")` - Navigate reference docs (contact models, etc.)
 - **Use when**: Know WHERE to look OR need to explore PFC's capability boundaries
 - **Critical role**: Reveals what PFC CAN'T do → signals when to implement custom solutions
 
@@ -236,8 +243,8 @@ pfc_browse_commands(command="ball create")  # Full docs
 pfc_browse_python_api()                             # Overview
 pfc_browse_python_api(api="itasca.ball.Ball.pos")  # Full method docs
 
-# Browse - Contact Models
-pfc_browse_contact_models(model="linear")  # Properties: kn, ks, fric...
+# Browse - Reference Documentation
+pfc_browse_reference(topic="contact-models linear")  # Properties: kn, ks, fric...
 
 # Query (keyword search → returns paths)
 pfc_query_command(query="generate")
@@ -394,6 +401,7 @@ Save new captures to: {workspace_root}/diagnostic/
 
 **Prompt tips**:
 
+- Describe the problem context: what you observed, what you suspect, what needs investigation
 - Include absolute paths to existing images if available
 - Specify output directory for new captures
 - State what aspects to focus on

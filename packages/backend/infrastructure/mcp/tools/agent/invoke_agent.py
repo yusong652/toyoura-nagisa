@@ -49,7 +49,7 @@ async def invoke_agent(
 The invoke_agent tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
 
 Available agent types and the tools they have access to:
-- pfc_explorer: PFC documentation query agent (read-only). Use this when you need to query PFC command syntax, find Python API usage examples, or search workspace files for context. This agent cannot execute scripts or modify files. (Tools: read, glob, grep, bash, bash_output, pfc_browse_commands, pfc_browse_python_api, pfc_query_command, pfc_query_python_api, pfc_browse_contact_models, web_search, todo_write)
+- pfc_explorer: PFC documentation query agent (read-only). Use this when you need to query PFC command syntax, find Python API usage examples, or search workspace files for context. This agent cannot execute scripts or modify files. (Tools: read, glob, grep, bash, bash_output, pfc_browse_commands, pfc_browse_python_api, pfc_query_command, pfc_query_python_api, pfc_browse_reference, web_search, todo_write)
 - pfc_diagnostic: PFC multimodal diagnostic agent. Use this when you need to visually diagnose simulation issues by capturing and analyzing screenshots from multiple angles and coloring modes. This agent can also inspect task status from MainAgent's executed tasks. (Tools: pfc_capture_plot, read, pfc_check_task_status, pfc_list_tasks, pfc_query_command, pfc_query_python_api, glob, grep, bash, bash_output, todo_write)
 
 When using the invoke_agent tool, you must specify a subagent_type parameter to select which agent type to use.
@@ -59,6 +59,7 @@ Usage notes:
 - The agent's outputs should generally be trusted
 - Clearly tell the agent whether you expect it to write code or just to do research
 - Each agent invocation is stateless. You will not be able to send additional messages to the agent, nor will the agent be able to communicate with you outside of its final report. Therefore, your prompt should contain a highly detailed task description for the agent to perform autonomously and you should specify exactly what information the agent should return back to you in its final and only message to you.
+- Describe the problem context clearly: what you observed, what you suspect, and what you need the agent to investigate or confirm.
     """
     # Architecture guarantee: tool_manager.py always injects _meta.client_id
     session_id = context.client_id

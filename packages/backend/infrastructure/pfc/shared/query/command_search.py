@@ -1,7 +1,7 @@
 """High-level command search interface.
 
 This module provides a simple, user-friendly API for searching PFC commands.
-Model properties are handled separately via pfc_browse_contact_models tool.
+Model properties are handled separately via pfc_browse_reference tool.
 """
 
 from typing import List, Optional, Dict, Any
@@ -22,7 +22,7 @@ class CommandSearch:
     - Support for filtering by category
     - BM25 with multi-field scoring (name=0.5, keywords=0.3, description=0.2)
 
-    Note: For contact model properties, use pfc_browse_contact_models tool directly.
+    Note: For contact model properties, use pfc_browse_reference tool directly.
 
     Usage:
         >>> # Basic search

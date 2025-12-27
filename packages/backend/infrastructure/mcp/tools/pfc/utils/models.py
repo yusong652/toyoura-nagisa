@@ -41,6 +41,22 @@ MAX_WAIT_SECONDS = 3600
 # Custom Validators
 # ============================================================================
 
+def normalize_input(value: Optional[str], lowercase: bool = False) -> str:
+    """Normalize user input: collapse whitespace, optionally lowercase.
+
+    Args:
+        value: Input string to normalize
+        lowercase: Whether to convert to lowercase
+
+    Returns:
+        Normalized string with collapsed whitespace
+    """
+    if value is None:
+        return ""
+    normalized = " ".join(value.split())
+    return normalized.lower() if lowercase else normalized
+
+
 def validate_non_empty_string(value: str) -> str:
     """Validate that a string is not empty after stripping whitespace."""
     stripped = value.strip()

@@ -22,6 +22,118 @@ class CommandFormatter:
     """
 
     @staticmethod
+    def format_with_error(error_msg: str, fallback_content: str) -> str:
+        """Prepend error message to fallback content.
+
+        Used when a requested path doesn't exist but we can show the parent level.
+        Format matches pfc_browse_python_api for consistency.
+
+        Args:
+            error_msg: Error message describing what wasn't found
+            fallback_content: Content from parent level to display
+
+        Returns:
+            Formatted markdown with error notice and fallback content
+        """
+        return f"Error: {error_msg}\n\n{fallback_content}"
+
+    @staticmethod
+    def format_root(categories: Dict[str, Any]) -> str:
+        """Format command categories overview as markdown.
+
+        Args:
+            categories: Dict of category data from index
+
+        Returns:
+            Formatted markdown string
+        """
+        parts = []
+
+        total_commands = sum(
+            len(cat_data.get("commands", []))
+            for cat_data in categories.values()
+        )
+
+        parts.append("## PFC Command Documentation")
+        parts.append("")
+        parts.append(f"Total: {len(categories)} categories, {total_commands} commands")
+        parts.append("")
+
+        for cat_name, cat_data in categories.items():
+            cmd_count = len(cat_data.get("commands", []))
+            description = cat_data.get("description", "")
+            if len(description) > 50:
+                description = description[:47] + "..."
+            parts.append(f"- {cat_name} ({cmd_count}): {description}")
+
+        parts.append("")
+        parts.append("Navigation:")
+        parts.append('- pfc_browse_commands(command="<category>") to list commands')
+        parts.append('- pfc_browse_commands(command="<category> <cmd>") for full doc')
+        parts.append("")
+        parts.append("Search: pfc_query_command(query=\"...\") for keyword search")
+        parts.append("")
+        parts.append('Contact Models: pfc_browse_reference(topic="contact-models") for model properties')
+
+        return "\n".join(parts)
+
+    @staticmethod
+    def format_category(category: str, cat_data: Dict[str, Any]) -> str:
+        """Format command list in a category as markdown.
+
+        Args:
+            category: Category name
+            cat_data: Category data dict with commands list
+
+        Returns:
+            Formatted markdown string
+        """
+        parts = []
+
+        commands = cat_data.get("commands", [])
+        full_name = cat_data.get("full_name", category.title())
+        description = cat_data.get("description", "")
+        related = cat_data.get("related_categories", [])
+
+        parts.append(f"## {full_name} ({len(commands)} commands)")
+        parts.append("")
+        if description:
+            parts.append(description)
+            parts.append("")
+
+        for cmd in commands:
+            name = cmd.get("name", "")
+            python_avail = cmd.get("python_available", False)
+            if python_avail is True:
+                python_mark = "[py]"
+            elif python_avail == "partial":
+                python_mark = "[py:partial]"
+            else:
+                python_mark = ""
+
+            short_desc = cmd.get("short_description", "")
+            if len(short_desc) > 45:
+                short_desc = short_desc[:42] + "..."
+
+            parts.append(f"- {name}{' ' + python_mark if python_mark else ''}: {short_desc}")
+
+        parts.append("")
+        parts.append("[py] = Python SDK available, [py:partial] = partial support")
+        parts.append("")
+        parts.append("Navigation:")
+        parts.append(f'- pfc_browse_commands(command="{category} <cmd>") for full doc')
+        parts.append("- pfc_browse_commands() for categories overview")
+
+        if category == "contact":
+            parts.append("")
+            parts.append('Contact Models: pfc_browse_reference(topic="contact-models") for model properties')
+
+        if related:
+            parts.append(f"Related: {', '.join(related)}")
+
+        return "\n".join(parts)
+
+    @staticmethod
     def format_command(doc: Dict[str, Any], category: str) -> str:
         """Format a full command documentation as markdown.
 
@@ -134,191 +246,6 @@ class CommandFormatter:
         return "\n".join(parts)
 
     @staticmethod
-    def format_full_model(doc: Dict[str, Any]) -> str:
-        """Format a complete contact model documentation as markdown.
-
-        Args:
-            doc: Model documentation dict with all properties
-
-        Returns:
-            Formatted markdown string
-
-        Example:
-            >>> doc = {"model": "linear", "full_name": "Linear Model", ...}
-            >>> md = CommandFormatter.format_full_model(doc)
-            >>> "# Linear Model" in md
-            True
-        """
-        parts = []
-
-        model_name = doc.get("model", "unknown")
-        model_full_name = doc.get("full_name", model_name)
-
-        # Header
-        parts.append(f"# {model_full_name}")
-        parts.append(f"*Model name: `{model_name}`*")
-        parts.append("")
-
-        # Description
-        description = doc.get("description", "")
-        if description:
-            parts.append("## Description")
-            parts.append(description)
-            parts.append("")
-
-        # Typical Applications
-        typical_apps = doc.get("typical_applications", [])
-        if typical_apps:
-            parts.append("## Typical Applications")
-            for app in typical_apps:
-                parts.append(f"- {app}")
-            parts.append("")
-
-        # Property Groups
-        property_groups = doc.get("property_groups", [])
-        if property_groups:
-            parts.append("## Properties")
-            parts.append("")
-
-            for group in property_groups:
-                group_name = group.get("name", "Properties")
-                group_desc = group.get("description", "")
-
-                parts.append(f"### {group_name}")
-                if group_desc:
-                    parts.append(f"*{group_desc}*")
-                    parts.append("")
-
-                properties = group.get("properties", [])
-                if properties:
-                    # Create property table
-                    parts.append("| Property | Symbol | Description | Type | Default |")
-                    parts.append("|----------|--------|-------------|------|---------|")
-
-                    for prop in properties:
-                        keyword = prop.get("keyword", "")
-                        symbol = prop.get("symbol", "-")
-                        desc = prop.get("description", "")
-                        prop_type = prop.get("type", "")
-                        default = prop.get("default", "-")
-
-                        # Truncate description for table
-                        if len(desc) > 60:
-                            desc = desc[:57] + "..."
-
-                        parts.append(f"| `{keyword}` | {symbol} | {desc} | {prop_type} | {default} |")
-
-                    parts.append("")
-
-        # Usage Examples
-        parts.append("## Usage")
-        parts.append(f"Set properties for this model using:")
-        parts.append(f"- Command: `contact cmat add model {model_name} property <prop> <value>`")
-        parts.append(f"- Command: `contact property <prop> <value> range ...`")
-        parts.append(f"- Python: `contact.set_prop('<prop>', value)`")
-        parts.append("")
-
-        return "\n".join(parts)
-
-    @staticmethod
-    def format_model_property(doc: Dict[str, Any], property_keyword: str) -> str:
-        """Format a contact model property documentation as markdown.
-
-        Args:
-            doc: Model documentation dict (full model with property_groups)
-            property_keyword: Specific property keyword (e.g., "kn", "pb_kn")
-
-        Returns:
-            Formatted markdown string
-
-        Example:
-            >>> doc = {"model": "linear", "property_groups": [...]}
-            >>> md = CommandFormatter.format_model_property(doc, "kn")
-            >>> "# linear.kn" in md
-            True
-        """
-        parts = []
-
-        model_name = doc.get("model", "unknown")
-        model_full_name = doc.get("full_name", model_name)
-
-        # Find the specific property
-        target_property = None
-        for group in doc.get("property_groups", []):
-            for prop in group.get("properties", []):
-                if prop.get("keyword") == property_keyword:
-                    target_property = prop
-                    break
-            if target_property:
-                break
-
-        if not target_property:
-            return f"# Property {property_keyword} not found in {model_name}"
-
-        # Header
-        parts.append(f"# {model_name}.{property_keyword}")
-        parts.append(f"*{model_full_name}*")
-        parts.append("")
-
-        # Property details
-        symbol = target_property.get("symbol", "")
-        if symbol:
-            parts.append(f"**Symbol**: {symbol}")
-
-        prop_type = target_property.get("type", "")
-        if prop_type:
-            parts.append(f"**Type**: {prop_type}")
-
-        description = target_property.get("description", "")
-        if description:
-            parts.append(f"**Description**: {description}")
-            parts.append("")
-
-        # Range and default
-        prop_range = target_property.get("range", "")
-        default = target_property.get("default", "")
-        if prop_range or default:
-            parts.append("## Value Constraints")
-            if prop_range:
-                parts.append(f"- **Range**: {prop_range}")
-            if default:
-                parts.append(f"- **Default**: {default}")
-            parts.append("")
-
-        # Flags
-        modifiable = target_property.get("modifiable", True)
-        inheritable = target_property.get("inheritable", False)
-        parts.append("## Property Flags")
-        parts.append(f"- **Modifiable**: {'Yes' if modifiable else 'No'}")
-        parts.append(f"- **Inheritable**: {'Yes' if inheritable else 'No'}")
-        parts.append("")
-
-        # Notes
-        notes = target_property.get("notes", "")
-        if notes:
-            parts.append("## Notes")
-            parts.append(notes)
-            parts.append("")
-
-        # Usage context
-        parts.append("## Usage")
-        parts.append("Set this property using:")
-        parts.append(f"- Command: `contact cmat add ... property {property_keyword} <value>`")
-        parts.append(f"- Command: `contact property {property_keyword} <value> range ...`")
-        parts.append(f"- Python: `contact.set_prop('{property_keyword}', value)`")
-        parts.append("")
-
-        # Model context
-        typical_apps = doc.get("typical_applications", [])
-        if typical_apps:
-            parts.append(f"## {model_full_name} - Typical Applications")
-            for app in typical_apps:
-                parts.append(f"- {app}")
-            parts.append("")
-
-        return "\n".join(parts)
-
-    @staticmethod
     def format_search_results(results: List[CommandSearchResult]) -> str:
         """Format search results as a summary list.
 
@@ -381,7 +308,7 @@ class CommandFormatter:
 Suggestions:
 - Try simpler keywords (e.g., "ball create" instead of "how to create a ball")
 - Command categories: ball, wall, clump, contact, model, fragment, measure
-- For contact model properties: use pfc_browse_contact_models tool
+- For contact model properties: use pfc_browse_reference tool
 - For Python SDK: use pfc_query_python_api tool
 
 Common commands:

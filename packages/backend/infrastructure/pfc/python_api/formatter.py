@@ -22,6 +22,235 @@ class APIDocFormatter:
     """
 
     @staticmethod
+    def format_with_error(error_msg: str, fallback_content: str) -> str:
+        """Prepend error message to fallback content.
+
+        Used when a requested path doesn't exist but we can show the parent level.
+
+        Args:
+            error_msg: Error message describing what wasn't found
+            fallback_content: Content from parent level to display
+
+        Returns:
+            Formatted markdown with error notice and fallback content
+        """
+        return f"Error: {error_msg}\n\n{fallback_content}"
+
+    @staticmethod
+    def _index_key_to_path(index_key: str) -> str:
+        """Convert index key to full path.
+
+        Examples:
+        - "itasca" -> "itasca"
+        - "ball" -> "itasca.ball"
+        - "wall.facet" -> "itasca.wall.facet"
+        """
+        if index_key == "itasca":
+            return "itasca"
+        return f"itasca.{index_key}"
+
+    @staticmethod
+    def format_root(modules: Dict[str, Any], objects: Dict[str, Any]) -> str:
+        """Format root overview of all modules and objects.
+
+        Args:
+            modules: Dict of module data from index
+            objects: Dict of object data from index
+
+        Returns:
+            Formatted markdown string
+        """
+        parts = []
+
+        # Build modules list
+        module_lines = []
+        for key, data in modules.items():
+            full_path = APIDocFormatter._index_key_to_path(key)
+            func_count = len(data.get("functions", []))
+            desc = data.get("description", "")
+            if len(desc) > 50:
+                desc = desc[:47] + "..."
+            module_lines.append(f"- {full_path} ({func_count} funcs): {desc}")
+
+        # Build objects list
+        object_lines = []
+        for name, data in objects.items():
+            desc = data.get("description", "")
+            if len(desc) > 50:
+                desc = desc[:47] + "..."
+
+            # Find which module contains this object
+            file_path = data.get("file", "")
+            if "ball" in file_path:
+                obj_path = f"itasca.ball.{name}"
+            elif "clump/pebble" in file_path:
+                obj_path = f"itasca.clump.pebble.{name}"
+            elif "clump/template" in file_path:
+                obj_path = f"itasca.clump.template.{name}"
+            elif "clump" in file_path:
+                obj_path = f"itasca.clump.{name}"
+            elif "wall/facet" in file_path:
+                obj_path = f"itasca.wall.facet.{name}"
+            elif "wall/vertex" in file_path:
+                obj_path = f"itasca.wall.vertex.{name}"
+            elif "wall" in file_path:
+                obj_path = f"itasca.wall.{name}"
+            elif "measure" in file_path:
+                obj_path = f"itasca.measure.{name}"
+            else:
+                obj_path = name
+
+            # Handle Contact types - they are in itasca root namespace
+            if name == "Contact":
+                contact_types = data.get("types", [])
+                if contact_types:
+                    for ct in contact_types:
+                        object_lines.append(f"- itasca.{ct}: {desc}")
+                    continue
+                else:
+                    obj_path = f"itasca.{name}"
+
+            object_lines.append(f"- {obj_path}: {desc}")
+
+        parts.append("## PFC Python SDK Documentation")
+        parts.append("")
+        parts.append(f"Modules ({len(modules)}):")
+        parts.append("\n".join(module_lines))
+        parts.append("")
+        parts.append(f"Objects ({len(object_lines)}):")
+        parts.append("\n".join(object_lines))
+        parts.append("")
+        parts.append("Navigation:")
+        parts.append('- pfc_browse_python_api(api="itasca.ball") for module functions')
+        parts.append('- pfc_browse_python_api(api="itasca.ball.Ball") for object methods')
+        parts.append('- pfc_browse_python_api(api="itasca.ball.create") for function doc')
+        parts.append('- pfc_browse_python_api(api="itasca.ball.Ball.pos") for method doc')
+        parts.append("")
+        parts.append('Search: pfc_query_python_api(query="...") for keyword search')
+
+        return "\n".join(parts)
+
+    @staticmethod
+    def format_module(
+        module_path: str,
+        module_data: Dict[str, Any],
+        related_objects: Optional[List[str]] = None
+    ) -> str:
+        """Format module overview with its functions.
+
+        Args:
+            module_path: Full module path (e.g., "itasca.ball")
+            module_data: Module data dict
+            related_objects: Optional list of related object names
+
+        Returns:
+            Formatted markdown string
+        """
+        parts = []
+
+        functions = module_data.get("functions", [])
+        description = module_data.get("description", "")
+
+        # Build function list
+        func_lines = []
+        for func in functions:
+            if isinstance(func, dict):
+                name = func.get("name", "")
+                desc = func.get("description", "")
+                if len(desc) > 60:
+                    desc = desc[:57] + "..."
+                func_lines.append(f"- {name}: {desc}")
+            else:
+                func_lines.append(f"- {func}")
+
+        parts.append(f"## {module_path}")
+        parts.append("")
+        if description:
+            parts.append(description)
+            parts.append("")
+        parts.append(f"Functions ({len(func_lines)}):")
+        parts.append("\n".join(func_lines))
+
+        if related_objects:
+            obj_paths = [f"{module_path}.{obj}" for obj in related_objects]
+            parts.append("")
+            parts.append(f"Related Objects: {', '.join(obj_paths)}")
+
+        parts.append("")
+        parts.append("Navigation:")
+        parts.append(f'- pfc_browse_python_api(api="{module_path}.<func>") for function doc')
+        parts.append("- pfc_browse_python_api() for root overview")
+
+        return "\n".join(parts)
+
+    @staticmethod
+    def format_object(
+        module_path: str,
+        object_name: str,
+        object_doc: Dict[str, Any],
+        display_name: Optional[str] = None
+    ) -> str:
+        """Format object overview with its method groups.
+
+        Args:
+            module_path: Full module path (e.g., "itasca.ball")
+            object_name: Object name (e.g., "Ball")
+            object_doc: Object documentation dict
+            display_name: Optional display name for Contact types
+
+        Returns:
+            Formatted markdown string
+        """
+        parts = []
+
+        shown_name = display_name or object_name
+        description = object_doc.get("description", "")
+        note = object_doc.get("note", "")
+        method_groups = object_doc.get("method_groups", {})
+        methods = object_doc.get("methods", [])
+
+        full_path = f"{module_path}.{shown_name}"
+
+        # Build method groups or list
+        method_lines = []
+        if method_groups:
+            for group_name, group_methods in method_groups.items():
+                if isinstance(group_methods, list):
+                    method_list = ", ".join(group_methods[:5])
+                    if len(group_methods) > 5:
+                        method_list += f", ... (+{len(group_methods)-5})"
+                    method_lines.append(f"- {group_name}: {method_list}")
+                else:
+                    method_lines.append(f"- {group_name}: {group_methods}")
+        elif methods:
+            method_names = []
+            for m in methods:
+                if isinstance(m, dict):
+                    method_names.append(m.get("name", str(m)))
+                else:
+                    method_names.append(str(m))
+            for i in range(0, len(method_names), 5):
+                chunk = method_names[i:i+5]
+                method_lines.append(f"  {', '.join(chunk)}")
+
+        parts.append(f"## {full_path}")
+        parts.append("")
+        if description:
+            parts.append(description)
+        if note:
+            parts.append("")
+            parts.append(f"Note: {note}")
+        parts.append("")
+        parts.append("Method Groups:")
+        parts.append("\n".join(method_lines))
+        parts.append("")
+        parts.append("Navigation:")
+        parts.append(f'- pfc_browse_python_api(api="{full_path}.<method>") for method doc')
+        parts.append(f'- pfc_browse_python_api(api="{module_path}") for module overview')
+
+        return "\n".join(parts)
+
+    @staticmethod
     def _detect_component_methods(object_name: str, method_name: str) -> List[str]:
         """Detect if a method has component alternatives (_x, _y, _z).
 
@@ -319,7 +548,7 @@ class APIDocFormatter:
         return api_name
 
     @staticmethod
-    def format_no_results_response(query: str, hints: List[str] = None) -> str:
+    def format_no_results_response(query: str, hints: Optional[List[str]] = None) -> str:
         """Format LLM content when no Python SDK API found.
 
         Args:
@@ -404,7 +633,7 @@ class APIDocFormatter:
         return "\n".join(lines)
 
     @staticmethod
-    def format_method(method_doc: Dict[str, Any], object_name: str, actual_object_name: str = None) -> str:
+    def format_method(method_doc: Dict[str, Any], object_name: str, actual_object_name: Optional[str] = None) -> str:
         """Format method documentation for browse tool.
 
         Args:

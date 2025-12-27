@@ -20,6 +20,8 @@ from .models import (
     MAX_TIMEOUT_MS,
     MIN_WAIT_SECONDS,
     MAX_WAIT_SECONDS,
+    # Utility functions
+    normalize_input,
     # Annotated types
     TaskId,
     TaskDescription,
@@ -60,6 +62,8 @@ __all__ = [
     "MAX_TIMEOUT_MS",
     "MIN_WAIT_SECONDS",
     "MAX_WAIT_SECONDS",
+    # Utility functions from models
+    "normalize_input",
     # Annotated types from models
     "TaskId",
     "TaskDescription",

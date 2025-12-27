@@ -76,7 +76,7 @@ PFC_TOOLS: List[str] = [
     # PFC documentation - Browse (directory listing)
     "pfc_browse_commands",
     "pfc_browse_python_api",
-    "pfc_browse_contact_models",
+    "pfc_browse_reference",
     # PFC documentation - Query (detailed lookup)
     "pfc_query_python_api",
     "pfc_query_command",
@@ -106,7 +106,10 @@ SUBAGENT_PFC_EXPLORER_TOOLS: List[str] = [
     "pfc_browse_python_api",
     "pfc_query_python_api",
     "pfc_query_command",
-    "pfc_browse_contact_models",
+    "pfc_browse_reference",
+    # Task context inspection (script is context)
+    "pfc_list_tasks",
+    "pfc_check_task_status",
     # Web search for external docs
     "web_search",
     # Task tracking (consistent with Claude Code Explore agent)
@@ -125,9 +128,6 @@ SUBAGENT_PFC_DIAGNOSTIC_TOOLS: List[str] = [
     # Task status inspection (read MainAgent's executed tasks)
     "pfc_check_task_status",  # Query task progress and output
     "pfc_list_tasks",         # List all tracked tasks with status
-    # Reference tools (understand PFC concepts for diagnosis)
-    "pfc_query_command",
-    "pfc_query_python_api",
     # Support tools (workspace navigation, read-only)
     "glob",
     "grep",

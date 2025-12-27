@@ -28,101 +28,63 @@ Scripts *are* the context. Each execution compounds understanding.
 
 ### 🔬 **Documentation-Driven Workflow**
 
-The LLM doesn't guess - it queries, navigates, and discovers:
+Simulation software comes with extensive documentation. The agent doesn't guess—it queries and browses documentation hierarchies to discover:
 
-1. **Query by Keywords** - Search returns documentation paths, not raw content
-2. **Browse by Path** - Navigate to specific docs, or explore parent directories to discover alternatives
-3. **Write Test Script** - Small-scale validation (10 particles, 100 steps)
-4. **Execute Production Script** - Full simulation with progress monitoring
+- **What exists**: Available features and their usage patterns
+- **What's missing**: Gaps that require workarounds
+- **What's limited**: Built-in features that don't fully cover the use case
 
-**Example Workflow**:
-```
-User: "Create a ball settling simulation with 1000 particles"
-
-toyoura-nagisa:
-1. Queries 'ball generate' → returns path: "ball generate"
-2. Browses "ball generate" → learns syntax, sees [no Python API]
-3. Queries 'gravity' → returns path: "model gravity"
-4. Browses "model gravity" → learns scripting pattern
-5. Writes test script (10 particles) → validates approach
-6. Executes production (1000 particles) → monitors progress
-```
-
-**Boundary Discovery**:
-```
-User: "Create walls around the domain"
-
-toyoura-nagisa:
-1. Queries "wall create" → returns path: "wall create"
-2. Browses "wall create" → sees [no Python API]
-3. Browses "itasca.wall" → confirms: only find/list/count, no create
-4. Decision: uses itasca.command("wall create ...") wrapper
-```
-
-**Manual Implementation**:
-```
-User: "Apply confining pressure to cylindrical boundary"
-
-toyoura-nagisa:
-1. Queries "servo" → finds servo command
-2. Browses "wall servo" → sees limitation: single force direction only
-3. Browses "itasca.wall.Wall" → finds set_vel(), contact force methods
-4. Decision: implements custom radial pressure control loop
-```
-
-### ⚡ **Task Lifecycle Management**
-
-Long-running PFC simulations require monitoring, control, and learning from history.
-
-**Session 1: Compression Test**
+**Discovery Flow**
 
 ```
-User: "Run isotropic compression to 100kPa confining pressure"
-
-toyoura-nagisa:
-1. Submit: pfc_execute_task → script includes termination condition
-2. Monitor: pfc_check_task_status → tracks progress
-   - "Compression cycles: 50000, stress: 95kPa"
-   - "Target reached, saving checkpoint..."
-3. Result: Task completed normally
-4. (If instability detected: pfc_interrupt_task → stop and adjust)
+├─ Query       → keyword search returns documentation paths
+├─ Browse      → navigate hierarchy, see available options
+├─ Discover    → identify gaps and limitations
+└─ Decide      → use built-in features vs implement custom solutions
 ```
 
-**Session 2: Shear Test**
+### ⚡ **Adaptive Simulation Control**
+
+The agent maintains full control over simulation execution through deep backend integration.
+
+**Autonomous Control Loop**
 
 ```
-User: "Run triaxial shear test on the consolidated sample"
-
-toyoura-nagisa:
-1. Checks pfc_list_tasks → sees "Isotropic compression" completed
-2. Checks pfc_check_task_status → reviews final output
-   - Checkpoint: "consolidated_100kPa.sav"
-   - Wall IDs: top_wall=1, bottom_wall=2
-3. Reviews compression script → servo settings, contact model
-4. Writes shear script:
-   - model restore "consolidated_100kPa.sav"
-   - References wall IDs for axial loading
+├─ Submit      → pfc_execute_task(compression_script)
+├─ Monitor     → pfc_check_task_status → "Cycle 50000: stress=98kPa"
+├─ Analyze     → bash/read → parse output files, extract metrics
+├─ Diagnose    → pfc_capture_plot → verify uniform stress distribution
+├─ Complete    → Task finished, checkpoint saved
+├─ Submit      → pfc_execute_task(shear_script)  ← starts new task
+├─ Monitor     → pfc_check_task_status → "Strain: 2.1%, peak approaching"
+├─ Interrupt   → Detects instability → stops execution
+└─ Restart     → pfc_execute_task(adjusted_script) ← restarts with fixes
 ```
 
-**Session N: Learn from Failure**
-
-```
-Previous shear test failed with instability...
-
-toyoura-nagisa:
-1. Checks pfc_list_tasks → finds similar shear tasks
-2. Compares outputs: successful runs vs failed runs
-3. Reviews scripts: identifies parameter differences
-4. Applies working approach to complete the task
-```
-
-Every execution—success or failure—becomes context for future decisions.
+The agent decides when to continue, when to stop, and when to restart—without user intervention.
 
 ### 🤖 **SubAgent Delegation**
 
-The main agent can delegate exploration tasks to a specialized SubAgent:
+Complex explorations risk context window exhaustion and hallucination. SubAgents solve both:
 
-**PFC Explorer**: Queries command documentation, searches Python API examples, explores project history for successful patterns, and searches the web for references—all without consuming the main agent's context window.
+- **Context Isolation**: SubAgent exploration doesn't consume MainAgent's context window
+- **Structured Results**: Only verified findings return to MainAgent—no intermediate noise
+- **Read-Only Safety**: SubAgents cannot execute simulations or modify files
+
+- **PFC Explorer**: Documentation queries, API exploration, project history search
+- **PFC Diagnostic**: Multimodal visual analysis, task output correlation, structured diagnosis
+
+The MainAgent stays focused on decision-making while SubAgents handle deep exploration.
+
+### 🤝 **Intent Awareness**
+
+User operations automatically become agent context:
+
+- **Terminal commands**: Bash operations visible to agent without copy-paste
+- **Console execution**: PFC IPython operations persist as tracked tasks—user scripts are context too
+- **File mentions**: `@file` syntax injects file content inline
+
+Scripts *are* the context—yours included. The agent sees what you did, no explanation needed.
 
 ## 🎨 Additional Features
 

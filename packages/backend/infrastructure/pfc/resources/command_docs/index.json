@@ -435,56 +435,56 @@
           "python_alternative": "itasca.command('contact apply-group ...') - Python SDK does not provide direct apply-group functionality. Manual implementation requires:\n1. Iterate through contacts\n2. Get contact group name: contact.group(slot)\n3. Get contact ends: contact.end1(), contact.end2()\n4. Apply group to pieces/bodies: piece.set_group() or body.set_group()\n\nExample:\nfor c in it.contact.list():\n    group_name = c.group('Default')\n    if group_name:\n        c.end1().set_group(group_name, 'Default')\n        c.end2().set_group(group_name, 'Default')"
         },
         {
-          "name": "add",
-          "file": "commands/contact/cmat/add.json",
+          "name": "cmat add",
+          "file": "commands/contact/cmat-add.json",
           "short_description": "Adds a new entry to the CMAT (Contact Model Assignment Table)",
           "syntax": "contact cmat add <i> <keyword> ... range",
           "python_available": false,
           "python_alternative": "itasca.command('contact cmat add ...') - Python SDK does not provide direct CMAT API, must use command interface"
         },
         {
-          "name": "apply",
-          "file": "commands/contact/cmat/apply.json",
+          "name": "cmat apply",
+          "file": "commands/contact/cmat-apply.json",
           "short_description": "Apply the CMAT to existing contacts",
           "syntax": "contact cmat apply <keyword> <range>",
           "python_available": false,
           "python_alternative": "itasca.command('contact cmat apply ...') - Python SDK does not provide direct CMAT API, must use command interface"
         },
         {
-          "name": "default",
-          "file": "commands/contact/cmat/default.json",
+          "name": "cmat default",
+          "file": "commands/contact/cmat-default.json",
           "short_description": "Set the default slot(s) of the CMAT",
           "syntax": "contact cmat default <type stype> <keyword> ...",
           "python_available": false,
           "python_alternative": "itasca.command('contact cmat default ...') - Python SDK does not provide direct CMAT API, must use command interface"
         },
         {
-          "name": "list",
-          "file": "commands/contact/cmat/list.json",
+          "name": "cmat list",
+          "file": "commands/contact/cmat-list.json",
           "short_description": "Lists the CMAT (Contact Model Assignment Table)",
           "syntax": "contact cmat list <keyword>",
           "python_available": false,
           "python_alternative": "itasca.command('contact cmat list') - Python SDK does not provide direct CMAT API, must use command interface. Output goes to console, cannot be captured directly in Python."
         },
         {
-          "name": "modify",
-          "file": "commands/contact/cmat/modify.json",
+          "name": "cmat modify",
+          "file": "commands/contact/cmat-modify.json",
           "short_description": "Modify an existing entry in the CMAT (Contact Model Assignment Table)",
           "syntax": "contact cmat modify <i> <keyword> ... <range>",
           "python_available": false,
           "python_alternative": "itasca.command('contact cmat modify ...') - Python SDK does not provide direct CMAT API, must use command interface"
         },
         {
-          "name": "proximity",
-          "file": "commands/contact/cmat/proximity.json",
+          "name": "cmat proximity",
+          "file": "commands/contact/cmat-proximity.json",
           "short_description": "Set the contact detection distance for the CMAT (Contact Model Assignment Table)",
           "syntax": "contact cmat <sprocess> proximity <fd>",
           "python_available": false,
           "python_alternative": "itasca.command('contact cmat proximity <value>') - Python SDK does not provide direct CMAT proximity API, must use command interface"
         },
         {
-          "name": "remove",
-          "file": "commands/contact/cmat/remove.json",
+          "name": "cmat remove",
+          "file": "commands/contact/cmat-remove.json",
           "short_description": "Remove an entry from the CMAT (Contact Model Assignment Table)",
           "syntax": "contact cmat remove <i>",
           "python_available": false,

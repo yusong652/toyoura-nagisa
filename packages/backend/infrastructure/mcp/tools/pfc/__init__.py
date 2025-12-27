@@ -15,7 +15,7 @@ Diagnostic Tools:
 
 Documentation Browse Tools (like glob + cat - navigate by path):
 - pfc_browse_commands: Navigate command hierarchy (e.g., "ball create")
-- pfc_browse_contact_models: Navigate contact model properties (e.g., "linear")
+- pfc_browse_reference: Navigate reference docs (e.g., "contact-models linear")
 - pfc_browse_python_api: Navigate Python SDK hierarchy (e.g., "itasca.ball.Ball.pos")
 
 Documentation Query Tools (like grep - search by keywords):
@@ -57,7 +57,7 @@ from .pfc_interrupt_task import register_pfc_interrupt_task_tool
 from .pfc_query_python_api import register_pfc_query_python_api_tool
 from .pfc_query_command import register_pfc_query_command_tool
 from .pfc_browse_commands import register_pfc_browse_commands_tool
-from .pfc_browse_contact_models import register_pfc_browse_contact_models_tool
+from .pfc_browse_reference import register_pfc_browse_reference_tool
 from .pfc_browse_python_api import register_pfc_browse_python_api_tool
 from .pfc_capture_plot import register_pfc_capture_plot_tool
 
@@ -69,7 +69,7 @@ __all__ = [
     "register_pfc_query_python_api_tool",
     "register_pfc_query_command_tool",
     "register_pfc_browse_commands_tool",
-    "register_pfc_browse_contact_models_tool",
+    "register_pfc_browse_reference_tool",
     "register_pfc_browse_python_api_tool",
     "register_pfc_capture_plot_tool",
 ]
