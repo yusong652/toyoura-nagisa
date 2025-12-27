@@ -125,9 +125,6 @@ SUBAGENT_PFC_DIAGNOSTIC_TOOLS: List[str] = [
     # Task status inspection (read MainAgent's executed tasks)
     "pfc_check_task_status",  # Query task progress and output
     "pfc_list_tasks",         # List all tracked tasks with status
-    # Reference tools (understand PFC concepts for diagnosis)
-    "pfc_query_command",
-    "pfc_query_python_api",
     # Support tools (workspace navigation, read-only)
     "glob",
     "grep",
