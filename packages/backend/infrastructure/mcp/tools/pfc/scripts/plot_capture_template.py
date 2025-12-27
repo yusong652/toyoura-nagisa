@@ -168,8 +168,8 @@ def _build_ball_color_by_command(
             color_by_part = f'color-by numeric-attribute "{spec["attribute"]}"'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
         elif spec["type"] == "text":
-            # 'Any' filter means show all values (escaped for Python string)
-            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
+            # Text attributes use named color mapping (no filter needed)
+            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
             color_options = "color-options named maximum-names 1000000 name-controls true"
         else:
             return ""
@@ -266,8 +266,8 @@ def _build_wall_color_by_command(
             color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
         elif spec["type"] == "text":
-            # Wall text attributes use 'Any' piece off filter (escaped for Python string)
-            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\' piece off"
+            # Wall text attributes use named color mapping (no filter needed)
+            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
             color_options = "color-options named maximum-names 1000000 name-controls true"
         else:
             return ""
