@@ -107,6 +107,9 @@ SUBAGENT_PFC_EXPLORER_TOOLS: List[str] = [
     "pfc_query_python_api",
     "pfc_query_command",
     "pfc_browse_reference",
+    # Task context inspection (script is context)
+    "pfc_list_tasks",
+    "pfc_check_task_status",
     # Web search for external docs
     "web_search",
     # Task tracking (consistent with Claude Code Explore agent)
