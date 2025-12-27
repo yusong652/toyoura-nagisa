@@ -88,6 +88,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
 
             # Map pfc-server status to display status
             status_map: dict[str, str] = {
+                "pending": "pending",
                 "running": "running",
                 "success": "completed",
                 "error": "failed",

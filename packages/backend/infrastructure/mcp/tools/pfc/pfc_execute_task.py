@@ -71,98 +71,61 @@ def register_pfc_task_tool(mcp: FastMCP):
                 session_id=session_id
             )
 
-            # Handle result based on execution mode
+            # Validate background mode response
             status = result.get("status")
             data = result.get("data")
 
-            if run_in_background:
-                # ===== Background Mode =====
-                if status != "pending":
-                    return error_response(
-                        f"Unexpected server response in background mode: status={status} "
-                        f"(expected 'pending'). Server may have changed behavior."
-                    )
-
-                # Use unified formatter for consistent output format
-                task_id = data.get("task_id") if data else None
-
-                # Create structured task data using shared formatter
-                task_data = create_task_status_data(data or {}, task_id or "unknown")
-                task_data.status = "submitted"  # Map "pending" to "submitted" for display
-                task_data.description = description  # Use tool parameter
-
-                # Format using unified formatter
-                formatted = format_task_status_for_llm(
-                    data=task_data,
-                    offset=0,
-                    limit=DEFAULT_OUTPUT_LINES,
+            if run_in_background and status != "pending":
+                return error_response(
+                    f"Unexpected server response in background mode: status={status} "
+                    f"(expected 'pending'). Server may have changed behavior."
                 )
 
-                return success_response(
-                    message=result.get("message", f"Task submitted: {script_path}"),
-                    llm_content={
-                        "parts": [{
-                            "type": "text",
-                            "text": formatted.text
-                        }]
-                    },
-                    entry_script=script_path,
-                    task_id=task_id,
-                    git_commit=task_data.git_commit,
-                    pagination=formatted.pagination
-                )
+            # ===== Unified Response Building =====
+            # Status mapping: server status → display status
+            # - pending (background or foreground timeout): submitted/running
+            # - success/error/interrupted (foreground completed): completed/failed/interrupted
+            STATUS_MAP: dict[str, str] = {
+                "pending": "submitted" if run_in_background else "running",
+                "success": "completed",
+                "error": "failed",
+            }
+            display_status = STATUS_MAP.get(str(status), str(status))
 
-            else:
-                # ===== Foreground Mode (Synchronous) =====
-                # Possible server statuses:
-                #   success     - Script completed successfully
-                #   error       - Script execution failed
-                #   running     - Wait timeout, but task continues in background
-                #   interrupted - Script was interrupted by user
-                task_id = data.get("task_id") if data else None
-                status_str = str(status) if status else "unknown"
+            # Create structured task data
+            task_id = data.get("task_id") if data else None
+            task_data = create_task_status_data(data or {}, task_id or "unknown")
+            task_data.status = display_status
+            task_data.description = description
 
-                # Status mapping: server status → display status
-                STATUS_MAP: dict[str, str] = {
-                    "success": "completed",
-                    "error": "failed",
-                    # running/interrupted stay unchanged
-                }
-                display_status = STATUS_MAP.get(status_str, status_str)
+            # Set error message for failed tasks
+            if status == "error" and not task_data.error:
+                task_data.error = result.get("message", "Task execution failed")
 
-                # Create structured task data
-                task_data = create_task_status_data(data or {}, task_id or "unknown")
-                task_data.status = display_status
-                task_data.description = description
+            # Format using unified formatter
+            formatted = format_task_status_for_llm(
+                data=task_data,
+                offset=0,
+                limit=DEFAULT_OUTPUT_LINES,
+            )
 
-                # Only set error for actual error states (not running/interrupted)
-                if status == "error" and not task_data.error:
-                    task_data.error = result.get("message", "Task execution failed")
+            # Build response
+            response_kwargs: Dict[str, Any] = {
+                "message": result.get("message", f"Task {display_status}: {script_path}"),
+                "llm_content": {"parts": [{"type": "text", "text": formatted.text}]},
+                "entry_script": script_path,
+                "task_id": task_id,
+                "git_commit": task_data.git_commit,
+                "pagination": formatted.pagination,
+            }
 
-                # Format using unified formatter
-                formatted = format_task_status_for_llm(
-                    data=task_data,
-                    offset=0,
-                    limit=DEFAULT_OUTPUT_LINES,
-                )
+            # Add status-specific fields for completed foreground tasks
+            if status == "success":
+                response_kwargs["script_result"] = task_data.result
+            elif status == "error":
+                response_kwargs["script_error"] = task_data.error
 
-                # Build response based on status
-                response_kwargs: Dict[str, Any] = {
-                    "message": result.get("message", f"Task {display_status}: {script_path}"),
-                    "llm_content": {"parts": [{"type": "text", "text": formatted.text}]},
-                    "entry_script": script_path,
-                    "task_id": task_id,
-                    "git_commit": task_data.git_commit,
-                    "pagination": formatted.pagination,
-                }
-
-                # Add status-specific fields
-                if status == "success":
-                    response_kwargs["script_result"] = task_data.result
-                elif status == "error":
-                    response_kwargs["script_error"] = task_data.error
-
-                return success_response(**response_kwargs)
+            return success_response(**response_kwargs)
 
         except ConnectionError as e:
             return error_response(f"Cannot connect to PFC server: {str(e)}")

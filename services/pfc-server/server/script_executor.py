@@ -403,16 +403,17 @@ class PFCScriptExecutor:
 
             if is_timeout:
                 # Script execution timed out but task is still running in background
-                # Return "running" status since task continues execution
+                # Return "pending" status to unify with background mode handling
+                # This allows the tool layer to use the same code path for both cases
                 logger.warning("Script execution timed out (still running): {} (timeout: {}ms)".format(script_path, timeout_ms))
 
                 task = self.task_manager.tasks.get(task_id) if task_id else None
-                timeout_message = "Foreground wait timed out after {}ms. Task '{}' is still running in background. Use pfc_check_task_status to monitor progress.".format(
+                timeout_message = "Foreground wait timed out after {}ms. Task '{}' continues in background.".format(
                     timeout_ms, script_name
                 )
 
                 return {
-                    "status": "running",
+                    "status": "pending",
                     "message": timeout_message,
                     "data": {
                         "task_id": task_id,

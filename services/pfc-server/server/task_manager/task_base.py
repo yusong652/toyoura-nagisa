@@ -44,13 +44,45 @@ class Task(ABC):
         self.task_type = task_type
         self.start_time = time.time()
         self.end_time = None  # type: Optional[float]
-        self.status = "running"  # type: str
+        self._status = "pending"  # type: str  # Internal status, use get_status() for current state
         self.notified = False  # type: bool  # Whether completion has been notified to LLM
         self.on_status_change = on_status_change  # Callback for persistence
         self.error = None  # type: Optional[str]  # Error message (extracted on completion)
 
         # Register completion callback
         future.add_done_callback(self._on_complete)
+
+    @property
+    def status(self):
+        # type: () -> str
+        """
+        Get current task status by checking future state.
+
+        Status values:
+        - "pending": Task queued, waiting for main thread
+        - "running": Task currently executing in main thread
+        - "completed": Task finished successfully
+        - "failed": Task finished with error
+        - "interrupted": Task was interrupted by user
+        """
+        # If already completed, return stored status
+        if self._status in ("completed", "failed", "interrupted"):
+            return self._status
+
+        # Check future state for pending/running tasks
+        if self.future.done():
+            # Future completed but status not yet updated (race condition)
+            return self._status
+        elif self.future.running():
+            return "running"
+        else:
+            return "pending"
+
+    @status.setter
+    def status(self, value):
+        # type: (str) -> None
+        """Set task status (used by _on_complete callback)."""
+        self._status = value
 
     def _on_complete(self, f):
         # type: (Any) -> None

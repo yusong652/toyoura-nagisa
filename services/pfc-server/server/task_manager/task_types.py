@@ -68,9 +68,10 @@ class ScriptTask(Task):
         # type: () -> Dict[str, Any]
         """Get script task status with output and result data."""
         elapsed_time = self.get_elapsed_time()
+        current_status = self.status  # Use property to get real-time status
 
-        if self.status == "running":
-            # Task still executing - include current output
+        if current_status in ("pending", "running"):
+            # Task pending or executing - include current output
             current_output = self.get_current_output()
 
             response_data = {
@@ -90,11 +91,19 @@ class ScriptTask(Task):
             if current_output:
                 response_data["output"] = current_output
 
-            return {
-                "status": "running",
-                "message": "Script still executing: {}\nElapsed time: {:.2f}s".format(
+            # Message based on status
+            if current_status == "pending":
+                message = "Script queued (waiting for main thread): {}\nWaiting time: {:.2f}s".format(
                     self.description, elapsed_time
-                ),
+                )
+            else:
+                message = "Script executing: {}\nElapsed time: {:.2f}s".format(
+                    self.description, elapsed_time
+                )
+
+            return {
+                "status": current_status,
+                "message": message,
                 "data": response_data
             }
 
@@ -104,12 +113,12 @@ class ScriptTask(Task):
             result = self.future.result(timeout=0)
         except Exception as e:
             result = None
-            if self.status == "completed":
+            if current_status == "completed":
                 logger.warning("Status mismatch for task {}: status='completed' but future raised: {}".format(
                     self.task_id, str(e)
                 ))
 
-        if self.status == "completed":
+        if current_status == "completed":
             # Script completed successfully
             logger.info("✓ Task completed: {} (ID: {}, Time: {:.2f}s)".format(
                 self.description, self.task_id, elapsed_time
@@ -169,7 +178,7 @@ class ScriptTask(Task):
                 "data": response_data
             }
 
-        elif self.status == "interrupted":
+        elif current_status == "interrupted":
             # Script was interrupted by user
             logger.info("⊘ Script task interrupted: {} (ID: {}, Time: {:.2f}s)".format(
                 self.description, self.task_id, elapsed_time

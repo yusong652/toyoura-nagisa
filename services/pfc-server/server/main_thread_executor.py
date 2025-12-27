@@ -108,6 +108,9 @@ class MainThreadExecutor:
                     )
 
                 try:
+                    # Mark future as running (enables future.running() check)
+                    future.set_running_or_notify_cancel()
+
                     # Execute task
                     result = func(*args, **kwargs)
                     future.set_result(result)

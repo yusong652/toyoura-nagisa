@@ -93,6 +93,7 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                     is_historical = task.get("historical", False)
 
                     status_text = {
+                        "pending": "Pending",
                         "running": "Running",
                         "completed": "Completed",
                         "failed": "Failed",

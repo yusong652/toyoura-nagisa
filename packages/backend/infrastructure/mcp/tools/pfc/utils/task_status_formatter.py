@@ -30,7 +30,7 @@ CONTEXT_INJECTION_MAX_CHARS = 2000
 class TaskStatusData:
     """Structured task status data."""
     task_id: str
-    status: str  # running, completed, failed, interrupted, not_found
+    status: str  # pending, running, completed, failed, interrupted, not_found
     entry_script: Optional[str] = None
     description: Optional[str] = None
     output: Optional[str] = None
@@ -140,7 +140,7 @@ def format_task_status_for_llm(
     )
 
     # Build navigation hint (status-aware)
-    if data.status == "submitted":
+    if data.status in ("submitted", "pending"):
         nav_hint = "use pfc_check_task_status to monitor progress"
     else:
         nav_parts = []
@@ -163,6 +163,11 @@ def format_task_status_for_llm(
     if data.status == "submitted":
         # Just submitted, no end time yet
         time_section = f"submitted: {start_str}"
+    elif data.status == "pending":
+        # Queued but not yet started
+        import time
+        current_str = format_timestamp(time.time())
+        time_section = f"queued: {start_str}\ncurrent: {current_str}"
     elif data.status == "running":
         import time
         current_str = format_timestamp(time.time())

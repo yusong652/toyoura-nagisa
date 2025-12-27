@@ -540,65 +540,94 @@ class PFCWebSocketServer:
                 "data": None
             }
 
+    async def _process_message(self, websocket: WebSocketServerProtocol, message: str):
+        """
+        Process a single WebSocket message concurrently.
+
+        This method is spawned as an independent task for each incoming message,
+        allowing lightweight operations (ping, status queries) to complete even
+        while long-running foreground tasks are executing.
+
+        Args:
+            websocket: WebSocket connection instance
+            message: Raw message string to process
+        """
+        try:
+            # Parse incoming message
+            data = json.loads(message)
+            msg_type = data.get("type", "pfc_task")
+            request_id = data.get("request_id", "unknown")
+
+            # Route to appropriate handler
+            handler = self._handlers.get(msg_type)
+            if handler:
+                # ping handler is synchronous, others are async
+                if msg_type == "ping":
+                    response = handler()
+                else:
+                    response = await handler(data)
+
+                # Send response (ignore connection closed - will be handled by main loop)
+                await self._send_response(websocket, response, request_id)
+            else:
+                logger.warning(f"Unknown message type: {msg_type}")
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON: {e}")
+            error_response = {
+                "type": "error",
+                "message": "Invalid JSON format",
+                "error": str(e)
+            }
+            await self._send_response(websocket, error_response)
+
+        except asyncio.CancelledError:
+            # Task was cancelled (connection closed), silently exit
+            raise
+
+        except Exception as e:
+            logger.error(f"Message handling error: {e}")
+            error_response = {
+                "type": "error",
+                "message": "Internal server error",
+                "error": str(e)
+            }
+            await self._send_response(websocket, error_response)
+
     async def handle_client(self, websocket: WebSocketServerProtocol, path: Optional[str] = None):
         """
-        Handle WebSocket client connection.
+        Handle WebSocket client connection with concurrent message processing.
 
-        Routes incoming messages to appropriate handlers based on message type.
+        Each incoming message is processed in a separate async task, preventing
+        long-running foreground tasks from blocking lightweight operations like
+        ping/pong heartbeats and status queries.
 
         Args:
             websocket: WebSocket connection instance
             path: Request path (for websockets 9.x compatibility)
         """
         self.active_connections.add(websocket)
+        pending_tasks = set()  # type: set
 
         try:
             async for message in websocket:
-                try:
-                    # Parse incoming message
-                    data = json.loads(message)
-                    msg_type = data.get("type", "pfc_task")
-                    request_id = data.get("request_id", "unknown")
-
-                    # Route to appropriate handler
-                    handler = self._handlers.get(msg_type)
-                    if handler:
-                        # ping handler is synchronous, others are async
-                        if msg_type == "ping":
-                            response = handler()
-                        else:
-                            response = await handler(data)
-
-                        # Send response
-                        if not await self._send_response(websocket, response, request_id):
-                            break  # Connection closed
-                    else:
-                        logger.warning(f"Unknown message type: {msg_type}")
-
-                except json.JSONDecodeError as e:
-                    logger.error(f"Invalid JSON: {e}")
-                    error_response = {
-                        "type": "error",
-                        "message": "Invalid JSON format",
-                        "error": str(e)
-                    }
-                    if not await self._send_response(websocket, error_response):
-                        break
-
-                except Exception as e:
-                    logger.error(f"Message handling error: {e}")
-                    error_response = {
-                        "type": "error",
-                        "message": "Internal server error",
-                        "error": str(e)
-                    }
-                    if not await self._send_response(websocket, error_response):
-                        break
+                # Spawn independent task for each message (non-blocking)
+                task = asyncio.ensure_future(
+                    self._process_message(websocket, message)
+                )
+                pending_tasks.add(task)
+                task.add_done_callback(pending_tasks.discard)
 
         except websockets.exceptions.ConnectionClosed:
             pass  # Client disconnected normally
 
         finally:
+            # Cancel pending response tasks (connection is closing)
+            for task in pending_tasks:
+                task.cancel()
+            # Wait briefly for cancellations to complete
+            if pending_tasks:
+                await asyncio.gather(*pending_tasks, return_exceptions=True)
             self.active_connections.discard(websocket)
 
     async def broadcast_event(self, event_type: str, data: Dict[str, Any]):
