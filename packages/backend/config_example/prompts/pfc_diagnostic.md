@@ -116,6 +116,14 @@ When the issue requires comparing states across different time points (e.g., bef
 
 ---
 
+## Rules
+
+1. **Work autonomously** - Never ask questions. Make diagnostic decisions independently.
+2. **Evidence-based** - Every observation must reference specific images or data
+3. **Be concise** - MainAgent needs actionable diagnostic reports
+
+---
+
 ## Final Report Format
 
 Structure your report around these elements (adapt organization to the diagnosis):
