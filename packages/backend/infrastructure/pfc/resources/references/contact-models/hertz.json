@@ -49,7 +49,7 @@
           "default": "0.0",
           "modifiable": true,
           "inheritable": true,
-          "notes": "Shear modulus of the material. Fundamental material property (unlike linear model's stiffness). Typical values: 1e9 - 1e11 Pa for rocks, 1e7 - 1e9 Pa for soils. Inherits through complex averaging from contacting pieces."
+          "notes": "Shear modulus of the material. Fundamental material property (unlike linear model's stiffness). Typical values: 1e9 - 1e11 Pa for rocks, 1e7 - 1e9 Pa for soils. Inheritance uses Mindlin-Deresiewicz effective modulus: G* = ((2-ν₁)/G₁ + (2-ν₂)/G₂)⁻¹, then G = 2G*(2-ν)."
         },
         {
           "keyword": "hz_poiss",
@@ -60,7 +60,7 @@
           "default": "0.0",
           "modifiable": true,
           "inheritable": true,
-          "notes": "Poisson's ratio of the material. Fundamental material property. Typical values: 0.2 - 0.35 for most materials. Inherits through complex averaging from contacting pieces. Must be > -1.0 and ≤ 0.5."
+          "notes": "Poisson's ratio of the material. Fundamental material property. Typical values: 0.2 - 0.35 for most materials. Must be > -1.0 and ≤ 0.5. Inheritance uses Mindlin-Deresiewicz: E* and G* computed from both pieces, then ν = (4G* - E*)/(2G* - E*)."
         },
         {
           "keyword": "fric",
@@ -71,8 +71,7 @@
           "default": "0.0",
           "modifiable": true,
           "inheritable": true,
-          "notes": "Coulomb friction coefficient. Shear force limited by friction. Uses MINIMUM friction coefficient between contacting surfaces. Value of 0.0 means frictionless contact.",
-          "inheritance_rule": "Uses MINIMUM value from contacting pieces"
+          "notes": "Coulomb friction coefficient. Shear force limited by friction. Value of 0.0 means frictionless contact. Inheritance uses minimum: fric = min(fric(1), fric(2))."
         },
         {
           "keyword": "hz_mode",

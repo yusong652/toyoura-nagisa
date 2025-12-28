@@ -34,7 +34,7 @@
           "default": "0.0",
           "modifiable": true,
           "inheritable": true,
-          "notes": "Primary elastic property. Controls normal force-displacement relationship. Can be set directly or calculated via 'deformability' method using emod/kratio."
+          "notes": "Primary elastic property. Controls normal force-displacement relationship. Can be set directly or calculated via 'deformability' method using emod/kratio. Inheritance uses series formula: 1/kn = 1/kn(1) + 1/kn(2)."
         },
         {
           "keyword": "ks",
@@ -45,7 +45,7 @@
           "default": "0.0",
           "modifiable": true,
           "inheritable": true,
-          "notes": "Primary elastic property. Controls shear force-displacement relationship. Can be set directly or calculated via 'deformability' method using emod/kratio."
+          "notes": "Primary elastic property. Controls shear force-displacement relationship. Can be set directly or calculated via 'deformability' method using emod/kratio. Inheritance uses series formula: 1/ks = 1/ks(1) + 1/ks(2)."
         },
         {
           "keyword": "fric",
@@ -56,7 +56,7 @@
           "default": "0.0",
           "modifiable": true,
           "inheritable": true,
-          "notes": "Coulomb friction coefficient applied in unbonded state. Shear force limited to fric × |normal force|. Not used when bond is active."
+          "notes": "Coulomb friction coefficient applied in unbonded state. Shear force limited to fric × |normal force|. Not used when bond is active. Inheritance uses minimum: fric = min(fric(1), fric(2))."
         },
         {
           "keyword": "rgap",

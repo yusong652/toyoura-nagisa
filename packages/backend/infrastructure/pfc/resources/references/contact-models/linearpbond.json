@@ -37,7 +37,7 @@
           "default": "0.0",
           "modifiable": true,
           "inheritable": true,
-          "notes": "Base linear stiffness, acts in parallel with bond. Total normal force = linear force + parallel-bond force."
+          "notes": "Base linear stiffness, acts in parallel with bond. Total normal force = linear force + parallel-bond force. Inheritance uses series formula: 1/kn = 1/kn(1) + 1/kn(2)."
         },
         {
           "keyword": "ks",
@@ -48,7 +48,7 @@
           "default": "0.0",
           "modifiable": true,
           "inheritable": true,
-          "notes": "Base linear stiffness, acts in parallel with bond. Total shear force = linear force + parallel-bond force."
+          "notes": "Base linear stiffness, acts in parallel with bond. Total shear force = linear force + parallel-bond force. Inheritance uses series formula: 1/ks = 1/ks(1) + 1/ks(2)."
         },
         {
           "keyword": "fric",
@@ -59,7 +59,7 @@
           "default": "0.0",
           "modifiable": true,
           "inheritable": true,
-          "notes": "Coulomb friction coefficient for the linear component. Applied after bond breaks."
+          "notes": "Coulomb friction coefficient for the linear component. Applied after bond breaks. Inheritance uses minimum: fric = min(fric(1), fric(2))."
         },
         {
           "keyword": "rgap",
