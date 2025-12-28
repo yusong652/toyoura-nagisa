@@ -9,6 +9,7 @@
   ],
   "search_keywords": [
     "not",
-    "not"
+    "invert",
+    "exclude"
   ]
 }
