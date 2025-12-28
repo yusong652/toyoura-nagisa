@@ -117,7 +117,7 @@
       "model": "linear"
     },
     {
-      "command": "contact model hertz range type ball-ball",
+      "command": "contact model hertz range contact type 'ball-ball'",
       "description": "Switch ball-ball contacts to nonlinear Hertz model",
       "model": "hertz"
     },
@@ -250,8 +250,8 @@
       "use_case": "Different models for different contact types",
       "workflow": [
         "1. Assign different models to different types:",
-        "   contact model hertz range type ball-ball",
-        "   contact model linear range type ball-facet",
+        "   contact model hertz range contact type 'ball-ball'",
+        "   contact model linear range contact type 'ball-facet'",
         "2. Set properties for each model type using ranges"
       ]
     }
@@ -302,7 +302,7 @@
     },
     "examples": [
       "contact model linear range group 'soil'",
-      "contact model hertz range type ball-ball",
+      "contact model hertz range contact type 'ball-ball'",
       "contact model null range model linear"
     ]
   },

@@ -37,7 +37,7 @@
       "use_case": "Selective activation of specific contact subset"
     },
     {
-      "command": "contact activate false range type ball-facet",
+      "command": "contact activate false range contact type 'ball-facet'",
       "description": "Deactivate ball-facet contacts, let model determine activity",
       "use_case": "Allow contact model to control ball-facet contact activity"
     },
@@ -190,7 +190,7 @@
       "use_case": "Prevent contact deactivation for ball-facet contacts",
       "workflow": [
         "1. Ball-facet contacts might deactivate when ball moves away",
-        "2. Activate ball-facet contacts: contact activate true range type ball-facet",
+        "2. Activate ball-facet contacts: contact activate true range contact type 'ball-facet'",
         "3. Ball-facet contacts stay active until contact detection removes them"
       ],
       "notes": "Activity state set to true regardless of resolution strategy for ball-facet contacts"
@@ -283,7 +283,7 @@
     },
     "examples": [
       "contact activate true range group 'specimen'",
-      "contact activate false range type ball-facet",
+      "contact activate false range contact type 'ball-facet'",
       "contact activate true range model linearpbond"
     ]
   },
@@ -405,7 +405,7 @@
     "note": "Activity state is set to true regardless of contact resolution strategy for ball-facet or pebble-facet contacts",
     "meaning": "When activate = true, ball-facet contacts are active immediately, bypassing normal resolution logic",
     "typical_issue": "Ball-facet contacts may become inactive as ball moves away from facet",
-    "solution": "Use contact activate true range type ball-facet to keep them active",
+    "solution": "Use contact activate true range contact type 'ball-facet' to keep them active",
     "related": "Similar behavior for pebble-facet contacts"
   },
   "default_behavior": {

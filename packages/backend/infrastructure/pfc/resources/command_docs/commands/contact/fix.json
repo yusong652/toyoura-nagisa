@@ -42,7 +42,7 @@
       "use_case": "Return to dynamic force calculation after fixed phase"
     },
     {
-      "command": "contact fix on range type ball-facet",
+      "command": "contact fix on range contact type 'ball-facet'",
       "description": "Fix all ball-facet (ball-wall) contacts",
       "use_case": "Apply constant wall forces"
     },
@@ -133,7 +133,7 @@
       "workflow": [
         "1. Walls in contact with specimen",
         "2. Cycle to establish initial force distribution",
-        "3. Fix wall contacts: contact fix on range type ball-facet",
+        "3. Fix wall contacts: contact fix on range contact type 'ball-facet'",
         "4. Wall reaction forces remain constant",
         "5. Interior can rearrange without wall force changes"
       ]
@@ -246,7 +246,7 @@
     "examples": [
       "contact fix on range position-x 1.1 1.9",
       "contact fix on range group 'boundary'",
-      "contact fix on range type ball-facet",
+      "contact fix on range contact type 'ball-facet'",
       "contact fix on range contact gap 0 100"
     ]
   },

@@ -53,7 +53,7 @@
       "use_case": "Mark contacts that should have special behavior (e.g., fixed)"
     },
     {
-      "command": "contact group 'boundary' range type ball-facet",
+      "command": "contact group 'boundary' range contact type 'ball-facet'",
       "description": "Assign all ball-wall contacts to 'boundary' group",
       "use_case": "Identify boundary contacts for analysis"
     },
@@ -143,7 +143,7 @@
       "Python provides richer query capabilities (in_group, groups dict)"
     ],
     "command_vs_python": {
-      "command": "contact group 'boundary' range type ball-facet",
+      "command": "contact group 'boundary' range contact type 'ball-facet'",
       "python": "for c in it.contact.list():\\n    if c.end1().type_id() == 'ball' and c.end2().type_id() == 'facet':\\n        c.set_group('boundary')"
     }
   },
@@ -211,7 +211,7 @@
     {
       "use_case": "Identify boundary contacts",
       "workflow": [
-        "1. Identify boundary contacts by type: contact group 'boundary' range type ball-facet",
+        "1. Identify boundary contacts by type: contact group 'boundary' range contact type 'ball-facet'",
         "2. All ball-wall contacts now in 'boundary' group",
         "3. Can apply boundary conditions: contact fix on range group 'boundary'",
         "4. Can analyze separately: contact result sum force range group 'boundary'"
@@ -249,7 +249,7 @@
       "use_case": "Multiple independent classifications",
       "workflow": [
         "1. By location: contact group 'top' slot 'region' range position-z 8 10",
-        "2. By type: contact group 'boundary' slot 'Default' range type ball-facet",
+        "2. By type: contact group 'boundary' slot 'Default' range contact type 'ball-facet'",
         "3. By interface: contact group 'specimen-platen' slot 'interface' range ball group 'specimen' contact wall group 'platen'",
         "4. Can combine: range group 'top' slot 'region' contact group 'boundary'"
       ],
@@ -298,7 +298,7 @@
       "contact bonded": "Only bonded contacts"
     },
     "examples": [
-      "contact group 'boundary' range type ball-facet",
+      "contact group 'boundary' range contact type 'ball-facet'",
       "contact group 'top' range position-z 8 10",
       "contact group 'interface' range plane dip 0 origin 0 0 5 dist 0.1"
     ]
@@ -382,7 +382,7 @@
       "function": "Assign group names TO contacts",
       "direction": "User → Contact",
       "command": "contact group <name> range ...",
-      "example": "contact group 'boundary' range type ball-facet",
+      "example": "contact group 'boundary' range contact type 'ball-facet'",
       "result": "Contacts have group name"
     },
     "contact_apply_group": {
@@ -393,7 +393,7 @@
       "result": "Pieces/bodies get group names from contacts"
     },
     "typical_sequence": [
-      "1. Assign groups to contacts: contact group 'boundary' range type ball-facet",
+      "1. Assign groups to contacts: contact group 'boundary' range contact type 'ball-facet'",
       "2. Propagate to pieces: contact apply-group",
       "3. Both contacts and pieces now have 'boundary' group"
     ]
@@ -409,7 +409,7 @@
         "contact group 'foundation' slot 'region' range position-z 0 5",
         "",
         "# Level 3: Boundary type in 'Default' slot",
-        "contact group 'loaded' range type ball-facet",
+        "contact group 'loaded' range contact type 'ball-facet'",
         "",
         "# Can combine: range group 'soil' slot 'material' contact group 'foundation' slot 'region'"
       ]

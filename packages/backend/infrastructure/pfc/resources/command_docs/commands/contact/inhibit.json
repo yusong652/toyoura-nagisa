@@ -42,7 +42,7 @@
       "use_case": "Re-enable all previously inhibited contacts"
     },
     {
-      "command": "contact inhibit on range type ball-facet",
+      "command": "contact inhibit on range contact type 'ball-facet'",
       "description": "Inhibit all ball-wall contacts",
       "use_case": "Temporarily disable boundary forces"
     },
@@ -178,9 +178,9 @@
       "workflow": [
         "1. Simulation with ball-wall contacts at boundaries",
         "2. Need to temporarily remove boundary forces",
-        "3. Inhibit boundary contacts: contact inhibit on range type ball-facet",
+        "3. Inhibit boundary contacts: contact inhibit on range contact type 'ball-facet'",
         "4. Run simulation without boundary forces (balls can pass through walls)",
-        "5. Re-enable boundary: contact inhibit off range type ball-facet",
+        "5. Re-enable boundary: contact inhibit off range contact type 'ball-facet'",
         "6. Boundary forces resume"
       ],
       "notes": "Reversible - contacts remain, just inactive"
@@ -299,7 +299,7 @@
       "contact bonded": "Only bonded contacts"
     },
     "examples": [
-      "contact inhibit on range type ball-facet",
+      "contact inhibit on range contact type 'ball-facet'",
       "contact inhibit on range group 'disabled'",
       "contact inhibit on range position-x 1.1 1.9",
       "contact inhibit on range contact gap 0 100"
@@ -452,12 +452,12 @@
       "description": "Alternate inhibit state for special analyses",
       "example": [
         "# Phase 1: Inhibit boundaries",
-        "contact inhibit on range type ball-facet",
+        "contact inhibit on range contact type 'ball-facet'",
         "cycle 1000  # Interior free to rearrange",
         "",
         "# Phase 2: Inhibit interior",
-        "contact inhibit off range type ball-facet",
-        "contact inhibit on range type ball-ball",
+        "contact inhibit off range contact type 'ball-facet'",
+        "contact inhibit on range contact type 'ball-ball'",
         "cycle 1000  # Boundaries active, interior frozen",
         "",
         "# Phase 3: All active",

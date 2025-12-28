@@ -97,7 +97,7 @@
       "use_case": "Organize bodies based on contact group assignments"
     },
     {
-      "command": "contact apply-group range type ball-ball",
+      "command": "contact apply-group range contact type 'ball-ball'",
       "description": "Apply group names only from ball-ball contacts",
       "use_case": "Selective propagation based on contact type"
     }
@@ -200,7 +200,7 @@
     {
       "use_case": "Identify pieces by contact topology",
       "workflow": [
-        "1. Assign groups to contacts based on criteria: contact group 'Default' 'boundary' range type ball-facet",
+        "1. Assign groups to contacts based on criteria: contact group 'Default' 'boundary' range contact type 'ball-facet'",
         "2. Propagate to pieces: contact apply-group",
         "3. All pieces with ball-facet contacts now in 'boundary' group",
         "4. Can now select these pieces: ball delete range group 'boundary'"
@@ -258,7 +258,7 @@
       "function": "Assign group names TO contacts",
       "syntax": "contact group <slot> <name> <range>",
       "direction": "User → Contact (assigns groups)",
-      "example": "contact group 'Default' 'boundary' range type ball-facet",
+      "example": "contact group 'Default' 'boundary' range contact type 'ball-facet'",
       "result": "Contacts have group names"
     },
     "contact_apply_group": {
@@ -299,7 +299,7 @@
     },
     "examples": [
       "contact apply-group range group 'interface'",
-      "contact apply-group range type ball-ball",
+      "contact apply-group range contact type 'ball-ball'",
       "contact apply-group range model linearpbond"
     ],
     "note": "Range restricts which CONTACTS are processed, not which pieces/bodies receive groups"

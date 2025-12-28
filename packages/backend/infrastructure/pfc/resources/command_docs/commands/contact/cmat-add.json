@@ -167,7 +167,7 @@
       "description": "Add CMAT entry for 'soil' group with linear model and specified properties"
     },
     {
-      "command": "contact cmat add 1 model linearpbond property pb_kn 1e9 pb_ks 5e8 pb_ten 1e6 pb_coh 5e5 range type ball-ball",
+      "command": "contact cmat add 1 model linearpbond property pb_kn 1e9 pb_ks 5e8 pb_ten 1e6 pb_coh 5e5 range contact type 'ball-ball'",
       "description": "Insert CMAT entry at position 1 for ball-ball contacts with parallel bonds"
     },
     {
@@ -183,7 +183,7 @@
       "description": "Add entry that invokes 'bond' method with gap=0.0 at contact creation"
     },
     {
-      "command": "contact cmat add mechanical model linear property kn 1e8 proximity 0.1 range type ball-facet",
+      "command": "contact cmat add mechanical model linear property kn 1e8 proximity 0.1 range contact type 'ball-facet'",
       "description": "Add mechanical contact entry with proximity detection for ball-facet contacts"
     },
     {
@@ -233,7 +233,7 @@
     },
     {
       "use_case": "Different models for different contact types",
-      "command": "contact cmat add model hertz range type ball-ball\ncontact cmat add model linear range type ball-facet"
+      "command": "contact cmat add model hertz range contact type 'ball-ball'\ncontact cmat add model linear range contact type 'ball-facet'"
     },
     {
       "use_case": "Automatic bond activation",

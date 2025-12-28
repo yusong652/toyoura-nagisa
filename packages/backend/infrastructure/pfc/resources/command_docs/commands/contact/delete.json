@@ -25,7 +25,7 @@
       "use_case": "Remove contacts that transmit no forces"
     },
     {
-      "command": "contact delete range type ball-facet",
+      "command": "contact delete range contact type 'ball-facet'",
       "description": "Delete all ball-facet contacts",
       "use_case": "Remove specific contact type while preserving others"
     },
@@ -247,7 +247,7 @@
       "contact delete range contact inactive",
       "contact delete range group 'temporary'",
       "contact delete range model null",
-      "contact delete range type ball-facet",
+      "contact delete range contact type 'ball-facet'",
       "contact delete range ball group 'region-A'"
     ],
     "safety": "Always use specific range to avoid unintended mass deletion"
@@ -400,10 +400,10 @@
       "description": "Delete specific contact types",
       "example": [
         "# Delete all ball-facet contacts (ball-wall)",
-        "contact delete range type ball-facet",
+        "contact delete range contact type 'ball-facet'",
         "",
         "# Delete all ball-ball contacts",
-        "contact delete range type ball-ball"
+        "contact delete range contact type 'ball-ball'"
       ]
     },
     "systematic_contact_reset": {

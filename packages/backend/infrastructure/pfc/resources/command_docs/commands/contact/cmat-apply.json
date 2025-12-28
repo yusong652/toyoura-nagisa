@@ -29,7 +29,7 @@
       "description": "Apply CMAT to contacts in group 'glass' with matches count of 2"
     },
     {
-      "command": "contact cmat apply range type ball-ball",
+      "command": "contact cmat apply range contact type 'ball-ball'",
       "description": "Apply CMAT to all ball-ball contacts"
     },
     {

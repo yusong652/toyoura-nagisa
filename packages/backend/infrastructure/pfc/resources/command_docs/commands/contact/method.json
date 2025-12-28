@@ -163,7 +163,7 @@
       "model": "linearpbond or linearcbond"
     },
     {
-      "command": "contact method deformability emod 50e9 kratio 1.5 range type ball-ball",
+      "command": "contact method deformability emod 50e9 kratio 1.5 range contact type 'ball-ball'",
       "description": "Set stiffnesses for ball-ball contacts only",
       "model": "any model with deformability method"
     }
@@ -357,7 +357,7 @@
     "examples": [
       "contact method bond gap 0.0 range contact active",
       "contact method deformability emod 60e9 kratio 2.5 range group 'specimen'",
-      "contact method pb_deformability emod 60e10 kratio 1.5 range type ball-ball"
+      "contact method pb_deformability emod 60e10 kratio 1.5 range contact type 'ball-ball'"
     ]
   },
   "performance_considerations": {

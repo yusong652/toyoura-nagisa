@@ -85,7 +85,7 @@
       "model": "linear, linearpbond, linearcbond, etc."
     },
     {
-      "command": "contact property hz_shear 2e9 hz_poiss 0.25 range type ball-ball",
+      "command": "contact property hz_shear 2e9 hz_poiss 0.25 range contact type 'ball-ball'",
       "description": "Update Hertz model material properties for ball-ball contacts",
       "model": "hertz"
     },
@@ -268,7 +268,7 @@
     },
     "examples": [
       "contact property kn 1e8 range group 'soil'",
-      "contact property fric 0.5 range type ball-ball",
+      "contact property fric 0.5 range contact type 'ball-ball'",
       "contact property pb_ten 2e5 range model linearpbond"
     ]
   },
