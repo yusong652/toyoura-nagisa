@@ -98,7 +98,8 @@ Understand MainAgent's simulation context before searching documentation:
 |------|-------|
 | `pfc_browse_commands` | `pfc_browse_commands(command="ball create")` - Full command documentation |
 | `pfc_browse_python_api` | `pfc_browse_python_api(api="itasca.ball.create")` - Full API documentation |
-| `pfc_browse_reference` | `pfc_browse_reference(topic="contact-models linear")` - Reference docs |
+| `pfc_browse_reference` | `pfc_browse_reference(topic="contact-models linear")` - Contact model properties |
+|                        | `pfc_browse_reference(topic="range-elements group")` - Range filtering syntax |
 
 **Workflow**: Query → Browse (search first, then get full documentation)
 
