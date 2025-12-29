@@ -164,14 +164,11 @@ class Agent:
                     pass  # Fallback gracefully if primary client unavailable
 
             # Build system prompt once (immutable during Agent lifecycle)
-            prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
-                self.session_id, self.config.tool_profile
-            )
+            # Memory context is now injected into user messages via ReminderInjector,
+            # not in the system prompt (follows modern LLM best practices)
             self._system_prompt = await build_system_prompt(
                 agent_profile=self.config.name,  # Use config.name for SubAgent prompt lookup
                 session_id=self.session_id,
-                enable_memory=self.context_manager.enable_memory,
-                tool_schemas=prompt_tool_schemas,
                 include_expression=self.is_main_agent,  # SubAgent: no expression instructions
             )
 

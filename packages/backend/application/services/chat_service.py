@@ -204,7 +204,7 @@ class ChatService:
 
     async def _inject_status_reminders(self, session_id: str, parsed_data: MessageParseResult) -> None:
         """
-        Inject system status reminders and file mentions into user message content.
+        Inject system status reminders, memory context, and file mentions into user message content.
 
         Delegates to ReminderInjector for unified reminder collection and injection.
 
@@ -218,9 +218,10 @@ class ChatService:
             agent_profile = parsed_data.get('agent_profile', 'general')
             mentioned_files = parsed_data.get('mentioned_files', [])
             content = parsed_data.get('content', [])
+            enable_memory = parsed_data.get('enable_memory', False)
 
             injector = ReminderInjector(session_id, agent_profile)
-            await injector.inject_to_user_message(content, mentioned_files or None)
+            await injector.inject_to_user_message(content, mentioned_files or None, enable_memory=enable_memory)
 
         except Exception as e:
             # Non-critical: Log and continue without reminders

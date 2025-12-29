@@ -115,9 +115,6 @@ class Mem0MemoryManager:
         if self.config.debug_mode:
             logger.info(f"[Mem0 Debug] Adding memory: user_id={user_id}, messages={len(messages)} messages, metadata={metadata}")
         
-        # Always log the actual user_id being used for debugging
-        print(f"[DEBUG] add_memory called with user_id={user_id}")
-        
         try:
             # Support Mem0 API variants: prefer user_id, fallback to agent_id
             try:
@@ -154,32 +151,7 @@ class Mem0MemoryManager:
                 if "error" in item:
                     logger.warning(f"[MEMORY] Error in {event_type} event for memory {memory_id}: {item['error']}")
                     continue
-                
-                # Log different event types with consistent formatting
-                if self.config.debug_mode:
-                    if event_type == "UPDATE":
-                        old_memory = item.get("previous_memory", "")
-                        new_memory = item.get("memory", "")
-                        print(f"[MEMORY] {event_type}: Memory {memory_id} updated")
-                        print(f"  OLD: {old_memory}")
-                        print(f"  NEW: {new_memory}")
-                    elif event_type == "DELETE":
-                        deleted_memory = item.get("memory", "")
-                        print(f"[MEMORY] {event_type}: Memory {memory_id} deleted")
-                        print(f"  Content: {deleted_memory}")
-                    elif event_type == "ADD":
-                        added_memory = item.get("memory", "")
-                        print(f"[MEMORY] {event_type}: Memory {memory_id} added")
-                        print(f"  Content: {added_memory}")
-                    else:
-                        # Unknown event type
-                        print(f"[MEMORY] {event_type}: Unknown event for memory {memory_id}")
-                else:
-                    # Non-debug mode: only show essential info
-                    if event_type == "ADD":
-                        added_memory = item.get("memory", "")
-                        print(f"[MEMORY] Stored: {added_memory}")
-            
+                   
             # Return the ID from the first result with an ID
             first_result = results_list[0]
             return first_result.get("id", "")
@@ -228,16 +200,16 @@ class Mem0MemoryManager:
                     limit=limit
                 )
             # mem0.search() always returns {'results': [...]} where results is always a list
-            results = search_result["results"]
-            
+            results = search_result.get("results", [])
+
             if self.config.debug_mode:
                 logger.info(f"[Mem0 Debug] Search completed, found {len(results)} results")
-            
+
         except Exception as e:
             logger.error(f"[Mem0] Search failed: {e}")
             # Return empty list on search failure
             results = []
-        
+
         return results
     
     async def get_relevant_memories_for_context(
@@ -269,32 +241,18 @@ class Mem0MemoryManager:
         # This method is always active when called
         
         
-        # Search memories with Mem0
-        if self.config.debug_mode:
-            logger.info(f"[Mem0 Debug] Starting context memory search (top_k: {top_k})")
-        
+        # Search memories with Mem0 
         raw_memories = await self.search_memories(
             query=query_text,
             user_id=user_id,
             limit=top_k * 2  # Get extra for filtering
         )
         
-        if self.config.debug_mode:
-            logger.info(f"[Mem0 Debug] Context search completed, processing {len(raw_memories)} raw memories")
-        
         # Convert to EnhancedMemory objects
         enhanced_memories = []
         
-        if self.config.debug_mode:
-            logger.info(f"[Mem0 Debug] Processing {len(raw_memories)} raw memories")
-            logger.info(f"[Mem0 Debug] Raw memories sample: {raw_memories[:1] if raw_memories else 'empty'}")
-        
         for i, mem in enumerate(raw_memories):
-            logger.debug(f"[Mem0 Debug] Processing memory {i}: type={type(mem)}, keys={list(mem.keys()) if isinstance(mem, dict) else 'not_dict'}")
             
-            if not isinstance(mem, dict):
-                logger.error(f"[Mem0 Debug] Memory {i} is not dict: {type(mem)} - {mem}")
-                continue
             metadata = mem.get("metadata", {})
             
             # Use relevance score from Mem0
@@ -312,9 +270,6 @@ class Mem0MemoryManager:
         # Sort by relevance and return top_k
         enhanced_memories.sort(key=lambda m: m.relevance_score, reverse=True)
         final_memories = enhanced_memories[:top_k]
-        
-        if self.config.debug_mode:
-            logger.info(f"[Mem0 Debug] Memory processing completed, final count: {len(final_memories)}")
         
         return final_memories
     

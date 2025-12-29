@@ -2,16 +2,14 @@
 Main prompt builder functions combining all components.
 """
 
-import json
 import logging
 import sys
 import platform
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 from .core import get_base_prompt, get_expression_prompt
-from .memory import build_memory_section_from_session
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
 
 logger = logging.getLogger(__name__)
@@ -79,9 +77,6 @@ session_id: {session_id_display}
 async def build_system_prompt(
     agent_profile: str = "general",
     session_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    enable_memory: bool = False,
-    tool_schemas: Optional[List[Dict[str, Any]]] = None,
     include_expression: bool = True,
 ) -> str:
     """
@@ -89,27 +84,24 @@ async def build_system_prompt(
 
     This is the main entry point for creating system prompts with support for:
     - Base identity and instructions (profile-specific)
-    - Automatic memory context injection from conversation history
     - Expression/Live2D instructions (MainAgent only)
 
-    Note: Tool schemas are NO LONGER embedded in the system prompt.
-    Modern LLM APIs (Anthropic, Gemini, OpenAI) handle tool definitions natively
-    via the `tools` API parameter. Embedding schemas in the prompt was a legacy
-    practice that caused token waste and potential confusion from duplicate definitions.
+    Note: Memory context is now injected into user messages via ReminderInjector,
+    not in the system prompt. This follows modern LLM best practices where dynamic
+    context should be closer to the user's query.
+
+    Note: Tool schemas are handled by native LLM API (tools parameter), not embedded
+    in the system prompt. This follows 2025 Anthropic best practices.
 
     Args:
         agent_profile: Agent profile type ("general", "pfc", "coding", "lifestyle", "disabled")
                       For SubAgents, use the SubAgent name (e.g., "pfc_explorer")
-        session_id: Session ID for memory retrieval
-        user_id: User ID for memory operations
-        enable_memory: Whether to enable memory injection (controlled by frontend)
-        tool_schemas: DEPRECATED - kept for API compatibility but no longer used.
-                     Tools are passed via native API parameter instead.
+        session_id: Session ID for workspace resolution
         include_expression: Whether to include expression/Live2D instructions (default True).
                            Set to False for SubAgents.
 
     Returns:
-        Complete system prompt string with memory context
+        Complete system prompt string
     """
     components = []
 
@@ -119,11 +111,7 @@ async def build_system_prompt(
         logger.warning(f"No base prompt found for profile: {agent_profile}")
         base = ""
 
-    # 2. Tool schemas are now handled by native LLM API (tools parameter)
-    # No longer embedded in system prompt - this was legacy behavior that caused
-    # duplicate definitions and wasted tokens. See 2025 Anthropic best practices.
-
-    # 3. Get workspace root for path substitution (dynamic based on profile and session)
+    # 2. Get workspace root for path substitution (dynamic based on profile and session)
     workspace_root = await _get_workspace_root(agent_profile, session_id)
 
     # Normalize workspace_root to forward slashes for LLM consistency
@@ -142,15 +130,7 @@ async def build_system_prompt(
     if base:
         components.append(base)
 
-    # 5. Memory context injection (if enabled)
-    if enable_memory and session_id:
-        memory_content = await build_memory_section_from_session(session_id, user_id)
-        if memory_content:
-            components.append(f"## Relevant Context from Memory\n\n{memory_content}")
-        else:
-            components.append("## Relevant Context from Memory\n\n(No relevant memories found for current query)")
-
-    # 6. Expression/Live2D instructions (MainAgent only)
+    # 5. Expression/Live2D instructions (MainAgent only)
     if include_expression:
         expression = get_expression_prompt()
         if expression:
