@@ -21,18 +21,15 @@ errorlog.txt
 # -----------------------------------------
 # PFC Server Files
 # -----------------------------------------
-# Server log
-pfc_server.log
-
 # Quick console scripts (managed by pfc-server)
 # These are auto-generated temporary scripts
 .quick_console/
 
 # -----------------------------------------
-# Task Data (managed by pfc-server)
+# Nagisa Server Data (managed by pfc-server)
 # -----------------------------------------
-# Task persistence is stored in toyoura-nagisa/data/
-# Not in workspace, so no need to ignore here
+# Contains task persistence, output logs, and server state
+.nagisa/
 
 # -----------------------------------------
 # OS Generated Files

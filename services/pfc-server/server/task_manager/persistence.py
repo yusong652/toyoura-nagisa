@@ -21,19 +21,19 @@ class TaskPersistence:
     Manage persistent storage of task data.
 
     Tasks are saved to JSON files organized by session:
-        data/sessions/{session_id}/tasks.json
+        .nagisa/sessions/{session_id}/tasks.json
 
     Each session has its own directory for clean isolation.
     On server restart, historical tasks are loaded as read-only records.
     """
 
-    def __init__(self, data_dir="data"):
+    def __init__(self, data_dir=".nagisa"):
         # type: (str,) -> None
         """
         Initialize persistence manager.
 
         Args:
-            data_dir: Base directory for task data (relative to pfc-server root)
+            data_dir: Base directory for task data (hidden directory in workspace)
         """
         self.data_dir = data_dir
         self.sessions_dir = os.path.join(data_dir, "sessions")

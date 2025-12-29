@@ -34,7 +34,11 @@ import time
 # Configure logging - output to both console and file
 import os
 # Use os.getcwd() since __file__ is not available when using exec()
-log_file = os.path.join(os.getcwd(), "pfc_server.log")
+# Store server log in .nagisa/ hidden directory for clean workspace
+nagisa_dir = os.path.join(os.getcwd(), ".nagisa")
+if not os.path.exists(nagisa_dir):
+    os.makedirs(nagisa_dir)
+log_file = os.path.join(nagisa_dir, "server.log")
 
 # Force configure logging (basicConfig won't work if already configured)
 root_logger = logging.getLogger()
@@ -266,8 +270,8 @@ def _create_gitignore(cwd, gitignore_path, result):
 errorlog.txt
 *.dmp
 *.temp
-pfc_server.log
 .quick_console/
+.nagisa/
 """
         try:
             with open(gitignore_path, 'w', encoding='utf-8') as f:

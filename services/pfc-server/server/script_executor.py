@@ -298,8 +298,8 @@ class PFCScriptExecutor:
             task_id = uuid.uuid4().hex[:8]
 
             # Create output log file for complete output preservation
-            # Path: data/sessions/{session_id}/logs/task_{task_id}.log
-            log_dir = os.path.join("data", "sessions", session_id, "logs")
+            # Path: .nagisa/sessions/{session_id}/logs/task_{task_id}.log
+            log_dir = os.path.join(".nagisa", "sessions", session_id, "logs")
             log_path = os.path.join(log_dir, "task_{}.log".format(task_id))
             output_buffer = FileBuffer(log_path)
 
