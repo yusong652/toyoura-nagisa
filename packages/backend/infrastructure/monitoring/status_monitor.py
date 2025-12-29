@@ -17,7 +17,7 @@ The monitor is session-scoped and provides unified reminder API.
 """
 
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from .monitors import (
     InterruptMonitor,
@@ -186,7 +186,7 @@ class StatusMonitor:
         code: str,
         task_id: str,
         output: str,
-        error: str = None
+        error: Optional[str] = None,
     ) -> None:
         """
         Add a user PFC Python command context for LLM injection.
@@ -209,12 +209,12 @@ class StatusMonitor:
         self,
         task_id: str,
         status: str,
-        entry_script: str = None,
-        description: str = None,
-        output: str = None,
-        error: str = None,
-        elapsed_time: float = None,
-        git_commit: str = None,
+        entry_script: Optional[str] = None,
+        description: Optional[str] = None,
+        output: Optional[str] = None,
+        error: Optional[str] = None,
+        elapsed_time: Optional[float] = None,
+        git_commit: Optional[str] = None,
     ) -> None:
         """
         Add a user PFC task status context for LLM injection.
