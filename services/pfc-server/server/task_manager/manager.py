@@ -82,7 +82,7 @@ class TaskManager:
             future: asyncio Future object for the task
             script_name: Name of the script file (e.g., "main.py")
             script_path: Optional full path to entry script for reference
-            output_buffer: Optional StringIO buffer for real-time output capture
+            output_buffer: Optional FileBuffer for output capture (writes to disk)
             description: Task description from PFC agent (LLM-provided)
             git_commit: Git commit hash on pfc-executions branch (version snapshot)
             source: Task source identifier ("agent" or "user_console")

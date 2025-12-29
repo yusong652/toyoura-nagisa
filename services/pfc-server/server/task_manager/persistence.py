@@ -96,9 +96,8 @@ class TaskPersistence:
         task_data["script_name"] = task.script_name
         task_data["script_path"] = task.script_path
         task_data["git_commit"] = getattr(task, "git_commit", None)  # Git version snapshot
-        # Save output snapshot
-        output = task.get_current_output()
-        task_data["output"] = output if output else ""
+        # Save log file path (output is read from file on demand)
+        task_data["log_path"] = getattr(task, "log_path", None)
         # Save error message (for failed tasks)
         task_data["error"] = getattr(task, "error", None)
 
@@ -290,6 +289,7 @@ class HistoricalTask:
 
     Implements same interface as Task for compatibility with TaskManager,
     but without Future or output buffer (no active execution).
+    Output is read from log file on demand.
     """
 
     def __init__(self, task_data):
@@ -315,7 +315,9 @@ class HistoricalTask:
         self.script_name = task_data.get("script_name", "")
         self.script_path = task_data.get("script_path")
         self.git_commit = task_data.get("git_commit")  # Git version snapshot
-        self.output_snapshot = task_data.get("output", "")
+        self.log_path = task_data.get("log_path")  # Path to output log file
+        # Backward compatibility: support old format with inline output
+        self._output_snapshot = task_data.get("output", "")
         self.error = task_data.get("error")  # Error message (for failed tasks)
 
         # No Future or output_buffer for historical tasks
@@ -332,8 +334,23 @@ class HistoricalTask:
 
     def get_current_output(self):
         # type: () -> Optional[str]
-        """Return output snapshot."""
-        return self.output_snapshot
+        """
+        Read output from log file.
+
+        Falls back to inline snapshot for backward compatibility with old format.
+        """
+        # Try reading from log file first
+        if self.log_path:
+            try:
+                import os
+                if os.path.exists(self.log_path):
+                    with open(self.log_path, 'r', encoding='utf-8') as f:
+                        return f.read()
+            except Exception as e:
+                logger.warning("Failed to read log file {}: {}".format(self.log_path, e))
+
+        # Fallback to inline snapshot (backward compatibility)
+        return self._output_snapshot if self._output_snapshot else None
 
     def get_status_response(self):
         # type: () -> Dict[str, Any]

@@ -365,14 +365,15 @@ class PFCWebSocketServer:
                 raise ValueError("script_path is required")
 
             import os
-            from io import StringIO
             import uuid
+            from io import StringIO
 
             # Read script content
             with open(script_path, 'r', encoding='utf-8') as f:
                 script_content = f.read()
 
             # Generate task_id for tracking
+            # Use StringIO for diagnostic scripts (quick, no persistence needed)
             task_id = uuid.uuid4().hex[:8]
             output_buffer = StringIO()
 

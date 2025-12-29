@@ -20,8 +20,9 @@ class ScriptTask(Task):
     """
     Task for Python script execution.
 
-    Enhanced task type with real-time output capture via StringIO buffer,
+    Enhanced task type with real-time output capture via FileBuffer,
     suitable for long-running simulations with progress monitoring.
+    Output is written directly to disk for complete preservation.
     Includes git-based version tracking via git_commit.
     """
 
@@ -36,7 +37,7 @@ class ScriptTask(Task):
             future: asyncio Future object for the task
             script_name: Name of the script file (e.g., "main.py")
             script_path: Optional full path to entry script for reference
-            output_buffer: Optional StringIO buffer for real-time output capture
+            output_buffer: Optional FileBuffer for output capture (writes to disk)
             description: Task description from PFC agent (LLM-provided)
             on_status_change: Optional callback function(task) called when task status changes
             git_commit: Git commit hash on pfc-executions branch (version snapshot)
@@ -49,6 +50,11 @@ class ScriptTask(Task):
         self.output_buffer = output_buffer
         self.git_commit = git_commit  # Git version snapshot
         self.source = source  # Task source: "agent" or "user_console"
+
+        # Extract log path from FileBuffer for persistence
+        self.log_path = None  # type: Optional[str]
+        if output_buffer and hasattr(output_buffer, 'get_path'):
+            self.log_path = output_buffer.get_path()
 
         logger.info("✓ Script task registered: {} (ID: {}, Session: {})".format(
             script_name, task_id, session_id
