@@ -141,15 +141,25 @@ def _pfc_diagnostic_callback():
 
     # Execute script
     try:
+        import sys
         import itasca  # type: ignore
 
         # Read script content
         with open(script_path, 'r', encoding='utf-8') as f:
             script_content = f.read()
 
-        # Execute in isolated namespace with itasca available
-        exec_context = {"itasca": itasca}
-        exec(script_content, exec_context, exec_context)
+        # Temporarily restore original stdout to avoid mixing with main script output
+        # When main script is running, sys.stdout points to its FileBuffer
+        # Diagnostic output should go to original console, not main script's log
+        old_stdout = sys.stdout
+        sys.stdout = sys.__stdout__  # Python's original stdout
+
+        try:
+            # Execute in isolated namespace with itasca available
+            exec_context = {"itasca": itasca}
+            exec(script_content, exec_context, exec_context)
+        finally:
+            sys.stdout = old_stdout  # Restore (back to main script's buffer if running)
 
         # Get result if script defined 'result' variable
         result = exec_context.get("result", None)
