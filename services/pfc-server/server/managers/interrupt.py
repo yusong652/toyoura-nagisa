@@ -200,7 +200,7 @@ def _re_register_callback(itasca_module, position=50.0):
 
     # Also re-register diagnostic callback if it was registered
     try:
-        from .diagnostic_executor import _pfc_diagnostic_callback, is_callback_registered
+        from ..executors.diagnostic import _pfc_diagnostic_callback, is_callback_registered
         if is_callback_registered():
             __main__._pfc_diagnostic_callback = _pfc_diagnostic_callback
             itasca_module.set_callback("_pfc_diagnostic_callback", 51.0)

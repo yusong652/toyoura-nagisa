@@ -55,7 +55,7 @@ root_logger.addHandler(console_handler)
 root_logger.addHandler(file_handler)
 
 # Import server components
-from server.main_thread_executor import MainThreadExecutor
+from server.executors import MainThreadExecutor
 from server.server import create_server
 
 # Load configuration
@@ -108,11 +108,11 @@ try:
     _init_status["pfc_state"] = True
 
     # Register global callback for task interruption (must be before any script execution)
-    from server.interrupt_manager import register_interrupt_callback
+    from server.managers import register_interrupt_callback
     _init_status["interrupt"] = register_interrupt_callback(it, position=50.0)
 
     # Register diagnostic callback for cycle-safe script execution (after interrupt)
-    from server.diagnostic_executor import register_diagnostic_callback
+    from server.executors import register_diagnostic_callback
     _init_status["diagnostic"] = register_diagnostic_callback(it, position=51.0)
 
 except ImportError:

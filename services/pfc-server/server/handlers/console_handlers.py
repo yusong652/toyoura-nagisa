@@ -165,7 +165,7 @@ async def handle_diagnostic_execute(ctx, data):
             # Strategy 2: Use callback execution (works during cycle)
             logger.info("Queue blocked, switching to callback execution")
 
-            from ..diagnostic_executor import submit_diagnostic, is_callback_registered
+            from ..executors import submit_diagnostic, is_callback_registered
 
             if not is_callback_registered():
                 raise RuntimeError(

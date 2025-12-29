@@ -14,10 +14,9 @@ from typing import Any, Dict, Optional
 import websockets
 from websockets.server import WebSocketServerProtocol  # type: ignore
 
-from .script_executor import PFCScriptExecutor
-from .main_thread_executor import MainThreadExecutor
+from .executors import PFCScriptExecutor, MainThreadExecutor
 from .task_manager import TaskManager
-from .quick_console_manager import QuickConsoleManager
+from .managers import QuickConsoleManager
 from .handlers import (
     ServerContext,
     handle_pfc_task,

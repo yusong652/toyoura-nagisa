@@ -93,7 +93,7 @@ async def handle_reset_workspace(ctx, data):
         results.append(task_result)
 
         # 3. Reset git execution branch
-        from ..git_version_manager import get_git_manager
+        from ..managers import get_git_manager
         if workspace_path:
             git_manager = get_git_manager(workspace_path)
             git_result = git_manager.reset_execution_branch()

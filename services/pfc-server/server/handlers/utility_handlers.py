@@ -40,7 +40,7 @@ async def handle_interrupt_task(ctx, data):
     Returns:
         Response dict with interrupt request result
     """
-    from ..interrupt_manager import request_interrupt
+    from ..managers import request_interrupt
 
     request_id = data.get("request_id", "unknown")
     task_id = data.get("task_id", "")

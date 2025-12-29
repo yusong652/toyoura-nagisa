@@ -9,9 +9,8 @@ from typing import TYPE_CHECKING, Dict
 
 if TYPE_CHECKING:
     from ..task_manager import TaskManager
-    from ..script_executor import PFCScriptExecutor
-    from ..main_thread_executor import MainThreadExecutor
-    from ..quick_console_manager import QuickConsoleManager
+    from ..executors import PFCScriptExecutor, MainThreadExecutor
+    from ..managers import QuickConsoleManager
 
 
 class ServerContext:
@@ -61,7 +60,7 @@ class ServerContext:
         Returns:
             QuickConsoleManager instance for the workspace
         """
-        from ..quick_console_manager import QuickConsoleManager
+        from ..managers import QuickConsoleManager
 
         if workspace_path not in self.quick_console_managers:
             self.quick_console_managers[workspace_path] = QuickConsoleManager(workspace_path)

@@ -20,10 +20,9 @@ import traceback
 import uuid
 from typing import Any, Dict, Optional
 
-from .main_thread_executor import MainThreadExecutor
-from .utils import path_to_llm_format, FileBuffer
-from .git_version_manager import get_git_manager
-from .interrupt_manager import set_current_task, clear_current_task, clear_interrupt
+from .main_thread import MainThreadExecutor
+from ..utils import path_to_llm_format, FileBuffer
+from ..managers import get_git_manager, set_current_task, clear_current_task, clear_interrupt
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
