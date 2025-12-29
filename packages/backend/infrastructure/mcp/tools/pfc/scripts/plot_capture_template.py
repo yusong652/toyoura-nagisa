@@ -235,8 +235,9 @@ def _build_ball_color_by_command(
             color_by_part = f'color-by numeric-attribute "{spec["attribute"]}"'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
         elif spec["type"] == "text":
-            # Text attributes use named color mapping (no filter needed)
-            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+            # Text attributes need 'Any' filter to show all values
+            # Escape single quotes for embedding in itasca.command('...')
+            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
             color_options = "color-options named maximum-names 1000000 name-controls true"
         else:
             return ""
@@ -333,8 +334,9 @@ def _build_wall_color_by_command(
             color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
         elif spec["type"] == "text":
-            # Wall text attributes use named color mapping (no filter needed)
-            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+            # Wall text attributes need 'Any' filter to show all values
+            # Escape single quotes for embedding in itasca.command('...')
+            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
             color_options = "color-options named maximum-names 1000000 name-controls true"
         else:
             return ""
@@ -393,7 +395,9 @@ def _build_contact_color_by_command(
             color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
         elif spec["type"] == "text":
-            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+            # Contact text attributes need 'Any' filter to show all values
+            # Escape single quotes for embedding in itasca.command('...')
+            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
             color_options = "color-options named maximum-names 1000000 name-controls true"
         elif spec["type"] == "numeric-property":
             color_by_part = f'color-by numeric-property "{spec["property"]}"'
