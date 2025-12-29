@@ -30,6 +30,9 @@ from .scripts import (
     DEFAULT_WALL_TRANSPARENCY,
     DEFAULT_IMAGE_SIZE,
     BallShapeType,
+    ValidatedBallColorBy,
+    ValidatedWallColorBy,
+    ValidatedContactColorBy,
     VectorQuantityType,
     CutPlane,
 )
@@ -68,12 +71,15 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 "Arrow mode requires ball_color_by to be a vector attribute, otherwise falls back to sphere."
             )
         ),
-        ball_color_by: Optional[str] = Field(
+        ball_color_by: ValidatedBallColorBy = Field(
             default=None,
             description=(
                 "Ball coloring attribute. "
-                "Common: position, velocity, displacement, spin, force-contact, force-applied, "
-                "radius, damp, density, mass, id, group, extra-1, extra-2, ..."
+                "Vector: position, velocity, displacement, spin, force-contact, force-applied, "
+                "force-unbalanced, moment-contact, moment-applied, moment-unbalanced. "
+                "Scalar: radius, damp, density, mass. "
+                "Text: id, group. "
+                "Extra: extra-1, extra-2, ... (custom attributes)."
             )
         ),
         ball_color_by_quantity: Optional[VectorQuantityType] = Field(
@@ -84,12 +90,13 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             default=True,
             description="Show boundary walls."
         ),
-        wall_color_by: Optional[str] = Field(
+        wall_color_by: ValidatedWallColorBy = Field(
             default=None,
             description=(
                 "Wall coloring attribute. "
-                "Common: position, velocity, displacement, force-contact, "
-                "name, id, group, extra-1, extra-2, ..."
+                "Vector: position, velocity, displacement, force-contact. "
+                "Text: name, group. "
+                "Extra: extra-1, extra-2, ... (custom attributes)."
             )
         ),
         wall_color_by_quantity: Optional[VectorQuantityType] = Field(
@@ -106,12 +113,14 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             default=False,
             description="Show contact forces between particles."
         ),
-        contact_color_by: Optional[str] = Field(
+        contact_color_by: ValidatedContactColorBy = Field(
             default="force",
             description=(
                 "Contact coloring attribute. "
-                "Common: force, id, group, contact-type, model-name, "
-                "fric, kn, ks, emod, kratio, extra-1, extra-2, ..."
+                "Vector: force. "
+                "Text: id, group, contact-type, model-name. "
+                "Property: fric, kn, ks, dp_nratio, dp_sratio, emod, kratio, rr_fric, rr_kr, rr_slip. "
+                "Extra: extra-1, extra-2, ... (custom attributes)."
             )
         ),
         contact_color_by_quantity: Optional[VectorQuantityType] = Field(

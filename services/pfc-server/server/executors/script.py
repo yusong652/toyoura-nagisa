@@ -18,13 +18,11 @@ import sys
 import time
 import traceback
 import uuid
-from io import StringIO
 from typing import Any, Dict, Optional
 
-from .main_thread_executor import MainThreadExecutor
-from .utils import path_to_llm_format
-from .git_version_manager import get_git_manager
-from .interrupt_manager import set_current_task, clear_current_task, clear_interrupt
+from .main_thread import MainThreadExecutor
+from ..utils import path_to_llm_format, FileBuffer
+from ..managers import get_git_manager, set_current_task, clear_current_task, clear_interrupt
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
@@ -63,7 +61,7 @@ class PFCScriptExecutor:
         Args:
             script_path: Path to script (for error messages)
             script_content: Script content to execute
-            output_buffer: StringIO buffer for capturing stdout (shared with TaskManager)
+            output_buffer: FileBuffer for capturing stdout (shared with TaskManager)
             task_id: Task ID for interrupt checking
 
         Returns:
@@ -295,11 +293,14 @@ class PFCScriptExecutor:
             }
 
         try:
-            # Create shared output buffer for real-time output capture
-            output_buffer = StringIO()
-
-            # Generate task_id early (needed for git commit and interrupt tracking)
+            # Generate task_id early (needed for log path, git commit, and interrupt tracking)
             task_id = uuid.uuid4().hex[:8]
+
+            # Create output log file for complete output preservation
+            # Path: .nagisa/sessions/{session_id}/logs/task_{task_id}.log
+            log_dir = os.path.join(".nagisa", "sessions", session_id, "logs")
+            log_path = os.path.join(log_dir, "task_{}.log".format(task_id))
+            output_buffer = FileBuffer(log_path)
 
             # Create git execution snapshot (before running script)
             # This captures the exact code state that will be executed

@@ -19,6 +19,9 @@ from .plot_capture_template import (
     WallColorByType,
     ContactColorByType,
     VectorQuantityType,
+    ValidatedBallColorBy,
+    ValidatedWallColorBy,
+    ValidatedContactColorBy,
     CutPlane,
 )
 
@@ -36,5 +39,8 @@ __all__ = [
     "WallColorByType",
     "ContactColorByType",
     "VectorQuantityType",
+    "ValidatedBallColorBy",
+    "ValidatedWallColorBy",
+    "ValidatedContactColorBy",
     "CutPlane",
 ]

@@ -11,8 +11,9 @@ Design Philosophy:
 - Auto-cleanup temporary plot after export
 """
 
-from typing import Dict, Any, List, Literal, Tuple, Optional, Annotated
-from pydantic import BaseModel, Field
+from typing import Dict, Any, List, Literal, Tuple, Optional, Annotated, Union
+from pydantic import BaseModel, Field, BeforeValidator
+import re
 
 
 # Type definitions for tool parameters (keep in sync with SPECS below)
@@ -43,6 +44,72 @@ ContactColorByType = Literal[
 ]
 VectorQuantityType = Literal["mag", "x", "y", "z"]
 BallShapeType = Literal["sphere", "arrow"]
+
+# Pattern for extra-N attributes (e.g., extra-1, extra-2)
+EXTRA_PATTERN = re.compile(r"^extra-\d+$", re.IGNORECASE)
+
+
+def _validate_ball_color_by(value: Optional[str]) -> Optional[str]:
+    """Validate ball_color_by accepts Literal values or extra-N pattern."""
+    if value is None:
+        return None
+    v = value.lower()
+    # Check if it's a known attribute
+    if v in (
+        "position", "velocity", "displacement", "spin",
+        "force-contact", "force-applied", "force-unbalanced",
+        "moment-contact", "moment-applied", "moment-unbalanced",
+        "radius", "damp", "density", "mass", "id", "group",
+    ):
+        return value
+    # Check extra-N pattern
+    if EXTRA_PATTERN.match(v):
+        return value
+    raise ValueError(
+        f"Invalid ball_color_by: '{value}'. "
+        f"Valid: position, velocity, displacement, spin, force-contact, force-applied, "
+        f"radius, damp, density, mass, id, group, extra-1, extra-2, ..."
+    )
+
+
+def _validate_wall_color_by(value: Optional[str]) -> Optional[str]:
+    """Validate wall_color_by accepts Literal values or extra-N pattern."""
+    if value is None:
+        return None
+    v = value.lower()
+    if v in ("position", "velocity", "displacement", "force-contact", "name", "group"):
+        return value
+    if EXTRA_PATTERN.match(v):
+        return value
+    raise ValueError(
+        f"Invalid wall_color_by: '{value}'. "
+        f"Valid: position, velocity, displacement, force-contact, name, group, extra-1, extra-2, ..."
+    )
+
+
+def _validate_contact_color_by(value: Optional[str]) -> Optional[str]:
+    """Validate contact_color_by accepts Literal values or extra-N pattern."""
+    if value is None:
+        return None
+    v = value.lower()
+    if v in (
+        "force", "id", "group", "contact-type", "model-name",
+        "fric", "kn", "ks", "dp_nratio", "dp_sratio",
+        "emod", "kratio", "rr_fric", "rr_kr", "rr_slip",
+    ):
+        return value
+    if EXTRA_PATTERN.match(v):
+        return value
+    raise ValueError(
+        f"Invalid contact_color_by: '{value}'. "
+        f"Valid: force, id, group, contact-type, model-name, fric, kn, ks, extra-1, extra-2, ..."
+    )
+
+
+# Validated types for tool parameters (supports Literal values + extra-N pattern)
+ValidatedBallColorBy = Annotated[Optional[str], BeforeValidator(_validate_ball_color_by)]
+ValidatedWallColorBy = Annotated[Optional[str], BeforeValidator(_validate_wall_color_by)]
+ValidatedContactColorBy = Annotated[Optional[str], BeforeValidator(_validate_contact_color_by)]
 
 
 class CutPlane(BaseModel):
@@ -168,8 +235,9 @@ def _build_ball_color_by_command(
             color_by_part = f'color-by numeric-attribute "{spec["attribute"]}"'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
         elif spec["type"] == "text":
-            # Text attributes use named color mapping (no filter needed)
-            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+            # Text attributes need 'Any' filter to show all values
+            # Escape single quotes for embedding in itasca.command('...')
+            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
             color_options = "color-options named maximum-names 1000000 name-controls true"
         else:
             return ""
@@ -266,8 +334,9 @@ def _build_wall_color_by_command(
             color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
         elif spec["type"] == "text":
-            # Wall text attributes use named color mapping (no filter needed)
-            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+            # Wall text attributes need 'Any' filter to show all values
+            # Escape single quotes for embedding in itasca.command('...')
+            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
             color_options = "color-options named maximum-names 1000000 name-controls true"
         else:
             return ""
@@ -326,7 +395,9 @@ def _build_contact_color_by_command(
             color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
         elif spec["type"] == "text":
-            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+            # Contact text attributes need 'Any' filter to show all values
+            # Escape single quotes for embedding in itasca.command('...')
+            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
             color_options = "color-options named maximum-names 1000000 name-controls true"
         elif spec["type"] == "numeric-property":
             color_by_part = f'color-by numeric-property "{spec["property"]}"'
