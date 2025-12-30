@@ -611,10 +611,14 @@ def generate_plot_capture_script(
         '',
         '# Wait for export to complete (export bitmap is async)',
         'import time',
-        '_max_wait, _elapsed = 10, 0',
+        '_max_wait, _elapsed = 32, 0',
         'while not os.path.exists(output_path) and _elapsed < _max_wait:',
         '    time.sleep(0.1)',
         '    _elapsed += 0.1',
+        '',
+        '# Verify export succeeded',
+        'if not os.path.exists(output_path):',
+        '    raise RuntimeError(f"Export timeout: file not created after {_max_wait}s: {output_path}")',
         '',
     ])
 

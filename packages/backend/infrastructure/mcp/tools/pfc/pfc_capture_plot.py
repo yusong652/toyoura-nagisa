@@ -26,7 +26,6 @@ from backend.infrastructure.mcp.utils.tool_result import success_response, error
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
 from .scripts import (
     generate_plot_capture_script,
-    DEFAULT_PLOT_NAME,
     DEFAULT_WALL_TRANSPARENCY,
     DEFAULT_IMAGE_SIZE,
     BallShapeType,
@@ -198,10 +197,13 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             if view_settings:
                 view_settings["projection"] = projection
 
+            # Generate unique plot name to avoid conflicts in concurrent execution
+            unique_plot_name = f"NagisaDiag_{int(time.time() * 1000) % 1000000}"
+
             # Generate Python script for plot capture
             script_content = generate_plot_capture_script(
                 output_path=normalized_output_path,
-                plot_name=DEFAULT_PLOT_NAME,
+                plot_name=unique_plot_name,
                 size=(size[0], size[1]),
                 view_settings=view_settings,
                 include_ball=include_ball,
@@ -245,15 +247,12 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 _cleanup_script(script_path)
 
             # Handle execution result
+            # Script layer validates file creation and raises RuntimeError on timeout
             status = result.get("status")
 
             if status == "error":
                 error_msg = result.get("message", "Plot capture failed")
                 return error_response(f"Plot capture failed: {error_msg}")
-
-            # Verify file was created (script already waits for async export)
-            if not os.path.exists(output_path):
-                return error_response(f"Export completed but file not found: {output_path}")
 
             # Build success response
             return success_response(
