@@ -84,8 +84,7 @@ class PFCWebSocketServer:
             quick_console_managers=self._quick_console_managers,
         )
 
-        # Message handlers registry
-        # Note: ping is sync, others are async
+        # Message handlers registry (all handlers are async with unified signature)
         self._handlers = {
             "pfc_task": handle_pfc_task,
             "check_task_status": handle_check_task_status,
@@ -144,12 +143,7 @@ class PFCWebSocketServer:
             # Route to appropriate handler
             handler = self._handlers.get(msg_type)
             if handler:
-                # ping handler is synchronous (no context needed), others are async
-                if msg_type == "ping":
-                    response = handler()
-                else:
-                    response = await handler(self._context, data)
-
+                response = await handler(self._context, data)
                 # Send response (ignore connection closed - will be handled by main loop)
                 await self._send_response(websocket, response, request_id)
             else:

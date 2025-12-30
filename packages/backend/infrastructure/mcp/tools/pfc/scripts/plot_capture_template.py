@@ -265,14 +265,17 @@ def _build_ball_arrow_command(
             color-by vector-attribute "velocity" quantity mag
             color-options scaled ramp rainbow minimum automatic maximum automatic
             scale-by-magnitude off
+            [cut ...]
             legend active on
+
+    Note: legend is added separately after cut command in the caller.
 
     Args:
         color_by: Vector attribute name (e.g., "velocity", "displacement")
         quantity: Vector component: "mag", "x", "y", "z". Default: "mag"
 
     Returns:
-        PFC command fragment for arrow visualization
+        PFC command fragment for arrow visualization (without legend)
     """
     # Validate and normalize quantity
     qty = quantity.lower() if quantity else "mag"
@@ -283,8 +286,7 @@ def _build_ball_arrow_command(
         f'shape arrow scale automatic arrow-quality 8 '
         f'color-by vector-attribute "{color_by}" quantity {qty} '
         f'color-options scaled ramp rainbow minimum automatic maximum automatic '
-        f'scale-by-magnitude off '
-        f'legend active on'
+        f'scale-by-magnitude off'
     )
 
 
@@ -556,6 +558,7 @@ def generate_plot_capture_script(
             cmd_parts = ["plot item create ball active on", arrow_cmd]
             if cut_cmd:
                 cmd_parts.append(cut_cmd)
+            cmd_parts.append("legend active on")
             lines.append(f"itasca.command('{' '.join(cmd_parts)}')")
         else:
             # Sphere mode: standard ball visualization
@@ -608,10 +611,14 @@ def generate_plot_capture_script(
         '',
         '# Wait for export to complete (export bitmap is async)',
         'import time',
-        '_max_wait, _elapsed = 10, 0',
+        '_max_wait, _elapsed = 32, 0',
         'while not os.path.exists(output_path) and _elapsed < _max_wait:',
         '    time.sleep(0.1)',
         '    _elapsed += 0.1',
+        '',
+        '# Verify export succeeded',
+        'if not os.path.exists(output_path):',
+        '    raise RuntimeError(f"Export timeout: file not created after {_max_wait}s: {output_path}")',
         '',
     ])
 

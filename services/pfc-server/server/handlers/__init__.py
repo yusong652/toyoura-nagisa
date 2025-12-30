@@ -12,10 +12,8 @@ from .task_handlers import (
     handle_list_tasks,
     handle_mark_task_notified,
 )
-from .console_handlers import (
-    handle_quick_python,
-    handle_diagnostic_execute,
-)
+from .console_handlers import handle_quick_python
+from .diagnostic_handlers import handle_diagnostic_execute
 from .workspace_handlers import (
     handle_reset_workspace,
     handle_get_working_directory,
@@ -35,6 +33,7 @@ __all__ = [
     "handle_mark_task_notified",
     # Console handlers
     "handle_quick_python",
+    # Diagnostic handlers
     "handle_diagnostic_execute",
     # Workspace handlers
     "handle_reset_workspace",
