@@ -265,14 +265,17 @@ def _build_ball_arrow_command(
             color-by vector-attribute "velocity" quantity mag
             color-options scaled ramp rainbow minimum automatic maximum automatic
             scale-by-magnitude off
+            [cut ...]
             legend active on
+
+    Note: legend is added separately after cut command in the caller.
 
     Args:
         color_by: Vector attribute name (e.g., "velocity", "displacement")
         quantity: Vector component: "mag", "x", "y", "z". Default: "mag"
 
     Returns:
-        PFC command fragment for arrow visualization
+        PFC command fragment for arrow visualization (without legend)
     """
     # Validate and normalize quantity
     qty = quantity.lower() if quantity else "mag"
@@ -283,8 +286,7 @@ def _build_ball_arrow_command(
         f'shape arrow scale automatic arrow-quality 8 '
         f'color-by vector-attribute "{color_by}" quantity {qty} '
         f'color-options scaled ramp rainbow minimum automatic maximum automatic '
-        f'scale-by-magnitude off '
-        f'legend active on'
+        f'scale-by-magnitude off'
     )
 
 
@@ -556,6 +558,7 @@ def generate_plot_capture_script(
             cmd_parts = ["plot item create ball active on", arrow_cmd]
             if cut_cmd:
                 cmd_parts.append(cut_cmd)
+            cmd_parts.append("legend active on")
             lines.append(f"itasca.command('{' '.join(cmd_parts)}')")
         else:
             # Sphere mode: standard ball visualization
