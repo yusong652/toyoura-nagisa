@@ -4,14 +4,41 @@ Console-related message handlers.
 Handles quick Python execution and diagnostic script execution.
 """
 
+import asyncio
+import concurrent.futures
 import logging
 from io import StringIO
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 from .context import ServerContext
 from .helpers import truncate_message
 
 logger = logging.getLogger("PFC-Server")
+
+
+async def _await_future_with_timeout(
+    loop: asyncio.AbstractEventLoop,
+    future: concurrent.futures.Future,
+    timeout: float
+) -> Tuple[Optional[Dict[str, Any]], bool]:
+    """
+    Await a concurrent.futures.Future with timeout, non-blocking.
+
+    Args:
+        loop: Event loop for run_in_executor
+        future: Future to await
+        timeout: Timeout in seconds
+
+    Returns:
+        Tuple of (result, timed_out):
+            - (result_dict, False) if completed within timeout
+            - (None, True) if timed out
+    """
+    try:
+        result = await loop.run_in_executor(None, future.result, timeout)
+        return result, False
+    except concurrent.futures.TimeoutError:
+        return None, True
 
 
 async def handle_quick_python(ctx, data):
@@ -125,7 +152,6 @@ async def handle_diagnostic_execute(ctx, data):
         if not script_path:
             raise ValueError("script_path is required")
 
-        import concurrent.futures
         import os
         import uuid
 
@@ -138,7 +164,11 @@ async def handle_diagnostic_execute(ctx, data):
         task_id = uuid.uuid4().hex[:8]
         output_buffer = StringIO()
 
+        # Get event loop for non-blocking waits
+        loop = asyncio.get_event_loop()
+
         # Strategy 1: Try queue execution with short timeout (1 second)
+        # This detects if the main thread queue is blocked by a long-running task
         queue_future = ctx.main_executor.submit(
             ctx.script_executor._execute_script_sync,
             script_path,
@@ -147,9 +177,10 @@ async def handle_diagnostic_execute(ctx, data):
             task_id
         )
 
-        try:
-            # Wait 1 second for queue execution
-            result = queue_future.result(timeout=1.0)
+        result, queue_blocked = await _await_future_with_timeout(loop, queue_future, 1.0)
+
+        if not queue_blocked and result is not None:
+            # Queue was available, execution completed
             logger.info("Diagnostic executed via queue: {}".format(
                 os.path.basename(script_path)
             ))
@@ -160,46 +191,44 @@ async def handle_diagnostic_execute(ctx, data):
                 **result
             }
 
-        except concurrent.futures.TimeoutError:
-            # Queue execution timed out (queue blocked)
-            # Strategy 2: Use callback execution (works during cycle)
-            logger.info("Queue blocked, switching to callback execution")
+        # Strategy 2: Queue blocked, use callback execution (works during cycle)
+        logger.info("Queue blocked, switching to callback execution")
 
-            from ..executors import submit_diagnostic, is_callback_registered
+        from ..executors import submit_diagnostic, is_callback_registered
 
-            if not is_callback_registered():
-                raise RuntimeError(
-                    "Diagnostic callback not registered and queue is blocked. "
-                    "Restart PFC server to enable callback execution."
-                )
+        if not is_callback_registered():
+            raise RuntimeError(
+                "Diagnostic callback not registered and queue is blocked. "
+                "Restart PFC server to enable callback execution."
+            )
 
-            # Submit to callback executor
-            callback_future = submit_diagnostic(script_path)
+        # Submit to callback executor
+        callback_future = submit_diagnostic(script_path)
 
-            # Wait for callback execution
-            timeout_sec = (timeout_ms - 1000) / 1000.0
-            timeout_sec = max(timeout_sec, 1.0)
+        # Wait for callback execution
+        timeout_sec = max((timeout_ms - 1000) / 1000.0, 1.0)
+        result, timed_out = await _await_future_with_timeout(loop, callback_future, timeout_sec)
 
-            try:
-                result = callback_future.result(timeout=timeout_sec)
-                logger.info("Diagnostic executed via callback: {}".format(
-                    os.path.basename(script_path)
-                ))
-                return {
-                    "type": "diagnostic_result",
-                    "request_id": request_id,
-                    "execution_path": "callback",
-                    **result
-                }
-            except concurrent.futures.TimeoutError:
-                return {
-                    "type": "diagnostic_result",
-                    "request_id": request_id,
-                    "status": "timeout",
-                    "message": "Diagnostic timed out after {}ms. "
-                               "Queue blocked and no cycle running.".format(timeout_ms),
-                    "data": None
-                }
+        if not timed_out and result is not None:
+            logger.info("Diagnostic executed via callback: {}".format(
+                os.path.basename(script_path)
+            ))
+            return {
+                "type": "diagnostic_result",
+                "request_id": request_id,
+                "execution_path": "callback",
+                **result
+            }
+
+        # Both strategies failed
+        return {
+            "type": "diagnostic_result",
+            "request_id": request_id,
+            "status": "timeout",
+            "message": "Diagnostic timed out after {}ms. "
+                       "Queue blocked and no cycle running.".format(timeout_ms),
+            "data": None
+        }
 
     except ValueError as e:
         return {
