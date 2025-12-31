@@ -4,6 +4,9 @@
  * This module exports all shared type definitions used across web and CLI frontends.
  */
 
+// API response types (2025 Standard)
+export * from './api';
+
 // WebSocket types
 export * from './websocket';
 

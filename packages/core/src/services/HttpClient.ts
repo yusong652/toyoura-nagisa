@@ -1,9 +1,13 @@
 /**
  * HTTP client utility for making API requests with consistent error handling.
- * 
+ *
  * Provides a standardized interface for HTTP operations with proper error
  * handling, request/response logging, and type safety for toyoura-nagisa frontend.
+ *
+ * Automatically unwraps ApiResponse format (2025 Standard) for seamless migration.
  */
+
+import { unwrapApiResponse } from '../types'
 
 export interface ApiError extends Error {
   status: number
@@ -116,7 +120,9 @@ export class HttpClient {
         return {} as T
       }
 
-      return (await response.json()) as T
+      const json = await response.json()
+      // Automatically unwrap ApiResponse format (2025 Standard)
+      return unwrapApiResponse<T>(json)
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('fetch')) {
         // Network error
