@@ -11,6 +11,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from .task_base import Task
+from ..utils import TaskDataBuilder, build_response
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
@@ -80,22 +81,15 @@ class ScriptTask(Task):
             # Task pending or executing - include current output
             current_output = self.get_current_output()
 
-            response_data = {
-                "task_id": self.task_id,
-                "session_id": self.session_id,
-                "task_type": self.task_type,
-                "source": self.source,
-                "script_name": self.script_name,
-                "entry_script": self.script_path,
-                "script_path": self.script_path,
-                "description": self.description,
-                "start_time": self.start_time,
-                "elapsed_time": elapsed_time,
-                "git_commit": self.git_commit
-            }
-
-            if current_output:
-                response_data["output"] = current_output
+            data = (TaskDataBuilder(
+                    self.task_id, self.task_type, self.source,
+                    self.script_name, self.script_path, self.description
+                )
+                .with_session(self.session_id)
+                .with_git_commit(self.git_commit)
+                .with_timing(self.start_time, elapsed_time=elapsed_time)
+                .with_output(current_output)
+                .build())
 
             # Message based on status
             if current_status == "pending":
@@ -107,11 +101,7 @@ class ScriptTask(Task):
                     self.description, elapsed_time
                 )
 
-            return {
-                "status": current_status,
-                "message": message,
-                "data": response_data
-            }
+            return build_response(current_status, message, data)
 
         # Task completed or failed - retrieve result for status/data only
         # Output is ALWAYS retrieved from buffer (single source of truth)
@@ -133,12 +123,12 @@ class ScriptTask(Task):
             # Get output from buffer (single source of truth)
             output_text = self.get_current_output()
 
-            # Extract only status and data from result
+            # Extract only status and result from execution response
             result_data = None
             result_status = "success"
 
             if isinstance(result, dict):
-                result_data = result.get("data")
+                result_data = result.get("result")
                 result_status = result.get("status", "success")
             else:
                 result_data = result
@@ -160,29 +150,18 @@ class ScriptTask(Task):
                     self.description, elapsed_time
                 )
 
-            # Build unified response data with all metadata
-            response_data = {
-                "task_id": self.task_id,
-                "session_id": self.session_id,
-                "task_type": self.task_type,
-                "source": self.source,
-                "script_name": self.script_name,
-                "entry_script": self.script_path,
-                "script_path": self.script_path,
-                "description": self.description,
-                "start_time": self.start_time,
-                "end_time": self.end_time,
-                "elapsed_time": elapsed_time,
-                "output": output_text if output_text else "",
-                "result": serialized_result,  # Script's 'result' variable
-                "git_commit": self.git_commit
-            }
+            data = (TaskDataBuilder(
+                    self.task_id, self.task_type, self.source,
+                    self.script_name, self.script_path, self.description
+                )
+                .with_session(self.session_id)
+                .with_git_commit(self.git_commit)
+                .with_timing(self.start_time, self.end_time, elapsed_time)
+                .with_output(output_text if output_text else "")
+                .with_result(serialized_result)
+                .build())
 
-            return {
-                "status": result_status,
-                "message": message,
-                "data": response_data
-            }
+            return build_response(result_status, message, data)
 
         elif current_status == "interrupted":
             # Script was interrupted by user
@@ -203,28 +182,17 @@ class ScriptTask(Task):
                     self.description, elapsed_time
                 )
 
-            # Build unified response data with all metadata
-            response_data = {
-                "task_id": self.task_id,
-                "session_id": self.session_id,
-                "task_type": self.task_type,
-                "source": self.source,
-                "script_name": self.script_name,
-                "entry_script": self.script_path,
-                "script_path": self.script_path,
-                "description": self.description,
-                "start_time": self.start_time,
-                "end_time": self.end_time,
-                "elapsed_time": elapsed_time,
-                "output": output_text if output_text else "",
-                "git_commit": self.git_commit
-            }
+            data = (TaskDataBuilder(
+                    self.task_id, self.task_type, self.source,
+                    self.script_name, self.script_path, self.description
+                )
+                .with_session(self.session_id)
+                .with_git_commit(self.git_commit)
+                .with_timing(self.start_time, self.end_time, elapsed_time)
+                .with_output(output_text if output_text else "")
+                .build())
 
-            return {
-                "status": "interrupted",
-                "message": message,
-                "data": response_data
-            }
+            return build_response("interrupted", message, data)
 
         else:  # status == "failed"
             # Script failed
@@ -246,29 +214,18 @@ class ScriptTask(Task):
                     self.description, elapsed_time, error_msg
                 )
 
-            # Build unified error data with all metadata
-            error_data = {
-                "task_id": self.task_id,
-                "session_id": self.session_id,
-                "task_type": self.task_type,
-                "source": self.source,
-                "script_name": self.script_name,
-                "entry_script": self.script_path,
-                "script_path": self.script_path,
-                "description": self.description,
-                "start_time": self.start_time,
-                "end_time": self.end_time,
-                "elapsed_time": elapsed_time,
-                "output": output_text if output_text else "",
-                "error": error_msg,
-                "git_commit": self.git_commit
-            }
+            data = (TaskDataBuilder(
+                    self.task_id, self.task_type, self.source,
+                    self.script_name, self.script_path, self.description
+                )
+                .with_session(self.session_id)
+                .with_git_commit(self.git_commit)
+                .with_timing(self.start_time, self.end_time, elapsed_time)
+                .with_output(output_text if output_text else "")
+                .with_error(error_msg)
+                .build())
 
-            return {
-                "status": "error",
-                "message": message,
-                "data": error_data
-            }
+            return build_response("error", message, data)
 
     def get_task_info(self):
         # type: () -> Dict[str, Any]

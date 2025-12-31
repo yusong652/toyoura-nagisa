@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 import websockets
 from websockets.server import WebSocketServerProtocol  # type: ignore
 
-from .executors import PFCScriptExecutor, MainThreadExecutor
+from .executors import ScriptRunner, MainThreadExecutor
 from .task_manager import TaskManager
 from .managers import QuickConsoleManager
 from .handlers import (
@@ -69,7 +69,7 @@ class PFCWebSocketServer:
         self.ping_interval = ping_interval
         self.ping_timeout = ping_timeout
         self.task_manager = TaskManager()
-        self.script_executor = PFCScriptExecutor(main_executor, self.task_manager)
+        self.script_runner = ScriptRunner(main_executor, self.task_manager)
         self.active_connections = set()
         self.server = None
 
@@ -79,7 +79,7 @@ class PFCWebSocketServer:
         # Create server context for handlers
         self._context = ServerContext(
             task_manager=self.task_manager,
-            script_executor=self.script_executor,
+            script_runner=self.script_runner,
             main_executor=self.main_executor,
             quick_console_managers=self._quick_console_managers,
         )

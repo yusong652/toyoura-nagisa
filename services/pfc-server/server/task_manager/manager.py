@@ -23,8 +23,8 @@ class TaskManager:
     """
     Manage long-running task tracking and status queries.
 
-    This class is separate from PFCScriptExecutor to maintain clear
-    separation of concerns: executor executes scripts, task manager
+    This class is separate from ScriptRunner to maintain clear
+    separation of concerns: runner runs scripts, task manager
     tracks their lifecycle.
 
     Tasks are represented as ScriptTask objects for Python script execution,

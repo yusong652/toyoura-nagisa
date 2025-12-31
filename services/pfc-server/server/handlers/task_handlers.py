@@ -40,7 +40,7 @@ async def handle_pfc_task(ctx, data):
     # Only agent tasks get git snapshots
     enable_git_snapshot = (source == "agent")
 
-    result = await ctx.script_executor.execute_script(
+    result = await ctx.script_runner.run(
         session_id, script_path, description, timeout_ms, run_in_background,
         source=source, enable_git_snapshot=enable_git_snapshot
     )

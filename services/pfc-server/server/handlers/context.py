@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Dict
 
 if TYPE_CHECKING:
     from ..task_manager import TaskManager
-    from ..executors import PFCScriptExecutor, MainThreadExecutor
+    from ..executors import ScriptRunner, MainThreadExecutor
     from ..managers import QuickConsoleManager
 
 
@@ -22,7 +22,7 @@ class ServerContext:
 
     Attributes:
         task_manager: Manages task lifecycle and status tracking
-        script_executor: Executes PFC Python scripts
+        script_runner: Runs PFC Python scripts via main thread queue
         main_executor: Queue-based main thread execution
         quick_console_managers: Cache of QuickConsoleManager per workspace
     """
@@ -30,7 +30,7 @@ class ServerContext:
     def __init__(
         self,
         task_manager,  # type: TaskManager
-        script_executor,  # type: PFCScriptExecutor
+        script_runner,  # type: ScriptRunner
         main_executor,  # type: MainThreadExecutor
         quick_console_managers,  # type: Dict[str, QuickConsoleManager]
     ):
@@ -40,12 +40,12 @@ class ServerContext:
 
         Args:
             task_manager: Task lifecycle manager
-            script_executor: PFC script executor
+            script_runner: Script runner for PFC Python scripts
             main_executor: Main thread executor for queue-based execution
             quick_console_managers: Dict mapping workspace paths to QuickConsoleManager
         """
         self.task_manager = task_manager
-        self.script_executor = script_executor
+        self.script_runner = script_runner
         self.main_executor = main_executor
         self.quick_console_managers = quick_console_managers
 

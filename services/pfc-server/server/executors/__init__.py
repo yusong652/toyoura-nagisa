@@ -5,7 +5,7 @@ Execution engines for running PFC scripts and commands.
 """
 
 from .main_thread import MainThreadExecutor
-from .script import PFCScriptExecutor
+from .script import ScriptRunner
 from .diagnostic import (
     submit_diagnostic,
     is_callback_registered,
@@ -15,7 +15,7 @@ from .diagnostic import (
 
 __all__ = [
     "MainThreadExecutor",
-    "PFCScriptExecutor",
+    "ScriptRunner",
     "submit_diagnostic",
     "is_callback_registered",
     "register_diagnostic_callback",

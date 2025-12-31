@@ -21,15 +21,15 @@ import uuid
 from typing import Any, Dict, Optional
 
 from .main_thread import MainThreadExecutor
-from ..utils import path_to_llm_format, FileBuffer
+from ..utils import path_to_llm_format, FileBuffer, TaskDataBuilder, build_response
 from ..managers import get_git_manager, set_current_task, clear_current_task, clear_interrupt
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
 
 
-class PFCScriptExecutor:
-    """Execute Python scripts using PFC Python SDK via main thread queue."""
+class ScriptRunner:
+    """Run Python scripts via PFC main thread queue."""
 
     def __init__(self, main_executor, task_manager):
         # type: (MainThreadExecutor, Any) -> None
@@ -50,10 +50,10 @@ class PFCScriptExecutor:
             logger.warning("⚠ ITASCA SDK not available for script execution")
             self.itasca = None
 
-    def _execute_script_sync(self, script_path, script_content, output_buffer, task_id):
+    def _execute(self, script_path, script_content, output_buffer, task_id):
         # type: (str, str, Any, str) -> Dict[str, Any]
         """
-        Execute Python script synchronously (called in main thread).
+        Execute script in main thread (called via queue).
 
         Captures stdout during execution for progress tracking using shared buffer.
         Supports interruption via registered PFC callback.
@@ -65,10 +65,10 @@ class PFCScriptExecutor:
             task_id: Task ID for interrupt checking
 
         Returns:
-            Result dictionary with status, message, data, and output:
+            Result dictionary with status, message, result, and output:
                 - status: "success", "error", or "interrupted"
                 - message: User-friendly message
-                - data: Script result (from 'result' variable)
+                - result: Script result (from 'result' variable)
                 - output: Captured stdout content (print statements)
         """
         # Use shared output buffer for stdout capture
@@ -126,7 +126,7 @@ class PFCScriptExecutor:
             return {
                 "status": "success",
                 "message": message,
-                "data": serialized_result,
+                "result": serialized_result,
                 "output": output_text  # Include captured output
             }
 
@@ -138,7 +138,7 @@ class PFCScriptExecutor:
             return {
                 "status": "interrupted",
                 "message": "Script interrupted by user: {}".format(str(e)),
-                "data": None,
+                "result": None,
                 "output": output_text  # Include output up to interruption point
             }
 
@@ -153,7 +153,7 @@ class PFCScriptExecutor:
                 return {
                     "status": "interrupted",
                     "message": "Script interrupted by user",
-                    "data": None,
+                    "result": None,
                     "output": output_text  # Include output up to interruption point
                 }
 
@@ -210,7 +210,7 @@ class PFCScriptExecutor:
             return {
                 "status": "error",
                 "message": error_message,
-                "data": None,
+                "result": None,
                 "output": output_text  # Include output up to error point
             }
 
@@ -221,10 +221,10 @@ class PFCScriptExecutor:
             clear_current_task()
             clear_interrupt(task_id)
 
-    async def execute_script(self, session_id, script_path, description, timeout_ms=None, run_in_background=True, source="agent", enable_git_snapshot=True):
+    async def run(self, session_id, script_path, description, timeout_ms=None, run_in_background=True, source="agent", enable_git_snapshot=True):
         # type: (str, str, str, Optional[int], bool, str, bool) -> Dict[str, Any]
         """
-        Execute Python script with flexible execution control.
+        Run script (submit to main thread queue, optionally wait for completion).
 
         Execution modes:
         - Asynchronous (run_in_background=True, default): Submit as background task, return task_id immediately
@@ -318,7 +318,7 @@ class PFCScriptExecutor:
 
             # Submit to main thread queue
             future = self.main_executor.submit(
-                self._execute_script_sync,
+                self._execute,
                 script_path,
                 script_content,
                 output_buffer,
@@ -341,21 +341,11 @@ class PFCScriptExecutor:
 
             if run_in_background:
                 # Asynchronous: return immediately
-                return {
-                    "status": "pending",
-                    "message": "Script submitted: {}".format(script_name),
-                    "data": {
-                        "task_id": task_id,
-                        "task_type": "script",
-                        "source": source,
-                        "script_name": script_name,
-                        "entry_script": script_path,
-                        "script_path": script_path,
-                        "description": description,
-                        "start_time": submit_time,
-                        "git_commit": git_commit
-                    }
-                }
+                data = (TaskDataBuilder(task_id, "script", source, script_name, script_path, description)
+                    .with_git_commit(git_commit)
+                    .with_timing(submit_time)
+                    .build())
+                return build_response("pending", "Script submitted: {}".format(script_name), data)
 
             # Synchronous: wait for completion
             timeout_seconds = timeout_ms / 1000.0 if timeout_ms else None
@@ -377,25 +367,17 @@ class PFCScriptExecutor:
             end_time = task.end_time if task else None
             elapsed_time = (end_time - start_time) if (start_time and end_time) else 0
 
-            return {
-                "status": result_dict.get("status", "success"),
-                "message": result_dict.get("message", "Script executed"),
-                "data": {
-                    "task_id": task_id,
-                    "task_type": "script",
-                    "source": source,
-                    "script_name": script_name,
-                    "entry_script": script_path,
-                    "script_path": script_path,
-                    "description": description,
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "elapsed_time": elapsed_time,
-                    "output": full_output,
-                    "result": result_dict.get("data"),
-                    "git_commit": git_commit
-                }
-            }
+            data = (TaskDataBuilder(task_id, "script", source, script_name, script_path, description)
+                .with_git_commit(git_commit)
+                .with_timing(start_time, end_time, elapsed_time)
+                .with_output(full_output)
+                .with_result(result_dict.get("result"))
+                .build())
+            return build_response(
+                result_dict.get("status", "success"),
+                result_dict.get("message", "Script executed"),
+                data
+            )
 
         except Exception as e:
             # Special handling for timeout errors
@@ -413,23 +395,15 @@ class PFCScriptExecutor:
                     timeout_ms, script_name
                 )
 
-                return {
-                    "status": "pending",
-                    "message": timeout_message,
-                    "data": {
-                        "task_id": task_id,
-                        "task_type": "script",
-                        "source": source,
-                        "script_name": script_name,
-                        "entry_script": script_path,
-                        "script_path": script_path,
-                        "description": description,
-                        "start_time": task.start_time if task else None,
-                        "elapsed_time": task.get_elapsed_time() if task else None,
-                        "output": output_buffer.getvalue() if output_buffer else "",
-                        "git_commit": git_commit
-                    }
-                }
+                data = (TaskDataBuilder(task_id or "unknown", "script", source, script_name, script_path, description)
+                    .with_git_commit(git_commit)
+                    .with_timing(
+                        task.start_time if task else None,
+                        elapsed_time=task.get_elapsed_time() if task else None
+                    )
+                    .with_output(output_buffer.getvalue() if output_buffer else "")
+                    .build())
+                return build_response("pending", timeout_message, data)
 
             # General error handling
             logger.error("Script execution failed: {}".format(e))
@@ -438,24 +412,17 @@ class PFCScriptExecutor:
             task = self.task_manager.tasks.get(task_id) if task_id else None
             output_text = output_buffer.getvalue() if output_buffer else ""
 
-            return {
-                "status": "error",
-                "message": error_message,
-                "data": {
-                    "task_id": task_id,
-                    "task_type": "script",
-                    "script_name": script_name,
-                    "entry_script": script_path,
-                    "script_path": script_path,
-                    "description": description,
-                    "start_time": task.start_time if task else None,
-                    "end_time": task.end_time if task else None,
-                    "elapsed_time": (task.end_time - task.start_time) if (task and task.start_time and task.end_time) else None,
-                    "output": output_text,
-                    "error": error_message,
-                    "git_commit": git_commit
-                }
-            }
+            start_time = task.start_time if task else None
+            end_time = task.end_time if task else None
+            elapsed_time = (end_time - start_time) if (start_time and end_time) else None
+
+            data = (TaskDataBuilder(task_id or "unknown", "script", source, script_name, script_path, description)
+                .with_git_commit(git_commit)
+                .with_timing(start_time, end_time, elapsed_time)
+                .with_output(output_text)
+                .with_error(error_message)
+                .build())
+            return build_response("error", error_message, data)
 
     def _serialize_result(self, result: Any) -> Any:
         """

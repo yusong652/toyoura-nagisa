@@ -53,8 +53,8 @@ async def handle_quick_python(ctx, data):
             description=code_preview
         )
 
-        # Execute using existing script executor (synchronous for quick commands)
-        result = await ctx.script_executor.execute_script(
+        # Execute using script runner (synchronous for quick commands)
+        result = await ctx.script_runner.run(
             session_id=session_id,
             script_path=script_path,
             description=code_preview,

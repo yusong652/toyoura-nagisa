@@ -85,7 +85,7 @@ async def handle_diagnostic_execute(ctx, data):
         # Strategy 1: Try queue execution with short timeout (1 second)
         # This detects if the main thread queue is blocked by a long-running task
         queue_future = ctx.main_executor.submit(
-            ctx.script_executor._execute_script_sync,
+            ctx.script_runner._execute,
             script_path,
             script_content,
             output_buffer,
