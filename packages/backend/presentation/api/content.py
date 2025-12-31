@@ -1,208 +1,181 @@
 """
-Content Generation API Routes.
+Content Generation API (2025 Standard).
 
-This module handles content generation endpoints including title generation
-and image generation following Clean Architecture principles.
+Handles content generation endpoints including title, image, and video generation.
+
+Routes:
+    POST /content/title    - Generate session title
+    POST /content/image    - Generate image from conversation
+    POST /content/video    - Generate video from image
 """
-from typing import Dict, Any
-from fastapi import APIRouter, HTTPException, Depends, Request
-from backend.presentation.models.api_models import GenerateImageRequest, GenerateVideoRequest
+from typing import Optional
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
+
+from backend.presentation.models.api_models import ApiResponse
+from backend.presentation.exceptions import (
+    BadRequestError,
+    SessionNotFoundError,
+    InternalServerError,
+)
 from backend.application.services.contents import TitleService, ImageService, VideoService
 from backend.infrastructure.llm.base.client import LLMClientBase
 
 router = APIRouter(tags=["content"])
 
 
-def get_title_service() -> TitleService:
-    """
-    Dependency injection for TitleService.
+# =====================
+# Response Data Models
+# =====================
+class TitleGenerateData(BaseModel):
+    """Response data for title generation."""
+    session_id: str = Field(..., description="Session that received new title")
+    title: str = Field(..., description="Generated title text")
 
-    Returns:
-        TitleService: Title generation service instance
-    """
+
+class ImageGenerateData(BaseModel):
+    """Response data for image generation."""
+    image_path: Optional[str] = Field(default=None, description="Path to generated image")
+
+
+class VideoGenerateData(BaseModel):
+    """Response data for video generation."""
+    video_path: Optional[str] = Field(default=None, description="Path to generated video")
+
+
+# =====================
+# Request Models
+# =====================
+class GenerateTitleRequest(BaseModel):
+    """Request body for title generation."""
+    session_id: str = Field(..., description="Session ID to generate title for")
+
+
+class GenerateImageRequest(BaseModel):
+    """Request body for image generation."""
+    session_id: str = Field(..., description="Session ID")
+
+
+class GenerateVideoRequest(BaseModel):
+    """Request body for video generation."""
+    session_id: str = Field(..., description="Session ID")
+    motion_style: Optional[str] = Field(
+        default=None,
+        description="Motion style description (e.g., 'cinematic camera movement')"
+    )
+
+
+# =====================
+# Dependency Injection
+# =====================
+def get_title_service() -> TitleService:
+    """Dependency injection for TitleService."""
     return TitleService()
 
 
 def get_image_service() -> ImageService:
-    """
-    Dependency injection for ImageService.
-
-    Returns:
-        ImageService: Image generation service instance
-    """
+    """Dependency injection for ImageService."""
     return ImageService()
 
 
 def get_video_service() -> VideoService:
-    """
-    Dependency injection for VideoService.
-
-    Returns:
-        VideoService: Video generation service instance
-    """
+    """Dependency injection for VideoService."""
     return VideoService()
 
 
 def get_llm_client(request: Request) -> LLMClientBase:
-    """
-    Get LLM client from app state.
-    
-    Args:
-        request: FastAPI request object
-        
-    Returns:
-        LLMClientBase: LLM client instance
-    """
+    """Get LLM client from app state."""
     return request.app.state.llm_client
 
 
-@router.post("/history/generate-title", response_model=dict)
+# =====================
+# API Endpoints
+# =====================
+@router.post("/content/title", response_model=ApiResponse[TitleGenerateData])
 async def generate_title(
-    request: Request,
+    request: GenerateTitleRequest,
+    http_request: Request,
     service: TitleService = Depends(get_title_service),
     llm_client: LLMClientBase = Depends(get_llm_client)
-) -> Dict[str, Any]:
-    """
-    Generate a descriptive title for a chat session based on conversation history.
-    
-    This endpoint:
-    1. Validates the session exists
-    2. Analyzes conversation history
-    3. Uses LLM to generate a contextual title
-    4. Updates session metadata with new title
-    
-    Args:
-        request: FastAPI request containing session_id in JSON body
-        
-    Returns:
-        Dict[str, Any]: Title generation result with structure:
-            - session_id: str - Session that received new title
-            - title: str - Generated title text
-            - success: bool - Operation success flag
-    
-    Raises:
-        HTTPException: 
-            - 400 if no session_id provided or no valid messages for title generation
-            - 404 if session not found
-            - 500 if title generation fails
+) -> ApiResponse[TitleGenerateData]:
+    """Generate a descriptive title for a chat session.
+
+    Analyzes conversation history and uses LLM to generate a contextual title.
     """
     try:
-        # Parse request body
-        data = await request.json()
-        session_id = data.get('session_id')
-        
-        if not session_id:
-            raise HTTPException(
-                status_code=400,
-                detail="session_id not provided in request"
-            )
-        
-        # Generate title using service
         result = await service.generate_title_for_session(
-            session_id=session_id,
+            session_id=request.session_id,
             llm_client=llm_client
         )
-        
+
         if not result:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Session {session_id} not found"
-            )
-        
+            raise SessionNotFoundError(request.session_id)
+
         if result.get("error"):
-            error_msg = result["error"]
-            print(f"[ERROR] Title generation: {error_msg}")
-            raise HTTPException(
-                status_code=400,
-                detail=error_msg
+            raise BadRequestError(message=result["error"])
+
+        return ApiResponse(
+            success=True,
+            message="Title generated successfully",
+            data=TitleGenerateData(
+                session_id=request.session_id,
+                title=result.get("title", "")
             )
-        
-        return result
-    except HTTPException:
+        )
+    except (SessionNotFoundError, BadRequestError):
         raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate title: {str(e)}"
+        raise InternalServerError(
+            message=f"Failed to generate title: {str(e)}"
         )
 
 
-@router.post("/generate-image", response_model=dict)
+@router.post("/content/image", response_model=ApiResponse[ImageGenerateData])
 async def generate_image(
     request: GenerateImageRequest,
+    http_request: Request,
     service: ImageService = Depends(get_image_service),
     llm_client: LLMClientBase = Depends(get_llm_client)
-) -> Dict[str, Any]:
-    """
-    Generate an image based on recent conversation context.
-    
-    This endpoint:
-    1. Analyzes recent session messages
-    2. Generates appropriate image prompts using LLM
-    3. Creates image using text-to-image service
-    4. Saves generated image to session folder
-    
-    Args:
-        request: Image generation request with session_id
-        
-    Returns:
-        Dict[str, Any]: Image generation result with structure:
-            - success: bool - Operation success flag
-            - image_path: str - Local path to saved image (if successful)
-            - error: str - Error message (if failed)
-    
-    Raises:
-        HTTPException: 500 if image generation fails
+) -> ApiResponse[ImageGenerateData]:
+    """Generate an image based on recent conversation context.
+
+    Analyzes recent messages, generates prompts using LLM,
+    and creates image using text-to-image service.
     """
     try:
         result = await service.generate_image_for_session(
             session_id=request.session_id,
             llm_client=llm_client
         )
-        
+
         if not result.get("success"):
             error_msg = result.get("error", "Image generation failed")
-            print(f"[ERROR] Image generation failed: {error_msg}")
-            
-        return result
+            raise InternalServerError(message=error_msg)
+
+        return ApiResponse(
+            success=True,
+            message="Image generated successfully",
+            data=ImageGenerateData(image_path=result.get("image_path"))
+        )
+    except InternalServerError:
+        raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        raise InternalServerError(
+            message=f"Failed to generate image: {str(e)}"
+        )
 
 
-@router.post("/generate-video", response_model=dict)
+@router.post("/content/video", response_model=ApiResponse[VideoGenerateData])
 async def generate_video(
     request: GenerateVideoRequest,
+    http_request: Request,
     service: VideoService = Depends(get_video_service),
     llm_client: LLMClientBase = Depends(get_llm_client)
-) -> Dict[str, Any]:
-    """
-    Generate a video from the most recent image in conversation context.
-    
-    This endpoint:
-    1. Finds the most recent generated image in the session
-    2. Extracts the original text-to-image prompt from history
-    3. Optimizes the prompt for video motion using LLM
-    4. Generates video using image-to-video service
-    5. Saves generated video to session folder
-    
-    Args:
-        request: Video generation request with session_id and optional motion_style
-        
-    Returns:
-        Dict[str, Any]: Video generation result with structure:
-            - success: bool - Operation success flag
-            - video_path: str - Local path to saved video (if successful)
-            - error: str - Error message (if failed)
-    
-    Raises:
-        HTTPException: 500 if video generation fails
+) -> ApiResponse[VideoGenerateData]:
+    """Generate a video from the most recent image in conversation.
+
+    Finds recent image, optimizes prompt for motion using LLM,
+    and generates video using image-to-video service.
     """
     try:
         result = await service.generate_video_for_session(
@@ -210,16 +183,59 @@ async def generate_video(
             motion_style=request.motion_style,
             llm_client=llm_client
         )
-        
+
         if not result.get("success"):
             error_msg = result.get("error", "Video generation failed")
-            print(f"[ERROR] Video generation failed: {error_msg}")
-            
-        return result
+            raise InternalServerError(message=error_msg)
+
+        return ApiResponse(
+            success=True,
+            message="Video generated successfully",
+            data=VideoGenerateData(video_path=result.get("video_path"))
+        )
+    except InternalServerError:
+        raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        raise InternalServerError(
+            message=f"Failed to generate video: {str(e)}"
+        )
+
+
+# =====================
+# Legacy Routes (deprecated)
+# =====================
+@router.post("/history/generate-title", response_model=ApiResponse[TitleGenerateData], deprecated=True)
+async def generate_title_legacy(
+    http_request: Request,
+    service: TitleService = Depends(get_title_service),
+    llm_client: LLMClientBase = Depends(get_llm_client)
+) -> ApiResponse[TitleGenerateData]:
+    """[DEPRECATED] Use POST /content/title instead."""
+    data = await http_request.json()
+    session_id = data.get('session_id')
+    if not session_id:
+        raise BadRequestError(message="session_id not provided in request")
+    request = GenerateTitleRequest(session_id=session_id)
+    return await generate_title(request, http_request, service, llm_client)
+
+
+@router.post("/generate-image", response_model=ApiResponse[ImageGenerateData], deprecated=True)
+async def generate_image_legacy(
+    request: GenerateImageRequest,
+    http_request: Request,
+    service: ImageService = Depends(get_image_service),
+    llm_client: LLMClientBase = Depends(get_llm_client)
+) -> ApiResponse[ImageGenerateData]:
+    """[DEPRECATED] Use POST /content/image instead."""
+    return await generate_image(request, http_request, service, llm_client)
+
+
+@router.post("/generate-video", response_model=ApiResponse[VideoGenerateData], deprecated=True)
+async def generate_video_legacy(
+    request: GenerateVideoRequest,
+    http_request: Request,
+    service: VideoService = Depends(get_video_service),
+    llm_client: LLMClientBase = Depends(get_llm_client)
+) -> ApiResponse[VideoGenerateData]:
+    """[DEPRECATED] Use POST /content/video instead."""
+    return await generate_video(request, http_request, service, llm_client)

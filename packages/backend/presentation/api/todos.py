@@ -1,146 +1,135 @@
 """
-Todo API - Endpoints for todo status retrieval.
+Todo API (2025 Standard).
 
 Provides read-only access to todo status for frontend display.
 All endpoints require explicit agent_profile parameter for workspace resolution.
+
+Routes:
+    GET /api/todos/current  - Get current in-progress todo
+    GET /api/todos          - List all todos
+    GET /api/todos/pending  - List pending/in-progress todos
 """
-
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Query
-from typing import Dict, Any, Optional
+from pydantic import BaseModel, Field
 
+from backend.presentation.models.api_models import ApiResponse
+from backend.presentation.exceptions import InternalServerError
 from backend.application.services.todo_service import get_todo_service
 
 router = APIRouter(prefix="/api/todos", tags=["todos"])
 
 
-@router.get("/current")
+# =====================
+# Response Data Models
+# =====================
+class TodoItem(BaseModel):
+    """Todo item structure."""
+    todo_id: Optional[str] = Field(default=None, description="Todo identifier")
+    content: str = Field(..., description="Imperative form of the task")
+    activeForm: str = Field(..., description="Present continuous form (for display)")
+    status: str = Field(..., description="Todo status: pending, in_progress, completed")
+    session_id: Optional[str] = Field(default=None, description="Session identifier")
+    created_at: Optional[float] = Field(default=None, description="Creation timestamp")
+    updated_at: Optional[float] = Field(default=None, description="Last update timestamp")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+
+
+class CurrentTodoData(BaseModel):
+    """Response data for current todo."""
+    todo: Optional[TodoItem] = Field(default=None, description="Current in-progress todo")
+
+
+class TodoListData(BaseModel):
+    """Response data for todo list."""
+    todos: List[TodoItem] = Field(..., description="List of todos")
+    count: int = Field(..., description="Total count")
+
+
+# =====================
+# API Endpoints
+# =====================
+@router.get("/current", response_model=ApiResponse[CurrentTodoData])
 async def get_current_todo(
     agent_profile: str = Query(..., description="Agent profile for workspace resolution"),
-    session_id: Optional[str] = Query(None, description="Session identifier (for PFC workspace sync)")
-) -> Dict[str, Any]:
-    """
-    Get the currently in-progress todo for display.
+    session_id: Optional[str] = Query(default=None, description="Session identifier")
+) -> ApiResponse[CurrentTodoData]:
+    """Get the currently in-progress todo for display.
 
-    This endpoint retrieves the first todo with status="in_progress" from
-    the workspace, which is displayed in the frontend to show what the
-    agent is currently working on.
-
-    Args:
-        agent_profile: Agent profile type (e.g., "pfc", "coding", "general").
-                      Determines which workspace to use.
-        session_id: Optional session identifier (for PFC profile workspace sync).
-
-    Returns:
-        {
-            "success": bool,
-            "todo": {
-                "todo_id": str,
-                "content": str,          # Imperative form
-                "activeForm": str,       # Present continuous form (for display)
-                "status": str,
-                "session_id": str,
-                "created_at": float,
-                "updated_at": float,
-                "metadata": dict
-            } | None,
-            "message": str
-        }
+    Retrieves the first todo with status="in_progress" from the workspace,
+    displayed in the frontend to show what the agent is currently working on.
     """
     try:
         service = get_todo_service()
-        todo = await service.get_current_todo(agent_profile, session_id)
+        todo_dict = await service.get_current_todo(agent_profile, session_id)
 
-        return {
-            "success": True,
-            "todo": todo,
-            "message": "Current todo retrieved successfully" if todo else "No active todo"
-        }
+        todo = TodoItem(**todo_dict) if todo_dict else None
 
+        return ApiResponse(
+            success=True,
+            message="Current todo retrieved" if todo else "No active todo",
+            data=CurrentTodoData(todo=todo)
+        )
     except Exception as e:
-        return {
-            "success": False,
-            "todo": None,
-            "error": f"Failed to get current todo: {str(e)}"
-        }
+        raise InternalServerError(
+            message=f"Failed to get current todo: {str(e)}"
+        )
 
 
-@router.get("/all")
+@router.get("", response_model=ApiResponse[TodoListData])
 async def get_all_todos(
     agent_profile: str = Query(..., description="Agent profile for workspace resolution"),
-    session_id: Optional[str] = Query(None, description="Session identifier (for PFC workspace sync)")
-) -> Dict[str, Any]:
-    """
-    Get all todos for the workspace.
-
-    Args:
-        agent_profile: Agent profile type (e.g., "pfc", "coding", "general").
-        session_id: Optional session identifier (for PFC profile workspace sync).
-
-    Returns:
-        {
-            "success": bool,
-            "todos": List[Dict],
-            "count": int,
-            "message": str
-        }
-    """
+    session_id: Optional[str] = Query(default=None, description="Session identifier")
+) -> ApiResponse[TodoListData]:
+    """Get all todos for the workspace."""
     try:
         service = get_todo_service()
-        todos = await service.get_all_todos(agent_profile, session_id)
+        todo_dicts = await service.get_all_todos(agent_profile, session_id)
 
-        return {
-            "success": True,
-            "todos": todos,
-            "count": len(todos),
-            "message": f"Retrieved {len(todos)} todo(s)"
-        }
+        todos = [TodoItem(**t) for t in todo_dicts]
 
+        return ApiResponse(
+            success=True,
+            message=f"Retrieved {len(todos)} todo(s)",
+            data=TodoListData(todos=todos, count=len(todos))
+        )
     except Exception as e:
-        return {
-            "success": False,
-            "todos": [],
-            "count": 0,
-            "error": f"Failed to get todos: {str(e)}"
-        }
+        raise InternalServerError(
+            message=f"Failed to get todos: {str(e)}"
+        )
 
 
-@router.get("/pending")
+@router.get("/pending", response_model=ApiResponse[TodoListData])
 async def get_pending_todos(
     agent_profile: str = Query(..., description="Agent profile for workspace resolution"),
-    session_id: Optional[str] = Query(None, description="Session identifier (for PFC workspace sync)"),
-    limit: Optional[int] = Query(None, description="Maximum number of todos to return")
-) -> Dict[str, Any]:
-    """
-    Get pending and in_progress todos.
-
-    Args:
-        agent_profile: Agent profile type (e.g., "pfc", "coding", "general").
-        session_id: Optional session identifier (for PFC profile workspace sync).
-        limit: Maximum number of todos to return
-
-    Returns:
-        {
-            "success": bool,
-            "todos": List[Dict],
-            "count": int,
-            "message": str
-        }
-    """
+    session_id: Optional[str] = Query(default=None, description="Session identifier"),
+    limit: Optional[int] = Query(default=None, description="Maximum number of todos")
+) -> ApiResponse[TodoListData]:
+    """Get pending and in_progress todos."""
     try:
         service = get_todo_service()
-        todos = await service.get_pending_todos(agent_profile, session_id, limit)
+        todo_dicts = await service.get_pending_todos(agent_profile, session_id, limit)
 
-        return {
-            "success": True,
-            "todos": todos,
-            "count": len(todos),
-            "message": f"Retrieved {len(todos)} pending todo(s)"
-        }
+        todos = [TodoItem(**t) for t in todo_dicts]
 
+        return ApiResponse(
+            success=True,
+            message=f"Retrieved {len(todos)} pending todo(s)",
+            data=TodoListData(todos=todos, count=len(todos))
+        )
     except Exception as e:
-        return {
-            "success": False,
-            "todos": [],
-            "count": 0,
-            "error": f"Failed to get pending todos: {str(e)}"
-        }
+        raise InternalServerError(
+            message=f"Failed to get pending todos: {str(e)}"
+        )
+
+
+# =====================
+# Legacy Routes (deprecated)
+# =====================
+@router.get("/all", response_model=ApiResponse[TodoListData], deprecated=True)
+async def get_all_todos_legacy(
+    agent_profile: str = Query(..., description="Agent profile"),
+    session_id: Optional[str] = Query(default=None, description="Session identifier")
+) -> ApiResponse[TodoListData]:
+    """[DEPRECATED] Use GET /api/todos instead."""
+    return await get_all_todos(agent_profile, session_id)
