@@ -82,8 +82,9 @@ async def handle_diagnostic_execute(ctx, data):
         # Get event loop for non-blocking waits
         loop = asyncio.get_event_loop()
 
-        # Strategy 1: Try queue execution with short timeout (1 second)
-        # This detects if the main thread queue is blocked by a long-running task
+        # Strategy 1: Try queue execution with 8 second timeout
+        # This covers most diagnostic tasks (plot creation + export + file wait)
+        # If timeout, likely blocked by long-running cycle
         queue_future = ctx.main_executor.submit(
             ctx.script_runner._execute,
             script_path,
@@ -92,7 +93,7 @@ async def handle_diagnostic_execute(ctx, data):
             task_id
         )
 
-        result, queue_blocked = await _await_future_with_timeout(loop, queue_future, 1.0)
+        result, queue_blocked = await _await_future_with_timeout(loop, queue_future, 8.0)
 
         if not queue_blocked and result is not None:
             # Queue was available, execution completed
@@ -120,8 +121,8 @@ async def handle_diagnostic_execute(ctx, data):
         # Submit to callback executor
         callback_future = submit_diagnostic(script_path)
 
-        # Wait for callback execution
-        timeout_sec = max((timeout_ms - 1000) / 1000.0, 1.0)
+        # Wait for callback execution (remaining time after queue timeout)
+        timeout_sec = max((timeout_ms - 8000) / 1000.0, 1.0)
         result, timed_out = await _await_future_with_timeout(loop, callback_future, timeout_sec)
 
         if not timed_out and result is not None:
