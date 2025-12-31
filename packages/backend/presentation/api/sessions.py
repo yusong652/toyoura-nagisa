@@ -1,15 +1,27 @@
 """
-Session Management API Routes.
+Session Management API Routes (2025 Standard).
 
-This module handles all session-related API endpoints following Clean Architecture principles.
-Routes are thin layers that delegate business logic to the service layer.
+This module handles all session-related API endpoints following:
+- Clean Architecture principles (thin controllers, service delegation)
+- FastAPI 2025 Standard (ApiResponse[T], standardized exceptions)
+- RESTful conventions (resource-based URLs, proper HTTP methods)
+
+Routes:
+    POST   /history          - Create new session
+    GET    /history          - List all sessions
+    GET    /history/{id}     - Get session details
+    POST   /history/switch   - Switch active session
+    DELETE /history/{id}     - Delete session
+    GET    /history/{id}/token-usage - Get token usage
 """
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends, Request
-from backend.presentation.models.api_models import (
-    SwitchSessionRequest,
-    DeleteSessionRequest,
-    NewHistoryRequest,
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
+
+from backend.presentation.models.api_models import ApiResponse
+from backend.presentation.exceptions import (
+    SessionNotFoundError,
+    InternalServerError,
 )
 from backend.application.services.session_service import SessionService
 from backend.infrastructure.llm.base.client import LLMClientBase
@@ -17,156 +29,176 @@ from backend.infrastructure.llm.base.client import LLMClientBase
 router = APIRouter(tags=["sessions"])
 
 
+# =====================
+# Response Data Models
+# =====================
+class SessionData(BaseModel):
+    """Session metadata for API responses."""
+    id: str = Field(..., description="Session UUID")
+    name: str = Field(..., description="Session display name")
+    created_at: str = Field(..., description="Creation timestamp (ISO format)")
+    updated_at: str = Field(..., description="Last update timestamp (ISO format)")
+    message_count: Optional[int] = Field(None, description="Number of messages")
+
+
+class SessionCreateData(BaseModel):
+    """Response data for session creation."""
+    session_id: str = Field(..., description="UUID of the newly created session")
+
+
+class SessionDetailsData(BaseModel):
+    """Detailed session information including history."""
+    session: SessionData = Field(..., description="Session metadata")
+    history: List[dict] = Field(..., description="Complete message history")
+    message_count: int = Field(..., description="Total message count")
+
+
+class SessionSwitchData(BaseModel):
+    """Response data for session switch operation."""
+    session_id: str = Field(..., description="Target session ID")
+    message_count: int = Field(..., description="Total messages in session")
+    recent_messages: List[dict] = Field(..., description="Recent message context")
+
+
+class SessionDeleteData(BaseModel):
+    """Response data for session deletion."""
+    session_id: str = Field(..., description="Deleted session ID")
+
+
+class TokenUsageData(BaseModel):
+    """Token usage statistics for a session."""
+    prompt_tokens: int = Field(0, description="Input tokens (context window usage)")
+    completion_tokens: int = Field(0, description="Output tokens (AI response)")
+    total_tokens: int = Field(0, description="Total tokens used in last turn")
+    tokens_left: Optional[int] = Field(None, description="Remaining tokens in context window")
+
+
+# =====================
+# Request Models
+# =====================
+class CreateSessionRequest(BaseModel):
+    """Request body for creating a new session."""
+    name: Optional[str] = Field(None, description="Session display name (defaults to 'New Session')")
+
+
+class SwitchSessionRequest(BaseModel):
+    """Request body for switching to a different session."""
+    session_id: str = Field(..., description="Target session UUID")
+
+
+# =====================
+# Dependency Injection
+# =====================
 def get_session_service() -> SessionService:
-    """
-    Dependency injection for SessionService.
-    
-    Returns:
-        SessionService: Session service instance
-    """
+    """Dependency injection for SessionService."""
     return SessionService()
 
 
 def get_llm_client(request: Request) -> LLMClientBase:
-    """
-    Get LLM client from app state.
-    
-    Args:
-        request: FastAPI request object
-        
-    Returns:
-        LLMClientBase: LLM client instance
-    """
+    """Get LLM client from app state."""
     return request.app.state.llm_client
 
 
-@router.post("/history/create", response_model=dict)
+# =====================
+# API Endpoints
+# =====================
+@router.post("/history", response_model=ApiResponse[SessionCreateData])
 async def create_session(
-    request: NewHistoryRequest,
+    request: CreateSessionRequest,
     service: SessionService = Depends(get_session_service)
-) -> dict:
-    """
-    Create a new chat session.
-    
-    This endpoint:
-    1. Creates a new session with the provided name
-    2. Initializes session metadata and storage
-    3. Returns the new session ID for client use
-    
-    Args:
-        request: New history request with session name
-        
-    Returns:
-        dict: Creation result with structure:
-            - session_id: str - UUID of the newly created session
-            - success: bool - Always True if successful
-    
-    Raises:
-        HTTPException: 500 if session creation fails
+) -> ApiResponse[SessionCreateData]:
+    """Create a new chat session.
+
+    Creates a new session with the provided name, initializes session
+    metadata and storage, and returns the new session ID.
     """
     try:
         session_name = request.name or "New Session"
         result = await service.create_session(session_name=session_name)
-        return result
+        return ApiResponse(
+            success=True,
+            message="Session created successfully",
+            data=SessionCreateData(session_id=result["session_id"])
+        )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create session: {str(e)}"
+        raise InternalServerError(
+            message=f"Failed to create session: {str(e)}"
         )
 
 
-@router.get("/history/sessions", response_model=List[dict])
-async def get_all_sessions(
+@router.get("/history", response_model=ApiResponse[List[SessionData]])
+async def list_sessions(
     service: SessionService = Depends(get_session_service)
-) -> List[dict]:
-    """
-    Get all available chat sessions.
-    
-    Returns:
-        List[dict]: List of session metadata:
-            - id: str - Session UUID
-            - name: str - Session display name
-            - created_at: str - Creation timestamp
-            - updated_at: str - Last update timestamp
-            - message_count: int - Number of messages
-    
-    Raises:
-        HTTPException: 500 if retrieval fails
+) -> ApiResponse[List[SessionData]]:
+    """List all available chat sessions.
+
+    Returns metadata for all sessions including name, timestamps,
+    and message counts.
     """
     try:
         sessions = await service.get_all_sessions()
-        return sessions
+        session_list = [
+            SessionData(
+                id=s["id"],
+                name=s["name"],
+                created_at=s["created_at"],
+                updated_at=s["updated_at"],
+                message_count=s.get("message_count")
+            )
+            for s in sessions
+        ]
+        return ApiResponse(
+            success=True,
+            message=f"Retrieved {len(session_list)} sessions",
+            data=session_list
+        )
     except Exception as e:
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to retrieve sessions: {str(e)}"
+        raise InternalServerError(
+            message=f"Failed to retrieve sessions: {str(e)}"
         )
 
 
-@router.get("/history/{session_id}", response_model=dict)
+@router.get("/history/{session_id}", response_model=ApiResponse[SessionDetailsData])
 async def get_session_details(
     session_id: str,
     service: SessionService = Depends(get_session_service)
-) -> dict:
-    """
-    Get detailed information about a specific session.
-    
-    Args:
-        session_id: Session UUID
-        
-    Returns:
-        dict: Session details with structure:
-            - session: dict - Session metadata
-            - history: List[dict] - Complete message history
-            - message_count: int - Total message count
-    
-    Raises:
-        HTTPException: 404 if session not found, 500 if retrieval fails
+) -> ApiResponse[SessionDetailsData]:
+    """Get detailed information about a specific session.
+
+    Returns session metadata along with complete message history.
     """
     try:
         result = await service.get_session_details(session_id)
         if not result:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Session {session_id} not found"
+            raise SessionNotFoundError(session_id)
+
+        return ApiResponse(
+            success=True,
+            message="Session details retrieved",
+            data=SessionDetailsData(
+                session=SessionData(**result["session"]),
+                history=result["history"],
+                message_count=result["message_count"]
             )
-        return result
-    except HTTPException:
+        )
+    except SessionNotFoundError:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to retrieve session details: {str(e)}"
+        raise InternalServerError(
+            message=f"Failed to retrieve session details: {str(e)}"
         )
 
 
-@router.post("/history/switch", response_model=dict)
+@router.post("/history/switch", response_model=ApiResponse[SessionSwitchData])
 async def switch_session(
     request: SwitchSessionRequest,
     service: SessionService = Depends(get_session_service),
     llm_client: LLMClientBase = Depends(get_llm_client)
-) -> dict:
-    """
-    Switch to a different chat session.
-    
-    This endpoint:
-    1. Validates the target session exists
-    2. Clears tool cache for the session
-    3. Loads session history
-    4. Returns recent messages for context
-    
-    Args:
-        request: Switch session request with session_id
-        
-    Returns:
-        dict: Switch result with structure:
-            - session_id: str - Target session ID
-            - success: bool - Operation success flag
-            - message_count: int - Total messages in session
-            - recent_messages: List[dict] - Recent message context
-    
-    Raises:
-        HTTPException: 404 if session not found, 500 if switch fails
+) -> ApiResponse[SessionSwitchData]:
+    """Switch to a different chat session.
+
+    Validates the target session exists, clears tool cache,
+    loads session history, and returns recent messages for context.
     """
     try:
         result = await service.switch_session(
@@ -174,46 +206,35 @@ async def switch_session(
             llm_client=llm_client
         )
         if not result:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Session {request.session_id} not found"
+            raise SessionNotFoundError(request.session_id)
+
+        return ApiResponse(
+            success=True,
+            message=f"Switched to session {request.session_id[:8]}...",
+            data=SessionSwitchData(
+                session_id=result["session_id"],
+                message_count=result["message_count"],
+                recent_messages=result.get("recent_messages", [])
             )
-        return result
-    except HTTPException:
+        )
+    except SessionNotFoundError:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to switch session: {str(e)}"
+        raise InternalServerError(
+            message=f"Failed to switch session: {str(e)}"
         )
 
 
-@router.delete("/history/{session_id}", response_model=dict)
+@router.delete("/history/{session_id}", response_model=ApiResponse[SessionDeleteData])
 async def delete_session(
     session_id: str,
     service: SessionService = Depends(get_session_service),
     llm_client: LLMClientBase = Depends(get_llm_client)
-) -> dict:
-    """
-    Delete a chat session and all associated data.
+) -> ApiResponse[SessionDeleteData]:
+    """Delete a chat session and all associated data.
 
-    This endpoint:
-    1. Validates session exists
-    2. Deletes session history and metadata
-    3. Clears tool cache
-    4. Removes related memories from vector DB
-
-    Args:
-        session_id: Session UUID to delete
-
-    Returns:
-        dict: Deletion result with structure:
-            - session_id: str - Deleted session ID
-            - success: bool - Operation success flag
-            - message: str - User-friendly status message
-
-    Raises:
-        HTTPException: 404 if session not found, 500 if deletion fails
+    Deletes session history, metadata, clears tool cache,
+    and removes related memories from vector DB.
     """
     try:
         result = await service.delete_session(
@@ -221,50 +242,65 @@ async def delete_session(
             llm_client=llm_client
         )
         if not result:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Session {session_id} not found"
-            )
-        return result
-    except HTTPException:
+            raise SessionNotFoundError(session_id)
+
+        return ApiResponse(
+            success=True,
+            message="Session deleted successfully",
+            data=SessionDeleteData(session_id=session_id)
+        )
+    except SessionNotFoundError:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete session: {str(e)}"
+        raise InternalServerError(
+            message=f"Failed to delete session: {str(e)}"
         )
 
 
-@router.get("/history/{session_id}/token-usage", response_model=dict)
+@router.get("/history/{session_id}/token-usage", response_model=ApiResponse[TokenUsageData])
 async def get_token_usage(
     session_id: str,
     service: SessionService = Depends(get_session_service)
-) -> dict:
-    """
-    Get token usage information for a session.
+) -> ApiResponse[TokenUsageData]:
+    """Get token usage information for a session.
 
     Returns the latest token usage statistics from the last LLM interaction.
     This data is persisted in runtime_state.json and survives session switches.
-
-    Args:
-        session_id: Session UUID
-
-    Returns:
-        dict: Token usage information with structure:
-            - prompt_tokens: int - Input tokens (context window usage)
-            - completion_tokens: int - Output tokens (AI response)
-            - total_tokens: int - Total tokens used in last turn
-            - tokens_left: int - Remaining tokens in context window
-            Or empty dict if no token usage data available
-
-    Raises:
-        HTTPException: 500 if retrieval fails
     """
     try:
         usage = await service.get_token_usage(session_id)
-        return usage if usage else {}
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to retrieve token usage: {str(e)}"
+        if usage:
+            return ApiResponse(
+                success=True,
+                message="Token usage retrieved",
+                data=TokenUsageData(**usage)
+            )
+        return ApiResponse(
+            success=True,
+            message="No token usage data available",
+            data=TokenUsageData()
         )
+    except Exception as e:
+        raise InternalServerError(
+            message=f"Failed to retrieve token usage: {str(e)}"
+        )
+
+
+# =====================
+# Backward Compatibility Routes (deprecated)
+# =====================
+@router.post("/history/create", response_model=ApiResponse[SessionCreateData], deprecated=True)
+async def create_session_legacy(
+    request: CreateSessionRequest,
+    service: SessionService = Depends(get_session_service)
+) -> ApiResponse[SessionCreateData]:
+    """[DEPRECATED] Use POST /history instead."""
+    return await create_session(request, service)
+
+
+@router.get("/history/sessions", response_model=ApiResponse[List[SessionData]], deprecated=True)
+async def list_sessions_legacy(
+    service: SessionService = Depends(get_session_service)
+) -> ApiResponse[List[SessionData]]:
+    """[DEPRECATED] Use GET /history instead."""
+    return await list_sessions(service)
