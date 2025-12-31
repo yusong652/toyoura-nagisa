@@ -235,7 +235,7 @@ def register_diagnostic_callback(itasca_module, position=51.0):
     try:
         # Inject function into __main__ namespace (required for PFC lookup)
         import __main__
-        __main__._pfc_diagnostic_callback = _pfc_diagnostic_callback # type: ignore
+        __main__._pfc_diagnostic_callback = _pfc_diagnostic_callback  # type: ignore[attr-defined]
 
         # Register with PFC
         itasca_module.set_callback("_pfc_diagnostic_callback", position)

@@ -54,7 +54,7 @@ def request_interrupt(task_id):
     with _flags_lock:
         _interrupt_flags[task_id] = True
 
-    logger.info("Interrupt requested: {}".format(task_id))
+    logger.info("Interrupt requested: %s", task_id)
     return True
 
 
@@ -89,7 +89,7 @@ def clear_interrupt(task_id):
     with _flags_lock:
         if task_id in _interrupt_flags:
             del _interrupt_flags[task_id]
-            logger.debug("Cleared interrupt flag: {}".format(task_id))
+            logger.debug("Cleared interrupt flag: %s", task_id)
 
 
 def get_pending_interrupts():
@@ -124,7 +124,7 @@ def set_current_task(task_id):
     """
     global _current_task_id
     _current_task_id = task_id
-    logger.info("Current task set for interrupt: {}".format(task_id))
+    logger.debug("Current task set: %s", task_id)
 
 
 def clear_current_task():
@@ -138,7 +138,7 @@ def clear_current_task():
     prev_task = _current_task_id
     _current_task_id = None
     if prev_task:
-        logger.debug("Current task cleared: {}".format(prev_task))
+        logger.debug("Current task cleared: %s", prev_task)
 
 
 def get_current_task():
@@ -164,17 +164,16 @@ def _pfc_interrupt_check():
     Checks if current task has interrupt request and raises InterruptedError.
     This function is injected into __main__ namespace and registered with PFC.
 
+    Note:
+        Must be fast - runs every cycle during simulation.
+        Only checks current task's flag, no locking needed (GIL atomic read).
+
     Raises:
         InterruptedError: If current task has pending interrupt request
     """
     task_id = _current_task_id
-    # Debug: Log when callback is triggered with pending interrupt
-    pending = get_pending_interrupts()
-    if pending:
-        logger.debug("Interrupt check: current_task={}, pending={}".format(task_id, pending))
-
     if task_id and check_interrupt(task_id):
-        logger.info("Interrupting task: {}".format(task_id))
+        logger.info("Interrupting task: %s", task_id)
         raise InterruptedError("Task {} interrupted by user".format(task_id))
 
 
@@ -194,7 +193,7 @@ def _re_register_callback(itasca_module, position=50.0):
     Also re-registers diagnostic callback if it was registered.
     """
     import __main__
-    __main__._pfc_interrupt_check = _pfc_interrupt_check
+    __main__._pfc_interrupt_check = _pfc_interrupt_check  # type: ignore[attr-defined]
     itasca_module.set_callback("_pfc_interrupt_check", position)
     logger.debug("Interrupt callback re-registered after model reset")
 
@@ -202,7 +201,7 @@ def _re_register_callback(itasca_module, position=50.0):
     try:
         from ..executors.diagnostic import _pfc_diagnostic_callback, is_callback_registered
         if is_callback_registered():
-            __main__._pfc_diagnostic_callback = _pfc_diagnostic_callback
+            __main__._pfc_diagnostic_callback = _pfc_diagnostic_callback  # type: ignore[attr-defined]
             itasca_module.set_callback("_pfc_diagnostic_callback", 51.0)
             logger.debug("Diagnostic callback re-registered after model reset")
     except ImportError:
@@ -244,7 +243,7 @@ def register_interrupt_callback(itasca_module, position=50.0):
     try:
         # Inject function into __main__ namespace (required for PFC lookup)
         import __main__
-        __main__._pfc_interrupt_check = _pfc_interrupt_check
+        __main__._pfc_interrupt_check = _pfc_interrupt_check  # type: ignore[attr-defined]
 
         # Register with PFC
         itasca_module.set_callback("_pfc_interrupt_check", position)
@@ -266,11 +265,11 @@ def register_interrupt_callback(itasca_module, position=50.0):
         itasca_module.command = _wrapped_command
 
         _callback_registered = True
-        logger.info("Interrupt callback registered (position: {})".format(position))
+        logger.info("Interrupt callback registered (position=%.1f)", position)
         return True
 
     except Exception as e:
-        logger.error("Failed to register interrupt callback: {}".format(e))
+        logger.error("Failed to register interrupt callback: %s", e)
         return False
 
 
@@ -298,7 +297,7 @@ def unregister_interrupt_callback(itasca_module, position=50.0):
         return True
 
     except Exception as e:
-        logger.error("Failed to unregister interrupt callback: {}".format(e))
+        logger.error("Failed to unregister interrupt callback: %s", e)
         return False
 
 
