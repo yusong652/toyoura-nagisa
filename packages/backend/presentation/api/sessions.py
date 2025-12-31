@@ -158,6 +158,29 @@ async def list_sessions(
         )
 
 
+# =====================
+# Legacy Routes (must be before /{session_id} to avoid path collision)
+# =====================
+@router.post("/history/create", response_model=ApiResponse[SessionCreateData], deprecated=True)
+async def create_session_legacy(
+    request: CreateSessionRequest,
+    service: SessionService = Depends(get_session_service)
+) -> ApiResponse[SessionCreateData]:
+    """[DEPRECATED] Use POST /history instead."""
+    return await create_session(request, service)
+
+
+@router.get("/history/sessions", response_model=ApiResponse[List[SessionData]], deprecated=True)
+async def list_sessions_legacy(
+    service: SessionService = Depends(get_session_service)
+) -> ApiResponse[List[SessionData]]:
+    """[DEPRECATED] Use GET /history instead."""
+    return await list_sessions(service)
+
+
+# =====================
+# Dynamic Routes
+# =====================
 @router.get("/history/{session_id}", response_model=ApiResponse[SessionDetailsData])
 async def get_session_details(
     session_id: str,
@@ -286,21 +309,3 @@ async def get_token_usage(
         )
 
 
-# =====================
-# Backward Compatibility Routes (deprecated)
-# =====================
-@router.post("/history/create", response_model=ApiResponse[SessionCreateData], deprecated=True)
-async def create_session_legacy(
-    request: CreateSessionRequest,
-    service: SessionService = Depends(get_session_service)
-) -> ApiResponse[SessionCreateData]:
-    """[DEPRECATED] Use POST /history instead."""
-    return await create_session(request, service)
-
-
-@router.get("/history/sessions", response_model=ApiResponse[List[SessionData]], deprecated=True)
-async def list_sessions_legacy(
-    service: SessionService = Depends(get_session_service)
-) -> ApiResponse[List[SessionData]]:
-    """[DEPRECATED] Use GET /history instead."""
-    return await list_sessions(service)
