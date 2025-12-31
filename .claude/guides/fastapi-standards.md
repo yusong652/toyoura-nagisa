@@ -157,6 +157,21 @@ Follow RESTful conventions:
 @router.post("/sessions/{id}/archive")      # Archive session
 ```
 
+### Route Order (Critical)
+
+FastAPI matches routes in **definition order**. Static paths must come before dynamic paths:
+
+```python
+# CORRECT order
+@router.get("/history")                 # Static - matches first
+@router.get("/history/sessions")        # Static - matches second
+@router.get("/history/{session_id}")    # Dynamic - matches last
+
+# WRONG order (causes 404 for /history/sessions)
+@router.get("/history/{session_id}")    # "sessions" matched as session_id!
+@router.get("/history/sessions")        # Never reached
+```
+
 ### Deprecation
 
 When changing routes, keep old ones with `deprecated=True`:
