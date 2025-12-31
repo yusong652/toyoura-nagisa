@@ -42,7 +42,7 @@ class TaskPersistence:
         # Ensure base directories exist
         self._ensure_data_dir()
 
-        logger.info("✓ TaskPersistence initialized (sessions dir: {})".format(self.sessions_dir))
+        logger.info("TaskPersistence initialized (sessions_dir=%s)", self.sessions_dir)
 
     def _ensure_data_dir(self):
         # type: () -> None
@@ -206,9 +206,10 @@ class TaskPersistence:
             with open(filepath, 'r') as f:
                 tasks_data = json.load(f)
 
-            logger.info("✓ Loaded {} task(s) for session {}".format(
+            logger.info(
+                "Loaded %d task(s) for session %s",
                 len(tasks_data), session_id
-            ))
+            )
             return tasks_data
 
         except Exception as e:
@@ -240,10 +241,10 @@ class TaskPersistence:
                 session_tasks = self._load_session_tasks(session_id)
                 all_tasks.extend(session_tasks)
 
-            logger.info("✓ Loaded {} task(s) from {} session(s)".format(
-                len(all_tasks),
-                len(os.listdir(self.sessions_dir))
-            ))
+            logger.info(
+                "Loaded %d task(s) from %d session(s)",
+                len(all_tasks), len(os.listdir(self.sessions_dir))
+            )
             return all_tasks
 
         except Exception as e:

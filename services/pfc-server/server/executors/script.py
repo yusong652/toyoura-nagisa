@@ -47,7 +47,7 @@ class ScriptRunner:
             import itasca  # type: ignore
             self.itasca = itasca
         except ImportError:
-            logger.warning("⚠ ITASCA SDK not available for script execution")
+            logger.warning("ITASCA SDK not available for script execution")
             self.itasca = None
 
     def _execute(self, script_path, script_content, output_buffer, task_id):

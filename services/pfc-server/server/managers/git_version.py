@@ -420,7 +420,7 @@ class GitVersionManager:
                     "deleted_commits": 0
                 }
 
-            logger.info("✓ Deleted '{}' branch ({} commits)".format(EXECUTION_BRANCH, commit_count))
+            logger.info("Deleted '%s' branch (%d commits)", EXECUTION_BRANCH, commit_count)
 
             return {
                 "success": True,

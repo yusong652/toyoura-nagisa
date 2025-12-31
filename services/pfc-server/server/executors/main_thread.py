@@ -30,10 +30,10 @@ class MainThreadExecutor:
         self.task_queue = queue.Queue()
         self.main_thread_id = threading.current_thread().ident
         self.main_thread_name = threading.current_thread().name
-        logger.info("✓ MainThreadExecutor initialized")
-        logger.info("  Main thread: {} (ID: {})".format(
+        logger.info(
+            "MainThreadExecutor initialized (main_thread=%s, id=%s)",
             self.main_thread_name, self.main_thread_id
-        ))
+        )
 
     def submit(self, func, *args, **kwargs):
         # type: (Callable[..., Any], Any, Any) -> Future
@@ -55,9 +55,10 @@ class MainThreadExecutor:
         """
         future = Future()
         self.task_queue.put((func, args, kwargs, future))
-        logger.debug("Task submitted: {} (queue size: {})".format(
+        logger.debug(
+            "Task submitted: %s (queue_size=%d)",
             func.__name__, self.task_queue.qsize()
-        ))
+        )
         return future
 
     def process_tasks(self):
@@ -82,11 +83,10 @@ class MainThreadExecutor:
 
         if not is_main_thread:
             logger.warning(
-                "⚠️  process_tasks() called from WRONG THREAD! "
-                "Current: {} (ID: {}), Expected: {} (ID: {})".format(
-                    current_thread_name, current_thread_id,
-                    self.main_thread_name, self.main_thread_id
-                )
+                "process_tasks() called from wrong thread: "
+                "current=%s (id=%s), expected=%s (id=%s)",
+                current_thread_name, current_thread_id,
+                self.main_thread_name, self.main_thread_id
             )
 
         processed_count = 0
@@ -100,11 +100,10 @@ class MainThreadExecutor:
 
                 # Log thread information for first task
                 if processed_count == 1:
-                    thread_status = "MAIN THREAD" if is_main_thread else "WRONG THREAD"
+                    thread_status = "main_thread" if is_main_thread else "wrong_thread"
                     logger.info(
-                        "Processing tasks in {} ({}, ID: {})".format(
-                            thread_status, current_thread_name, current_thread_id
-                        )
+                        "Processing tasks (thread=%s, name=%s, id=%s)",
+                        thread_status, current_thread_name, current_thread_id
                     )
 
                 try:
@@ -114,19 +113,19 @@ class MainThreadExecutor:
                     # Execute task
                     result = func(*args, **kwargs)
                     future.set_result(result)
-                    logger.debug("✓ Task completed: {}".format(func.__name__))
+                    logger.debug("Task completed: %s", func.__name__)
 
                 except Exception as e:
                     # Set exception on future
                     future.set_exception(e)
-                    logger.error("✗ Task failed: {} - {}".format(func.__name__, e))
+                    logger.error("Task failed: %s - %s", func.__name__, e)
 
             except queue.Empty:
                 # Queue empty, exit
                 break
 
         if processed_count > 0:
-            logger.info("Processed {} task(s)".format(processed_count))
+            logger.info("Processed %d task(s)", processed_count)
 
         return processed_count
 

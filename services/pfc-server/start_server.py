@@ -370,7 +370,7 @@ def run_task_loop(interval=0.01):
             main_executor.process_tasks()
             stop_event.wait(interval)
     except KeyboardInterrupt:
-        print("\n✓ Loop stopped")
+        print("\nLoop stopped")
     finally:
         stop_event.clear()
 
@@ -477,7 +477,7 @@ def _print_startup_summary():
     if warnings:
         print("-" * 60)
         for w in warnings:
-            print("  ⚠ {}".format(w))
+            print("  [!] {}".format(w))
 
     print("-" * 60)
     print("Commands:  server_status()  run_task_loop()")

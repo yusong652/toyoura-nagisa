@@ -109,9 +109,10 @@ async def handle_reset_workspace(ctx, data):
         all_success = all(r.get("success", False) for r in results)
         summary_parts = [r.get("message", "") for r in results]
 
-        logger.info("✓ Workspace reset completed for: {}".format(
+        logger.info(
+            "Workspace reset completed for: %s",
             workspace_path or "(no workspace)"
-        ))
+        )
 
         return {
             "type": "result",

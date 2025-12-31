@@ -51,9 +51,10 @@ class TaskManager:
         else:
             self.persistence = None
 
-        logger.info("✓ TaskManager initialized (persistence: {})".format(
+        logger.info(
+            "TaskManager initialized (persistence=%s)",
             "enabled" if enable_persistence else "disabled"
-        ))
+        )
 
     def _load_historical_tasks(self):
         # type: () -> None
@@ -68,7 +69,7 @@ class TaskManager:
                 if historical_task:
                     self.tasks[historical_task.task_id] = historical_task
 
-            logger.info("✓ Loaded {} historical task(s)".format(len(tasks_data)))
+            logger.info("Loaded %d historical task(s)", len(tasks_data))
         except Exception as e:
             logger.error("Failed to load historical tasks: {}".format(e))
 
@@ -345,9 +346,10 @@ class TaskManager:
                     if os.path.exists(session_dir):
                         shutil.rmtree(session_dir)
 
-                logger.info("✓ Cleared {} task(s) for session {}".format(
+                logger.info(
+                    "Cleared %d task(s) for session %s",
                     len(tasks_to_remove), session_id
-                ))
+                )
 
                 return {
                     "success": True,
@@ -369,7 +371,7 @@ class TaskManager:
                         if os.path.isdir(session_path):
                             shutil.rmtree(session_path)
 
-                logger.info("✓ Cleared all {} task(s) across all sessions".format(cleared_count))
+                logger.info("Cleared all %d task(s) across all sessions", cleared_count)
 
                 return {
                     "success": True,

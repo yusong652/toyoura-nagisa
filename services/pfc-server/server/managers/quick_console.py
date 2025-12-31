@@ -55,7 +55,7 @@ class QuickConsoleManager:
         # Ensure directory exists and initialize counter
         self._init_directory()
 
-        logger.info("✓ QuickConsoleManager initialized (dir: {})".format(self.console_dir))
+        logger.info("QuickConsoleManager initialized (dir=%s)", self.console_dir)
 
     def _init_directory(self):
         # type: () -> None
@@ -284,9 +284,10 @@ for traceability and debugging purposes.
             with open(script_path, 'w', encoding='utf-8') as f:
                 f.write(script_content)
 
-            logger.info("✓ Quick script created: {} ({} chars)".format(
+            logger.info(
+                "Quick script created: %s (%d chars)",
                 script_name, len(code)
-            ))
+            )
 
             return script_name, script_path, code
 
@@ -390,7 +391,7 @@ for traceability and debugging purposes.
 
                 # Delete entire directory
                 shutil.rmtree(self.console_dir)
-                logger.info("✓ Deleted quick console directory: {}".format(self.console_dir))
+                logger.info("Deleted quick console directory: %s", self.console_dir)
 
             # Reset counter to 0
             with self._lock:

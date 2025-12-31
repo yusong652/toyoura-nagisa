@@ -57,9 +57,10 @@ class ScriptTask(Task):
         if output_buffer and hasattr(output_buffer, 'get_path'):
             self.log_path = output_buffer.get_path()
 
-        logger.info("✓ Script task registered: {} (ID: {}, Session: {})".format(
+        logger.info(
+            "Script task registered: %s (id=%s, session=%s)",
             script_name, task_id, session_id
-        ))
+        )
 
     def get_current_output(self):
         # type: () -> Optional[str]
@@ -116,9 +117,10 @@ class ScriptTask(Task):
 
         if current_status == "completed":
             # Script completed successfully
-            logger.info("✓ Task completed: {} (ID: {}, Time: {:.2f}s)".format(
+            logger.info(
+                "Task completed: %s (id=%s, time=%.2fs)",
                 self.description, self.task_id, elapsed_time
-            ))
+            )
 
             # Get output from buffer (single source of truth)
             output_text = self.get_current_output()
@@ -165,9 +167,10 @@ class ScriptTask(Task):
 
         elif current_status == "interrupted":
             # Script was interrupted by user
-            logger.info("⊘ Script task interrupted: {} (ID: {}, Time: {:.2f}s)".format(
+            logger.info(
+                "Script task interrupted: %s (id=%s, time=%.2fs)",
                 self.description, self.task_id, elapsed_time
-            ))
+            )
 
             # Get output from buffer (single source of truth)
             output_text = self.get_current_output()
@@ -196,7 +199,7 @@ class ScriptTask(Task):
 
         else:  # status == "failed"
             # Script failed
-            logger.error("✗ Script task failed: {} (ID: {})".format(self.description, self.task_id))
+            logger.error("Script task failed: %s (id=%s)", self.description, self.task_id)
 
             # Get output from buffer (single source of truth)
             output_text = self.get_current_output()
