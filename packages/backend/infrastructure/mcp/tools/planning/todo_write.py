@@ -10,7 +10,7 @@ All sessions in the same workspace share the same todo list for better continuit
 """
 
 import logging
-from typing import List, Dict, Any, Literal
+from typing import List, Dict, Any, Literal, cast
 from pydantic import BaseModel, Field
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
@@ -292,7 +292,7 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
     """
     # Extract session ID from context (client_id is the session ID in MCP)
     # Architecture guarantee: tool_manager.py always injects _meta.client_id
-    session_id = context.client_id
+    session_id = cast(str, context.client_id)
 
     try:
         # Get agent_profile from context_manager (set by Agent before tool execution)
