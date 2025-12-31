@@ -6,39 +6,42 @@ even when PFC main thread is blocked by cycle() computation. It uses PFC's
 callback system to execute scripts in the gaps between cycles.
 
 Key Design:
-- Uses global variables to pass script path to parameterless callback
+- Uses thread-safe queue for pending diagnostic requests
 - Callback executes at position 51.0 (after interrupt check at 50.0)
-- Supports both cycle-blocked and cycle-free execution scenarios
+- Batch execution: processes all pending diagnostics per callback invocation
+- Supports concurrent diagnostic requests from agent
 
 Architecture:
-- WebSocket thread: calls submit_diagnostic(script_path)
-- PFC callback: _pfc_diagnostic_callback() reads global and executes
-- Result returned via Future object
+- WebSocket thread: calls submit_diagnostic(script_path) -> queued
+- PFC callback: _pfc_diagnostic_callback() batch executes all pending
+- Results returned via Future objects
 
 Python 3.6 compatible implementation.
 """
 
-import threading
 import logging
 from concurrent.futures import Future
-from typing import Any, Dict, Optional
+from typing import Any, Tuple
+
+# Python 3.6 compatible queue import
+try:
+    from queue import Queue, Empty
+except ImportError:
+    from Queue import Queue, Empty  # type: ignore
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
 
 
 # =============================================================================
-# Global State (Parameter channel for parameterless callback)
+# Global State (Queue for pending diagnostic requests)
 # =============================================================================
 
-# Pending diagnostic script path
-_pending_script_path = None  # type: Optional[str]
+# Queue of pending diagnostics: (script_path, future) tuples
+_pending_queue = Queue()  # type: Queue[Tuple[str, Future]]
 
-# Future for returning result to caller
-_pending_future = None  # type: Optional[Future]
-
-# Lock for thread-safe access
-_pending_lock = threading.Lock()
+# Maximum diagnostics to execute per callback (safety limit)
+MAX_BATCH_SIZE = 10
 
 
 # =============================================================================
@@ -50,8 +53,9 @@ def submit_diagnostic(script_path):
     """
     Submit diagnostic script for callback execution.
 
-    Called from WebSocket handler thread. The script will be executed
-    by PFC callback during next cycle gap.
+    Called from WebSocket handler thread. The script will be queued and
+    executed by PFC callback during next cycle gap. Multiple diagnostics
+    can be queued and will be batch executed.
 
     Args:
         script_path: Absolute path to Python script file
@@ -62,86 +66,71 @@ def submit_diagnostic(script_path):
     Example:
         future = submit_diagnostic("/path/to/capture_plot.py")
         result = future.result(timeout=30)  # Wait up to 30 seconds
+
+    Note:
+        Thread-safe. Multiple concurrent calls are supported.
     """
-    global _pending_script_path, _pending_future
-
     future = Future()
-
-    with _pending_lock:
-        # Check if another diagnostic is pending
-        if _pending_script_path is not None:
-            # Previous diagnostic not yet executed - this shouldn't happen often
-            logger.warning("Previous diagnostic pending, replacing: {}".format(
-                _pending_script_path
-            ))
-
-        _pending_script_path = script_path
-        _pending_future = future
-
-    logger.debug("Diagnostic submitted: {}".format(script_path))
+    _pending_queue.put((script_path, future))
+    logger.debug("Diagnostic queued: %s (queue_size=%d)", script_path, _pending_queue.qsize())
     return future
+
+
+def get_pending_count():
+    # type: () -> int
+    """Get number of pending diagnostic requests."""
+    return _pending_queue.qsize()
 
 
 def is_diagnostic_pending():
     # type: () -> bool
-    """Check if a diagnostic script is pending execution."""
-    return _pending_script_path is not None
+    """Check if any diagnostic script is pending execution."""
+    return not _pending_queue.empty()
 
 
-def clear_pending_diagnostic():
-    # type: () -> None
-    """Clear pending diagnostic (for cleanup/reset)."""
-    global _pending_script_path, _pending_future
+def clear_pending_diagnostics():
+    # type: () -> int
+    """
+    Clear all pending diagnostics (for cleanup/reset).
 
-    with _pending_lock:
-        if _pending_future is not None and not _pending_future.done():
-            _pending_future.set_exception(
-                RuntimeError("Diagnostic cleared before execution")
-            )
-        _pending_script_path = None
-        _pending_future = None
+    Returns:
+        int: Number of diagnostics cleared
+    """
+    cleared = 0
+    while True:
+        try:
+            script_path, future = _pending_queue.get_nowait()
+            if not future.done():
+                future.set_exception(
+                    RuntimeError("Diagnostic cleared before execution")
+                )
+            cleared += 1
+        except Empty:
+            break
+
+    if cleared > 0:
+        logger.info("Cleared %d pending diagnostic(s)", cleared)
+
+    return cleared
 
 
 # =============================================================================
 # PFC Callback Function (Executed in main thread during cycle gaps)
 # =============================================================================
 
-def _pfc_diagnostic_callback():
-    # type: () -> None
+def _execute_single_diagnostic(script_path, future):
+    # type: (str, Future) -> None
     """
-    PFC callback - Execute pending diagnostic script.
+    Execute a single diagnostic script.
 
-    This function is called by PFC after each cycle. It checks if there's
-    a pending diagnostic script and executes it.
-
-    No parameters - reads from global _pending_script_path.
-
-    Note:
-        - Must be fast when no diagnostic pending (just a None check)
-        - Script execution happens in PFC main thread
-        - Result returned via Future.set_result()
+    Args:
+        script_path: Path to diagnostic script
+        future: Future to set result/exception on
     """
-    global _pending_script_path, _pending_future
+    import sys
+    import os
 
-    # Fast path: no pending diagnostic (99% of the time)
-    if _pending_script_path is None:
-        return
-
-    # Take ownership of pending diagnostic
-    with _pending_lock:
-        if _pending_script_path is None or _pending_future is None:
-            return
-
-        script_path = _pending_script_path
-        future = _pending_future
-        _pending_script_path = None
-        _pending_future = None
-
-    logger.info("Executing diagnostic via callback: {}".format(script_path))
-
-    # Execute script
     try:
-        import sys
         import itasca  # type: ignore
 
         # Read script content
@@ -170,11 +159,46 @@ def _pfc_diagnostic_callback():
             "data": result
         })
 
-        logger.info("Diagnostic completed via callback: {}".format(script_path))
+        logger.debug("Diagnostic completed: %s", os.path.basename(script_path))
 
     except Exception as e:
-        logger.error("Diagnostic callback execution failed: {}".format(e))
+        logger.error("Diagnostic execution failed: %s - %s", script_path, e)
         future.set_exception(e)
+
+
+def _pfc_diagnostic_callback():
+    # type: () -> None
+    """
+    PFC callback - Batch execute all pending diagnostic scripts.
+
+    This function is called by PFC after each cycle. It processes all
+    pending diagnostic requests in the queue (up to MAX_BATCH_SIZE).
+
+    No parameters - reads from global _pending_queue.
+
+    Note:
+        - Fast path when queue empty (just an empty check)
+        - Batch execution reduces cycle gap overhead
+        - Each script executes in PFC main thread
+        - Results returned via Future.set_result()
+    """
+    # Fast path: no pending diagnostics (99% of the time)
+    if _pending_queue.empty():
+        return
+
+    # Batch execute all pending diagnostics
+    executed = 0
+    while executed < MAX_BATCH_SIZE:
+        try:
+            script_path, future = _pending_queue.get_nowait()
+        except Empty:
+            break
+
+        _execute_single_diagnostic(script_path, future)
+        executed += 1
+
+    if executed > 0:
+        logger.info("Executed %d diagnostic(s) via callback", executed)
 
 
 # =============================================================================
@@ -217,11 +241,11 @@ def register_diagnostic_callback(itasca_module, position=51.0):
         itasca_module.set_callback("_pfc_diagnostic_callback", position)
 
         _callback_registered = True
-        logger.info("Diagnostic callback registered (position: {})".format(position))
+        logger.info("Diagnostic callback registered (position=%.1f)", position)
         return True
 
     except Exception as e:
-        logger.error("Failed to register diagnostic callback: {}".format(e))
+        logger.error("Failed to register diagnostic callback: %s", e)
         return False
 
 
@@ -249,7 +273,7 @@ def unregister_diagnostic_callback(itasca_module, position=51.0):
         return True
 
     except Exception as e:
-        logger.error("Failed to unregister diagnostic callback: {}".format(e))
+        logger.error("Failed to unregister diagnostic callback: %s", e)
         return False
 
 
