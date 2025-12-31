@@ -10,20 +10,21 @@ interface ProfileInfo {
   icon: string
 }
 
-interface GetProfilesResponse {
-  success: boolean
+interface ProfileListData {
   profiles: ProfileInfo[]
-  message?: string
-  error?: string
 }
 
 export class AgentService {
   /**
-   * Get all available agent profiles with their metadata
+   * Get all available agent profiles with their metadata.
+   *
+   * Note: HttpClient automatically unwraps ApiResponse format,
+   * so this returns the data payload directly (ProfileListData).
+   *
    * @returns Promise resolving to list of available profiles
    */
-  async getAvailableProfiles(): Promise<GetProfilesResponse> {
-    return await apiClient.get<GetProfilesResponse>('/api/profiles')
+  async getAvailableProfiles(): Promise<ProfileListData> {
+    return await apiClient.get<ProfileListData>('/api/profiles')
   }
 }
 

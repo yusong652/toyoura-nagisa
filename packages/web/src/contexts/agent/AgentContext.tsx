@@ -60,20 +60,19 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
   const refreshProfiles = useCallback(async (): Promise<void> => {
     setIsProfileLoading(true)
     try {
+      // HttpClient unwraps ApiResponse, so we get ProfileListData directly
       const data = await agentService.getAvailableProfiles()
-      if (data.success) {
-        // Convert backend format to frontend format
-        const profiles: AgentProfileInfo[] = data.profiles.map(p => ({
-          profile_type: p.profile_type as AgentProfileType,
-          name: p.name,
-          description: p.description,
-          tool_count: p.tool_count,
-          estimated_tokens: p.estimated_tokens,
-          color: p.color,
-          icon: p.icon
-        }))
-        setAvailableProfiles(profiles)
-      }
+      // Convert backend format to frontend format
+      const profiles: AgentProfileInfo[] = data.profiles.map(p => ({
+        profile_type: p.profile_type as AgentProfileType,
+        name: p.name,
+        description: p.description,
+        tool_count: p.tool_count,
+        estimated_tokens: p.estimated_tokens,
+        color: p.color,
+        icon: p.icon
+      }))
+      setAvailableProfiles(profiles)
     } catch (error) {
       console.error('Failed to load agent profiles:', error)
     } finally {
