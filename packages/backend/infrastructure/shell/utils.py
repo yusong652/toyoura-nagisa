@@ -10,7 +10,7 @@ Used by both ShellExecutor (synchronous) and BackgroundProcessManager (async str
 import os
 import re
 import sys
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 
 # Python invocation patterns for detection
@@ -76,7 +76,7 @@ def enhance_python_command(command: str) -> Tuple[str, bool]:
 
 
 def prepare_shell_env(
-    base_env: Dict[str, str] = None,
+    base_env: Optional[Dict[str, str]],
     force_unbuffered: bool = True,
     encoding: str = "utf-8",
 ) -> Dict[str, str]:
@@ -86,6 +86,7 @@ def prepare_shell_env(
     - PYTHONUNBUFFERED: Force unbuffered Python output
     - PYTHONIOENCODING: Ensure consistent encoding
     - PYTHONUTF8: Enable UTF-8 mode for Python (Windows)
+    - LC_ALL/LANG: Ensure UTF-8 locale for proper Unicode handling
 
     Args:
         base_env: Base environment dict (defaults to os.environ)
@@ -106,5 +107,11 @@ def prepare_shell_env(
     # Enable UTF-8 mode on Windows for consistent encoding
     if sys.platform == "win32":
         env['PYTHONUTF8'] = '1'
+    else:
+        # On Unix-like systems (macOS, Linux), ensure UTF-8 locale
+        # This ensures commands like git, ls output Unicode properly
+        # instead of octal escape sequences (e.g., \346\265\213 instead of 测试)
+        env['LC_ALL'] = 'en_US.UTF-8'
+        env['LANG'] = 'en_US.UTF-8'
 
     return env
