@@ -67,10 +67,10 @@ class SessionDeleteData(BaseModel):
 
 class TokenUsageData(BaseModel):
     """Token usage statistics for a session."""
-    prompt_tokens: int = Field(0, description="Input tokens (context window usage)")
-    completion_tokens: int = Field(0, description="Output tokens (AI response)")
-    total_tokens: int = Field(0, description="Total tokens used in last turn")
-    tokens_left: Optional[int] = Field(None, description="Remaining tokens in context window")
+    prompt_tokens: int = Field(default=0, description="Input tokens (context window usage)")
+    completion_tokens: int = Field(default=0, description="Output tokens (AI response)")
+    total_tokens: int = Field(default=0, description="Total tokens used in last turn")
+    tokens_left: Optional[int] = Field(default=None, description="Remaining tokens in context window")
 
 
 # =====================

@@ -36,8 +36,8 @@ class ApiResponse(BaseModel, Generic[T]):
     """
     success: bool = Field(..., description="Whether the operation succeeded")
     message: str = Field(..., description="Human-readable status message")
-    data: Optional[T] = Field(None, description="Response payload (null on error)")
-    error_code: Optional[str] = Field(None, description="Error code for client handling (null on success)")
+    data: Optional[T] = Field(default=None, description="Response payload (null on error)")
+    error_code: Optional[str] = Field(default=None, description="Error code for client handling (null on success)")
 
 
 class StandardErrorResponse(BaseModel):
