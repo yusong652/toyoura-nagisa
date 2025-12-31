@@ -38,6 +38,4 @@ export { ToolService, toolService } from './ToolService';
 export type {
   UpdateToolsEnabledRequest,
   UpdateToolsEnabledResponse,
-  UpdateTtsEnabledRequest,
-  UpdateTtsEnabledResponse
 } from './ToolService';
