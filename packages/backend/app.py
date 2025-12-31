@@ -1,6 +1,3 @@
-import sys
-import os
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -24,43 +21,8 @@ from backend.presentation.websocket.websocket_handler import create_websocket_ha
 from backend.presentation.websocket.routes import register_websocket_routes
 from backend.presentation.exceptions import register_exception_handlers
 from backend.shared.utils.app_context import set_app
+from backend.shared.utils.process_utils import kill_process_on_port
 import threading
-import subprocess
-
-
-def kill_process_on_port(port: int) -> bool:
-    """Kill any process occupying the specified port (Windows only)."""
-    if sys.platform != "win32":
-        return False
-
-    try:
-        # Find PID using netstat
-        result = subprocess.run(
-            ["netstat", "-ano"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-
-        for line in result.stdout.split("\n"):
-            if f":{port}" in line and "LISTENING" in line:
-                parts = line.split()
-                if parts:
-                    pid = parts[-1]
-                    try:
-                        subprocess.run(
-                            ["taskkill", "/F", "/PID", pid],
-                            capture_output=True,
-                            timeout=5
-                        )
-                        print(f"[INIT] Killed stale process {pid} on port {port}")
-                        return True
-                    except Exception:
-                        pass
-    except Exception as e:
-        print(f"[INIT] Port cleanup check failed: {e}")
-
-    return False
 
 
 @asynccontextmanager
