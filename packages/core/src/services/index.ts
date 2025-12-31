@@ -15,7 +15,7 @@ export type {
   MessageRequest,
   ChatStreamRequest,
   MessageDeleteRequest,
-  MessageDeleteResponse
+  MessageDeleteData
 } from './ChatService';
 
 // Session Service
@@ -26,16 +26,9 @@ export type {
   SwitchSessionRequest,
   SessionHistoryResponse,
   GenerateTitleRequest,
-  GenerateTitleResponse,
+  GenerateTitleData,
   TokenUsageResponse
 } from './SessionService';
 
 // Agent Service
 export { AgentService, agentService } from './AgentService';
-
-// Tool Service
-export { ToolService, toolService } from './ToolService';
-export type {
-  UpdateToolsEnabledRequest,
-  UpdateToolsEnabledResponse,
-} from './ToolService';

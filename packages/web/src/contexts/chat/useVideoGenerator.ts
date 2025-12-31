@@ -50,12 +50,15 @@ export const useVideoGenerator = ({
   ): Promise<VideoGeneratorResult> => {
 
     try {
+      // HttpClient unwraps ApiResponse, so we get VideoGenerateData directly
+      // Errors are thrown as ApiBusinessError
       const result = await chatService.generateVideo(sessionId, motionStyle)
-      
-      if (result.success && sessionId === currentSessionId) {
+
+      // Success - update messages if in current session
+      if (sessionId === currentSessionId) {
         try {
           const historyData = await sessionService.getSessionHistory(sessionId)
-          
+
           if (historyData.history && Array.isArray(historyData.history)) {
             const lastVideoMessage = historyData.history
               .filter((msg: any) => msg.role === 'video')
@@ -67,7 +70,7 @@ export const useVideoGenerator = ({
               const filename = videoPath?.split('/').pop() || 'video.mp4'
               const extension = filename.toLowerCase().split('.').pop()
               let mediaType = 'video/mp4' // default
-              
+
               if (extension === 'gif') {
                 mediaType = 'image/gif'
               } else if (extension === 'webm') {
@@ -78,7 +81,7 @@ export const useVideoGenerator = ({
 
               const videoMessage: Message = {
                 id: lastVideoMessage.id || uuidv4(),
-                role: 'assistant',  // ✨ Use role instead of sender: 'bot'
+                role: 'assistant',
                 text: lastVideoMessage.content || '',
                 timestamp: new Date(lastVideoMessage.timestamp || Date.now()).getTime(),
                 files: [{
@@ -95,8 +98,8 @@ export const useVideoGenerator = ({
           console.error('Failed to retrieve generated video message:', error)
         }
       }
-      
-      return result
+
+      return { success: true, video_path: result.video_path }
     } catch (error) {
       console.error('Video generation failed:', error)
       return {

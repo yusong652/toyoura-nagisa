@@ -281,9 +281,10 @@ export class SessionManager extends EventEmitter {
    */
   async refreshTitle(sessionId: string): Promise<void> {
     try {
+      // HttpClient unwraps ApiResponse, so we get GenerateTitleData directly
       const data = await this.sessionService.generateTitle(sessionId)
 
-      if (data.success && data.title) {
+      if (data.title) {
         // Update local session list
         this.sessions = this.sessions.map(session =>
           session.id === sessionId

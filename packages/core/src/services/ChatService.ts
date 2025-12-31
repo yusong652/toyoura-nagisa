@@ -36,9 +36,9 @@ export interface MessageDeleteRequest {
   message_id: string
 }
 
-export interface MessageDeleteResponse {
-  success: boolean
-  detail?: string
+export interface MessageDeleteData {
+  session_id: string
+  message_id: string
 }
 
 export class ChatService {
@@ -138,76 +138,61 @@ export class ChatService {
 
   /**
    * Delete a specific message from a chat session.
-   * 
+   *
+   * Note: HttpClient automatically unwraps ApiResponse format,
+   * so this returns the data payload directly (MessageDeleteData).
+   *
    * @param sessionId - Session containing the message
    * @param messageId - Unique identifier of message to delete
    * @returns Promise resolving to deletion result
    */
-  async deleteMessage(sessionId: string, messageId: string): Promise<MessageDeleteResponse> {
+  async deleteMessage(sessionId: string, messageId: string): Promise<MessageDeleteData> {
     const request: MessageDeleteRequest = {
       session_id: sessionId,
       message_id: messageId
     }
 
-    return await apiClient.post<MessageDeleteResponse>('/api/messages/delete', request)
+    return await apiClient.post<MessageDeleteData>('/api/messages/delete', request)
   }
 
   /**
    * Generate an AI-created image for the current session.
-   * 
+   *
+   * Note: HttpClient automatically unwraps ApiResponse format,
+   * so this returns the data payload directly (ImageGenerateData).
+   * Errors are thrown as ApiBusinessError.
+   *
    * @param sessionId - Session to generate image for
    * @returns Promise resolving to image generation result
    */
   async generateImage(sessionId: string): Promise<{
-    success: boolean
     image_path?: string
-    error?: string
   }> {
-    try {
-      const response = await apiClient.post<{
-        success: boolean
-        image_path?: string
-        error?: string
-      }>('/api/generate-image', { session_id: sessionId })
-      
-      return response
-    } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.message || 'Network error during image generation' 
-      }
-    }
+    return await apiClient.post<{
+      image_path?: string
+    }>('/api/generate-image', { session_id: sessionId })
   }
 
   /**
    * Generate a video from the most recent image in the session.
-   * 
+   *
+   * Note: HttpClient automatically unwraps ApiResponse format,
+   * so this returns the data payload directly (VideoGenerateData).
+   * Errors are thrown as ApiBusinessError.
+   *
    * @param sessionId - Session containing the image to convert to video
    * @param motionStyle - Optional motion style for the video generation
    * @returns Promise resolving to video generation result
    */
   async generateVideo(sessionId: string, motionStyle?: string): Promise<{
-    success: boolean
     video_path?: string
-    error?: string
   }> {
-    try {
-      const response = await apiClient.post<{
-        success: boolean
-        video_path?: string
-        error?: string
-      }>('/api/generate-video', { 
-        session_id: sessionId,
-        motion_style: motionStyle
-      })
-      
-      return response
-    } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.message || 'Network error during video generation' 
-      }
-    }
+    return await apiClient.post<{
+      video_path?: string
+    }>('/api/generate-video', {
+      session_id: sessionId,
+      motion_style: motionStyle
+    })
   }
 }
 

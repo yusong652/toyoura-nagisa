@@ -1,12 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
-import { toolService, agentService } from '@toyoura-nagisa/core'
+import { agentService } from '@toyoura-nagisa/core'
 import { AgentProfileType, AgentProfileInfo } from '@toyoura-nagisa/core'
 
 interface AgentContextType {
-  // Tool-related state
-  toolsEnabled: boolean
-  updateToolsEnabled: (enabled: boolean) => Promise<void>
-
   // Agent profile state (frontend only)
   currentProfile: AgentProfileType
   setCurrentProfile: (profile: AgentProfileType) => void
@@ -30,9 +26,6 @@ interface AgentProviderProps {
 }
 
 export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
-  // Tool state management
-  const [toolsEnabled, setToolsEnabled] = useState<boolean>(false)
-  
   // Agent profile state
   const [currentProfile, setCurrentProfile] = useState<AgentProfileType>(AgentProfileType.GENERAL)
   const [availableProfiles, setAvailableProfiles] = useState<AgentProfileInfo[]>([])
@@ -41,19 +34,6 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
   // Load available profiles on mount
   useEffect(() => {
     refreshProfiles()
-  }, [])
-
-  // Update tools enabled status (legacy support)
-  const updateToolsEnabled = useCallback(async (enabled: boolean): Promise<void> => {
-    try {
-      const data = await toolService.updateToolsEnabled(enabled)
-      if (data.success) {
-        setToolsEnabled(data.tools_enabled)
-      }
-    } catch (error) {
-      console.error('Failed to update tools status:', error)
-      throw error
-    }
   }, [])
 
   // Refresh available profiles from backend
@@ -80,19 +60,10 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
     }
   }, [])
 
-  // Simple profile selection (frontend state only)
-  const handleSetCurrentProfile = useCallback((profile: AgentProfileType) => {
-    setCurrentProfile(profile)
-    // Update tools enabled based on selected profile
-    setToolsEnabled(profile !== AgentProfileType.DISABLED)
-  }, [])
-
   return (
     <AgentContext.Provider value={{
-      toolsEnabled,
-      updateToolsEnabled,
       currentProfile,
-      setCurrentProfile: handleSetCurrentProfile,
+      setCurrentProfile,
       availableProfiles,
       isProfileLoading,
       refreshProfiles

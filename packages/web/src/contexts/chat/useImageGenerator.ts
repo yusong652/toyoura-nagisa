@@ -24,12 +24,15 @@ export const useImageGenerator = ({
   ): Promise<ImageGeneratorResult> => {
 
     try {
+      // HttpClient unwraps ApiResponse, so we get ImageGenerateData directly
+      // Errors are thrown as ApiBusinessError
       const result = await chatService.generateImage(sessionId)
-      
-      if (result.success && sessionId === currentSessionId) {
+
+      // Success - update messages if in current session
+      if (sessionId === currentSessionId) {
         try {
           const historyData = await sessionService.getSessionHistory(sessionId)
-          
+
           if (historyData.history && Array.isArray(historyData.history)) {
             const lastImageMessage = historyData.history
               .filter((msg: any) => msg.role === 'image')
@@ -38,7 +41,7 @@ export const useImageGenerator = ({
             if (lastImageMessage) {
               const imageMessage: Message = {
                 id: lastImageMessage.id || uuidv4(),
-                role: 'assistant',  // ✨ Use role instead of sender: 'bot'
+                role: 'assistant',
                 text: lastImageMessage.content || '',
                 timestamp: new Date(lastImageMessage.timestamp || Date.now()).getTime(),
                 files: [{
@@ -55,8 +58,8 @@ export const useImageGenerator = ({
           console.error('获取生成的图片消息失败:', error)
         }
       }
-      
-      return result
+
+      return { success: true, image_path: result.image_path }
     } catch (error) {
       console.error('图片生成失败:', error)
       return {

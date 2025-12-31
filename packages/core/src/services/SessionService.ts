@@ -38,8 +38,8 @@ export interface GenerateTitleRequest {
   session_id: string
 }
 
-export interface GenerateTitleResponse {
-  success: boolean
+export interface GenerateTitleData {
+  session_id: string
   title: string
 }
 
@@ -105,12 +105,15 @@ export class SessionService {
   /**
    * Generate an AI-powered title for a chat session based on its content.
    *
+   * Note: HttpClient automatically unwraps ApiResponse format,
+   * so this returns the data payload directly (GenerateTitleData).
+   *
    * @param sessionId - ID of session to generate title for
    * @returns Promise resolving to title generation result
    */
-  async generateTitle(sessionId: string): Promise<GenerateTitleResponse> {
+  async generateTitle(sessionId: string): Promise<GenerateTitleData> {
     const request: GenerateTitleRequest = { session_id: sessionId }
-    return await apiClient.post<GenerateTitleResponse>('/api/history/generate-title', request)
+    return await apiClient.post<GenerateTitleData>('/api/history/generate-title', request)
   }
 
   /**

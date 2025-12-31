@@ -288,11 +288,9 @@ export class ChatManager extends EventEmitter {
    */
   async deleteMessage(messageId: string, sessionId: string): Promise<void> {
     try {
-      const response = await this.chatService.deleteMessage(sessionId, messageId)
-
-      if (!response.success) {
-        throw new Error(`Failed to delete message: ${response.detail}`)
-      }
+      // HttpClient unwraps ApiResponse, so we get MessageDeleteData directly
+      // If deletion fails, HttpClient throws ApiBusinessError
+      await this.chatService.deleteMessage(sessionId, messageId)
 
       // Emit message deleted event
       this.emit(ChatEvent.MESSAGE_DELETED, {

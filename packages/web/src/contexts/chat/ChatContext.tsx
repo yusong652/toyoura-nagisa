@@ -33,10 +33,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const { queueAndPlayAudio, resetAudioState } = useAudio()
   const { ttsEnabled } = useTtsEnable()
   const { memoryEnabled } = useMemory()
-  const {
-    toolsEnabled,
-    currentProfile
-  } = useAgent()
+  const { currentProfile } = useAgent()
   
   // 从SessionContext获取会话相关状态和方法
   const {

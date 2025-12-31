@@ -31,11 +31,11 @@ export function useProfileManager({
   const refreshProfiles = useCallback(async () => {
     setIsProfileLoading(true);
     try {
+      // HttpClient unwraps ApiResponse, so we get ProfileListData directly
       const response = await apiClient.get<{
-        success: boolean;
         profiles: AgentProfileInfo[];
       }>('/api/profiles');
-      if (response.success && response.profiles) {
+      if (response.profiles) {
         setAvailableProfiles(response.profiles);
       }
     } catch (err) {
