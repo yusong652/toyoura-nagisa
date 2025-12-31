@@ -197,6 +197,21 @@ class CreateSessionRequest(BaseModel):
     name: Optional[str] = Field(None, description="Session name")
 ```
 
+### Field Definitions
+
+Use explicit `default=` for optional fields (Pylance compatibility):
+
+```python
+# Required field
+name: str = Field(..., description="Required field")
+
+# Optional field with None default
+notes: Optional[str] = Field(default=None, description="Optional field")
+
+# Optional field with value default
+count: int = Field(default=0, description="Defaults to 0")
+```
+
 ### Field Validation
 
 Use Pydantic validators for business rules:
@@ -206,7 +221,7 @@ from pydantic import field_validator
 
 class ExecuteRequest(BaseModel):
     command: str = Field(..., min_length=1, max_length=10000)
-    timeout_ms: Optional[int] = Field(None, ge=100, le=300000)
+    timeout_ms: Optional[int] = Field(default=None, ge=100, le=300000)
 
     @field_validator('command')
     @classmethod
