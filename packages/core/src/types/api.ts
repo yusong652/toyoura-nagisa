@@ -61,14 +61,41 @@ export function isApiResponse(obj: unknown): obj is ApiResponse<unknown> {
 }
 
 /**
+ * Error thrown when API returns success: false.
+ * Contains the error details from the response for handling in catch blocks.
+ */
+export class ApiBusinessError extends Error {
+  public readonly errorCode: string | null
+  public readonly data: unknown
+
+  constructor(message: string, errorCode: string | null, data: unknown) {
+    super(message)
+    this.name = 'ApiBusinessError'
+    this.errorCode = errorCode
+    this.data = data
+  }
+}
+
+/**
  * Unwrap ApiResponse if needed, otherwise return as-is.
  * Provides backward compatibility during API migration.
  *
+ * When success is false, throws ApiBusinessError to allow catch blocks
+ * to handle business logic errors (e.g., PFC server not connected).
+ *
  * @param response - Raw API response
  * @returns Unwrapped data or original response
+ * @throws ApiBusinessError when success is false
  */
 export function unwrapApiResponse<T>(response: unknown): T {
   if (isApiResponse(response)) {
+    if (!response.success) {
+      throw new ApiBusinessError(
+        response.message,
+        response.error_code,
+        response.data
+      )
+    }
     return response.data as T
   }
   return response as T

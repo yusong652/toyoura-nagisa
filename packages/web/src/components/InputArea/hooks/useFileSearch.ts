@@ -12,24 +12,7 @@ import {
  * It calls the backend REST API endpoint `/api/files/search` to retrieve
  * matching files based on fuzzy search.
  *
- * Features:
- * - Async file search with loading state
- * - Error handling for failed requests
- * - Result caching for current search
- * - Clean API with TypeScript support
- *
- * Args:
- *     agentProfile?: string - Agent profile for workspace resolution (default: 'general')
- *     sessionId?: string - Session ID for workspace context
- *
- * Returns:
- *     FileSearchHookReturn: Search function, results, and state
- *
- * TypeScript Learning Points:
- * - Async API calls with proper error handling
- * - State management for loading and error states
- * - Type-safe response parsing
- * - Custom hook composition
+ * Updated for 2025 Standard ApiResponse format.
  */
 
 const useFileSearch = (
@@ -76,16 +59,20 @@ const useFileSearch = (
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      // Parse response
-      const data: FileSearchResponse = await response.json()
+      // Parse response (2025 Standard ApiResponse format)
+      const apiResponse: FileSearchResponse = await response.json()
 
-      if (data.status === 'error') {
-        throw new Error(data.error || 'File search failed')
+      // Check for business logic errors
+      if (!apiResponse.success) {
+        throw new Error(apiResponse.message || 'File search failed')
       }
 
+      // Extract results from data
+      const searchResults = apiResponse.data?.results || []
+
       // Update results
-      setResults(data.results)
-      return data.results
+      setResults(searchResults)
+      return searchResults
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
@@ -117,71 +104,3 @@ const useFileSearch = (
 }
 
 export default useFileSearch
-
-/**
- * TypeScript Concepts Demonstrated:
- *
- * 1. **Async API Integration**:
- *    ```typescript
- *    const response = await fetch(`/api/files/search?${params}`)
- *    const data: FileSearchResponse = await response.json()
- *    ```
- *    Type-safe fetch with proper response parsing
- *
- * 2. **URLSearchParams Construction**:
- *    ```typescript
- *    const params = new URLSearchParams({ query, agent_profile, limit })
- *    if (sessionId) params.append('session_id', sessionId)
- *    ```
- *    Dynamic query parameter building
- *
- * 3. **Error Handling Patterns**:
- *    ```typescript
- *    try { ... } catch (err) {
- *      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
- *      setError(errorMessage)
- *    } finally {
- *      setIsSearching(false)
- *    }
- *    ```
- *    Comprehensive error handling with type guards
- *
- * 4. **State Management**:
- *    ```typescript
- *    const [results, setResults] = useState<FileSearchResult[]>([])
- *    const [isSearching, setIsSearching] = useState<boolean>(false)
- *    ```
- *    Multiple related state variables for complex UI states
- *
- * 5. **useCallback Optimization**:
- *    ```typescript
- *    const searchFiles = useCallback(async (query) => { ... }, [deps])
- *    ```
- *    Memoized async function to prevent unnecessary re-renders
- *
- * Architecture Benefits:
- * - **Separation of Concerns**: API logic isolated from UI components
- * - **Reusability**: Can be used by multiple components
- * - **Type Safety**: Full TypeScript coverage prevents runtime errors
- * - **Error Resilience**: Proper error handling and recovery
- * - **Performance**: Optimized with useCallback
- *
- * Usage in Components:
- * ```typescript
- * const { searchFiles, results, isSearching, error } = useFileSearch('general')
- *
- * // Trigger search
- * await searchFiles('sample')
- *
- * // Display results
- * {results.map(file => (
- *   <div key={file.path}>{file.filename}</div>
- * ))}
- *
- * // Show loading state
- * {isSearching && <Spinner />}
- *
- * // Handle errors
- * {error && <ErrorMessage message={error} />}
- * ```
- */

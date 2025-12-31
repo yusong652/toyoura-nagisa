@@ -14,13 +14,12 @@ export interface FileSearchResult {
   score: number;
 }
 
-interface FileSearchResponse {
-  status: 'success' | 'error';
+/** Response data from file search (unwrapped from ApiResponse) */
+interface FileSearchData {
   query: string;
   workspace: string;
   results: FileSearchResult[];
   total: number;
-  error?: string;
 }
 
 export interface UseFileSearchReturn {
@@ -79,19 +78,15 @@ export function useFileSearch(
           params.append('session_id', sessionId);
         }
 
-        // Call backend API
-        const data = await apiClient.get<FileSearchResponse>(
+        // Call backend API - response is unwrapped to FileSearchData
+        const data = await apiClient.get<FileSearchData>(
           `/api/files/search?${params.toString()}`
         );
-
-        if (data.status === 'error') {
-          throw new Error(data.error || 'File search failed');
-        }
 
         // Update results
         setResults(data.results);
         return data.results;
-      } catch (err) {
+      } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
         setError(errorMessage);
         setResults([]);

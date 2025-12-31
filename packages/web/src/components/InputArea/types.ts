@@ -451,15 +451,23 @@ export interface FileSearchResult {
 }
 
 /**
- * File search API response
+ * File search API data (unwrapped from ApiResponse)
  */
-export interface FileSearchResponse {
-  status: 'success' | 'error'
+export interface FileSearchData {
   query: string
   workspace: string
   results: FileSearchResult[]
   total: number
-  error?: string
+}
+
+/**
+ * File search API response (2025 Standard ApiResponse format)
+ */
+export interface FileSearchResponse {
+  success: boolean
+  message: string
+  data: FileSearchData | null
+  error_code: string | null
 }
 
 /**

@@ -15,8 +15,8 @@ export interface PfcConsoleExecuteRequest {
   timeout_ms?: number;
 }
 
-export interface PfcConsoleExecuteResponse {
-  success: boolean;
+/** Response data from PFC execution (unwrapped from ApiResponse) */
+export interface PfcConsoleExecuteData {
   task_id: string | null;
   script_name: string | null;
   script_path: string | null;
@@ -25,18 +25,17 @@ export interface PfcConsoleExecuteResponse {
   result: unknown;
   elapsed_time: number | null;
   context: string;
-  error: string | null;
   connected: boolean;
 }
 
-export interface PfcConsoleStatusResponse {
+/** Response data from connection status (unwrapped from ApiResponse) */
+export interface PfcConsoleStatusData {
   connected: boolean;
-  message: string;
 }
 
 export interface UsePfcConsoleCommandReturn {
   /** Execute PFC Python code */
-  executeCode: (code: string) => Promise<PfcConsoleExecuteResponse | null>;
+  executeCode: (code: string) => Promise<PfcConsoleExecuteData | null>;
   /** Whether execution is in progress */
   isExecuting: boolean;
   /** Last error message if any */
@@ -58,7 +57,7 @@ export function usePfcConsoleCommand(
   // Check connection on mount and when session/profile changes
   const checkConnection = useCallback(async (): Promise<boolean> => {
     try {
-      const response = await apiClient.get<PfcConsoleStatusResponse>(
+      const response = await apiClient.get<PfcConsoleStatusData>(
         '/api/pfc/console/status'
       );
       setIsConnected(response.connected);
@@ -76,7 +75,7 @@ export function usePfcConsoleCommand(
   }, [sessionId, checkConnection]);
 
   const executeCode = useCallback(
-    async (code: string): Promise<PfcConsoleExecuteResponse | null> => {
+    async (code: string): Promise<PfcConsoleExecuteData | null> => {
       if (!sessionId) {
         setError('No active session');
         return null;
@@ -86,7 +85,7 @@ export function usePfcConsoleCommand(
       setIsExecuting(true);
 
       try {
-        const response = await apiClient.post<PfcConsoleExecuteResponse>(
+        const response = await apiClient.post<PfcConsoleExecuteData>(
           '/api/pfc/console/execute',
           {
             code,
@@ -98,13 +97,9 @@ export function usePfcConsoleCommand(
         // Update connection status from response
         setIsConnected(response.connected);
 
-        // Check for connection error
-        if (!response.connected) {
-          setError(response.error || 'PFC server not connected');
-        }
-
         return response;
-      } catch (err) {
+      } catch (err: unknown) {
+        // Extract error message
         const errorMessage = err instanceof Error ? err.message : 'PFC command failed';
         setError(errorMessage);
         setIsConnected(false);

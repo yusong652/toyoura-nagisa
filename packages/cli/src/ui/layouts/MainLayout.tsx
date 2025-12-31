@@ -334,47 +334,40 @@ export const MainLayout: React.FC = () => {
         message: 'Resetting PFC workspace...',
       });
 
-      interface PfcResetResponse {
-        success: boolean;
-        message: string;
+      /** Response data from reset (unwrapped from ApiResponse) */
+      interface PfcResetData {
         quick_console?: { success: boolean; deleted_scripts: number };
         tasks?: { success: boolean; cleared_count: number };
         git?: { success: boolean; deleted_commits: number };
-        error?: string;
+        connected: boolean;
       }
 
-      const response = await apiClient.post<PfcResetResponse>('/api/pfc/console/reset', {
+      const response = await apiClient.post<PfcResetData>('/api/pfc/console/reset', {
         session_id: appState.currentSessionId || 'unknown',
         agent_profile: appState.currentProfile,
       });
 
-      if (response.success) {
-        const parts: string[] = [];
-        if (response.quick_console?.deleted_scripts) {
-          parts.push(`${response.quick_console.deleted_scripts} scripts`);
-        }
-        if (response.tasks?.cleared_count) {
-          parts.push(`${response.tasks.cleared_count} tasks`);
-        }
-        if (response.git?.deleted_commits) {
-          parts.push(`${response.git.deleted_commits} git snapshots`);
-        }
-
-        const summary = parts.length > 0 ? ` (cleared: ${parts.join(', ')})` : '';
-        appActions.addHistoryItem({
-          type: MessageType.INFO,
-          message: `PFC workspace reset complete${summary}`,
-        });
-      } else {
-        appActions.addHistoryItem({
-          type: MessageType.ERROR,
-          message: response.error || response.message || 'Reset failed',
-        });
+      const parts: string[] = [];
+      if (response.quick_console?.deleted_scripts) {
+        parts.push(`${response.quick_console.deleted_scripts} scripts`);
       }
-    } catch (err) {
+      if (response.tasks?.cleared_count) {
+        parts.push(`${response.tasks.cleared_count} tasks`);
+      }
+      if (response.git?.deleted_commits) {
+        parts.push(`${response.git.deleted_commits} git snapshots`);
+      }
+
+      const summary = parts.length > 0 ? ` (cleared: ${parts.join(', ')})` : '';
+      appActions.addHistoryItem({
+        type: MessageType.INFO,
+        message: `PFC workspace reset complete${summary}`,
+      });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'PFC reset failed';
       appActions.addHistoryItem({
         type: MessageType.ERROR,
-        message: err instanceof Error ? err.message : 'PFC reset failed',
+        message: errorMessage,
       });
     }
 
@@ -385,8 +378,8 @@ export const MainLayout: React.FC = () => {
   const loadPfcTasks = useCallback(async () => {
     setIsPfcTasksLoading(true);
     try {
-      interface TasksListResponse {
-        success: boolean;
+      /** Response data from tasks list (unwrapped from ApiResponse) */
+      interface TasksListData {
         tasks: Array<{
           task_id: string;
           status: string;
@@ -395,22 +388,18 @@ export const MainLayout: React.FC = () => {
           start_time: number | null;
           elapsed_time: number | null;
         }>;
-        error?: string;
+        total_count: number;
+        displayed_count: number;
+        has_more: boolean;
+        connected: boolean;
       }
-      const response = await apiClient.get<TasksListResponse>('/api/pfc/console/tasks?limit=20&offset=0');
-      if (response.success) {
-        setPfcTasks(response.tasks);
-      } else {
-        appActions.addHistoryItem({
-          type: MessageType.ERROR,
-          message: response.error || 'Failed to load PFC tasks',
-        });
-        setActiveDialog(null);
-      }
-    } catch (err) {
+      const response = await apiClient.get<TasksListData>('/api/pfc/console/tasks?limit=20&offset=0');
+      setPfcTasks(response.tasks);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load PFC tasks';
       appActions.addHistoryItem({
         type: MessageType.ERROR,
-        message: err instanceof Error ? err.message : 'Failed to load PFC tasks',
+        message: errorMessage,
       });
       setActiveDialog(null);
     } finally {
@@ -423,31 +412,24 @@ export const MainLayout: React.FC = () => {
     setActiveDialog(null);
 
     try {
-      interface TaskStatusResponse {
-        success: boolean;
+      /** Response data from task status (unwrapped from ApiResponse) */
+      interface TaskStatusData {
         task_id: string;
         status: string;
         entry_script: string | null;
         description: string | null;
         output: string | null;
-        error: string | null;
+        result: unknown;
         start_time: number | null;
         end_time: number | null;
         elapsed_time: number | null;
         git_commit: string | null;
+        connected: boolean;
       }
 
       // Include session_id for LLM intent awareness
       const sessionParam = appState.currentSessionId ? `?session_id=${appState.currentSessionId}` : '';
-      const response = await apiClient.get<TaskStatusResponse>(`/api/pfc/console/tasks/${taskId}${sessionParam}`);
-
-      if (!response.success) {
-        appActions.addHistoryItem({
-          type: MessageType.ERROR,
-          message: response.error || `Task ${taskId} not found`,
-        });
-        return;
-      }
+      const response = await apiClient.get<TaskStatusData>(`/api/pfc/console/tasks/${taskId}${sessionParam}`);
 
       // Format timestamp
       const formatTime = (ts: number | null) => {
@@ -471,18 +453,15 @@ export const MainLayout: React.FC = () => {
         response.output || '(no output)',
       ];
 
-      if (response.error) {
-        lines.push('', '--- Error ---', response.error);
-      }
-
       appActions.addHistoryItem({
         type: MessageType.INFO,
         message: lines.join('\n'),
       });
-    } catch (err) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch task details';
       appActions.addHistoryItem({
         type: MessageType.ERROR,
-        message: err instanceof Error ? err.message : 'Failed to fetch task details',
+        message: errorMessage,
       });
     }
   }, [appActions, appState.currentSessionId]);
@@ -538,6 +517,7 @@ export const MainLayout: React.FC = () => {
 
     if (result) {
       // Add PFC result with distinct styling
+      // isError is determined by connection status (disconnected = error state)
       appActions.addHistoryItem({
         type: MessageType.PFC_CONSOLE_RESULT,
         taskId: result.task_id,
@@ -545,8 +525,8 @@ export const MainLayout: React.FC = () => {
         output: result.output,
         result: result.result,
         elapsedTime: result.elapsed_time,
-        isError: !result.success,
-        error: result.error,
+        isError: !result.connected,
+        error: null, // Error info is now in the output field
         connected: result.connected,
       });
     } else {
@@ -570,12 +550,13 @@ export const MainLayout: React.FC = () => {
 
     if (result) {
       // Add shell result with distinct styling
+      // isError is determined by non-zero exit code
       appActions.addHistoryItem({
         type: MessageType.SHELL_RESULT,
         stdout: result.stdout || '',
         stderr: result.stderr || '',
         exitCode: result.exit_code,
-        isError: !result.success,
+        isError: result.exit_code !== 0,
       });
     } else {
       appActions.addHistoryItem({

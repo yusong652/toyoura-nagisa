@@ -15,25 +15,23 @@ export interface ShellExecuteRequest {
   timeout_ms?: number;
 }
 
-export interface ShellExecuteResponse {
-  success: boolean;
+/** Response data from shell execution (unwrapped from ApiResponse) */
+export interface ShellExecuteData {
   stdout: string;
   stderr: string;
   exit_code: number;
   cwd: string;
   context: string;
-  error?: string;
 }
 
-export interface CwdResponse {
-  success: boolean;
+/** Response data from cwd query (unwrapped from ApiResponse) */
+export interface CwdData {
   cwd: string;
-  error?: string;
 }
 
 export interface UseShellCommandReturn {
   /** Execute a shell command */
-  executeCommand: (command: string) => Promise<ShellExecuteResponse | null>;
+  executeCommand: (command: string) => Promise<ShellExecuteData | null>;
   /** Whether execution is in progress */
   isExecuting: boolean;
   /** Last error message if any */
@@ -56,10 +54,11 @@ export function useShellCommand(
 
     const fetchCwd = async () => {
       try {
-        const response = await apiClient.get<CwdResponse>(
-          `/api/shell/cwd/${sessionId}?agent_profile=${encodeURIComponent(agentProfile)}`
+        // Use query params (new format) with fallback to legacy path format
+        const response = await apiClient.get<CwdData>(
+          `/api/shell/cwd?session_id=${encodeURIComponent(sessionId)}&agent_profile=${encodeURIComponent(agentProfile)}`
         );
-        if (response.success && response.cwd) {
+        if (response.cwd) {
           setCwd(response.cwd);
         }
       } catch {
@@ -71,7 +70,7 @@ export function useShellCommand(
   }, [sessionId, agentProfile]);
 
   const executeCommand = useCallback(
-    async (command: string): Promise<ShellExecuteResponse | null> => {
+    async (command: string): Promise<ShellExecuteData | null> => {
       if (!sessionId) {
         setError('No active session');
         return null;
@@ -81,7 +80,7 @@ export function useShellCommand(
       setIsExecuting(true);
 
       try {
-        const response = await apiClient.post<ShellExecuteResponse>(
+        const response = await apiClient.post<ShellExecuteData>(
           '/api/shell/execute',
           {
             command,
@@ -96,7 +95,8 @@ export function useShellCommand(
         }
 
         return response;
-      } catch (err) {
+      } catch (err: unknown) {
+        // Extract error message
         const errorMessage = err instanceof Error ? err.message : 'Shell command failed';
         setError(errorMessage);
         return null;
