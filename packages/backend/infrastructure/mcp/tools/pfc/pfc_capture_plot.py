@@ -197,13 +197,14 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
             if view_settings:
                 view_settings["projection"] = projection
 
-            # Generate unique plot name to avoid conflicts in concurrent execution
-            unique_plot_name = f"NagisaDiag_{int(time.time() * 1000) % 1000000}"
+            # Fixed plot name - PFC's plot create auto-clears existing items
+            # Timeout budget tracking ensures requests don't overlap incorrectly
+            plot_name = "NagisaDiag"
 
             # Generate Python script for plot capture
             script_content = generate_plot_capture_script(
                 output_path=normalized_output_path,
-                plot_name=unique_plot_name,
+                plot_name=plot_name,
                 size=(size[0], size[1]),
                 view_settings=view_settings,
                 include_ball=include_ball,
@@ -247,12 +248,16 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
                 _cleanup_script(script_path)
 
             # Handle execution result
-            # Script layer validates file creation and raises RuntimeError on timeout
+            # File verification and plot cleanup are handled by pfc-server
             status = result.get("status")
 
             if status == "error":
                 error_msg = result.get("message", "Plot capture failed")
                 return error_response(f"Plot capture failed: {error_msg}")
+
+            if status == "timeout":
+                error_msg = result.get("message", "Plot capture timed out")
+                return error_response(error_msg)
 
             # Build success response
             return success_response(

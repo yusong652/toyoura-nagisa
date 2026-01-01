@@ -108,7 +108,10 @@ class MainThreadExecutor:
 
                 try:
                     # Mark future as running (enables future.running() check)
-                    future.set_running_or_notify_cancel()
+                    # Returns False if future was cancelled - skip execution
+                    if not future.set_running_or_notify_cancel():
+                        logger.debug("Task skipped (cancelled): %s", func.__name__)
+                        continue
 
                     # Execute task
                     result = func(*args, **kwargs)
