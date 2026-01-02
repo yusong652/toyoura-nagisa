@@ -96,7 +96,7 @@ class TaskStatusData(BaseModel):
 # =====================
 class ExecuteRequest(BaseModel):
     """Request body for PFC Python command execution."""
-    code: str = Field(..., min_length=1, description="Python code to execute")
+    code: str = Field(..., description="Python code to execute")
     session_id: str = Field(..., description="Session ID for task isolation")
     agent_profile: str = Field(default="pfc_expert", description="Agent profile for workspace resolution")
     timeout_ms: Optional[int] = Field(default=30000, description="Execution timeout in milliseconds")
@@ -170,6 +170,14 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
     for traceability. Results are returned synchronously.
     """
     try:
+        # Skip empty code - user typed ">" but no actual code
+        if not request.code.strip():
+            return ApiResponse(
+                success=True,
+                message="",
+                data=ExecuteData(connected=True, context="")
+            )
+
         workspace_path = await get_workspace_for_profile(
             request.agent_profile,
             request.session_id
