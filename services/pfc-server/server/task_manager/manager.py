@@ -73,8 +73,8 @@ class TaskManager:
         except Exception as e:
             logger.error("Failed to load historical tasks: {}".format(e))
 
-    def create_script_task(self, session_id, future, script_name, script_path=None, output_buffer=None, description=None, git_commit=None, source="agent", task_id=None):
-        # type: (str, Any, str, Optional[str], Any, Optional[str], Optional[str], str, Optional[str]) -> str
+    def create_script_task(self, session_id, future, script_name, entry_script, output_buffer=None, description=None, git_commit=None, source="agent", task_id=None):
+        # type: (str, Any, str, str, Any, Optional[str], Optional[str], str, Optional[str]) -> str
         """
         Register a new long-running Python script task.
 
@@ -82,7 +82,7 @@ class TaskManager:
             session_id: Session identifier for task isolation
             future: asyncio Future object for the task
             script_name: Name of the script file (e.g., "main.py")
-            script_path: Optional full path to entry script for reference
+            entry_script: Full path to entry script
             output_buffer: Optional FileBuffer for output capture (writes to disk)
             description: Task description from PFC agent (LLM-provided)
             git_commit: Git commit hash on pfc-executions branch (version snapshot)
@@ -96,7 +96,7 @@ class TaskManager:
             task_id = uuid.uuid4().hex[:8]
         # Pass save callback for automatic persistence on status change
         task = ScriptTask(
-            task_id, session_id, future, script_name, script_path,
+            task_id, session_id, future, script_name, entry_script,
             output_buffer, description, on_status_change=self._on_task_status_change,
             git_commit=git_commit, source=source
         )

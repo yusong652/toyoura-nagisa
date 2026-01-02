@@ -94,7 +94,7 @@ class TaskPersistence:
 
         # Script task fields
         task_data["script_name"] = task.script_name
-        task_data["script_path"] = task.script_path
+        task_data["entry_script"] = task.entry_script  # Unified field name
         task_data["git_commit"] = getattr(task, "git_commit", None)  # Git version snapshot
         # Save log file path (output is read from file on demand)
         task_data["log_path"] = getattr(task, "log_path", None)
@@ -314,7 +314,8 @@ class HistoricalTask:
 
         # Restore script task fields
         self.script_name = task_data.get("script_name", "")
-        self.script_path = task_data.get("script_path")
+        # Support both new (entry_script) and old (script_path) field names
+        self.entry_script = task_data.get("entry_script") or task_data.get("script_path") or ""  # type: str
         self.git_commit = task_data.get("git_commit")  # Git version snapshot
         self.log_path = task_data.get("log_path")  # Path to output log file
         # Backward compatibility: support old format with inline output
@@ -374,14 +375,13 @@ class HistoricalTask:
                     "task_type": self.task_type,
                     "source": self.source,
                     "script_name": self.script_name,
-                    "entry_script": self.script_path,
-                    "script_path": self.script_path,
+                    "entry_script": self.entry_script,
                     "description": self.description,
                     "elapsed_time": elapsed_time,
                     "start_time": self.start_time,
                     "end_time": self.end_time,
                     "output": output if output else "",
-                    "git_commit": getattr(self, "git_commit", None),
+                    "git_commit": self.git_commit,
                     "historical": True
                 }
             }
@@ -400,14 +400,13 @@ class HistoricalTask:
                     "task_type": self.task_type,
                     "source": self.source,
                     "script_name": self.script_name,
-                    "entry_script": self.script_path,
-                    "script_path": self.script_path,
+                    "entry_script": self.entry_script,
                     "description": self.description,
                     "elapsed_time": elapsed_time,
                     "start_time": self.start_time,
                     "end_time": self.end_time,
                     "output": output if output else "",
-                    "git_commit": getattr(self, "git_commit", None),
+                    "git_commit": self.git_commit,
                     "historical": True
                 }
             }
@@ -427,15 +426,14 @@ class HistoricalTask:
                     "task_type": self.task_type,
                     "source": self.source,
                     "script_name": self.script_name,
-                    "entry_script": self.script_path,
-                    "script_path": self.script_path,
+                    "entry_script": self.entry_script,
                     "description": self.description,
                     "elapsed_time": elapsed_time,
                     "start_time": self.start_time,
                     "end_time": self.end_time,
                     "output": output if output else "",
                     "error": error_msg,
-                    "git_commit": getattr(self, "git_commit", None),
+                    "git_commit": self.git_commit,
                     "historical": True
                 }
             }
@@ -456,8 +454,7 @@ class HistoricalTask:
             "historical": True,
             # Script task fields
             "name": self.script_name,
-            "entry_script": self.script_path,
-            "script_path": self.script_path,
+            "entry_script": self.entry_script,
             "git_commit": self.git_commit
         }
 

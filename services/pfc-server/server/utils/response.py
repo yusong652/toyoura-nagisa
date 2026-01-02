@@ -18,7 +18,7 @@ class TaskDataBuilder:
     ensuring consistent field naming across all response points.
 
     Example:
-        data = (TaskDataBuilder(task_id, "script", source, script_name, script_path, description)
+        data = (TaskDataBuilder(task_id, "script", source, script_name, entry_script, description)
             .with_git_commit(git_commit)
             .with_timing(start_time, end_time, elapsed_time)
             .with_output(output_text)
@@ -32,7 +32,7 @@ class TaskDataBuilder:
         task_type,  # type: str
         source,  # type: str
         script_name,  # type: str
-        script_path,  # type: str
+        entry_script,  # type: str
         description,  # type: str
     ):
         # type: (...) -> None
@@ -44,7 +44,7 @@ class TaskDataBuilder:
             task_type: Task type (e.g., "script")
             source: Task source ("agent", "user_console", "diagnostic")
             script_name: Script file name (e.g., "main.py")
-            script_path: Absolute path to script
+            entry_script: Absolute path to entry script
             description: Task description from agent
         """
         self._data = {
@@ -52,7 +52,7 @@ class TaskDataBuilder:
             "task_type": task_type,
             "source": source,
             "script_name": script_name,
-            "script_path": script_path,
+            "entry_script": entry_script,
             "description": description,
         }  # type: Dict[str, Any]
 
