@@ -12,6 +12,7 @@ from io import StringIO
 from typing import Any, Dict, Optional, Tuple
 
 from .context import ServerContext
+from .helpers import require_field
 
 logger = logging.getLogger("PFC-Server")
 
@@ -117,7 +118,11 @@ async def handle_diagnostic_execute(ctx, data):
     import time as time_module
 
     request_id = data.get("request_id", "unknown")
-    script_path = data.get("script_path", "")
+
+    script_path, err = require_field(data, "script_path", request_id, "diagnostic_result")
+    if err:
+        return err
+
     timeout_ms = data.get("timeout_ms", 30000)
 
     # Track start time for timeout budget
@@ -130,8 +135,6 @@ async def handle_diagnostic_execute(ctx, data):
         return max(total_timeout_sec - elapsed, 0.5)  # At least 0.5s
 
     try:
-        if not script_path:
-            raise ValueError("script_path is required")
 
         import os
         import uuid

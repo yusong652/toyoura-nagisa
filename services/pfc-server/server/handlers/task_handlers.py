@@ -7,7 +7,7 @@ Handles PFC task execution and task status management operations.
 from typing import Any, Dict
 
 from .context import ServerContext
-from .helpers import truncate_message
+from .helpers import truncate_message, require_field
 
 
 async def handle_pfc_task(ctx, data):
@@ -30,8 +30,12 @@ async def handle_pfc_task(ctx, data):
         Response dict with task execution result
     """
     request_id = data.get("request_id", "unknown")
+
+    script_path, err = require_field(data, "script_path", request_id)
+    if err:
+        return err
+
     session_id = data.get("session_id", "default")
-    script_path = data.get("script_path", "")
     description = data.get("description", "")
     timeout_ms = data.get("timeout_ms", None)
     run_in_background = data.get("run_in_background", True)
@@ -71,7 +75,10 @@ async def handle_check_task_status(ctx, data):
         Response dict with task status
     """
     request_id = data.get("request_id", "unknown")
-    task_id = data.get("task_id", "")
+
+    task_id, err = require_field(data, "task_id", request_id)
+    if err:
+        return err
 
     result = ctx.task_manager.get_task_status(task_id)
 
@@ -138,7 +145,10 @@ async def handle_mark_task_notified(ctx, data):
         Response dict with operation result
     """
     request_id = data.get("request_id", "unknown")
-    task_id = data.get("task_id", "")
+
+    task_id, err = require_field(data, "task_id", request_id)
+    if err:
+        return err
 
     result = ctx.task_manager.mark_task_notified(task_id)
 

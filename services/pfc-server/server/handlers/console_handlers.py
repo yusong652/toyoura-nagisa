@@ -8,7 +8,7 @@ import logging
 from typing import Any, Dict
 
 from .context import ServerContext
-from .helpers import truncate_message
+from .helpers import truncate_message, require_field
 
 logger = logging.getLogger("PFC-Server")
 
@@ -31,9 +31,16 @@ async def handle_user_console(ctx, data):
         Response dict with execution result
     """
     request_id = data.get("request_id", "unknown")
+
+    workspace_path, err = require_field(data, "workspace_path", request_id, "user_console_result")
+    if err:
+        return err
+
+    code, err = require_field(data, "code", request_id, "user_console_result")
+    if err:
+        return err
+
     session_id = data.get("session_id", "default")
-    workspace_path = data.get("workspace_path", "")
-    code = data.get("code", "")
     timeout_ms = data.get("timeout_ms", 30000)
 
     try:

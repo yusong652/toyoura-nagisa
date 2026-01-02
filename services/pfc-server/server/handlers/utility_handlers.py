@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, Dict
 
 from .context import ServerContext
+from .helpers import require_field
 
 
 async def handle_ping(ctx, data):
@@ -46,16 +47,10 @@ async def handle_interrupt_task(ctx, data):
     from ..managers import request_interrupt
 
     request_id = data.get("request_id", "unknown")
-    task_id = data.get("task_id", "")
 
-    if not task_id:
-        return {
-            "type": "result",
-            "request_id": request_id,
-            "status": "error",
-            "message": "task_id is required",
-            "data": None
-        }
+    task_id, err = require_field(data, "task_id", request_id)
+    if err:
+        return err
 
     # Request interrupt (will be checked by PFC callback)
     success = request_interrupt(task_id)
