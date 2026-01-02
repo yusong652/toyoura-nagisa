@@ -96,7 +96,7 @@ class TaskStatusData(BaseModel):
 # =====================
 class ExecuteRequest(BaseModel):
     """Request body for PFC Python command execution."""
-    code: str = Field(..., description="Python code to execute")
+    code: str = Field(..., min_length=1, description="Python code to execute")
     session_id: str = Field(..., description="Session ID for task isolation")
     agent_profile: str = Field(default="pfc_expert", description="Agent profile for workspace resolution")
     timeout_ms: Optional[int] = Field(default=30000, description="Execution timeout in milliseconds")

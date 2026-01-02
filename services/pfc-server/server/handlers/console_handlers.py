@@ -37,12 +37,6 @@ async def handle_user_console(ctx, data):
     timeout_ms = data.get("timeout_ms", 30000)
 
     try:
-        # Validate required parameters
-        if not workspace_path:
-            raise ValueError("workspace_path is required")
-        if not code or not code.strip():
-            raise ValueError("code cannot be empty")
-
         # Get or create UserConsoleManager for this workspace
         console_manager = ctx.get_user_console_manager(workspace_path)
 
@@ -78,14 +72,6 @@ async def handle_user_console(ctx, data):
             **result
         }
 
-    except ValueError as e:
-        return {
-            "type": "user_console_result",
-            "request_id": request_id,
-            "status": "error",
-            "message": str(e),
-            "data": None
-        }
     except Exception as e:
         logger.error(f"User console execution failed: {e}")
         return {
