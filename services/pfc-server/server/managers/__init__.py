@@ -4,7 +4,7 @@ PFC Server Managers.
 State managers for handling various server-side concerns.
 """
 
-from .quick_console import QuickConsoleManager
+from .user_console import UserConsoleManager
 from .git_version import GitVersionManager, get_git_manager, find_git_root
 from .interrupt import (
     request_interrupt,
@@ -20,8 +20,8 @@ from .interrupt import (
 )
 
 __all__ = [
-    # Quick console
-    "QuickConsoleManager",
+    # User console
+    "UserConsoleManager",
     # Git version
     "GitVersionManager",
     "get_git_manager",

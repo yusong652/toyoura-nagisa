@@ -16,14 +16,14 @@ from websockets.server import WebSocketServerProtocol  # type: ignore
 
 from .executors import ScriptRunner, MainThreadExecutor
 from .task_manager import TaskManager
-from .managers import QuickConsoleManager
+from .managers import UserConsoleManager
 from .handlers import (
     ServerContext,
     handle_pfc_task,
     handle_check_task_status,
     handle_list_tasks,
     handle_mark_task_notified,
-    handle_quick_python,
+    handle_user_console,
     handle_diagnostic_execute,
     handle_reset_workspace,
     handle_get_working_directory,
@@ -73,15 +73,15 @@ class PFCWebSocketServer:
         self.active_connections = set()
         self.server = None
 
-        # Quick console managers cache (workspace_path -> QuickConsoleManager)
-        self._quick_console_managers = {}  # type: Dict[str, QuickConsoleManager]
+        # User console managers cache (workspace_path -> UserConsoleManager)
+        self._user_console_managers = {}  # type: Dict[str, UserConsoleManager]
 
         # Create server context for handlers
         self._context = ServerContext(
             task_manager=self.task_manager,
             script_runner=self.script_runner,
             main_executor=self.main_executor,
-            quick_console_managers=self._quick_console_managers,
+            user_console_managers=self._user_console_managers,
         )
 
         # Message handlers registry (all handlers are async with unified signature)
@@ -91,7 +91,7 @@ class PFCWebSocketServer:
             "list_tasks": handle_list_tasks,
             "mark_task_notified": handle_mark_task_notified,
             "get_working_directory": handle_get_working_directory,
-            "quick_python": handle_quick_python,
+            "user_console": handle_user_console,
             "interrupt_task": handle_interrupt_task,
             "diagnostic_execute": handle_diagnostic_execute,
             "reset_workspace": handle_reset_workspace,

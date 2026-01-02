@@ -1,7 +1,7 @@
 """
 Console-related message handlers.
 
-Handles quick Python execution from user console (> prefix commands).
+Handles user console Python execution (> prefix commands).
 """
 
 import logging
@@ -13,10 +13,10 @@ from .helpers import truncate_message
 logger = logging.getLogger("PFC-Server")
 
 
-async def handle_quick_python(ctx, data):
+async def handle_user_console(ctx, data):
     # type: (ServerContext, Dict[str, Any]) -> Dict[str, Any]
     """
-    Handle quick_python message - execute quick Python code from user console.
+    Handle user_console message - execute Python code from user console.
 
     Args:
         ctx: Server context with dependencies
@@ -43,8 +43,8 @@ async def handle_quick_python(ctx, data):
         if not code or not code.strip():
             raise ValueError("code cannot be empty")
 
-        # Get or create QuickConsoleManager for this workspace
-        console_manager = ctx.get_quick_console_manager(workspace_path)
+        # Get or create UserConsoleManager for this workspace
+        console_manager = ctx.get_user_console_manager(workspace_path)
 
         # Create temporary script file
         code_preview = console_manager.get_code_preview(code)
@@ -73,23 +73,23 @@ async def handle_quick_python(ctx, data):
             result["message"] = truncate_message(result["message"])
 
         return {
-            "type": "quick_python_result",
+            "type": "user_console_result",
             "request_id": request_id,
             **result
         }
 
     except ValueError as e:
         return {
-            "type": "quick_python_result",
+            "type": "user_console_result",
             "request_id": request_id,
             "status": "error",
             "message": str(e),
             "data": None
         }
     except Exception as e:
-        logger.error(f"Quick Python execution failed: {e}")
+        logger.error(f"User console execution failed: {e}")
         return {
-            "type": "quick_python_result",
+            "type": "user_console_result",
             "request_id": request_id,
             "status": "error",
             "message": f"Execution failed: {e}",

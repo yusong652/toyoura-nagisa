@@ -47,7 +47,7 @@ class ExecuteData(BaseModel):
 
 class ResetData(BaseModel):
     """Response data for workspace reset."""
-    quick_console: Optional[Dict[str, Any]] = Field(default=None, description="Quick console reset info")
+    user_console: Optional[Dict[str, Any]] = Field(default=None, description="User console reset info")
     tasks: Optional[Dict[str, Any]] = Field(default=None, description="Tasks reset info")
     git: Optional[Dict[str, Any]] = Field(default=None, description="Git reset info")
     connected: bool = Field(default=True, description="PFC server connection status")
@@ -166,7 +166,7 @@ async def check_connection_status() -> ApiResponse[ConnectionStatusData]:
 async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData]:
     """Execute PFC Python code from user console.
 
-    The code is saved as a temporary script file in workspace/.quick_console/
+    The code is saved as a temporary script file in workspace/.user_console/
     for traceability. Results are returned synchronously.
     """
     try:
@@ -185,7 +185,7 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
                 data=ExecuteData(connected=False, context="")
             )
 
-        result = await client.send_quick_python(
+        result = await client.send_user_console(
             code=request.code,
             workspace_path=str(workspace_path),
             session_id=request.session_id,
@@ -261,7 +261,7 @@ async def reset_workspace(request: ResetRequest) -> ApiResponse[ResetData]:
     """Reset workspace state for testing.
 
     WARNING: This permanently deletes:
-    - Quick console scripts and counter
+    - User console scripts and counter
     - All task history (memory + disk)
     - Git pfc-executions branch (all execution snapshots)
 
@@ -297,7 +297,7 @@ async def reset_workspace(request: ResetRequest) -> ApiResponse[ResetData]:
             message=message,
             error_code=None if success else "RESET_ERROR",
             data=ResetData(
-                quick_console=data.get("quick_console"),
+                user_console=data.get("user_console"),
                 tasks=data.get("tasks"),
                 git=data.get("git"),
                 connected=True,

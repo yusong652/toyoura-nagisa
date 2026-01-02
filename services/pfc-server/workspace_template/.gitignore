@@ -21,9 +21,9 @@ errorlog.txt
 # -----------------------------------------
 # PFC Server Files
 # -----------------------------------------
-# Quick console scripts (managed by pfc-server)
+# User console scripts (managed by pfc-server)
 # These are auto-generated temporary scripts
-.quick_console/
+.user_console/
 
 # -----------------------------------------
 # Nagisa Server Data (managed by pfc-server)

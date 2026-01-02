@@ -56,7 +56,7 @@ async def handle_reset_workspace(ctx, data):
     Handle reset_workspace message - reset workspace state for testing.
 
     Resets:
-    1. Quick console (deletes temporary scripts)
+    1. User console (deletes temporary scripts)
     2. Task history (clears all tasks)
     3. Git execution branch (removes execution commits)
 
@@ -75,16 +75,16 @@ async def handle_reset_workspace(ctx, data):
     try:
         results = []
 
-        # 1. Reset quick console (if manager exists for workspace)
-        if workspace_path and workspace_path in ctx.quick_console_managers:
-            console_result = ctx.quick_console_managers[workspace_path].reset()
+        # 1. Reset user console (if manager exists for workspace)
+        if workspace_path and workspace_path in ctx.user_console_managers:
+            console_result = ctx.user_console_managers[workspace_path].reset()
             results.append(console_result)
             # Remove from cache after reset
-            del ctx.quick_console_managers[workspace_path]
+            del ctx.user_console_managers[workspace_path]
         else:
             results.append({
                 "success": True,
-                "message": "No quick console to reset",
+                "message": "No user console to reset",
                 "deleted_scripts": 0
             })
 
@@ -120,7 +120,7 @@ async def handle_reset_workspace(ctx, data):
             "status": "success" if all_success else "partial",
             "message": "Workspace reset complete:\n- " + "\n- ".join(summary_parts),
             "data": {
-                "quick_console": results[0],
+                "user_console": results[0],
                 "tasks": results[1],
                 "git": results[2]
             }

@@ -344,8 +344,8 @@ class PFCWebSocketClient:
                     data = json.loads(message)
                     msg_type = data.get("type")
 
-                    if msg_type in ("result", "quick_python_result", "diagnostic_result"):
-                        # Request result received (including quick_python_result and diagnostic_result)
+                    if msg_type in ("result", "user_console_result", "diagnostic_result"):
+                        # Request result received (including user_console_result and diagnostic_result)
                         request_id = data.get("request_id")
                         if request_id in self.pending_requests:
                             future = self.pending_requests.pop(request_id)
@@ -810,7 +810,7 @@ class PFCWebSocketClient:
 
         return None
 
-    async def send_quick_python(
+    async def send_user_console(
         self,
         code: str,
         workspace_path: str,
@@ -819,7 +819,7 @@ class PFCWebSocketClient:
         max_retries: int = 2
     ) -> Dict[str, Any]:
         """
-        Send quick Python code from user console for execution.
+        Send user console Python code for execution.
 
         Args:
             code: Python code to execute (single or multi-line)
@@ -843,14 +843,14 @@ class PFCWebSocketClient:
                 await self._ensure_connected()
                 return await self._send_request(
                     message={
-                        "type": "quick_python",
+                        "type": "user_console",
                         "session_id": session_id,
                         "workspace_path": workspace_path,
                         "code": code,
                         "timeout_ms": timeout_ms
                     },
                     timeout=websocket_timeout_ms / 1000.0,
-                    operation_name="Quick Python execution"
+                    operation_name="User console execution"
                 )
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
@@ -862,11 +862,11 @@ class PFCWebSocketClient:
                     continue
                 else:
                     raise ConnectionError(
-                        "Failed to execute quick Python after retries. "
+                        "Failed to execute user console code after retries. "
                         "Please ensure PFC server is running."
                     ) from e
 
-        raise RuntimeError("Unexpected code path in send_quick_python")
+        raise RuntimeError("Unexpected code path in send_user_console")
 
     async def ping(self) -> bool:
         """
@@ -911,7 +911,7 @@ class PFCWebSocketClient:
 
         Returns:
             Result dictionary with reset details for each component:
-                - quick_console: Reset status and deleted script count
+                - user_console: Reset status and deleted script count
                 - tasks: Clear status and cleared task count
                 - git: Branch reset status and deleted commit count
 

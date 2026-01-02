@@ -270,7 +270,7 @@ def _create_gitignore(cwd, gitignore_path, result):
 errorlog.txt
 *.dmp
 *.temp
-.quick_console/
+.user_console/
 .nagisa/
 """
         try:

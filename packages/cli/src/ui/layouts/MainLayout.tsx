@@ -336,7 +336,7 @@ export const MainLayout: React.FC = () => {
 
       /** Response data from reset (unwrapped from ApiResponse) */
       interface PfcResetData {
-        quick_console?: { success: boolean; deleted_scripts: number };
+        user_console?: { success: boolean; deleted_scripts: number };
         tasks?: { success: boolean; cleared_count: number };
         git?: { success: boolean; deleted_commits: number };
         connected: boolean;
@@ -348,8 +348,8 @@ export const MainLayout: React.FC = () => {
       });
 
       const parts: string[] = [];
-      if (response.quick_console?.deleted_scripts) {
-        parts.push(`${response.quick_console.deleted_scripts} scripts`);
+      if (response.user_console?.deleted_scripts) {
+        parts.push(`${response.user_console.deleted_scripts} scripts`);
       }
       if (response.tasks?.cleared_count) {
         parts.push(`${response.tasks.cleared_count} tasks`);

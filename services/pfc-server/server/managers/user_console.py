@@ -1,11 +1,11 @@
 """
-Quick Console Manager - Manage temporary script files for user Python console.
+User Console Manager - Manage temporary script files for user Python console.
 
-This module provides script file management for quick Python commands executed
+This module provides script file management for Python commands executed
 from the user console (`>` prefix). Each command is saved as a temporary script
 file for traceability and uniform task handling.
 
-Script files are stored in: workspace/.quick_console/quick_XXX.py
+Script files are stored in: workspace/.user_console/console_XXX.py
 
 Python 3.6 compatible implementation.
 """
@@ -18,8 +18,8 @@ from typing import Any, Dict, Optional, Tuple
 # Module logger
 logger = logging.getLogger("PFC-Server")
 
-# Default directory for quick console scripts (relative to workspace)
-QUICK_CONSOLE_DIR = ".quick_console"
+# Default directory for user console scripts (relative to workspace)
+USER_CONSOLE_DIR = ".user_console"
 
 # Counter persistence file (stores the current script counter)
 COUNTER_FILE = ".counter"
@@ -28,12 +28,12 @@ COUNTER_FILE = ".counter"
 MAX_CODE_SIZE = 10000
 
 
-class QuickConsoleManager:
+class UserConsoleManager:
     """
     Manage temporary script files for user Python console commands.
 
-    Creates sequentially numbered script files (quick_001.py, quick_002.py, etc.)
-    in the workspace/.quick_console/ directory. Each file contains exactly one
+    Creates sequentially numbered script files (console_001.py, console_002.py, etc.)
+    in the workspace/.user_console/ directory. Each file contains exactly one
     user command for traceability.
 
     Thread-safe: Uses lock for counter management.
@@ -42,20 +42,20 @@ class QuickConsoleManager:
     def __init__(self, workspace_path):
         # type: (str) -> None
         """
-        Initialize quick console manager.
+        Initialize user console manager.
 
         Args:
             workspace_path: Absolute path to the PFC workspace directory
         """
         self.workspace_path = workspace_path
-        self.console_dir = os.path.join(workspace_path, QUICK_CONSOLE_DIR)
+        self.console_dir = os.path.join(workspace_path, USER_CONSOLE_DIR)
         self._counter = 0
         self._lock = threading.Lock()
 
         # Ensure directory exists and initialize counter
         self._init_directory()
 
-        logger.info("QuickConsoleManager initialized (dir=%s)", self.console_dir)
+        logger.info("UserConsoleManager initialized (dir=%s)", self.console_dir)
 
     def _init_directory(self):
         # type: () -> None
@@ -70,13 +70,13 @@ class QuickConsoleManager:
         counter_from_file = self._load_counter()
         if counter_from_file is not None:
             self._counter = counter_from_file
-            logger.info("Quick console counter loaded from file: {}".format(self._counter))
+            logger.info("User console counter loaded from file: {}".format(self._counter))
             return
 
         # Fallback: scan existing scripts
         counter_from_scan = self._scan_existing_scripts()
         self._counter = counter_from_scan
-        logger.info("Quick console counter initialized from scan: {}".format(self._counter))
+        logger.info("User console counter initialized from scan: {}".format(self._counter))
 
         # Persist the scanned counter for future use
         if counter_from_scan > 0:
@@ -99,7 +99,7 @@ class QuickConsoleManager:
 
         # Create new directory
         os.makedirs(self.console_dir)
-        logger.info("Created quick console directory: {}".format(self.console_dir))
+        logger.info("Created user console directory: {}".format(self.console_dir))
         self._create_readme()
         return True
 
@@ -160,25 +160,25 @@ class QuickConsoleManager:
                 return 0
 
             for filename in os.listdir(self.console_dir):
-                if filename.startswith("quick_") and filename.endswith(".py"):
+                if filename.startswith("console_") and filename.endswith(".py"):
                     try:
-                        # Extract number from quick_XXX.py
-                        num_str = filename[6:-3]  # Remove "quick_" and ".py"
+                        # Extract number from console_XXX.py
+                        num_str = filename[8:-3]  # Remove "console_" and ".py"
                         num = int(num_str)
                         if num > max_counter:
                             max_counter = num
                     except ValueError:
                         continue
         except Exception as e:
-            logger.warning("Failed to scan existing quick scripts: {}".format(e))
+            logger.warning("Failed to scan existing console scripts: {}".format(e))
 
         return max_counter
 
     def _create_readme(self):
         # type: () -> None
-        """Create README file explaining the quick console directory."""
+        """Create README file explaining the user console directory."""
         readme_path = os.path.join(self.console_dir, "README.md")
-        readme_content = """# Quick Console Scripts
+        readme_content = """# User Console Scripts
 
 This directory contains Python scripts executed by the **user** through the PFC Python console (`>` prefix in CLI).
 
@@ -186,7 +186,7 @@ This directory contains Python scripts executed by the **user** through the PFC 
 
 - **Source**: These scripts are created from user console input, NOT by the AI agent
 - **Purpose**: Quick exploration, testing, and interactive PFC operations
-- **Naming**: `quick_XXX.py` where XXX is a sequential number
+- **Naming**: `console_XXX.py` where XXX is a sequential number
 - **Task Source**: Tasks from these scripts have `source: "user_console"` in task history
 
 ## Script Format
@@ -210,7 +210,7 @@ for traceability and debugging purposes.
         try:
             with open(readme_path, 'w', encoding='utf-8') as f:
                 f.write(readme_content)
-            logger.info("Created README in quick console directory")
+            logger.info("Created README in user console directory")
         except Exception as e:
             logger.warning("Failed to create README: {}".format(e))
 
@@ -223,12 +223,12 @@ for traceability and debugging purposes.
 
         Returns:
             Tuple of (script_name, script_path):
-                - script_name: "quick_XXX.py"
+                - script_name: "console_XXX.py"
                 - script_path: Full absolute path to the script file
         """
         with self._lock:
             self._counter += 1
-            script_name = "quick_{:03d}.py".format(self._counter)
+            script_name = "console_{:03d}.py".format(self._counter)
             script_path = os.path.join(self.console_dir, script_name)
             # Persist counter after increment
             self._save_counter()
@@ -245,7 +245,7 @@ for traceability and debugging purposes.
 
         Returns:
             Tuple of (script_name, script_path, code):
-                - script_name: "quick_XXX.py" (for display)
+                - script_name: "console_XXX.py" (for display)
                 - script_path: Full absolute path to the script file
                 - code: The code content (for reference)
 
@@ -270,7 +270,7 @@ for traceability and debugging purposes.
 
         # Build script content with header comment
         header_lines = [
-            "# Quick Console Command",
+            "# User Console Command",
             "# Auto-generated script for user console execution",
         ]
         if description:
@@ -285,14 +285,14 @@ for traceability and debugging purposes.
                 f.write(script_content)
 
             logger.info(
-                "Quick script created: %s (%d chars)",
+                "Console script created: %s (%d chars)",
                 script_name, len(code)
             )
 
             return script_name, script_path, code
 
         except Exception as e:
-            logger.error("Failed to create quick script {}: {}".format(script_name, e))
+            logger.error("Failed to create console script {}: {}".format(script_name, e))
             raise IOError("Failed to create script file: {}".format(e))
 
     def get_code_preview(self, code, max_length=50):
@@ -320,7 +320,7 @@ for traceability and debugging purposes.
         """
         Remove old script files, keeping the most recent N files.
 
-        Note: Only removes quick_*.py files. Counter file (.counter) and
+        Note: Only removes console_*.py files. Counter file (.counter) and
         README.md are preserved.
 
         Args:
@@ -330,12 +330,12 @@ for traceability and debugging purposes.
             Number of files removed
         """
         try:
-            # List all quick scripts with their numbers (excludes .counter and README)
+            # List all console scripts with their numbers (excludes .counter and README)
             scripts = []
             for filename in os.listdir(self.console_dir):
-                if filename.startswith("quick_") and filename.endswith(".py"):
+                if filename.startswith("console_") and filename.endswith(".py"):
                     try:
-                        num_str = filename[6:-3]
+                        num_str = filename[8:-3]
                         num = int(num_str)
                         scripts.append((num, filename))
                     except ValueError:
@@ -356,20 +356,20 @@ for traceability and debugging purposes.
                     logger.warning("Failed to remove {}: {}".format(filename, e))
 
             if removed > 0:
-                logger.info("Cleaned up {} old quick script(s)".format(removed))
+                logger.info("Cleaned up {} old console script(s)".format(removed))
 
             return removed
 
         except Exception as e:
-            logger.error("Failed to cleanup quick scripts: {}".format(e))
+            logger.error("Failed to cleanup console scripts: {}".format(e))
             return 0
 
     def reset(self):
         # type: () -> Dict[str, Any]
         """
-        Completely reset the quick console state.
+        Completely reset the user console state.
 
-        Deletes the entire .quick_console directory and resets the counter.
+        Deletes the entire .user_console directory and resets the counter.
         Used for testing/development to get a clean slate.
 
         Returns:
@@ -386,12 +386,12 @@ for traceability and debugging purposes.
             # Count existing scripts before deletion
             if os.path.exists(self.console_dir):
                 for filename in os.listdir(self.console_dir):
-                    if filename.startswith("quick_") and filename.endswith(".py"):
+                    if filename.startswith("console_") and filename.endswith(".py"):
                         deleted_count += 1
 
                 # Delete entire directory
                 shutil.rmtree(self.console_dir)
-                logger.info("Deleted quick console directory: %s", self.console_dir)
+                logger.info("Deleted user console directory: %s", self.console_dir)
 
             # Reset counter to 0
             with self._lock:
@@ -399,14 +399,14 @@ for traceability and debugging purposes.
 
             return {
                 "success": True,
-                "message": "Reset quick console ({} scripts deleted, counter reset to 0)".format(
+                "message": "Reset user console ({} scripts deleted, counter reset to 0)".format(
                     deleted_count
                 ),
                 "deleted_scripts": deleted_count
             }
 
         except Exception as e:
-            logger.error("Failed to reset quick console: {}".format(e))
+            logger.error("Failed to reset user console: {}".format(e))
             return {
                 "success": False,
                 "message": "Error: {}".format(str(e)),

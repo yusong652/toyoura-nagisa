@@ -460,7 +460,7 @@ The CLI supports direct command execution with automatic context injection for i
 ```
 - **API**: `POST /api/pfc/console/execute`
 - **Context**: Code + output injected as `<pfc-python>` tags with `<input>`, `<task_id>`, `<output>`, `<error>`
-- **Traceability**: Code saved to `workspace/.quick_console/` as timestamped scripts
+- **Traceability**: Code saved to `workspace/.user_console/` as timestamped scripts
 - **Requires**: PFC server running (WebSocket port 9001)
 - **Implementation**: `backend/presentation/api/pfc_console.py`
 
