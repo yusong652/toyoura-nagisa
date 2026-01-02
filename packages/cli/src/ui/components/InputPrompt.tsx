@@ -162,7 +162,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Check if input is a PFC console command (> prefix, not >>)
   const isPfcConsoleCommand = (text: string): boolean => {
     const trimmed = text.trim();
-    return trimmed.startsWith('>') && !trimmed.startsWith('>>') && trimmed.length > 1;
+    if (!trimmed.startsWith('>') || trimmed.startsWith('>>')) return false;
+    const code = trimmed.substring(1).trim();
+    return code.length > 0;
   };
 
   // Parse PFC console command from input (remove > prefix)
