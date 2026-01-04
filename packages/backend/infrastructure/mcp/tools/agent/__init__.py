@@ -6,12 +6,11 @@ This package provides tools for MainAgent to:
 """
 
 from .invoke_agent import invoke_agent, register_invoke_agent_tool
-from .trigger_skill import trigger_skill, register_trigger_skill_tool
+from .trigger_skill import register_trigger_skill_tool
 
 __all__ = [
     "invoke_agent",
     "register_invoke_agent_tool",
-    "trigger_skill",
     "register_trigger_skill_tool",
     "register_agent_tools",
 ]
