@@ -587,6 +587,14 @@ pfc_execute_task(entry_script="...", description="...", run_in_background=True)
 
 ---
 
+## Available Skills
+
+Use `trigger_skill(skill="skill-name")` to load specialized workflow instructions when needed.
+
+{available_skills}
+
+---
+
 ## PFC Script Best Practices
 
 ### Data Output Strategies
