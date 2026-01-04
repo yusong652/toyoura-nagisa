@@ -78,40 +78,19 @@ session_id: {session_id_display}
     return env_info
 
 
-def _get_available_skills_xml(
-    project_root: Optional[Path] = None,
-    allowed_skills: Optional[List[str]] = None
-) -> str:
+def _get_available_skills_xml(allowed_skills: List[str]) -> str:
     """
     Get available skills XML for system prompt injection.
 
     Args:
-        project_root: Project root directory for skills discovery
-        allowed_skills: Optional list of skill names to include. If None, include all.
+        allowed_skills: List of skill names to include (from profile config)
 
     Returns:
-        XML string with available skills, or empty string if no skills
+        XML string with available skills
     """
     try:
-        loader = get_skills_loader(project_root)
-
-        # If no allowed_skills filter, return all
-        if allowed_skills is None:
-            return loader.get_available_skills_xml()
-
-        # Filter skills based on allowed list
-        skills_xml = "<available_skills>\n"
-        for skill_name in allowed_skills:
-            skill = loader.get_skill(skill_name)
-            if skill:
-                skill_xml = skill.to_xml()
-                indented = "\n".join(f"  {line}" for line in skill_xml.split("\n"))
-                skills_xml += indented + "\n"
-            else:
-                logger.warning(f"Configured skill '{skill_name}' not found in .nagisa/skills/")
-        skills_xml += "</available_skills>"
-
-        return skills_xml
+        loader = get_skills_loader()
+        return loader.get_available_skills_xml(allowed_skills if allowed_skills else None)
     except Exception as e:
         logger.warning(f"Failed to load skills: {e}")
         return "<!-- Skills loading failed -->"
@@ -174,10 +153,7 @@ async def build_system_prompt(
         # Get allowed skills for this profile
         from backend.domain.models.agent_profiles import get_skills_for_profile
         allowed_skills = get_skills_for_profile(agent_profile)
-
-        # Use workspace root as project root for skills discovery
-        project_root = Path(workspace_root)
-        skills_xml = _get_available_skills_xml(project_root, allowed_skills if allowed_skills else None)
+        skills_xml = _get_available_skills_xml(allowed_skills)
         base = base.replace(SKILLS_PLACEHOLDER, skills_xml)
 
     # Add base prompt as first component

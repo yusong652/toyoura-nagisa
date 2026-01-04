@@ -33,27 +33,22 @@ class SkillsLoader:
 
     def __init__(self, skills_dir: Path):
         """
-        Initialize the SkillsLoader.
+        Initialize the SkillsLoader and scan for skills.
 
         Args:
             skills_dir: Path to the skills directory (e.g., .nagisa/skills/)
         """
         self.skills_dir = skills_dir
         self._skills: Dict[str, SkillMetadata] = {}
-        self._loaded = False
+        self._scan_skills()
 
-    def scan_skills(self) -> List[SkillMetadata]:
-        """
-        Scan the skills directory and extract metadata from all SKILL.md files.
-
-        Returns:
-            List of SkillMetadata for all discovered skills
-        """
+    def _scan_skills(self) -> None:
+        """Scan the skills directory and load all SKILL.md files."""
         self._skills.clear()
 
         if not self.skills_dir.exists():
             logger.debug(f"Skills directory does not exist: {self.skills_dir}")
-            return []
+            return
 
         # Scan for SKILL.md files in subdirectories
         for skill_path in self.skills_dir.glob("**/SKILL.md"):
@@ -72,9 +67,7 @@ class SkillsLoader:
             except Exception as e:
                 logger.error(f"Failed to parse skill file {skill_path}: {e}")
 
-        self._loaded = True
         logger.info(f"Loaded {len(self._skills)} skills from {self.skills_dir}")
-        return list(self._skills.values())
 
     def _parse_skill_file(self, path: Path) -> Optional[SkillMetadata]:
         """
@@ -118,22 +111,34 @@ class SkillsLoader:
             base_dir=path.parent,
         )
 
-    def get_available_skills_xml(self) -> str:
+    def get_available_skills_xml(self, allowed_skills: Optional[List[str]] = None) -> str:
         """
-        Generate XML representation of all available skills for system prompt.
+        Generate XML representation of available skills for system prompt.
+
+        Args:
+            allowed_skills: Optional list of skill names to include. If None, include all.
 
         Returns:
-            XML string with <available_skills> wrapper containing all skill metadata
+            XML string with <available_skills> wrapper containing skill metadata
         """
-        if not self._loaded:
-            self.scan_skills()
+        # Determine which skills to include
+        if allowed_skills is not None:
+            skills_to_include = [
+                self._skills[name] for name in allowed_skills
+                if name in self._skills
+            ]
+            # Warn about missing skills
+            for name in allowed_skills:
+                if name not in self._skills:
+                    logger.warning(f"Configured skill '{name}' not found in .nagisa/skills/")
+        else:
+            skills_to_include = list(self._skills.values())
 
-        if not self._skills:
+        if not skills_to_include:
             return "<available_skills>\n  <!-- No skills available -->\n</available_skills>"
 
         skills_xml = "<available_skills>\n"
-        for skill in sorted(self._skills.values(), key=lambda s: s.name):
-            # Indent each line of skill XML
+        for skill in sorted(skills_to_include, key=lambda s: s.name):
             skill_xml = skill.to_xml()
             indented = "\n".join(f"  {line}" for line in skill_xml.split("\n"))
             skills_xml += indented + "\n"
@@ -151,9 +156,6 @@ class SkillsLoader:
         Returns:
             SkillMetadata if found, None otherwise
         """
-        if not self._loaded:
-            self.scan_skills()
-
         return self._skills.get(skill_name)
 
     def get_skill_content(self, skill_name: str) -> Optional[str]:
@@ -185,9 +187,6 @@ class SkillsLoader:
         Returns:
             List of skill names
         """
-        if not self._loaded:
-            self.scan_skills()
-
         return sorted(self._skills.keys())
 
     def reload(self) -> List[SkillMetadata]:
@@ -197,16 +196,13 @@ class SkillsLoader:
         Returns:
             List of SkillMetadata for all discovered skills
         """
-        self._loaded = False
-        return self.scan_skills()
+        self._scan_skills()
+        return list(self._skills.values())
 
 
-def get_skills_loader(project_root: Optional[Path] = None) -> SkillsLoader:
+def get_skills_loader() -> SkillsLoader:
     """
     Get the singleton SkillsLoader instance.
-
-    Args:
-        project_root: Project root directory. If None, attempts to find it.
 
     Returns:
         SkillsLoader instance
@@ -214,13 +210,10 @@ def get_skills_loader(project_root: Optional[Path] = None) -> SkillsLoader:
     global _skills_loader
 
     if _skills_loader is None:
-        if project_root is None:
-            # Default to current working directory
-            project_root = Path.cwd()
-
+        # Use current working directory as project root
+        project_root = Path.cwd()
         skills_dir = project_root / DEFAULT_SKILLS_DIR
         _skills_loader = SkillsLoader(skills_dir)
-        _skills_loader.scan_skills()
 
     return _skills_loader
 
