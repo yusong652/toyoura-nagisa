@@ -89,6 +89,8 @@ PFC_TOOLS: List[str] = [
     "pfc_capture_plot",
     # SubAgent delegation
     "invoke_agent",
+    # Skills (on-demand workflow instructions)
+    "trigger_skill",
 ]
 
 # SubAgent-specific tool list for PFC Explorer (read-only exploration)
@@ -158,6 +160,19 @@ GENERAL_TOOLS: List[str] = [
     "invoke_agent",
 ]
 
+# =============================================================================
+# Skills Configuration (on-demand workflow instructions)
+# =============================================================================
+
+# PFC-specific skills for simulation workflows
+PFC_SKILLS: List[str] = [
+    "example",  # Example skill for demonstration
+    # Add more PFC-specific skills here as they are created
+    # "pfc-workflow-standard",
+    # "pfc-debugging",
+    # "pfc-contact-models",
+]
+
 
 # =============================================================================
 # Profile Configuration
@@ -187,6 +202,10 @@ class ProfileConfig:
     # Display metadata (for frontend)
     color: str
     icon: str
+
+    # Skills configuration (on-demand workflow instructions)
+    # Placed after required fields due to dataclass ordering requirements
+    skills: tuple = ()  # Immutable tuple of skill names available for this profile
 
     @property
     def tool_profile(self) -> str:
@@ -242,6 +261,7 @@ PROFILE_CONFIGS: Dict[AgentProfile, ProfileConfig] = {
         tools=tuple(PFC_TOOLS),
         color="#9C27B0",
         icon="⚛️",
+        skills=tuple(PFC_SKILLS),
     ),
 
     AgentProfile.GENERAL: ProfileConfig(
@@ -388,3 +408,21 @@ def get_all_profiles() -> Dict[str, dict]:
 def get_subagent_config(name: str) -> SubAgentConfig:
     """Get SubAgent configuration by name."""
     return SUBAGENT_CONFIGS[name]
+
+
+def get_skills_for_profile(profile: str | AgentProfile) -> List[str]:
+    """
+    Get available skills for a profile.
+
+    Args:
+        profile: Profile name string or AgentProfile enum
+
+    Returns:
+        List of skill names available for the profile
+    """
+    # SubAgents don't have skills (they're task-focused)
+    if isinstance(profile, str) and profile in SUBAGENT_CONFIGS:
+        return []
+
+    config = get_profile_config(profile)
+    return list(config.skills)

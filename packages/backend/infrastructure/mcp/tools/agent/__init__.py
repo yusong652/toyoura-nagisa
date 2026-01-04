@@ -1,13 +1,18 @@
-"""Agent tools for SubAgent invocation.
+"""Agent tools for SubAgent invocation and skill triggering.
 
-This package provides tools for MainAgent to delegate tasks to specialized SubAgents.
+This package provides tools for MainAgent to:
+- Delegate tasks to specialized SubAgents (invoke_agent)
+- Load skill instructions into conversation context (trigger_skill)
 """
 
 from .invoke_agent import invoke_agent, register_invoke_agent_tool
+from .trigger_skill import trigger_skill, register_trigger_skill_tool
 
 __all__ = [
     "invoke_agent",
     "register_invoke_agent_tool",
+    "trigger_skill",
+    "register_trigger_skill_tool",
     "register_agent_tools",
 ]
 
@@ -19,3 +24,4 @@ def register_agent_tools(mcp):
         mcp: FastMCP server instance
     """
     register_invoke_agent_tool(mcp)
+    register_trigger_skill_tool(mcp)

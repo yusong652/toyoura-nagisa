@@ -7,12 +7,16 @@ import sys
 import platform
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from .core import get_base_prompt, get_expression_prompt
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
+from backend.infrastructure.skills import get_skills_loader
 
 logger = logging.getLogger(__name__)
+
+# Placeholder for skills injection
+SKILLS_PLACEHOLDER = "{available_skills}"
 
 
 async def _get_workspace_root(agent_profile: str, session_id: Optional[str] = None) -> str:
@@ -74,6 +78,45 @@ session_id: {session_id_display}
     return env_info
 
 
+def _get_available_skills_xml(
+    project_root: Optional[Path] = None,
+    allowed_skills: Optional[List[str]] = None
+) -> str:
+    """
+    Get available skills XML for system prompt injection.
+
+    Args:
+        project_root: Project root directory for skills discovery
+        allowed_skills: Optional list of skill names to include. If None, include all.
+
+    Returns:
+        XML string with available skills, or empty string if no skills
+    """
+    try:
+        loader = get_skills_loader(project_root)
+
+        # If no allowed_skills filter, return all
+        if allowed_skills is None:
+            return loader.get_available_skills_xml()
+
+        # Filter skills based on allowed list
+        skills_xml = "<available_skills>\n"
+        for skill_name in allowed_skills:
+            skill = loader.get_skill(skill_name)
+            if skill:
+                skill_xml = skill.to_xml()
+                indented = "\n".join(f"  {line}" for line in skill_xml.split("\n"))
+                skills_xml += indented + "\n"
+            else:
+                logger.warning(f"Configured skill '{skill_name}' not found in .nagisa/skills/")
+        skills_xml += "</available_skills>"
+
+        return skills_xml
+    except Exception as e:
+        logger.warning(f"Failed to load skills: {e}")
+        return "<!-- Skills loading failed -->"
+
+
 async def build_system_prompt(
     agent_profile: str = "general",
     session_id: Optional[str] = None,
@@ -125,6 +168,17 @@ async def build_system_prompt(
     # Note: {tool_schemas} placeholder removed from prompts - tools via native API
     base = base.replace("{workspace_root}", workspace_root)
     base = base.replace("{env}", env_info)
+
+    # 6. Replace {available_skills} placeholder if present
+    if SKILLS_PLACEHOLDER in base:
+        # Get allowed skills for this profile
+        from backend.domain.models.agent_profiles import get_skills_for_profile
+        allowed_skills = get_skills_for_profile(agent_profile)
+
+        # Use workspace root as project root for skills discovery
+        project_root = Path(workspace_root)
+        skills_xml = _get_available_skills_xml(project_root, allowed_skills if allowed_skills else None)
+        base = base.replace(SKILLS_PLACEHOLDER, skills_xml)
 
     # Add base prompt as first component
     if base:
