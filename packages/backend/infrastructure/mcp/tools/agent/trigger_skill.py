@@ -33,6 +33,12 @@ def register_trigger_skill_tool(mcp: FastMCP):
     providing semantic clarity for LLM and runtime validation.
     """
     # Get dynamic type and description at registration time
+    # TODO: Currently, the Literal type includes ALL skills from .nagisa/skills/,
+    # not filtered by agent profile. The system prompt's {available_skills} section
+    # IS profile-filtered, so LLM guidance works correctly. However, if we need
+    # different agents to have different skill schemas (e.g., SubAgents with skills),
+    # we'll need to research FastMCP's dynamic tool registration mechanism or
+    # consider per-profile MCP server instances.
     SkillType = get_skill_literal_type()
     skill_description = get_skill_description()
 

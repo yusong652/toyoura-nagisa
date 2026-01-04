@@ -166,11 +166,10 @@ GENERAL_TOOLS: List[str] = [
 
 # PFC-specific skills for simulation workflows
 PFC_SKILLS: List[str] = [
-    "example",  # Example skill for demonstration
-    # Add more PFC-specific skills here as they are created
-    # "pfc-workflow-standard",
-    # "pfc-debugging",
-    # "pfc-contact-models",
+    "pfc-workflow-standard",   # Complete 7-step simulation workflow
+    "pfc-doc-navigation",      # Documentation search strategies
+    "pfc-subagent-guide",      # SubAgent delegation guide
+    "pfc-scripting-patterns",  # Script organization and data handling
 ]
 
 
