@@ -1,0 +1,92 @@
+---
+name: pfc-dependency-install
+description: >
+  Install Python packages in PFC's embedded Python 3.6 environment.
+  Use when import fails with ModuleNotFoundError, or user needs external packages.
+---
+
+# PFC Dependency Install
+
+Install packages in PFC's embedded Python environment (Python 3.6.1, pip 9.x, numpy 1.13.0).
+
+---
+
+## Install Pattern
+
+PFC uses embedded Python—subprocess calls won't work. Use pip's Python API:
+
+```python
+import pip
+pip.main(['install', '--user', 'package_name'])
+```
+
+**Always use `--user`**: Avoids permission issues with PFC installation directory.
+
+---
+
+## Critical: Restart After Install
+
+Installed packages won't be available until pfc-server restarts. Python caches loaded modules.
+
+**Workflow**:
+1. Install package with `pip.main()`
+2. Restart pfc-server
+3. Verify with `import package_name`
+
+---
+
+## PFC Pre-installed Packages
+
+PFC 7.0 includes these packages—do NOT override them:
+
+| Package | Version | Note |
+|---------|---------|------|
+| numpy | 1.13.0 | **Critical**: Many packages depend on this |
+| scipy | bundled | |
+| matplotlib | bundled | |
+| pytz | bundled | |
+
+**Check before installing**:
+```python
+import numpy; print(numpy.__version__, numpy.__file__)
+```
+
+If path shows `C:\Program Files\Itasca\...`, it's PFC's bundled version.
+
+---
+
+## Compatibility Table (numpy 1.13.0)
+
+| Package | Compatible Version | Command |
+|---------|-------------------|---------|
+| pandas | **0.19.2** | `pip.main(['install', '--user', 'pandas==0.19.2'])` |
+| tabulate | latest | `pip.main(['install', '--user', 'tabulate'])` |
+
+**Warning**: Newer pandas versions require numpy >= 1.15.4 and will fail.
+
+---
+
+## Troubleshooting
+
+### Module still not found after install
+Restart pfc-server to reload Python modules.
+
+### Package overrides PFC's bundled package
+If you accidentally installed a newer numpy:
+```python
+import pip
+pip.main(['uninstall', 'numpy', '-y'])
+# Then restart pfc-server
+```
+
+### Permission denied
+Always use `--user` flag.
+
+### Import error after install (version conflict)
+Check which version is loaded:
+```python
+import package_name
+print(package_name.__version__, package_name.__file__)
+```
+
+If path shows `AppData\Roaming\Python\...`, it's user-installed and may conflict with PFC.

@@ -210,6 +210,11 @@ class FileBuffer:
         # type: () -> bool
         return False
 
+    def isatty(self):
+        # type: () -> bool
+        """Check if buffer is connected to a terminal (always False for file buffer)."""
+        return False
+
     def __enter__(self):
         return self
 
