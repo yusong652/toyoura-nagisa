@@ -10,6 +10,7 @@ pfc-executions branch before each script execution.
 Python 3.6 compatible implementation.
 """
 
+
 import asyncio
 import concurrent.futures
 import logging
@@ -142,27 +143,23 @@ class ScriptRunner:
                 "output": output_text  # Include output up to interruption point
             }
 
-        except ValueError as e:
-            # PFC wraps callback exceptions in ValueError
-            # Check if this is a wrapped InterruptedError from our callback
-            error_str = str(e)
-            if "InterruptedError" in error_str and "_pfc_interrupt_check" in error_str:
-                output_text = output_buffer.getvalue()
-                logger.info("Script interrupted (via PFC callback): {}".format(script_path))
-
-                return {
-                    "status": "interrupted",
-                    "message": "Script interrupted by user",
-                    "result": None,
-                    "output": output_text  # Include output up to interruption point
-                }
-
-            # Not an interrupt - re-raise as regular exception
-            raise
-
-        except Exception as e:
+        except BaseException as e:
+            # Use BaseException to catch ALL exceptions including those from C extensions
             # Get captured output even on error
             output_text = output_buffer.getvalue()
+
+            # Check if this is a wrapped InterruptedError from our callback
+            # PFC wraps callback exceptions in ValueError
+            if isinstance(e, ValueError):
+                error_str = str(e)
+                if "InterruptedError" in error_str and "_pfc_interrupt_check" in error_str:
+                    logger.info("Script interrupted (via PFC callback): {}".format(script_path))
+                    return {
+                        "status": "interrupted",
+                        "message": "Script interrupted by user",
+                        "result": None,
+                        "output": output_text
+                    }
 
             # Capture complete stack trace for server logging (debugging)
             full_traceback = traceback.format_exc()
