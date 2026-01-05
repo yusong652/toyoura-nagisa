@@ -69,7 +69,15 @@ If path shows `C:\Program Files\Itasca\...`, it's PFC's bundled version.
 ## Troubleshooting
 
 ### Module still not found after install
-Restart pfc-server to reload Python modules.
+First, restart pfc-server to reload Python modules.
+
+### "Ghost install": pip says installed but ModuleNotFoundError persists
+Pip metadata may be corrupted (files missing but records remain). Force reinstall:
+```python
+import pip
+pip.main(['install', '--user', '--force-reinstall', '--no-cache-dir', 'package_name'])
+```
+Then restart pfc-server.
 
 ### Package overrides PFC's bundled package
 If you accidentally installed a newer numpy:
