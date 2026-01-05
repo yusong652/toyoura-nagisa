@@ -228,11 +228,12 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
             error=error_msg or ""
         )
 
-        success = (status == "success")
+        # Execution completed (even if Python code raised an error).
+        # Error details are in output field for the CLI to display.
+        # Only infrastructure errors (connection, timeout) should set success=False.
         return ApiResponse(
-            success=success,
-            message="Code executed successfully" if success else (error_msg or message),
-            error_code=None if success else "EXECUTION_ERROR",
+            success=True,
+            message="Code executed" if status == "success" else (error_msg or message or "Execution completed with errors"),
             data=ExecuteData(
                 task_id=task_id,
                 script_name=script_name,
