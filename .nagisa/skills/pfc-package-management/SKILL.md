@@ -1,13 +1,14 @@
 ---
-name: pfc-dependency-install
+name: pfc-package-management
 description: >
-  Install Python packages in PFC's embedded Python 3.6 environment.
-  Use when import fails with ModuleNotFoundError, or user needs external packages.
+  Manage Python packages in PFC's embedded Python 3.6 environment.
+  Use when import fails with ModuleNotFoundError, need to install/uninstall packages,
+  or resolve version conflicts.
 ---
 
-# PFC Dependency Install
+# PFC Package Management
 
-Install packages in PFC's embedded Python environment (Python 3.6.1, pip 9.x, numpy 1.13.0).
+Manage packages in PFC's embedded Python environment (Python 3.6.1, pip 9.x, numpy 1.13.0).
 
 ---
 
