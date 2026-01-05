@@ -1,14 +1,17 @@
 ---
 name: pfc-server-setup
 description: >
-  Guide users through PFC server setup: detect PFC installation, check Python
-  environment, install websockets, and start pfc-server. Use when pfc-server
-  connection fails, user asks how to start PFC integration, or first-time setup.
+  Complete PFC integration lifecycle: (1) Detect PFC installation path on Windows,
+  (2) Check/install websockets==9.1 in PFC's Python 3.6 environment (automated via
+  PFC Python executable), (3) Launch PFC GUI using PowerShell Start-Process (NOT
+  'start' command which blocks in git bash), (4) Guide user to start pfc-server in
+  PFC IPython console with run_loop(). Triggers: "open PFC", "start PFC", "connect
+  to PFC", "pfc-server connection failed", first-time PFC setup.
 ---
 
 # PFC Server Setup
 
-Guide for setting up pfc-server to enable Nagisa-PFC communication.
+Complete guide for PFC integration: environment setup, GUI launch, and pfc-server start.
 
 ---
 
@@ -116,12 +119,27 @@ print(f"start_server.py exists: {os.path.exists(start_script)}")
 
 ---
 
-## Step 5: Start pfc-server (User Action Required)
+## Step 5: Launch PFC GUI (Automated)
+
+**Nagisa can launch PFC GUI directly** using PowerShell:
+
+```bash
+powershell -Command "Start-Process '{pfc_path}/exe64/pfc3d700_gui.exe'"
+```
+
+**Important**: Use `powershell Start-Process`, NOT `start ""` command.
+The `start` command blocks in git bash until GUI closes.
+
+**Wait for PFC to fully load** before proceeding to next step.
+
+---
+
+## Step 6: Start pfc-server (User Action Required)
 
 Instruct user to run in **PFC GUI IPython console**:
 
 ```python
-exec(open(r'{project_path}/services/pfc-server/start_server.py', encoding='utf-8').read())
+%run "{project_path}/services/pfc-server/start_server.py"
 ```
 
 **Critical**: After the script loads, user MUST call:
@@ -135,7 +153,7 @@ This starts the WebSocket event loop and keeps the server running. Without `run_
 
 ---
 
-## Step 6: Verify Connection
+## Step 7: Verify Connection
 
 After pfc-server starts, verify from Nagisa:
 
@@ -173,5 +191,6 @@ Use manual fallback in PFC GUI IPython console.
 |------|----------|---------|
 | Check websockets | Nagisa | `"{pfc_path}/.../python.exe" -c "import pip; pip.main(['show', 'websockets'])"` |
 | Install websockets | Nagisa | `"{pfc_path}/.../python.exe" -c "import pip; pip.main(['install', '--user', 'websockets==9.1'])"` |
-| Start server | User (PFC GUI) | `exec(open(r'{project_path}/services/pfc-server/start_server.py', encoding='utf-8').read())` |
+| Launch PFC GUI | Nagisa | `powershell -Command "Start-Process '{pfc_path}/exe64/pfc3d700_gui.exe'"` |
+| Start server | User (PFC GUI) | `%run "{project_path}/services/pfc-server/start_server.py"` |
 | Run event loop | User (PFC GUI) | `run_loop()` |

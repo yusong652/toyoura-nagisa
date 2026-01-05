@@ -220,7 +220,7 @@ class BackgroundProcessManager:
                 enhanced_command, _ = enhance_python_command(command)
 
                 # Prepare environment with unbuffered output using shared utils
-                env = prepare_shell_env(force_unbuffered=True, encoding='utf-8')
+                env = prepare_shell_env(base_env=None, force_unbuffered=True, encoding='utf-8')
 
                 # Start the subprocess with line buffering
                 popen = subprocess.Popen(

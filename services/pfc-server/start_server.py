@@ -11,8 +11,8 @@ Architecture:
 - Command Execution: Main thread via queue (thread-safe for PFC)
 - Task Processing: IPython post_execute hook (triggered by any IPython command)
 
-Usage in PFC GUI IPython shell (one-line command):
-    >>> import sys; sys.path.append(r'C:\\Dev\\Han\\toyoura-nagisa\\services\\pfc-server'); exec(open(r'C:\\Dev\\Han\\toyoura-nagisa\\services\\pfc-server\\start_server.py', encoding='utf-8').read())
+Usage in PFC GUI IPython shell:
+    >>> exec(open(r'C:/Dev/Han/toyoura-nagisa/services/pfc-server/start_server.py', encoding='utf-8').read())
 
 Features:
     - IPython shell remains fully interactive (not blocked)
@@ -21,18 +21,38 @@ Features:
     - Supports callback-based commands (contact cmat, etc.)
     - Long timeout configuration for long-running tasks
     - Thread detection and logging for debugging
+    - Auto-detects script path for imports (no manual sys.path needed)
 
 Python 3.6 compatible implementation.
 """
 
 import sys
+import os
 import asyncio
 import logging
 import threading
 import time
 
+# =============================================================================
+# Add script directory to sys.path for imports
+# =============================================================================
+# Usage: %run "C:/.../pfc-server/start_server.py"  (IPython magic, sets __file__)
+
+try:
+    import server
+except ImportError:
+    # __file__ is set by IPython's %run magic
+    if '__file__' in dir():
+        _script_dir = os.path.dirname(os.path.abspath(__file__))
+        if _script_dir not in sys.path:
+            sys.path.insert(0, _script_dir)
+    else:
+        raise ImportError(
+            "Cannot find 'server' module. Use IPython %run:\n"
+            "  %run \"C:/.../pfc-server/start_server.py\""
+        )
+
 # Configure logging - output to both console and file
-import os
 # Use os.getcwd() since __file__ is not available when using exec()
 # Store server log in .nagisa/ hidden directory for clean workspace
 nagisa_dir = os.path.join(os.getcwd(), ".nagisa")
