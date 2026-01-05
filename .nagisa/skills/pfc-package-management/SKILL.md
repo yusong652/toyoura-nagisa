@@ -67,6 +67,18 @@ If path shows `C:\Program Files\Itasca\...`, it's PFC's bundled version.
 
 ---
 
+## Quick Reference
+
+| Operation | Command |
+|-----------|---------|
+| Install | `pip.main(['install', '--user', 'pkg'])` |
+| Uninstall | `pip.main(['uninstall', 'pkg', '-y'])` |
+| List all | `pip.main(['list'])` |
+| Show info | `pip.main(['show', 'pkg'])` |
+| Force reinstall | `pip.main(['install', '--user', '--force-reinstall', '--no-cache-dir', 'pkg'])` |
+
+---
+
 ## Troubleshooting
 
 ### Module still not found after install
