@@ -293,6 +293,20 @@ class FileMentionProcessor:
         )
 
         # Handle different content formats
+        if result.content_format == ContentFormat.METADATA:
+            # Validation errors (empty file, invalid image, etc.)
+            # Return as warning in system-reminder format
+            warning_msg = result.content if isinstance(result.content, str) else str(result.content)
+            warning_reminder = (
+                f"{tool_call_reminder}\n\n"
+                f"<system-reminder>\n"
+                f"Result of calling the Read tool:\n"
+                f"Warning: {warning_msg}\n"
+                f"</system-reminder>"
+            )
+            logger.warning(f"File validation warning for {file_content.path}: {warning_msg}")
+            return warning_reminder
+
         if result.content_format == ContentFormat.INLINE_DATA:
             # Binary/Image files: check multimodal support
             if isinstance(result.content, dict) and "inline_data" in result.content:

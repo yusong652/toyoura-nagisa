@@ -33,20 +33,68 @@ DEFAULT_MAX_LINES = 2000  # Maximum lines to read by default (matching Claude Co
 MAX_LINE_LENGTH = 2000   # Maximum line length before truncation (matching Claude Code)
 SAMPLE_SIZE_BINARY = 8192  # Bytes to sample for binary detection
 
+# -----------------------------------------------------------------------------
+# Magic Bytes Signatures for Image Validation
+# -----------------------------------------------------------------------------
+
+# Magic bytes signatures for common image formats
+# Reference: https://en.wikipedia.org/wiki/List_of_file_signatures
+IMAGE_MAGIC_BYTES = {
+    "png": b'\x89PNG\r\n\x1a\n',         # 8-byte PNG signature
+    "jpeg": b'\xff\xd8\xff',              # 3-byte JPEG start
+    "gif": b'GIF8',                       # GIF87a or GIF89a
+    "webp": (b'RIFF', b'WEBP'),           # RIFF at 0, WEBP at offset 8
+    "bmp": b'BM',                         # 2-byte BMP signature
+    "tiff": (b'II\x2a\x00', b'MM\x00\x2a'),  # Little/Big-endian
+    "ico": b'\x00\x00\x01\x00',           # Windows icon
+    "psd": b'8BPS',                       # Photoshop PSD
+}
+
+# Extensions that map to magic byte checks
+EXTENSION_TO_MAGIC = {
+    '.png': 'png',
+    '.jpg': 'jpeg',
+    '.jpeg': 'jpeg',
+    '.gif': 'gif',
+    '.webp': 'webp',
+    '.bmp': 'bmp',
+    '.tiff': 'tiff',
+    '.tif': 'tiff',
+    '.ico': 'ico',
+    '.psd': 'psd',
+}
+
+# Maximum bytes to read for magic validation
+MAGIC_BYTES_READ_SIZE = 12  # WebP needs 12 bytes for full validation
+
+# -----------------------------------------------------------------------------
 # Known file extensions for quick categorization
+# -----------------------------------------------------------------------------
+
 TEXT_EXTENSIONS = {
+    # Programming languages
     '.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.scss', '.sass',
-    '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
-    '.md', '.txt', '.rst', '.csv', '.tsv', '.sql', '.sh', '.bash', '.zsh',
     '.c', '.cpp', '.h', '.hpp', '.java', '.kt', '.swift', '.go', '.rs',
     '.php', '.rb', '.pl', '.r', '.m', '.scala', '.clj', '.hs', '.elm',
-    '.dockerfile', '.gitignore', '.gitattributes', '.editorconfig',
-    '.log', '.env', '.properties', '.makefile', '.cmake'
+    # Data/config formats
+    '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
+    '.csv', '.tsv', '.sql', '.log', '.env', '.properties',
+    # Documentation
+    '.md', '.txt', '.rst',
+    # Shell/build
+    '.sh', '.bash', '.zsh', '.dockerfile', '.makefile', '.cmake',
+    # Dotfiles
+    '.gitignore', '.gitattributes', '.editorconfig',
+    # Text-based image formats (XML/PostScript)
+    '.svg', '.eps',
 }
 
 IMAGE_EXTENSIONS = {
+    # Binary image formats (multimodal LLM compatible)
     '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif',
-    '.svg', '.webp', '.ico', '.psd', '.ai', '.eps'
+    '.webp', '.ico',
+    # Proprietary formats (no magic bytes validation, best-effort)
+    '.psd', '.ai',
 }
 
 # Encoding detection order
@@ -148,6 +196,138 @@ def detect_encoding(file_path: Path) -> Optional[str]:
         return None
 
 
+# -----------------------------------------------------------------------------
+# Validation utilities for robust file handling
+# -----------------------------------------------------------------------------
+
+def _check_empty_file(file_path: Path, file_size: int) -> Optional[ProcessingResult]:
+    """
+    Check if file is empty (0 bytes) and return appropriate result.
+
+    Args:
+        file_path: Path to the file
+        file_size: File size in bytes (pre-computed to avoid double stat)
+
+    Returns:
+        ProcessingResult with METADATA format if empty, None otherwise
+    """
+    if file_size == 0:
+        return ProcessingResult(
+            content=f"File is empty (0 bytes): {file_path.name}",
+            content_format=ContentFormat.METADATA,
+            truncated=False,
+            truncation_reason=None,
+            original_size=0,
+            processed_size=0,
+            lines_shown=(0, 0),
+            file_type=_detect_file_type(file_path),
+            encoding=None
+        )
+    return None
+
+
+def _validate_image_magic_bytes(file_path: Path, file_size: int) -> Tuple[bool, Optional[str]]:
+    """
+    Validate image file has correct magic bytes signature.
+
+    This prevents LLM API errors when files have image extensions but
+    non-image content (e.g., JSON saved as .png).
+
+    Args:
+        file_path: Path to the image file
+        file_size: File size in bytes (reserved for future validation)
+
+    Returns:
+        Tuple of (is_valid, error_message)
+        - (True, None) if valid image or no validation needed
+        - (False, "reason") if invalid
+    """
+    _ = file_size  # Reserved for potential future size-based validation
+    ext = file_path.suffix.lower()
+
+    # Check if extension requires magic byte validation
+    if ext not in EXTENSION_TO_MAGIC:
+        # No magic validation for this extension (AI has complex/variable format)
+        return True, None
+
+    magic_type = EXTENSION_TO_MAGIC[ext]
+    expected = IMAGE_MAGIC_BYTES.get(magic_type)
+
+    if expected is None:
+        return True, None
+
+    # Note: Even for small files (< MAGIC_BYTES_READ_SIZE), we still attempt
+    # validation with whatever bytes are available
+
+    try:
+        with file_path.open('rb') as f:
+            header = f.read(MAGIC_BYTES_READ_SIZE)
+
+        # Handle WebP special case (RIFF at start, WEBP at offset 8)
+        if magic_type == 'webp':
+            riff_sig, webp_sig = expected
+            if not (header.startswith(riff_sig) and len(header) >= 12 and header[8:12] == webp_sig):
+                return False, f"Invalid WebP: expected RIFF...WEBP signature"
+            return True, None
+
+        # Handle TIFF dual format (little-endian or big-endian)
+        if magic_type == 'tiff':
+            le_sig, be_sig = expected
+            if not (header.startswith(le_sig) or header.startswith(be_sig)):
+                return False, f"Invalid TIFF: expected II or MM signature"
+            return True, None
+
+        # Standard single-signature check
+        if not header.startswith(expected):
+            return False, f"Invalid {ext.upper()}: magic bytes mismatch (expected {expected[:4]!r}, got {header[:4]!r})"
+
+        return True, None
+
+    except Exception as e:
+        return False, f"Failed to read file header: {e}"
+
+
+def _try_text_fallback(file_path: Path, original_error: str) -> Optional[ProcessingResult]:
+    """
+    Attempt to read a failed binary file as text.
+
+    This provides graceful degradation for files with image extensions
+    but text content (e.g., JSON saved as .png).
+
+    Args:
+        file_path: Path to the file
+        original_error: Original error message to include in result
+
+    Returns:
+        ProcessingResult if text reading succeeded, None if it failed
+    """
+    try:
+        encoding = detect_encoding(file_path)
+        if encoding:
+            result = _read_text_content(file_path, encoding)
+            # Add note about fallback only if we got valid text content
+            if isinstance(result.content, str) and result.content_format == ContentFormat.TEXT:
+                fallback_note = f"[Note: {original_error}. Reading as text instead.]\n\n"
+                return ProcessingResult(
+                    content=fallback_note + result.content,
+                    content_format=result.content_format,
+                    truncated=result.truncated,
+                    truncation_reason=result.truncation_reason,
+                    original_size=result.original_size,
+                    processed_size=result.processed_size + len(fallback_note),
+                    lines_shown=result.lines_shown,
+                    file_type=FileType.TEXT,  # Override to TEXT since we're reading as text
+                    encoding=result.encoding
+                )
+    except Exception:
+        pass
+    return None
+
+
+# -----------------------------------------------------------------------------
+# Content reading functions
+# -----------------------------------------------------------------------------
+
 def _read_text_content(
     file_path: Path,
     encoding: str,
@@ -214,9 +394,13 @@ def _read_binary_content(file_path: Path) -> ProcessingResult:
     Read and process binary content for multimodal LLM consumption.
 
     For binary files (images, documents, audio, video), this function:
-    1. Reads the raw binary data
-    2. Encodes it as base64
-    3. Returns structured inline_data format compatible with LLM multimodal APIs
+    1. Validates the file (empty check, magic bytes for images)
+    2. Reads the raw binary data
+    3. Encodes it as base64
+    4. Returns structured inline_data format compatible with LLM multimodal APIs
+
+    For invalid image files (wrong content type), attempts graceful fallback
+    to text reading.
 
     Args:
         file_path: Path to the binary file to read
@@ -228,6 +412,11 @@ def _read_binary_content(file_path: Path) -> ProcessingResult:
         - Other metadata about the processing
     """
     file_size = file_path.stat().st_size
+
+    # Check for empty file first
+    empty_result = _check_empty_file(file_path, file_size)
+    if empty_result:
+        return empty_result
 
     if file_size > INLINE_MAX_BYTES:
         return ProcessingResult(
@@ -241,6 +430,28 @@ def _read_binary_content(file_path: Path) -> ProcessingResult:
             file_type=_detect_file_type(file_path),
             encoding=None
         )
+
+    # Validate magic bytes for image files to prevent LLM API errors
+    file_type = _detect_file_type(file_path)
+    if file_type == FileType.IMAGE:
+        is_valid, error_msg = _validate_image_magic_bytes(file_path, file_size)
+        if not is_valid:
+            # Try text fallback for files with image extension but text content
+            fallback_result = _try_text_fallback(file_path, error_msg or "Invalid image")
+            if fallback_result:
+                return fallback_result
+            # If text fallback fails, return metadata error
+            return ProcessingResult(
+                content=f"Invalid image file: {error_msg}. Cannot read as text either.",
+                content_format=ContentFormat.METADATA,
+                truncated=False,
+                truncation_reason=None,
+                original_size=file_size,
+                processed_size=0,
+                lines_shown=(0, 0),
+                file_type=file_type,
+                encoding=None
+            )
 
     try:
         with file_path.open('rb') as f:
@@ -294,6 +505,10 @@ def read_file_safely(
     This is the main entry point for file reading, used by both the read tool
     and file mention processor.
 
+    Includes validation for:
+    - Empty files (0 bytes)
+    - Invalid image files (magic bytes mismatch)
+
     Args:
         file_path: Path to the file to read
         offset: Starting line number for text files (0-indexed)
@@ -302,6 +517,27 @@ def read_file_safely(
     Returns:
         ProcessingResult with content and metadata
     """
+    # Get file size early for validation
+    try:
+        file_size = file_path.stat().st_size
+    except OSError as e:
+        return ProcessingResult(
+            content=f"Cannot access file: {e}",
+            content_format=ContentFormat.METADATA,
+            truncated=False,
+            truncation_reason=None,
+            original_size=0,
+            processed_size=0,
+            lines_shown=(0, 0),
+            file_type=FileType.BINARY,
+            encoding=None
+        )
+
+    # Check for empty file at entry point (handles all file types)
+    empty_result = _check_empty_file(file_path, file_size)
+    if empty_result:
+        return empty_result
+
     # Detect file type
     file_type = _detect_file_type(file_path)
 

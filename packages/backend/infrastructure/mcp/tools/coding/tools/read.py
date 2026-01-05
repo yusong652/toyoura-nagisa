@@ -193,6 +193,16 @@ Usage:
         # Use absolute path with forward slashes for LLM consistency (matches Claude Code)
         abs_display = path_to_llm_format(file_path)
 
+        # Handle METADATA format (validation errors: empty file, invalid image, etc.)
+        if processing_result.content_format == ContentFormat.METADATA:
+            error_msg = processing_result.content if isinstance(processing_result.content, str) else str(processing_result.content)
+            return error_response(
+                error_msg,
+                file_path=abs_display,
+                file_type=file_type.value,
+                validation_error=True
+            )
+
         # Build parts array for unified content structure
         parts = []
 
