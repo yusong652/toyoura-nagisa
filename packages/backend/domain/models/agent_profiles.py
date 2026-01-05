@@ -166,10 +166,13 @@ GENERAL_TOOLS: List[str] = [
 
 # PFC-specific skills for simulation workflows
 PFC_SKILLS: List[str] = [
-    "pfc-workflow-standard",   # Complete 7-step simulation workflow
+    "pfc-script-creation",     # Script creation patterns and diff analysis
+    "pfc-error-resolution",    # Error diagnosis with task history tracing
+    "pfc-production-scale",    # Scaling test to production with data flow
+    "pfc-package-management",  # PFC Python package install/uninstall
+    "pfc-server-setup",        # pfc-server setup and connection guide
     "pfc-doc-navigation",      # Documentation search strategies
     "pfc-subagent-guide",      # SubAgent delegation guide
-    "pfc-scripting-patterns",  # Script organization and data handling
 ]
 
 
