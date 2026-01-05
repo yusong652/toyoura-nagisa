@@ -462,4 +462,8 @@ class HistoricalTask:
         if self.end_time is not None:
             info["end_time"] = self.end_time
 
+        # Add error for failed tasks
+        if self.status == "failed" and self.error:
+            info["error"] = self.error
+
         return info

@@ -116,11 +116,23 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                     # Format time info with date
                     time_info = format_time_range(start_time, end_time)
 
-                    task_lines.append(
+                    # Build task entry
+                    task_entry = (
                         f"[{status_text}] task_id: {task_id} | {elapsed:.1f}s | {time_info}{version_marker}{session_marker}{historical_marker}\n"
                         f"  Entry: {entry_script}\n"
                         f"  → {description}"
                     )
+
+                    # Add error summary for failed tasks (first line only)
+                    error = task.get("error")
+                    if status == "failed" and error:
+                        # Extract first line of error for summary
+                        error_first_line = error.split('\n')[0][:80]
+                        if len(error.split('\n')[0]) > 80:
+                            error_first_line += "..."
+                        task_entry += f"\n  ⚠ {error_first_line}"
+
+                    task_lines.append(task_entry)
 
                 # Build navigation hints
                 nav_hints = []

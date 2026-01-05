@@ -209,6 +209,9 @@ class Task(ABC):
         # Add end_time for completed/failed/interrupted tasks
         if self.status in ["completed", "failed", "interrupted"] and self.end_time is not None:
             info["end_time"] = self.end_time
+        # Add error for failed tasks
+        if self.status == "failed" and self.error:
+            info["error"] = self.error
         return info
 
     @staticmethod
