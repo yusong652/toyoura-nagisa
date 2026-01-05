@@ -12,7 +12,8 @@ Architecture:
 - Task Processing: IPython post_execute hook (triggered by any IPython command)
 
 Usage in PFC GUI IPython shell:
-    >>> exec(open(r'C:/Dev/Han/toyoura-nagisa/services/pfc-server/start_server.py', encoding='utf-8').read())
+    >>> %run "C:/Dev/Han/toyoura-nagisa/services/pfc-server/start_server.py"
+    >>> run_loop()
 
 Features:
     - IPython shell remains fully interactive (not blocked)
@@ -21,7 +22,6 @@ Features:
     - Supports callback-based commands (contact cmat, etc.)
     - Long timeout configuration for long-running tasks
     - Thread detection and logging for debugging
-    - Auto-detects script path for imports (no manual sys.path needed)
 
 Python 3.6 compatible implementation.
 """
@@ -53,7 +53,7 @@ except ImportError:
         )
 
 # Configure logging - output to both console and file
-# Use os.getcwd() since __file__ is not available when using exec()
+# Use os.getcwd() to store logs in PFC workspace (user's project directory)
 # Store server log in .nagisa/ hidden directory for clean workspace
 nagisa_dir = os.path.join(os.getcwd(), ".nagisa")
 if not os.path.exists(nagisa_dir):
