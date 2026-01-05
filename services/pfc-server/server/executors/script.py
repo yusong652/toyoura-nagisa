@@ -173,12 +173,17 @@ class ScriptRunner:
             tb = sys.exc_info()[2]
             user_frames = []
 
+            # Normalize script_path for comparison (Windows path format consistency)
+            normalized_script_path = os.path.normpath(script_path)
+
             # Walk through traceback to find user script frames
             while tb is not None:
                 frame = tb.tb_frame
                 filename = frame.f_code.co_filename
+                # Normalize filename for comparison (handles G:/ vs G:\ differences)
+                normalized_filename = os.path.normpath(filename)
                 # Only include frames from user script (not server code)
-                if filename == script_path or filename == '<string>':
+                if normalized_filename == normalized_script_path or filename == '<string>':
                     user_frames.append((
                         filename,
                         tb.tb_lineno,
