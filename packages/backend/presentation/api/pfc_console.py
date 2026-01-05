@@ -89,6 +89,7 @@ class TaskStatusData(BaseModel):
     end_time: Optional[float] = Field(default=None, description="End timestamp")
     elapsed_time: Optional[float] = Field(default=None, description="Elapsed time in seconds")
     git_commit: Optional[str] = Field(default=None, description="Git commit hash")
+    error: Optional[str] = Field(default=None, description="Error message for failed tasks")
     connected: bool = Field(default=True, description="PFC server connection status")
 
 
@@ -476,6 +477,7 @@ async def get_task_status(
                 end_time=data.get("end_time"),
                 elapsed_time=elapsed_time,
                 git_commit=git_commit,
+                error=error,
                 connected=True,
             )
         )

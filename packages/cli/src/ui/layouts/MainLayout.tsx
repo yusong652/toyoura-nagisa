@@ -424,6 +424,7 @@ export const MainLayout: React.FC = () => {
         end_time: number | null;
         elapsed_time: number | null;
         git_commit: string | null;
+        error: string | null;
         connected: boolean;
       }
 
@@ -448,10 +449,14 @@ export const MainLayout: React.FC = () => {
         `Ended: ${formatTime(response.end_time)}`,
         `Elapsed: ${response.elapsed_time ? `${response.elapsed_time.toFixed(1)}s` : 'n/a'}`,
         `Git: ${response.git_commit ? response.git_commit.slice(0, 8) : 'n/a'}`,
-        '',
-        '--- Output ---',
-        response.output || '(no output)',
       ];
+
+      // Add error for failed tasks
+      if (response.status === 'failed' && response.error) {
+        lines.push('', '--- Error ---', response.error);
+      }
+
+      lines.push('', '--- Output ---', response.output || '(no output)');
 
       appActions.addHistoryItem({
         type: MessageType.INFO,
