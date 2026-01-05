@@ -98,10 +98,12 @@ async def execute_shell_command(request: ExecuteRequest) -> ApiResponse[ShellExe
             stderr=result.stderr,
         )
 
-        success = result.exit_code == 0
+        # Command execution was successful (even if exit_code != 0).
+        # Non-zero exit codes are valid outcomes (e.g., grep returns 1 when no match).
+        # Only infrastructure errors (timeout, validation) should set success=False.
         return ApiResponse(
-            success=success,
-            message="Command executed" if success else f"Command failed (exit {result.exit_code})",
+            success=True,
+            message="Command executed" if result.exit_code == 0 else f"Command exited with code {result.exit_code}",
             data=ShellExecuteData(
                 stdout=result.stdout,
                 stderr=result.stderr,
