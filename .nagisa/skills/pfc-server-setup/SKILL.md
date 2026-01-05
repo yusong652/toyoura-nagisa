@@ -30,7 +30,7 @@ Guide for setting up pfc-server to enable Nagisa-PFC communication.
 
 **Windows - quick check**:
 ```bash
-dir "C:\Program Files\Itasca"
+dir "C:/Program Files/Itasca"
 ```
 
 **Windows - search entire drive** (if not in default location):
@@ -51,32 +51,30 @@ powershell -Command "Get-ChildItem -Path 'C:\','D:\' -Filter 'pfc*_gui.exe' -Rec
 
 ---
 
-## Step 2: Check PFC Python Environment
+## Step 2: Check websockets Installation
 
 Use `{pfc_path}` from Step 1 (e.g., `C:\Program Files\Itasca\PFC700`).
 
-**Verify websockets installed**:
-```python
-import os
-pfc_path = r"{pfc_path}"  # Use path from Step 1
+**Check via PFC Python** (recommended):
+```bash
+"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['show', 'websockets'])"
+```
 
-# Check PFC site-packages
-pfc_site = os.path.join(pfc_path, "exe64", "python36", "lib", "site-packages", "websockets")
-print(f"PFC websockets: {os.path.exists(pfc_site)}")
+If output shows `Name: websockets` and `Version: 9.1`, websockets is installed.
 
-# Check user site-packages
-user_site = os.path.expandvars(r"%APPDATA%\Python\Python36\site-packages\websockets")
-print(f"User websockets: {os.path.exists(user_site)}")
+**Alternative - check user site-packages**:
+```bash
+powershell -Command "Test-Path \"$env:APPDATA\Python\Python36\site-packages\websockets\""
+```
 
 ---
 
-## Step 3: Install websockets (User Action Required)
+## Step 3: Install websockets (Automated)
 
-If websockets not found, instruct user to run in **PFC GUI IPython console**:
+If websockets not found, **Nagisa can install it directly** using PFC's Python:
 
-```python
-import pip
-pip.main(['install', '--user', 'websockets==9.1'])
+```bash
+"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['install', '--user', 'websockets==9.1'])"
 ```
 
 **Why websockets==9.1?**
@@ -84,7 +82,16 @@ pip.main(['install', '--user', 'websockets==9.1'])
 - websockets 9.1 is the last version supporting Python 3.6
 - Newer versions require Python 3.7+
 
-**After install**: User must restart PFC GUI.
+### Fallback: Manual Installation
+
+If automated install fails (permission issues, environment problems), instruct user to run in **PFC GUI IPython console**:
+
+```python
+import pip
+pip.main(['install', '--user', 'websockets==9.1'])
+```
+
+**After install**: User should restart PFC GUI to ensure the module is loaded.
 
 ---
 
@@ -144,7 +151,7 @@ If successful, PFC integration is ready.
 ## Troubleshooting
 
 ### "No module named websockets"
-User needs to install websockets in PFC GUI (Step 3).
+Try automated install first (Step 3). If fails, use manual fallback in PFC GUI.
 
 ### "Connection refused" on port 9001
 pfc-server not running. User needs to start it in PFC GUI (Step 5).
@@ -155,20 +162,16 @@ User forgot `run_loop()`. The `start_server.py` script includes this, but if run
 ### "Address already in use"
 Another pfc-server instance is running. Close PFC and restart, or find and kill the process.
 
+### Automated install fails with permission error
+Use manual fallback in PFC GUI IPython console.
+
 ---
 
-## Quick Setup Commands
+## Quick Reference
 
-For experienced users (replace `{project_path}` with actual path):
-
-**In PFC GUI IPython**:
-```python
-# 1. Install websockets (first time only)
-import pip; pip.main(['install', '--user', 'websockets==9.1'])
-
-# 2. After PFC restart, start server
-exec(open(r'{project_path}/services/pfc-server/start_server.py', encoding='utf-8').read())
-
-# 3. Start event loop (REQUIRED)
-run_loop()
-```
+| Step | Executor | Command |
+|------|----------|---------|
+| Check websockets | Nagisa | `"{pfc_path}/.../python.exe" -c "import pip; pip.main(['show', 'websockets'])"` |
+| Install websockets | Nagisa | `"{pfc_path}/.../python.exe" -c "import pip; pip.main(['install', '--user', 'websockets==9.1'])"` |
+| Start server | User (PFC GUI) | `exec(open(r'{project_path}/services/pfc-server/start_server.py', encoding='utf-8').read())` |
+| Run event loop | User (PFC GUI) | `run_loop()` |
