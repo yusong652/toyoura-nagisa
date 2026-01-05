@@ -517,7 +517,8 @@ export const MainLayout: React.FC = () => {
 
     if (result) {
       // Add PFC result with distinct styling
-      // isError is determined by connection status (disconnected = error state)
+      // isError is true when disconnected OR when execution failed with error
+      const hasError = !result.connected || (result.error != null && result.error !== '');
       appActions.addHistoryItem({
         type: MessageType.PFC_CONSOLE_RESULT,
         taskId: result.task_id,
@@ -525,8 +526,8 @@ export const MainLayout: React.FC = () => {
         output: result.output,
         result: result.result,
         elapsedTime: result.elapsed_time,
-        isError: !result.connected,
-        error: null, // Error info is now in the output field
+        isError: hasError,
+        error: result.error,
         connected: result.connected,
       });
     } else {

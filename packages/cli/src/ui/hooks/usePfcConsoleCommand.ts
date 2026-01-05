@@ -22,6 +22,7 @@ export interface PfcConsoleExecuteData {
   script_path: string | null;
   code_preview: string | null;
   output: string | null;
+  error: string | null;
   result: unknown;
   elapsed_time: number | null;
   context: string;

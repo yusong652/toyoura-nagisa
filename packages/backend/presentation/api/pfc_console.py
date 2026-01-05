@@ -38,7 +38,8 @@ class ExecuteData(BaseModel):
     script_name: Optional[str] = Field(default=None, description="Script file name")
     script_path: Optional[str] = Field(default=None, description="Script file path")
     code_preview: Optional[str] = Field(default=None, description="Code preview")
-    output: Optional[str] = Field(default=None, description="Execution output")
+    output: Optional[str] = Field(default=None, description="Execution output (stdout)")
+    error: Optional[str] = Field(default=None, description="Error traceback if execution failed")
     result: Optional[Any] = Field(default=None, description="Script result")
     elapsed_time: Optional[float] = Field(default=None, description="Execution time")
     context: str = Field(default="", description="LLM context with caveat")
@@ -229,7 +230,7 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
         )
 
         # Execution completed (even if Python code raised an error).
-        # Error details are in output field for the CLI to display.
+        # Error details are in error field (traceback), output is stdout only.
         # Only infrastructure errors (connection, timeout) should set success=False.
         return ApiResponse(
             success=True,
@@ -240,6 +241,7 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
                 script_path=script_path,
                 code_preview=code_preview,
                 output=output,
+                error=error_msg,
                 result=script_result,
                 elapsed_time=elapsed_time,
                 context=context,

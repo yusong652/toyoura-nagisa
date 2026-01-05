@@ -367,11 +367,16 @@ class ScriptRunner:
             end_time = task.end_time if task else None
             elapsed_time = (end_time - start_time) if (start_time and end_time) else 0
 
+            # Extract error message if script execution failed
+            # (error info is in 'message' field when status is 'error')
+            error_msg = result_dict.get("message") if result_dict.get("status") == "error" else None
+
             data = (TaskDataBuilder(task_id, "script", source, script_name, script_path, description)
                 .with_git_commit(git_commit)
                 .with_timing(start_time, end_time, elapsed_time)
                 .with_output(full_output)
                 .with_result(result_dict.get("result"))
+                .with_error(error_msg)
                 .build())
             return build_response(
                 result_dict.get("status", "success"),
