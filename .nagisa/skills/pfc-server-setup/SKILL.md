@@ -119,41 +119,39 @@ print(f"start_server.py exists: {os.path.exists(start_script)}")
 
 ---
 
-## Step 5: Launch PFC GUI (Automated)
+## Step 5: Launch PFC with Auto-Start (Recommended)
 
-**Nagisa can launch PFC GUI directly** using PowerShell:
+**Nagisa can launch PFC with auto_start_server.dat** which opens the startup script:
+
+```bash
+powershell -Command "Start-Process '{pfc_path}/exe64/pfc3d700_gui.exe' -ArgumentList '{project_path}/services/pfc-server/auto_start_server.dat'"
+```
+
+After PFC loads:
+1. Script opens in Editor pane automatically
+2. User clicks **Execute** button
+3. Server starts and enters `run_loop()` automatically
+
+**Success indicator**: Console shows "PFC WebSocket Server started on port 9001".
+
+### Alternative: Manual Launch
+
+If auto-start doesn't work, use separate steps:
 
 ```bash
 powershell -Command "Start-Process '{pfc_path}/exe64/pfc3d700_gui.exe'"
 ```
 
-**Important**: Use `powershell Start-Process`, NOT `start ""` command.
-The `start` command blocks in git bash until GUI closes.
-
-**Wait for PFC to fully load** before proceeding to next step.
-
----
-
-## Step 6: Start pfc-server (User Action Required)
-
-Instruct user to run in **PFC GUI IPython console**:
-
+Then user runs in **PFC GUI IPython console**:
 ```python
 %run "{project_path}/services/pfc-server/start_server.py"
 ```
 
-**Critical**: After the script loads, user MUST call:
-```python
-run_loop()
-```
-
-This starts the WebSocket event loop and keeps the server running. Without `run_loop()`, the server won't accept connections.
-
-**Success indicator**: Console shows "PFC WebSocket Server started on port 9001".
+**Note**: `run_loop()` is called automatically (AUTO_START=True by default).
 
 ---
 
-## Step 7: Verify Connection
+## Step 6: Verify Connection
 
 After pfc-server starts, verify from Nagisa:
 
@@ -191,6 +189,5 @@ Use manual fallback in PFC GUI IPython console.
 |------|----------|---------|
 | Check websockets | Nagisa | `"{pfc_path}/.../python.exe" -c "import pip; pip.main(['show', 'websockets'])"` |
 | Install websockets | Nagisa | `"{pfc_path}/.../python.exe" -c "import pip; pip.main(['install', '--user', 'websockets==9.1'])"` |
-| Launch PFC GUI | Nagisa | `powershell -Command "Start-Process '{pfc_path}/exe64/pfc3d700_gui.exe'"` |
-| Start server | User (PFC GUI) | `%run "{project_path}/services/pfc-server/start_server.py"` |
-| Run event loop | User (PFC GUI) | `run_loop()` |
+| Launch + Auto-open | Nagisa | `powershell Start-Process '{pfc_path}/.../pfc3d700_gui.exe' -ArgumentList '{project_path}/.../auto_start_server.dat'` |
+| Execute script | User | Click **Execute** button in PFC Editor pane |

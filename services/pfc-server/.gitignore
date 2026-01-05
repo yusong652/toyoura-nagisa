@@ -12,6 +12,7 @@ test_*.py
 # PFC data files
 *.sav
 *.dat
+!auto_start_server.dat
 *.txt
 
 # Task persistence data (runtime)

@@ -1,0 +1,12 @@
+; PFC Auto-start Server Script
+; Usage: pfc3d700_gui.exe auto_start_server.dat
+;
+; This data file starts pfc-server automatically when PFC GUI launches.
+
+; Set path as FISH variable (Python can read via itasca.fish.get)
+fish define _set_server_path
+    global _pfc_server_path = 'C:/Dev/Han/toyoura-nagisa/services/pfc-server'
+end
+@_set_server_path
+
+program call "C:/Dev/Han/toyoura-nagisa/services/pfc-server/start_server.py"

@@ -36,21 +36,27 @@ import time
 # =============================================================================
 # Add script directory to sys.path for imports
 # =============================================================================
-# Usage: %run "C:/.../pfc-server/start_server.py"  (IPython magic, sets __file__)
+# Supports: %run, Editor Execute (with FISH variable), or dat file
 
 try:
     import server
 except ImportError:
-    # __file__ is set by IPython's %run magic
+    _script_dir = None
+
+    # Method 1: __file__ (set by %run)
     if '__file__' in dir():
         _script_dir = os.path.dirname(os.path.abspath(__file__))
-        if _script_dir not in sys.path:
-            sys.path.insert(0, _script_dir)
-    else:
-        raise ImportError(
-            "Cannot find 'server' module. Use IPython %run:\n"
-            "  %run \"C:/.../pfc-server/start_server.py\""
-        )
+
+    # Method 2: FISH variable (set by dat file)
+    if not _script_dir:
+        try:
+            import itasca as it
+            _script_dir = it.fish.get('_pfc_server_path')
+        except:
+            pass
+
+    if _script_dir and _script_dir not in sys.path:
+        sys.path.insert(0, _script_dir)
 
 # Configure logging - output to both console and file
 # Use os.getcwd() to store logs in PFC workspace (user's project directory)
@@ -99,7 +105,7 @@ except ImportError:
     PORT = 9001
     PING_INT = 120  # 2 minutes (long tasks friendly)
     PING_TO = 300   # 5 minutes (prevent disconnection)
-    AUTO_START = False
+    AUTO_START = True  # Auto-start run_loop() by default
     _config_loaded = False
 
 # Track initialization status for summary
@@ -162,6 +168,12 @@ def _setup_workspace_git():
     }
 
     cwd = os.getcwd()
+
+    # Skip if running from toyoura-nagisa development directory
+    # (has services/pfc-server subdirectory, indicating this is the dev project)
+    if os.path.exists(os.path.join(cwd, 'services', 'pfc-server', 'server')):
+        result["issue"] = "dev-project (skipped)"
+        return result
 
     # Windows: hide cmd window when running git commands
     # CREATE_NO_WINDOW = 0x08000000
