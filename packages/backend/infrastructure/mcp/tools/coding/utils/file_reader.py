@@ -144,7 +144,15 @@ class ProcessingResult:
 # -----------------------------------------------------------------------------
 
 def _detect_file_type(file_path: Path) -> FileType:
-    """Detect file type from extension and content."""
+    """Detect file type from extension and content.
+
+    Uses a two-phase approach:
+    1. Extension-based detection for known file types
+    2. Content-sniffing for unknown extensions (tries text decoding before binary)
+
+    This handles cases like .dat files that are actually text scripts but
+    would otherwise be classified as binary due to unknown extension.
+    """
     ext = file_path.suffix.lower()
 
     # Special handling for dotfiles (e.g., .gitignore, .env)
@@ -158,7 +166,10 @@ def _detect_file_type(file_path: Path) -> FileType:
     elif ext in IMAGE_EXTENSIONS:
         return FileType.IMAGE
     else:
-        # For all other files, treat as binary
+        # Content-sniffing: try to detect if file is text before defaulting to binary
+        # This handles cases like .dat files that are actually text scripts
+        if detect_encoding(file_path) is not None:
+            return FileType.TEXT
         return FileType.BINARY
 
 

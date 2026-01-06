@@ -57,6 +57,18 @@ def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> st
     # Get nagisa_path (toyoura-nagisa project root)
     nagisa_path = normalize_path_separators(str(PROJECT_ROOT), target_platform='linux')
 
+    # Get pfc_path from config (if available)
+    pfc_path_str = ""
+    try:
+        from backend.config.pfc import get_pfc_settings
+        pfc_settings = get_pfc_settings()
+        if pfc_settings.pfc_path:
+            pfc_path_str = normalize_path_separators(str(pfc_settings.pfc_path), target_platform='linux')
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.debug(f"Failed to get PFC path: {e}")
+
     # Check if directory is a git repository
     is_git_repo = (Path(working_dir) / ".git").exists()
 
@@ -70,16 +82,23 @@ def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> st
     # Truncate session_id to 8 characters for readability (consistent with task_id format)
     session_id_display = session_id[:8] if session_id else 'unknown'
 
+    # Build env lines
+    env_lines = [
+        f"Working directory: {working_dir}",
+        f"nagisa_path: {nagisa_path}",
+    ]
+    if pfc_path_str:
+        env_lines.append(f"pfc_path: {pfc_path_str}")
+    env_lines.extend([
+        f"Is directory a git repo: {'Yes' if is_git_repo else 'No'}",
+        f"Platform: {platform_name}",
+        f"OS Version: {os_version}",
+        f"Today's date: {current_date}",
+        f"session_id: {session_id_display}",
+    ])
+
     # Format environment information (Claude Code style)
-    env_info = f"""<env>
-Working directory: {working_dir}
-nagisa_path: {nagisa_path}
-Is directory a git repo: {'Yes' if is_git_repo else 'No'}
-Platform: {platform_name}
-OS Version: {os_version}
-Today's date: {current_date}
-session_id: {session_id_display}
-</env>"""
+    env_info = "<env>\n" + "\n".join(env_lines) + "\n</env>"
 
     return env_info
 
