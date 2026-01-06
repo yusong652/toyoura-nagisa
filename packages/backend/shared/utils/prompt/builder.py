@@ -49,8 +49,13 @@ def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> st
     Returns:
         Formatted environment information block
     """
+    from .config import PROJECT_ROOT
+
     # Use the provided workspace root (already normalized to forward slashes)
     working_dir = workspace_root
+
+    # Get nagisa_path (toyoura-nagisa project root)
+    nagisa_path = normalize_path_separators(str(PROJECT_ROOT), target_platform='linux')
 
     # Check if directory is a git repository
     is_git_repo = (Path(working_dir) / ".git").exists()
@@ -68,6 +73,7 @@ def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> st
     # Format environment information (Claude Code style)
     env_info = f"""<env>
 Working directory: {working_dir}
+nagisa_path: {nagisa_path}
 Is directory a git repo: {'Yes' if is_git_repo else 'No'}
 Platform: {platform_name}
 OS Version: {os_version}

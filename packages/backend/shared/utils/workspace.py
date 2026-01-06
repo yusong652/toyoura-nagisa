@@ -26,8 +26,9 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
     Workspace Strategy:
         - PFC profile with PFC server connected: PFC server's actual working directory
           → Ensures agent can access files saved by PFC (e.g., checkpoints, data)
-        - PFC profile without PFC server: Fallback to local pfc_workspace
-          → toyoura-nagisa/pfc_workspace (standalone mode)
+        - PFC profile without PFC server: Fallback priority:
+          1. Configured PFC workspace (PFC_WORKSPACE in config/pfc.py)
+          2. Local pfc_workspace (toyoura-nagisa/pfc_workspace)
         - Other profiles (coding, general, lifestyle, etc.): Unified workspace
           → toyoura-nagisa/workspace
 
@@ -65,9 +66,23 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
         except Exception as e:
             logger.warning(f"Failed to query PFC working directory: {e}")
 
-        # Fallback to local pfc_workspace
+        # Fallback 1: Use configured PFC workspace if available
+        try:
+            from backend.config.pfc import get_pfc_workspace
+
+            configured_workspace = get_pfc_workspace()
+            if configured_workspace:
+                logger.info(f"✓ Using configured PFC workspace: {configured_workspace}")
+                return configured_workspace
+        except ImportError:
+            logger.debug("PFC config not available, skipping configured workspace check")
+        except Exception as e:
+            logger.warning(f"Failed to get configured PFC workspace: {e}")
+
+        # Fallback 2: Local pfc_workspace (development/testing)
         try:
             from backend.shared.utils.prompt.config import BASE_DIR
+
             pfc_workspace = BASE_DIR / "pfc_workspace"
             pfc_workspace.mkdir(parents=True, exist_ok=True)
             logger.info(f"✓ Using fallback PFC workspace: {pfc_workspace}")
