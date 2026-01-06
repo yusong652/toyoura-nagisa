@@ -52,7 +52,7 @@ def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> st
     from .config import PROJECT_ROOT
 
     # Use the provided workspace root (already normalized to forward slashes)
-    working_dir = workspace_root
+    workspace = workspace_root
 
     # Get nagisa_path (toyoura-nagisa project root)
     nagisa_path = normalize_path_separators(str(PROJECT_ROOT), target_platform='linux')
@@ -70,7 +70,7 @@ def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> st
         logger.debug(f"Failed to get PFC path: {e}")
 
     # Check if directory is a git repository
-    is_git_repo = (Path(working_dir) / ".git").exists()
+    is_git_repo = (Path(workspace) / ".git").exists()
 
     # Get platform and OS version
     platform_name = sys.platform  # 'win32', 'linux', 'darwin', etc.
@@ -84,7 +84,7 @@ def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> st
 
     # Build env lines
     env_lines = [
-        f"Working directory: {working_dir}",
+        f"workspace: {workspace}",
         f"nagisa_path: {nagisa_path}",
     ]
     if pfc_path_str:

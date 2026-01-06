@@ -26,84 +26,62 @@ Complete guide for PFC integration: environment setup, GUI launch, and pfc-serve
 
 **Key point**: pfc-server runs INSIDE PFC GUI process, bridging Nagisa commands to itasca SDK.
 
+**Key Variables** (from `<env>`):
+- `{workspace}` - working directory
+- `{nagisa_path}` - toyoura-nagisa root
+- `{pfc_path}` - PFC installation directory
+- `{project_name}` - .prj filename (from Step 3)
+
 ---
 
 ## Step 1: Verify PFC Installation
 
-**Verify GUI exists**:
 ```bash
 powershell -Command "Test-Path '{pfc_path}/exe64/pfc3d700_gui.exe'"
 ```
 
-If exists, proceed to Step 2. If `pfc_path` unavailable, ask user for PFC installation path.
+**Success**: `True` → **Continue to Step 2**
 
-### Fallback: Search (only if config invalid)
-
-**Windows - search drives**:
+**Failure**: `False` or `pfc_path` unavailable → Search drives:
 ```bash
 powershell -Command "Get-ChildItem -Path 'C:\','D:\' -Filter 'pfc*_gui.exe' -Recurse -Depth 4 -ErrorAction SilentlyContinue | Select-Object -First 3 DirectoryName"
 ```
-
-**Common PFC paths**:
-- `C:\Program Files\Itasca\PFC700\` (PFC 7.0)
-- `C:\Program Files\Itasca\PFC600\` (PFC 6.0)
-
-**If not found**: Ask user for PFC installation path, then update config.
+If still not found, ask user for PFC installation path.
 
 ---
 
-## Step 2: Check websockets Installation
+## Step 2: Ensure websockets Installed
 
-Use `{pfc_path}` from Step 1.
-
-**Check via PFC Python** (recommended):
+**Check**:
 ```bash
 "{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['show', 'websockets'])"
 ```
 
-If output shows `Name: websockets` and `Version: 9.1`, websockets is installed.
+- `Version: 9.1` → **Continue to Step 3**
+- `Package(s) not found` → Install (see below)
+- Other version → Reinstall with `pip.main(['install', '--user', 'websockets==9.1', '--force-reinstall'])`
 
-**Alternative - check user site-packages**:
-```bash
-powershell -Command "Test-Path \"$env:APPDATA\Python\Python36\site-packages\websockets\""
-```
-
----
-
-## Step 3: Install websockets (Automated)
-
-If websockets not found, **Nagisa can install it directly** using PFC's Python:
-
+**Install**:
 ```bash
 "{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['install', '--user', 'websockets==9.1'])"
 ```
 
-**Why websockets==9.1?**
-- PFC uses Python 3.6.1
-- websockets 9.1 is the last version supporting Python 3.6
-- Newer versions require Python 3.7+
-
-### Fallback: Manual Installation
-
-If automated install fails (permission issues, environment problems), instruct user to run in **PFC GUI IPython console**:
-
+**Failure**: Permission error → Instruct user to run in PFC GUI IPython console:
 ```python
 import pip
 pip.main(['install', '--user', 'websockets==9.1'])
 ```
 
-**After install**: User should restart PFC GUI to ensure the module is loaded.
-
 ---
 
-## Step 4: Prepare Startup Script
+## Step 3: Prepare Startup Script
 
 **First, check if startup.dat already exists**:
 ```bash
 powershell -Command "Test-Path '{workspace}/.nagisa/startup.dat'"
 ```
 
-**If `True`**: Go directly to Step 5.
+**If `True`**: Go directly to Step 4.
 
 **If `False`**: Create startup.dat using Write tool:
 
@@ -133,30 +111,26 @@ end
 program call "{nagisa_path}/services/pfc-server/start_server.py"
 ```
 
+**Verify**: `powershell -Command "Test-Path '{workspace}/.nagisa/startup.dat'"` returns `True`
+
 ---
 
-## Step 5: Launch PFC
+## Step 4: Launch PFC
 
 ```bash
 powershell -Command "Start-Process '{pfc_path}/exe64/pfc3d700_gui.exe' -ArgumentList '{workspace}/.nagisa/startup.dat' -WorkingDirectory '{workspace}'"
 ```
 
-After PFC loads:
-1. Script opens in Editor pane automatically
-2. User clicks **Execute** button
-3. Server starts with `os.getcwd()` = workspace directory
-4. Git repository auto-initialized in workspace (if not exists)
+`[USER_ACTION_REQUIRED]` Inform user: "Please click **Execute** button in PFC Editor pane, then confirm when you see 'PFC WebSocket Server started on port 9001' in the console"
 
-**Success indicator**: Console shows "PFC WebSocket Server started on port 9001".
+**Success**: User confirms server started → **Continue to Step 5**
 
 ---
 
-## Step 6: Verify Connection
+## Step 5: Verify Connection
 
-After pfc-server starts, verify from Nagisa:
-
-```python
-# Use any PFC tool to test connection
+Use MCP tool to test connection:
+```
 pfc_list_tasks()
 ```
 
@@ -167,10 +141,10 @@ If successful, PFC integration is ready.
 ## Troubleshooting
 
 ### "No module named websockets"
-Try automated install (Step 3). If permission error, use manual install in PFC GUI IPython console.
+Try automated install (Step 2). If permission error, use manual install in PFC GUI IPython console.
 
 ### "Connection refused" on port 9001
-pfc-server not running. Execute startup script in PFC GUI (Step 5).
+pfc-server not running. Execute startup script in PFC GUI (Step 4).
 
 ### "Address already in use"
 Another pfc-server running. Close PFC and restart.
@@ -185,11 +159,9 @@ If auto-start fails, run in PFC GUI IPython console:
 
 ## Quick Reference
 
-| Step | Command |
-|------|---------|
-| Check websockets | `"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['show', 'websockets'])"` |
-| Install websockets | `"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['install', '--user', 'websockets==9.1'])"` |
-| Generate startup.dat | Use **Write tool** to create `{workspace}/.nagisa/startup.dat` |
-| Launch PFC | `powershell Start-Process '{pfc_path}/exe64/pfc3d700_gui.exe' -ArgumentList '{workspace}/.nagisa/startup.dat' -WorkingDirectory '{workspace}'` |
-
-**Key Variables**: `{pfc_path}` (PFC installation), `{nagisa_path}` (toyoura-nagisa root), `{workspace}` (Working directory)
+| Step | Command | Expected Output |
+|------|---------|-----------------|
+| Check websockets | `"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['show', 'websockets'])"` | `Version: 9.1` |
+| Install websockets | `"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['install', '--user', 'websockets==9.1'])"` | `Successfully installed` |
+| Launch PFC | `powershell Start-Process '{pfc_path}/exe64/pfc3d700_gui.exe' -ArgumentList '{workspace}/.nagisa/startup.dat' -WorkingDirectory '{workspace}'` | PFC GUI opens |
+| Verify connection | `pfc_list_tasks()` | `tasks: [...]` |
