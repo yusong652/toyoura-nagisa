@@ -72,6 +72,7 @@ PFC_TOOLS: List[str] = [
     "grep",
     # Search and planning
     "web_search",
+    "web_fetch",
     "todo_write",
     # PFC documentation - Browse (directory listing)
     "pfc_browse_commands",
