@@ -86,7 +86,27 @@ New (query first):     contact cmat → pfc_browse_commands
                        ball.vel()  → pfc_browse_python_api
 ```
 
-**Rule**: Unfamiliar syntax = query documentation first. Never guess PFC commands.
+**Rule**: Unfamiliar syntax = query documentation first. Never guess PFC commands or Python API.
+
+---
+
+## Error Resolution
+
+**By error type:**
+
+| Error Type | Diagnosis | Resolution |
+|------------|-----------|------------|
+| Python syntax/runtime | Stack trace with line number | Fix Python code directly |
+| PFC command syntax | Error message shows command | `pfc_browse_commands` for correct syntax |
+| PFC Python API | AttributeError or TypeError | `pfc_browse_python_api` for correct method |
+| Unexpected behavior | No error, wrong results | `pfc_capture_plot` or `invoke_agent(pfc_diagnostic)` |
+
+**Escalation order:**
+1. Read task output (stack trace, PFC error message)
+2. Browse PFC documentation for correct syntax
+3. Use diagnostic tools for visual/state issues
+4. Web search if documentation insufficient
+5. Ask user
 
 ---
 
