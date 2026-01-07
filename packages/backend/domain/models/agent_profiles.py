@@ -165,14 +165,12 @@ GENERAL_TOOLS: List[str] = [
 # =============================================================================
 
 # PFC-specific skills for simulation workflows
+# Note: Basic capabilities (error resolution, script creation, doc navigation,
+# subagent delegation, task execution) are now in system prompt.
+# Skills are reserved for special workflows that need on-demand detailed guidance.
 PFC_SKILLS: List[str] = [
-    "pfc-script-creation",     # Script creation patterns and diff analysis
-    "pfc-error-resolution",    # Error diagnosis with task history tracing
-    "pfc-production-scale",    # Scaling test to production with data flow
     "pfc-package-management",  # PFC Python package install/uninstall
     "pfc-server-setup",        # pfc-server setup and connection guide
-    "pfc-doc-navigation",      # Documentation search strategies
-    "pfc-subagent-guide",      # SubAgent delegation guide
 ]
 
 
