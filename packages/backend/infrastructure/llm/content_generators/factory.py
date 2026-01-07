@@ -157,16 +157,18 @@ class ContentGeneratorFactory:
             # Auto-detect LLM type
             llm_type = ContentGeneratorFactory.detect_llm_type(llm_client)
 
-            # Get the appropriate title generator
-            TitleGenerator = ContentGeneratorFactory.get_title_generator(llm_type)
+            # Get the appropriate title generator class
+            TitleGeneratorClass = ContentGeneratorFactory.get_title_generator(llm_type)
 
             # Extract the async client for generator (use async_client for OpenAI-compatible APIs)
             # Fallback to 'client' for providers that don't have separate async/sync clients
             client = getattr(llm_client, 'async_client', None) or getattr(llm_client, 'client', llm_client)
 
-            # Call provider-specific generator
-            title = await TitleGenerator.generate_title_from_messages(
-                client=client,
+            # Instantiate the generator with the client
+            generator = TitleGeneratorClass(client=client)
+
+            # Call provider-specific generator (now an instance method)
+            title = await generator.generate_title_from_messages(
                 latest_messages=latest_messages
             )
 
@@ -201,16 +203,18 @@ class ContentGeneratorFactory:
             # Auto-detect LLM type
             llm_type = ContentGeneratorFactory.detect_llm_type(llm_client)
 
-            # Get the appropriate image prompt generator
-            ImagePromptGenerator = ContentGeneratorFactory.get_image_prompt_generator(llm_type)
+            # Get the appropriate image prompt generator class
+            ImagePromptGeneratorClass = ContentGeneratorFactory.get_image_prompt_generator(llm_type)
 
             # Extract the async client for generator (use async_client for OpenAI-compatible APIs)
             # Fallback to 'client' for providers that don't have separate async/sync clients
             client = getattr(llm_client, 'async_client', None) or getattr(llm_client, 'client', llm_client)
 
-            # Call provider-specific generator
-            prompt_result = await ImagePromptGenerator.generate_text_to_image_prompt(
-                client=client,
+            # Instantiate the generator with the client
+            generator = ImagePromptGeneratorClass(client=client)
+
+            # Call provider-specific generator (now an instance method)
+            prompt_result = await generator.generate_text_to_image_prompt(
                 session_id=session_id
             )
 

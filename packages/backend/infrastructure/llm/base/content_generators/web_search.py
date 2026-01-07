@@ -5,7 +5,7 @@ Handles web search with proper error handling and debugging support.
 """
 
 from abc import abstractmethod
-from typing import Optional, Dict, Any, List, Awaitable
+from typing import Optional, Dict, Any, List
 from backend.domain.models.messages import UserMessage
 from .base import BaseContentGenerator
 
@@ -19,10 +19,9 @@ class BaseWebSearchGenerator(BaseContentGenerator):
     handling and debugging support.
     """
 
-    @staticmethod
     @abstractmethod
     async def perform_web_search(
-        client,  # LLM client instance
+        self,
         query: str,
         debug: bool = False,
         **kwargs
@@ -31,13 +30,15 @@ class BaseWebSearchGenerator(BaseContentGenerator):
         Perform a web search using the LLM's web search capabilities.
 
         Args:
-            client: LLM client instance for API calls
             query: The search query to find information on the web
             debug: Enable debug output
             **kwargs: Additional search parameters (max_uses, etc.)
 
         Returns:
             Dictionary containing search results or error information
+
+        Note:
+            Uses self.client for API calls (inherited from BaseContentGenerator).
         """
         pass
     

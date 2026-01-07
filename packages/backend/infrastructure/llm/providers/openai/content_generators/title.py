@@ -26,16 +26,14 @@ class OpenAITitleGenerator(BaseTitleGenerator):
     OpenAI-specific title generation using shared logic where possible.
     """
 
-    @staticmethod
     async def generate_title_from_messages(
-        client,  # OpenAI client instance
+        self,
         latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
 
         Args:
-            client: OpenAI client instance for API calls
             latest_messages: Recent conversation messages to generate title from
 
         Returns:
@@ -93,7 +91,7 @@ class OpenAITitleGenerator(BaseTitleGenerator):
                 "max_output_tokens": 100
             }
 
-            response: Response = await client.responses.create(**api_kwargs)
+            response: Response = await self.client.responses.create(**api_kwargs)
 
             if not response.output:
                 return None

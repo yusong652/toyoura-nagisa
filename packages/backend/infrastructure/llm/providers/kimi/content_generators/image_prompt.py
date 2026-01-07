@@ -6,7 +6,6 @@ Generates high-quality text-to-image prompts using the Kimi (Moonshot) API.
 
 from typing import Optional, Dict, Any, cast
 
-from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
 from backend.config import get_llm_settings
@@ -18,9 +17,8 @@ class KimiImagePromptGenerator(BaseImagePromptGenerator):
     Kimi-specific image prompt generation using Chat Completions API.
     """
 
-    @staticmethod
     async def generate_text_to_image_prompt(
-        client: AsyncOpenAI,
+        self,
         session_id: Optional[str] = None,
         debug: bool = False
     ) -> Optional[Dict[str, str]]:
@@ -28,7 +26,6 @@ class KimiImagePromptGenerator(BaseImagePromptGenerator):
         Generate high-quality text-to-image prompts using recent conversation context.
 
         Args:
-            client: Kimi AsyncOpenAI client instance
             session_id: Optional session ID for conversation context
             debug: Enable debug output
 
@@ -83,7 +80,7 @@ class KimiImagePromptGenerator(BaseImagePromptGenerator):
                 print(f"[Kimi ImagePrompt] Calling API with {len(chat_messages)} messages")
 
             # Call Kimi API (direct async call)
-            response: ChatCompletion = await client.chat.completions.create(
+            response: ChatCompletion = await self.client.chat.completions.create(
                 model=kimi_config.model,
                 messages=cast(Any, chat_messages),
                 temperature=context.get('temperature', 1.0),

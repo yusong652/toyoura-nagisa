@@ -7,7 +7,6 @@ Performs web searches using Kimi's built-in $web_search tool.
 from typing import Dict, Any, List, cast
 import json
 
-from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
 from backend.config import get_llm_settings
@@ -23,9 +22,8 @@ class KimiWebSearchGenerator(BaseWebSearchGenerator):
     builtin_function tool, which is called via the Chat Completions API.
     """
 
-    @staticmethod
     async def perform_web_search(
-        client: AsyncOpenAI,  # Kimi uses async OpenAI client (via OpenRouter or direct)
+        self,
         query: str,
         debug: bool = False,
         **kwargs  # Accept additional parameters for compatibility (e.g., max_uses)
@@ -34,7 +32,6 @@ class KimiWebSearchGenerator(BaseWebSearchGenerator):
         Perform a web search using Kimi's built-in $web_search tool.
 
         Args:
-            client: OpenAI client instance (Kimi client, sync)
             query: The search query to find information on the web
             debug: Enable debug output
             **kwargs: Additional search parameters (accepted for compatibility)
@@ -100,7 +97,7 @@ class KimiWebSearchGenerator(BaseWebSearchGenerator):
                 if debug:
                     print(f"[KimiWebSearch] API call iteration {iteration}")
                 # Direct async API call (no thread wrapper needed)
-                response: ChatCompletion = await client.chat.completions.create(
+                response: ChatCompletion = await self.client.chat.completions.create(
                     model=model,
                     messages=cast(Any, messages),
                     tools=cast(Any, tools),

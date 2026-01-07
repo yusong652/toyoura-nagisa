@@ -27,19 +27,15 @@ class GeminiTitleGenerator(BaseTitleGenerator):
     Gemini-specific title generation using shared logic where possible.
     """
 
-    @staticmethod
     async def generate_title_from_messages(
-        client,  # Gemini client instance
+        self,
         latest_messages: List[BaseMessage],
-        debug: bool = False
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
 
         Args:
-            client: Gemini client instance for API calls
             latest_messages: Recent conversation messages to generate title from
-            debug: Enable debug output for troubleshooting (unused, kept for interface consistency)
 
         Returns:
             Generated title string, or None if generation fails
@@ -119,7 +115,7 @@ class GeminiTitleGenerator(BaseTitleGenerator):
             title_generation_model = "gemini-2.0-flash"
 
             # Use async non-streaming for better performance
-            response = await client.aio.models.generate_content(
+            response = await self.client.aio.models.generate_content(
                 model=title_generation_model,
                 contents=contents,
                 config=title_config

@@ -25,10 +25,9 @@ class BaseImagePromptGenerator(BaseContentGenerator):
     recent conversation context, with support for positive and negative prompts.
     """
 
-    @staticmethod
     @abstractmethod
     async def generate_text_to_image_prompt(
-        client: Any,
+        self,
         session_id: Optional[str] = None
     ) -> Optional[Dict[str, str]]:
         """
@@ -38,12 +37,13 @@ class BaseImagePromptGenerator(BaseContentGenerator):
         for consistency across the codebase.
 
         Args:
-            client: Provider-specific LLM client instance for API calls
             session_id: Optional session ID for conversation context
-            debug: Enable debug output for troubleshooting
 
         Returns:
             Dictionary with 'text_prompt' and 'negative_prompt' keys, or None if failed
+
+        Note:
+            Uses self.client for API calls (inherited from BaseContentGenerator).
         """
         pass
     

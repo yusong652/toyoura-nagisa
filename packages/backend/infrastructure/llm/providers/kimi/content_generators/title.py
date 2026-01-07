@@ -6,7 +6,6 @@ Generates concise conversation titles using the Kimi (Moonshot) API.
 
 from typing import Optional, List, Any, cast
 
-from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
 from backend.domain.models.messages import BaseMessage
@@ -25,16 +24,14 @@ class KimiTitleGenerator(BaseTitleGenerator):
     Kimi-specific title generation using Chat Completions API.
     """
 
-    @staticmethod
     async def generate_title_from_messages(
-        client: AsyncOpenAI,
+        self,
         latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
 
         Args:
-            client: Kimi AsyncOpenAI client instance
             latest_messages: Recent conversation messages to generate title from
 
         Returns:
@@ -85,7 +82,7 @@ class KimiTitleGenerator(BaseTitleGenerator):
             ]
 
             # Call Kimi API using Chat Completions format (direct async call)
-            response: ChatCompletion = await client.chat.completions.create(
+            response: ChatCompletion = await self.client.chat.completions.create(
                 model=title_model,  # Use non-thinking model for fast title generation
                 messages=cast(Any, chat_messages),
                 temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,

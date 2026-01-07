@@ -18,28 +18,29 @@ from .base import BaseContentGenerator
 class BaseVideoPromptGenerator(BaseContentGenerator):
     """
     Abstract base class for video prompt generation from static image prompts.
-    
+
     Transforms static image descriptions into dynamic video prompts with motion,
     camera movements, and temporal changes for AI video generation models.
     """
-    
-    @staticmethod
+
     @abstractmethod
     async def generate_video_prompt(
-        client,  # LLM client instance (provider-specific)
+        self,
         original_prompt: str,
         image_base64: Optional[str] = None
     ) -> Optional[Dict[str, str]]:
         """
         Generate optimized video prompt from static image prompt.
-        
+
         Args:
-            client: Provider-specific LLM client instance
             original_prompt: Original static image generation prompt
             image_base64: Optional base64 encoded image for visual context
-            
+
         Returns:
             Dict with 'video_prompt' and 'negative_prompt' keys, or None if failed
+
+        Note:
+            Uses self.client for API calls (inherited from BaseContentGenerator).
         """
         pass
     

@@ -7,7 +7,6 @@ Generates concise conversation titles using the Zhipu (智谱) API.
 from typing import Optional, List, cast
 import asyncio
 
-from zai import ZhipuAiClient
 from zai.types.chat import Completion
 
 from backend.domain.models.messages import BaseMessage
@@ -26,16 +25,14 @@ class ZhipuTitleGenerator(BaseTitleGenerator):
     Zhipu-specific title generation using Chat Completions API.
     """
 
-    @staticmethod
     async def generate_title_from_messages(
-        client: ZhipuAiClient,  # Zhipu uses synchronous client
+        self,
         latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
 
         Args:
-            client: Zhipu ZhipuAiClient instance (synchronous)
             latest_messages: Recent conversation messages to generate title from
 
         Returns:
@@ -92,7 +89,7 @@ class ZhipuTitleGenerator(BaseTitleGenerator):
             response: Completion = cast(
                 Completion,
                 await asyncio.to_thread(
-                    client.chat.completions.create,
+                    self.client.chat.completions.create,
                     model=title_model,
                     messages=chat_messages,
                     temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,

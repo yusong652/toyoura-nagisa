@@ -21,9 +21,8 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
     Gemini-specific web search using shared logic and Gemini's google_search tool.
     """
 
-    @staticmethod
     async def perform_web_search(
-        client,  # Gemini client instance
+        self,
         query: str,
         debug: bool = False,
         **kwargs
@@ -67,7 +66,7 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
                 print(f"[WebSearch] Note: max_uses={max_uses} parameter ignored for Gemini (API limitation)")
 
             # Call the model with the query (async version)
-            response = await client.aio.models.generate_content(
+            response = await self.client.aio.models.generate_content(
                 model=model,
                 contents=contents,
                 config=search_config

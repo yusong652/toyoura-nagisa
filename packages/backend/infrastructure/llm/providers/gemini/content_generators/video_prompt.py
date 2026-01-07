@@ -19,9 +19,8 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
     Gemini-specific video prompt generation using direct implementation.
     """
 
-    @staticmethod
     async def generate_video_prompt(
-        client,  # Gemini client instance
+        self,
         original_prompt: str,
         image_base64: Optional[str] = None,
         motion_type: str = "cinematic",
@@ -32,7 +31,6 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
         Generate optimized video prompt using Gemini API.
 
         Args:
-            client: Gemini client instance
             original_prompt: Original static image generation prompt (not used directly)
             image_base64: Optional base64 encoded image (not sent to LLM)
             motion_type: Type of motion for the video
@@ -105,7 +103,7 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
                 GeminiDebugger.print_request(contents, prompt_config, model)
 
             # Use async non-streaming for better performance
-            response = await client.aio.models.generate_content(
+            response = await self.client.aio.models.generate_content(
                 model=model,
                 contents=contents,
                 config=prompt_config

@@ -19,9 +19,8 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
     Gemini-specific image prompt generation using direct implementation.
     """
 
-    @staticmethod
     async def generate_text_to_image_prompt(
-        client,  # Gemini client instance
+        self,
         session_id: Optional[str] = None,
         debug: bool = False
     ) -> Optional[Dict[str, str]]:
@@ -29,7 +28,6 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
         Generate high-quality text-to-image prompts using Gemini API.
 
         Args:
-            client: Gemini client instance
             session_id: Optional session ID for conversation context
             debug: Enable debug output
 
@@ -88,7 +86,7 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
                 GeminiDebugger.print_request(contents, prompt_config, model)
 
             # Use async non-streaming for better performance
-            response = await client.aio.models.generate_content(
+            response = await self.client.aio.models.generate_content(
                 model=model,
                 contents=contents,
                 config=prompt_config

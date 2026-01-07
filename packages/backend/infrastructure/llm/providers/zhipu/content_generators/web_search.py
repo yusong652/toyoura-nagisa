@@ -7,7 +7,6 @@ Performs web searches using Zhipu's built-in web_search tool.
 from typing import Dict, Any, List, cast
 import asyncio
 
-from zai import ZhipuAiClient
 from zai.types.chat import Completion
 
 from backend.config import get_llm_settings
@@ -24,9 +23,8 @@ class ZhipuWebSearchGenerator(BaseWebSearchGenerator):
     specified directly in the tools configuration.
     """
 
-    @staticmethod
     async def perform_web_search(
-        client: ZhipuAiClient,  # Zhipu uses synchronous client
+        self,
         query: str,
         debug: bool = False,
         **kwargs  # Accept additional parameters for compatibility (e.g., max_uses)
@@ -35,7 +33,6 @@ class ZhipuWebSearchGenerator(BaseWebSearchGenerator):
         Perform a web search using Zhipu's built-in web_search tool.
 
         Args:
-            client: Zhipu ZhipuAiClient instance (synchronous)
             query: The search query to find information on the web
             debug: Enable debug output
             **kwargs: Additional search parameters (accepted for compatibility)
@@ -82,7 +79,7 @@ class ZhipuWebSearchGenerator(BaseWebSearchGenerator):
             response: Completion = cast(
                 Completion,
                 await asyncio.to_thread(
-                    client.chat.completions.create,
+                    self.client.chat.completions.create,
                     model=model,
                     messages=messages,
                     tools=tools,

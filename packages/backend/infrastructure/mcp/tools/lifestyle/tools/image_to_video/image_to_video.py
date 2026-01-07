@@ -166,14 +166,30 @@ async def optimize_prompt_for_video(
             print(f"[DEBUG] Using Gemini video prompt generator")
             from backend.infrastructure.llm.providers.gemini.content_generators import GeminiVideoPromptGenerator
 
-            # Use video prompt generator
-            result = await GeminiVideoPromptGenerator.generate_video_prompt(
-                client=llm_client.client,  # Use the native Gemini client
+            # Instantiate generator with client
+            generator = GeminiVideoPromptGenerator(client=llm_client.client)
+
+            # Use video prompt generator (instance method)
+            result = await generator.generate_video_prompt(
                 original_prompt="",  # Not used in current implementation
                 session_id=session_id,  # Session provides conversation context and few-shot history
             )
             print(f"[DEBUG] Video prompt generator returned: {result}")
             
+        elif "OpenRouter" in client_class_name:
+            print(f"[DEBUG] Using OpenRouter video prompt generator")
+            from backend.infrastructure.llm.providers.openrouter.content_generators import OpenRouterVideoPromptGenerator
+
+            # Instantiate generator with client
+            generator = OpenRouterVideoPromptGenerator(client=llm_client.async_client)
+
+            # Use video prompt generator (instance method)
+            result = await generator.generate_video_prompt(
+                original_prompt="",
+                session_id=session_id,
+            )
+            print(f"[DEBUG] Video prompt generator returned: {result}")
+
         elif "OpenAI" in client_class_name:
             # TODO: Implement OpenAIVideoPromptGenerator when needed
             logger.warning("OpenAI video prompt generator not yet implemented, using fallback")
@@ -183,7 +199,7 @@ async def optimize_prompt_for_video(
             # TODO: Implement AnthropicVideoPromptGenerator when needed
             logger.warning("Anthropic video prompt generator not yet implemented, using fallback")
             result = None
-            
+
         else:
             logger.warning(f"Unknown LLM client type: {client_class_name}, using fallback")
             result = None

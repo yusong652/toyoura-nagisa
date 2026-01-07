@@ -5,7 +5,6 @@ Generates concise conversation titles using the Anthropic Claude API.
 """
 
 from typing import Optional, List
-import anthropic
 
 from backend.domain.models.messages import BaseMessage
 from backend.config import get_llm_settings
@@ -21,16 +20,14 @@ class AnthropicTitleGenerator(BaseTitleGenerator):
     Anthropic-specific title generation using shared logic where possible.
     """
 
-    @staticmethod
     async def generate_title_from_messages(
-        client: anthropic.AsyncAnthropic,
+        self,
         latest_messages: List[BaseMessage],
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
 
         Args:
-            client: Anthropic client instance for API calls
             latest_messages: Recent conversation messages to generate title from
 
         Returns:
@@ -106,7 +103,7 @@ class AnthropicTitleGenerator(BaseTitleGenerator):
                 import pprint
                 pprint.pprint(api_kwargs)
 
-            response = await client.messages.create(**api_kwargs)
+            response = await self.client.messages.create(**api_kwargs)
 
             # Extract text content using ResponseProcessor (skips thinking blocks)
             title_response_text = AnthropicResponseProcessor.extract_text_content(response)

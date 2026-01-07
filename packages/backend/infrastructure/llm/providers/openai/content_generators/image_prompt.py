@@ -20,9 +20,8 @@ class OpenAIImagePromptGenerator(BaseImagePromptGenerator):
     OpenAI-specific image prompt generation using direct implementation.
     """
 
-    @staticmethod
     async def generate_text_to_image_prompt(
-        client,  # OpenAI client instance
+        self,
         session_id: Optional[str] = None,
         debug: bool = False
     ) -> Optional[Dict[str, str]]:
@@ -30,7 +29,6 @@ class OpenAIImagePromptGenerator(BaseImagePromptGenerator):
         Generate high-quality text-to-image prompts using recent conversation context.
 
         Args:
-            client: OpenAI client instance for API calls
             session_id: Optional session ID for conversation context
             debug: Enable debug output
 
@@ -68,7 +66,7 @@ class OpenAIImagePromptGenerator(BaseImagePromptGenerator):
             if debug:
                 OpenAIDebugger.print_debug_request_payload(api_kwargs)
 
-            response: Response = await client.responses.create(**api_kwargs)
+            response: Response = await self.client.responses.create(**api_kwargs)
 
             if debug:
                 OpenAIDebugger.log_raw_response(response)

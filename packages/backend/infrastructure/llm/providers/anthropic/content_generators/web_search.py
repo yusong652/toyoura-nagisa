@@ -6,8 +6,6 @@ Performs web searches using the Anthropic Claude API with web_search_20250305 to
 
 from typing import Dict, Any
 
-import anthropic
-
 from backend.domain.models.messages import UserMessage
 from backend.infrastructure.llm.base.content_generators.web_search import BaseWebSearchGenerator
 from backend.infrastructure.llm.shared.constants import DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
@@ -23,9 +21,8 @@ class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
     Returns structured results with proper error handling and debugging support.
     """
 
-    @staticmethod
     async def perform_web_search(
-        client: anthropic.AsyncAnthropic,
+        self,
         query: str,
         debug: bool = False,
         **kwargs
@@ -37,7 +34,6 @@ class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
         decide whether to perform a search based on the query requirements.
 
         Args:
-            client: Anthropic Claude client instance
             query: The search query to find information on the web
             debug: Enable debug output
             **kwargs: Additional search parameters:
@@ -81,7 +77,7 @@ class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
                 api_kwargs["thinking"]["budget_tokens"] = 2048
 
             # Call the API with web search tool (async version)
-            response = await client.messages.create(**api_kwargs)
+            response = await self.client.messages.create(**api_kwargs)
 
             # Extract response text and tool usage information
             response_text = ""

@@ -6,8 +6,6 @@ Generates high-quality text-to-image prompts using the Anthropic Claude API.
 
 from typing import Optional, Dict, Any, cast
 
-import anthropic
-
 from backend.config import get_llm_settings
 from backend.infrastructure.llm.base.content_generators.image_prompt import BaseImagePromptGenerator
 from backend.infrastructure.llm.providers.anthropic.message_formatter import MessageFormatter
@@ -18,9 +16,8 @@ class AnthropicImagePromptGenerator(BaseImagePromptGenerator):
     Anthropic-specific image prompt generation using direct implementation.
     """
 
-    @staticmethod
     async def generate_text_to_image_prompt(
-        client: anthropic.AsyncAnthropic,
+        self,
         session_id: Optional[str] = None,
         debug: bool = False
     ) -> Optional[Dict[str, str]]:
@@ -28,7 +25,6 @@ class AnthropicImagePromptGenerator(BaseImagePromptGenerator):
         Generate high-quality text-to-image prompts using recent conversation context.
 
         Args:
-            client: Anthropic Claude client instance for API calls
             session_id: Optional session ID for conversation context
             debug: Enable debug output
 
@@ -56,7 +52,7 @@ class AnthropicImagePromptGenerator(BaseImagePromptGenerator):
             # Use the model from context (which now correctly uses Anthropic's model)
             model_for_text_to_image = context.get('model', llm_anthropic_config.model)
 
-            response = await client.messages.create(
+            response = await self.client.messages.create(
                 model=model_for_text_to_image,
                 max_tokens=4096,
                 temperature=context.get('temperature', 1.0),

@@ -23,9 +23,8 @@ class OpenAIWebSearchGenerator(BaseWebSearchGenerator):
     and return structured results with sources.
     """
 
-    @staticmethod
     async def perform_web_search(
-        client,  # OpenAI client instance
+        self,
         query: str,
         debug: bool = False,
         **kwargs  # Accept additional parameters for compatibility (e.g., max_uses)
@@ -34,7 +33,6 @@ class OpenAIWebSearchGenerator(BaseWebSearchGenerator):
         Perform a web search using OpenAI's native web search API.
 
         Args:
-            client: OpenAI client instance for API calls
             query: The search query to find information on the web
             debug: Enable debug output
             **kwargs: Additional search parameters (accepted for compatibility but not used)
@@ -69,7 +67,7 @@ class OpenAIWebSearchGenerator(BaseWebSearchGenerator):
                 OpenAIDebugger.print_debug_request_payload(api_kwargs)
 
             # Perform the web search using async API
-            response: Response = await client.responses.create(**api_kwargs)
+            response: Response = await self.client.responses.create(**api_kwargs)
 
             if debug:
                 OpenAIDebugger.log_raw_response(response)

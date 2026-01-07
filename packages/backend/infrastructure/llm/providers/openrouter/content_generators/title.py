@@ -6,7 +6,6 @@ Generates concise conversation titles using the OpenRouter API.
 
 from typing import Optional, List, Any, cast
 
-from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
 from backend.domain.models.messages import BaseMessage
@@ -25,16 +24,14 @@ class OpenRouterTitleGenerator(BaseTitleGenerator):
     OpenRouter-specific title generation using Chat Completions API.
     """
 
-    @staticmethod
     async def generate_title_from_messages(
-        client: AsyncOpenAI,  # OpenRouter uses async OpenAI client
+        self,
         latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
 
         Args:
-            client: Async OpenAI client instance (OpenRouter client)
             latest_messages: Recent conversation messages to generate title from
 
         Returns:
@@ -85,7 +82,7 @@ class OpenRouterTitleGenerator(BaseTitleGenerator):
             # Call OpenRouter API using Chat Completions format
             # Note: Set max_tokens to 1000 for thinking models (like GLM-4.6)
             # Thinking models need extra tokens for reasoning process before outputting the final answer
-            response: ChatCompletion = await client.chat.completions.create(
+            response: ChatCompletion = await self.client.chat.completions.create(
                 model=openrouter_config.model,
                 messages=cast(Any, chat_messages),
                 temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,

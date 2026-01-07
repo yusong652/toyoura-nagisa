@@ -7,7 +7,6 @@ Generates high-quality text-to-image prompts using the Zhipu (智谱) API.
 from typing import Optional, Dict, cast
 import asyncio
 
-from zai import ZhipuAiClient
 from zai.types.chat import Completion
 
 from backend.config import get_llm_settings
@@ -19,9 +18,8 @@ class ZhipuImagePromptGenerator(BaseImagePromptGenerator):
     Zhipu-specific image prompt generation using Chat Completions API.
     """
 
-    @staticmethod
     async def generate_text_to_image_prompt(
-        client: ZhipuAiClient,  # Zhipu uses synchronous client
+        self,
         session_id: Optional[str] = None,
         debug: bool = False
     ) -> Optional[Dict[str, str]]:
@@ -29,7 +27,6 @@ class ZhipuImagePromptGenerator(BaseImagePromptGenerator):
         Generate high-quality text-to-image prompts using recent conversation context.
 
         Args:
-            client: Zhipu ZhipuAiClient instance (synchronous)
             session_id: Optional session ID for conversation context
             debug: Enable debug output
 
@@ -87,7 +84,7 @@ class ZhipuImagePromptGenerator(BaseImagePromptGenerator):
             response: Completion = cast(
                 Completion,
                 await asyncio.to_thread(
-                    client.chat.completions.create,
+                    self.client.chat.completions.create,
                     model=zhipu_config.model,
                     messages=chat_messages,
                     temperature=context.get('temperature', 1.0),

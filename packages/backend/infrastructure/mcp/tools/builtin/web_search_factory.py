@@ -95,66 +95,16 @@ class WebSearchToolFactory:
             # Fallback to 'client' for providers that don't have separate async/sync clients
             client = getattr(llm_client, 'async_client', None) or getattr(llm_client, 'client', llm_client)
 
-            if llm_type.lower() == 'gemini':
-                # Gemini web search is async
-                result = WebSearchGenerator.perform_web_search(
-                    client=cast(Any, client),  # Type cast for Gemini client
-                    query=query,
-                    debug=debug,
-                    max_uses=max_uses  # Will be ignored but accepted for API compatibility
-                )
-                # Handle async result
-                if asyncio.iscoroutine(result):
-                    return await result
-                return result
-            elif llm_type.lower() == 'anthropic':
-                # Anthropic web search is sync
-                result = WebSearchGenerator.perform_web_search(
-                    client=cast(Any, client),  # Type cast for Anthropic client
+            # Instantiate the generator with the client
+            generator = WebSearchGenerator(client=client)
+
+            if llm_type.lower() in ('gemini', 'anthropic', 'openai', 'kimi', 'zhipu'):
+                # All providers now use instance method (async)
+                return await generator.perform_web_search(
                     query=query,
                     debug=debug,
                     max_uses=max_uses
                 )
-                # Ensure we return Dict[str, Any] for sync methods
-                if asyncio.iscoroutine(result):
-                    return await result
-                return result
-            elif llm_type.lower() == 'openai':
-                # OpenAI web search is async (uses asyncio.to_thread internally)
-                result = WebSearchGenerator.perform_web_search(
-                    client=cast(Any, client),  # Type cast for OpenAI client
-                    query=query,
-                    debug=debug,
-                    max_uses=max_uses  # Accepted for compatibility but not used
-                )
-                # Handle async result
-                if asyncio.iscoroutine(result):
-                    return await result
-                return result
-            elif llm_type.lower() == 'kimi':
-                # Kimi web search is async (uses asyncio.to_thread internally)
-                result = WebSearchGenerator.perform_web_search(
-                    client=cast(Any, client),  # Type cast for Kimi client
-                    query=query,
-                    debug=debug,
-                    max_uses=max_uses  # Accepted for compatibility
-                )
-                # Handle async result
-                if asyncio.iscoroutine(result):
-                    return await result
-                return result
-            elif llm_type.lower() == 'zhipu':
-                # Zhipu web search is async (uses asyncio.to_thread internally)
-                result = WebSearchGenerator.perform_web_search(
-                    client=cast(Any, client),  # Type cast for Zhipu client
-                    query=query,
-                    debug=debug,
-                    max_uses=max_uses  # Accepted for compatibility
-                )
-                # Handle async result
-                if asyncio.iscoroutine(result):
-                    return await result
-                return result
             else:
                 return {
                     "error": f"Unsupported LLM type: {llm_type}",
