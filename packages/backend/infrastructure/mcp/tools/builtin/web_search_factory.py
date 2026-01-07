@@ -27,14 +27,14 @@ class WebSearchToolFactory:
             from backend.infrastructure.llm.providers.anthropic.content_generators import AnthropicWebSearchGenerator as WebSearchGenerator
             return WebSearchGenerator
         elif llm_type.lower() == 'openai':
-            from backend.infrastructure.llm.providers.openai.content_generators import WebSearchGenerator
-            return WebSearchGenerator
+            from backend.infrastructure.llm.providers.openai.content_generators import OpenAIWebSearchGenerator
+            return OpenAIWebSearchGenerator
         elif llm_type.lower() == 'kimi':
             from backend.infrastructure.llm.providers.kimi.content_generators import KimiWebSearchGenerator as WebSearchGenerator
             return WebSearchGenerator
         elif llm_type.lower() == 'zhipu':
-            from backend.infrastructure.llm.providers.zhipu.content_generators import WebSearchGenerator
-            return WebSearchGenerator
+            from backend.infrastructure.llm.providers.zhipu.content_generators import ZhipuWebSearchGenerator
+            return ZhipuWebSearchGenerator
         else:
             raise ValueError(f"Unsupported LLM type: {llm_type}")
     

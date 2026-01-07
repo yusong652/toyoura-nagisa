@@ -35,7 +35,7 @@ from .context_manager import OpenAIContextManager
 from .debug import OpenAIDebugger
 from .response_processor import OpenAIResponseProcessor
 from .tool_manager import OpenAIToolManager
-from .content_generators import TitleGenerator, ImagePromptGenerator
+from .content_generators import OpenAITitleGenerator, OpenAIImagePromptGenerator
 
 
 class OpenAIClient(LLMClientBase):

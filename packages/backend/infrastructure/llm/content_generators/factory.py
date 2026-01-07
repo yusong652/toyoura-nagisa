@@ -76,23 +76,23 @@ class ContentGeneratorFactory:
             from backend.infrastructure.llm.providers.gemini.content_generators import GeminiTitleGenerator
             return GeminiTitleGenerator
         elif llm_type.lower() == 'anthropic':
-            from backend.infrastructure.llm.providers.anthropic.content_generators import TitleGenerator
-            return TitleGenerator
+            from backend.infrastructure.llm.providers.anthropic.content_generators import AnthropicTitleGenerator
+            return AnthropicTitleGenerator
         elif llm_type.lower() == 'openai':
-            from backend.infrastructure.llm.providers.openai.content_generators import TitleGenerator
-            return TitleGenerator
+            from backend.infrastructure.llm.providers.openai.content_generators import OpenAITitleGenerator
+            return OpenAITitleGenerator
         elif llm_type.lower() == 'kimi':
             # Kimi has its own TitleGenerator using Chat Completions API
-            from backend.infrastructure.llm.providers.kimi.content_generators import TitleGenerator
-            return TitleGenerator
+            from backend.infrastructure.llm.providers.kimi.content_generators import KimiTitleGenerator
+            return KimiTitleGenerator
         elif llm_type.lower() == 'openrouter':
             # OpenRouter uses Chat Completions API (similar to Kimi)
-            from backend.infrastructure.llm.providers.openrouter.content_generators import TitleGenerator
-            return TitleGenerator
+            from backend.infrastructure.llm.providers.openrouter.content_generators import OpenRouterTitleGenerator
+            return OpenRouterTitleGenerator
         elif llm_type.lower() == 'zhipu':
             # Zhipu uses Chat Completions API via zai SDK
-            from backend.infrastructure.llm.providers.zhipu.content_generators import TitleGenerator
-            return TitleGenerator
+            from backend.infrastructure.llm.providers.zhipu.content_generators import ZhipuTitleGenerator
+            return ZhipuTitleGenerator
         else:
             raise ValueError(f"Unsupported LLM type for title generation: {llm_type}")
 
@@ -114,23 +114,23 @@ class ContentGeneratorFactory:
             from backend.infrastructure.llm.providers.gemini.content_generators import GeminiImagePromptGenerator
             return GeminiImagePromptGenerator
         elif llm_type.lower() == 'anthropic':
-            from backend.infrastructure.llm.providers.anthropic.content_generators import ImagePromptGenerator
-            return ImagePromptGenerator
+            from backend.infrastructure.llm.providers.anthropic.content_generators import AnthropicImagePromptGenerator
+            return AnthropicImagePromptGenerator
         elif llm_type.lower() == 'openai':
-            from backend.infrastructure.llm.providers.openai.content_generators import ImagePromptGenerator
-            return ImagePromptGenerator
+            from backend.infrastructure.llm.providers.openai.content_generators import OpenAIImagePromptGenerator
+            return OpenAIImagePromptGenerator
         elif llm_type.lower() == 'kimi':
             # Kimi has its own ImagePromptGenerator using Chat Completions API
-            from backend.infrastructure.llm.providers.kimi.content_generators import ImagePromptGenerator
-            return ImagePromptGenerator
+            from backend.infrastructure.llm.providers.kimi.content_generators import KimiImagePromptGenerator
+            return KimiImagePromptGenerator
         elif llm_type.lower() == 'openrouter':
             # OpenRouter uses Chat Completions API (similar to Kimi)
-            from backend.infrastructure.llm.providers.openrouter.content_generators import ImagePromptGenerator
-            return ImagePromptGenerator
+            from backend.infrastructure.llm.providers.openrouter.content_generators import OpenRouterImagePromptGenerator
+            return OpenRouterImagePromptGenerator
         elif llm_type.lower() == 'zhipu':
             # Zhipu uses Chat Completions API via zai SDK
-            from backend.infrastructure.llm.providers.zhipu.content_generators import ImagePromptGenerator
-            return ImagePromptGenerator
+            from backend.infrastructure.llm.providers.zhipu.content_generators import ZhipuImagePromptGenerator
+            return ZhipuImagePromptGenerator
         else:
             raise ValueError(f"Unsupported LLM type for image prompt generation: {llm_type}")
 
