@@ -80,8 +80,8 @@ Command chaining:
   - DO NOT use newlines to separate commands
 
 Working directory:
-  - Maintain current directory using absolute paths
-  - Avoid cd unless explicitly requested by user
+  - cwd is fixed to workspace root (shown in <env> as `workspace:`)
+  - Always use absolute paths; cd commands do NOT change cwd for subsequent calls
   - Good: pytest /foo/bar/tests
   - Bad: cd /foo/bar && pytest tests
 """
