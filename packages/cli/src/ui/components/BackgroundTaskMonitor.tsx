@@ -38,7 +38,7 @@ function truncateCommand(command: string, maxLength: number = 40): string {
 }
 
 /**
- * Get status indicator and color
+ * Get status indicator symbol and color
  */
 function getStatusDisplay(status: BackgroundTask['status'], exitCode?: number): {
   indicator: string;
@@ -46,14 +46,14 @@ function getStatusDisplay(status: BackgroundTask['status'], exitCode?: number): 
 } {
   switch (status) {
     case 'running':
-      return { indicator: '...', color: theme.status.info };
+      return { indicator: '⏵', color: theme.status.info };
     case 'completed':
       if (exitCode === 0) {
-        return { indicator: 'OK', color: theme.status.success };
+        return { indicator: '⏺', color: theme.status.success };
       }
-      return { indicator: `X${exitCode}`, color: theme.status.error };
+      return { indicator: '⏺', color: theme.status.error };
     case 'killed':
-      return { indicator: 'KILL', color: theme.status.warning };
+      return { indicator: '⏹', color: theme.status.warning };
     default:
       return { indicator: '?', color: theme.text.secondary };
   }
@@ -69,29 +69,26 @@ interface TaskItemProps {
 const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const { indicator, color } = getStatusDisplay(task.status, task.exit_code);
   const runtime = formatRuntime(task.runtime_seconds);
-  const displayCommand = task.description || truncateCommand(task.command, 50);
+  const displayCommand = task.description || truncateCommand(task.command, 60);
 
-  // Get last line of output for inline display
+  // Get last line of output
   const lastOutput = task.recent_output.length > 0
-    ? task.recent_output[task.recent_output.length - 1].slice(0, 40)
+    ? task.recent_output[task.recent_output.length - 1].slice(0, 70)
     : '';
 
   return (
-    <Box>
-      {/* Compact single-line format: [status] id runtime command (output) */}
-      <Text color={theme.text.secondary}>[</Text>
-      <Text color={color}>{indicator}</Text>
-      <Text color={theme.text.secondary}>] </Text>
-      <Text color={theme.text.muted}>{task.process_id}</Text>
-      <Text color={theme.text.secondary}> </Text>
-      <Text color={theme.text.accent}>{runtime}</Text>
-      <Text color={theme.text.secondary}> </Text>
-      <Text color={theme.text.primary}>{displayCommand}</Text>
+    <Box flexDirection="column">
+      {/* Line 1: symbol command runtime */}
+      <Box>
+        <Text color={color}>{indicator} </Text>
+        <Text color={theme.text.primary}>{displayCommand}</Text>
+        <Text color={theme.text.muted}> ({runtime})</Text>
+      </Box>
+      {/* Line 2: output (if any) */}
       {lastOutput && (
-        <>
-          <Text color={theme.text.secondary}> | </Text>
-          <Text color={theme.text.muted} dimColor>{lastOutput}</Text>
-        </>
+        <Box marginLeft={2}>
+          <Text color={theme.text.secondary} dimColor>{lastOutput}</Text>
+        </Box>
       )}
     </Box>
   );
