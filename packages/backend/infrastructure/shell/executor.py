@@ -253,48 +253,47 @@ class ShellExecutor:
         env: dict,
         original_command: Optional[str] = None,
     ) -> ShellExecutionResult:
-        """Execute command in foreground, blocking until completion.
+        """Execute command in foreground using native asyncio subprocess.
 
-        Uses asyncio.to_thread to run synchronous subprocess in a thread pool,
-        which works reliably on all platforms including Windows.
+        Uses asyncio.create_subprocess_shell for true async execution
+        without blocking the event loop or consuming thread pool resources.
         """
         start_time = time.time()
 
-        def _run_subprocess():
-            """Run subprocess synchronously in thread pool."""
-            process = self._create_process(
-                command=command,
+        try:
+            # Create subprocess using native asyncio
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                stdin=asyncio.subprocess.DEVNULL,
                 cwd=cwd,
                 env=env,
-                line_buffered=False,  # Foreground uses default buffering
             )
+
+            # Wait for completion with timeout
             try:
-                stdout, stderr = process.communicate(timeout=timeout_seconds)
-                return {
-                    'stdout': stdout,
-                    'stderr': stderr,
-                    'exit_code': process.returncode,
-                    'error': None
-                }
-            except subprocess.TimeoutExpired:
+                stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=timeout_seconds
+                )
+            except asyncio.TimeoutError:
+                # Kill the process on timeout
                 process.kill()
-                process.communicate()
-                return {
-                    'stdout': None,
-                    'stderr': None,
-                    'exit_code': None,
-                    'error': f"Command timed out after {timeout_seconds:.1f} seconds"
-                }
+                await process.communicate()  # Clean up
+                raise TimeoutError(f"Command timed out after {timeout_seconds:.1f} seconds")
 
-        # Run in thread pool to avoid blocking event loop
-        result = await asyncio.to_thread(_run_subprocess)
+            # Decode output (handle encoding errors gracefully)
+            stdout = stdout_bytes.decode('utf-8', errors='replace') if stdout_bytes else ''
+            stderr = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ''
+            # returncode is guaranteed to be set after communicate() completes
+            exit_code: int = process.returncode if process.returncode is not None else -1
 
-        if result['error']:
-            raise TimeoutError(result['error'])
+        except TimeoutError:
+            raise
+        except Exception as e:
+            raise ShellExecutorError(f"Subprocess execution failed: {type(e).__name__}: {e}") from e
 
-        stdout = result['stdout'] or ''
-        stderr = result['stderr'] or ''
-        exit_code = result['exit_code']
         execution_time = time.time() - start_time
 
         # Process output (foreground only - background handles its own output)
