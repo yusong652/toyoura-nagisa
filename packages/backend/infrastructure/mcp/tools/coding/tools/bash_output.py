@@ -6,7 +6,7 @@ designed to match Claude Code's BashOutput tool behavior.
 """
 
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from pydantic import Field
 from fastmcp.server.context import Context  # type: ignore
 
@@ -56,10 +56,6 @@ async def bash_output(
         ...,
         min_length=1,
         description="The ID of the background shell to retrieve output from"
-    ),
-    filter: Optional[str] = Field(
-        None,
-        description="Optional regex to filter output lines"
     )
 ) -> Dict[str, Any]:
     """
@@ -82,7 +78,7 @@ async def bash_output(
             return error_response(f"No shell found with ID: {bash_id}")
 
         # Retrieve output from the specified process
-        result: ProcessOutputResult = process_manager.get_process_output(bash_id, filter)
+        result: ProcessOutputResult = process_manager.get_process_output(bash_id)
 
         # Convert infrastructure result to tool response
         if not result.success:

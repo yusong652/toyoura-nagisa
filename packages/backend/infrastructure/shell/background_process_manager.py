@@ -11,7 +11,6 @@ Uses ShellExecutor for unified process creation.
 """
 
 import asyncio
-import re
 import subprocess
 import uuid
 from dataclasses import dataclass, field
@@ -344,11 +343,7 @@ class BackgroundProcessManager:
                     error=f"Failed to start background process: {e}"
                 )
 
-    def get_process_output(
-        self,
-        process_id: str,
-        filter_regex: Optional[str] = None
-    ) -> ProcessOutputResult:
+    def get_process_output(self, process_id: str) -> ProcessOutputResult:
         """
         Get incremental output from a background process.
 
@@ -357,7 +352,6 @@ class BackgroundProcessManager:
 
         Args:
             process_id: Process ID to retrieve output from
-            filter_regex: Optional regex to filter output lines
 
         Returns:
             ProcessOutputResult with output data or error
@@ -391,18 +385,6 @@ class BackgroundProcessManager:
                 # Update positions for next query
                 bg_process.last_stdout_position = len(bg_process.stdout_buffer)
                 bg_process.last_stderr_position = len(bg_process.stderr_buffer)
-
-            # Apply filtering if requested
-            if filter_regex:
-                try:
-                    pattern = re.compile(filter_regex)
-                    new_stdout = [line for line in new_stdout if pattern.search(line)]
-                    new_stderr = [line for line in new_stderr if pattern.search(line)]
-                except re.error as e:
-                    return ProcessOutputResult(
-                        success=False,
-                        error=f"Invalid regex pattern: {e}"
-                    )
 
             # Format output
             stdout_text = '\n'.join(new_stdout) if new_stdout else ''
