@@ -16,7 +16,12 @@ circular imports with MCP tools. Import directly from submodule:
 
 from .executor import ShellExecutor, BackgroundProcessHandle
 from .state import ShellState, ShellStateStorage
-from .utils import detect_python_command, prepare_shell_env
+from .utils import (
+    detect_python_command,
+    prepare_shell_env,
+    MAX_LINE_LENGTH,
+    MAX_BUFFER_LINES,
+)
 
 __all__ = [
     # Executor
@@ -28,4 +33,7 @@ __all__ = [
     # Utilities
     "detect_python_command",
     "prepare_shell_env",
+    # Constants
+    "MAX_LINE_LENGTH",
+    "MAX_BUFFER_LINES",
 ]

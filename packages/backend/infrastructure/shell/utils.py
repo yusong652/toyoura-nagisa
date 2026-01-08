@@ -3,6 +3,7 @@
 Provides common functionality for shell command execution:
 - Python command detection and enhancement
 - Environment preparation for subprocess execution
+- Output buffer limits
 
 Used by both ShellExecutor (synchronous) and BackgroundProcessManager (async streaming).
 """
@@ -10,8 +11,12 @@ Used by both ShellExecutor (synchronous) and BackgroundProcessManager (async str
 import os
 import re
 import sys
-from typing import Dict, Tuple, Optional
+from typing import Dict, Optional
 
+
+# Background process buffer limits (memory protection)
+MAX_LINE_LENGTH = 10000   # Single line max (10KB), prevents minified JS issues
+MAX_BUFFER_LINES = 10000  # Circular buffer size for streaming output
 
 # Python invocation patterns for detection
 PYTHON_PATTERNS = [

@@ -20,6 +20,7 @@ from typing import Dict, Set, Optional, List, Any, Literal
 from threading import Lock, Thread
 
 from .executor import ShellExecutor, BackgroundProcessHandle, ShellExecutorError
+from .utils import MAX_LINE_LENGTH, MAX_BUFFER_LINES
 
 
 @dataclass
@@ -120,8 +121,6 @@ class BackgroundProcessManager:
     # Configuration constants
     MAX_PROCESSES_PER_SESSION = 10
     MAX_PROCESSES_GLOBAL = 50  # Global limit across all sessions
-    MAX_BUFFER_LINES = 10000  # Store more lines since we return complete output
-    MAX_LINE_LENGTH = 10000  # Single line max length (10KB)
     PROCESS_TIMEOUT_HOURS = 2
     CLEANUP_INTERVAL_MINUTES = 10
 
@@ -216,15 +215,15 @@ class BackgroundProcessManager:
                     # Store lines for incremental reading
                     cleaned_line = line.rstrip('\n\r')
                     # Truncate very long lines to prevent memory issues
-                    if len(cleaned_line) > self.MAX_LINE_LENGTH:
-                        cleaned_line = cleaned_line[:self.MAX_LINE_LENGTH] + "... (truncated)"
+                    if len(cleaned_line) > MAX_LINE_LENGTH:
+                        cleaned_line = cleaned_line[:MAX_LINE_LENGTH] + "... (truncated)"
                     buffer.append(cleaned_line)
                     process._last_output_time = datetime.now()
 
                     # Implement circular buffer to prevent memory issues
-                    if len(buffer) > self.MAX_BUFFER_LINES:
+                    if len(buffer) > MAX_BUFFER_LINES:
                         # For incremental mode, we need to adjust the position tracker
-                        excess = len(buffer) - self.MAX_BUFFER_LINES
+                        excess = len(buffer) - MAX_BUFFER_LINES
                         if is_stderr:
                             process.last_stderr_position = max(0, process.last_stderr_position - excess)
                         else:

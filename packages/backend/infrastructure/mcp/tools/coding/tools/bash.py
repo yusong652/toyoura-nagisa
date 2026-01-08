@@ -62,6 +62,10 @@ async def bash(
 IMPORTANT: This tool is for terminal operations like git, npm, docker, pytest, etc.
 DO NOT use it for file operations - use specialized tools instead.
 
+Directory verification:
+  - Before creating directories/files, use `ls` to verify parent directory exists
+  - Example: before "mkdir foo/bar", first "ls foo" to check "foo" exists
+
 Usage notes:
   - Output truncated to 30000 characters max
   - Always quote paths with spaces: cd "path with spaces/file.txt"
