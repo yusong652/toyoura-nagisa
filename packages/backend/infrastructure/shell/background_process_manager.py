@@ -71,6 +71,31 @@ class StartProcessResult:
     error: Optional[str] = None
 
 
+@dataclass
+class ProcessOutputResult:
+    """Result of getting process output.
+
+    Infrastructure layer returns this; tool layer converts to success_response/error_response.
+    """
+    success: bool
+    # Process info
+    process_id: Optional[str] = None
+    status: Optional[str] = None  # "running", "completed", "killed"
+    exit_code: Optional[int] = None
+    command: Optional[str] = None
+    # Output
+    stdout: str = ""
+    stderr: str = ""
+    has_new_output: bool = False
+    new_line_count: int = 0
+    total_line_count: int = 0
+    # Metadata for hint generation
+    is_python_script: bool = False
+    runtime_seconds: float = 0.0
+    # Error
+    error: Optional[str] = None
+
+
 class BackgroundProcessManager:
     """
     Manages background bash processes with improved output handling.
@@ -313,7 +338,7 @@ class BackgroundProcessManager:
         self,
         process_id: str,
         filter_regex: Optional[str] = None
-    ) -> Dict[str, Any]:
+    ) -> ProcessOutputResult:
         """
         Get incremental output from a background process.
 
@@ -325,11 +350,14 @@ class BackgroundProcessManager:
             filter_regex: Optional regex to filter output lines
 
         Returns:
-            Dict containing process status and incremental output
+            ProcessOutputResult with output data or error
         """
         with self._lock:
             if process_id not in self.processes:
-                return error_response(f"Process {process_id} not found")
+                return ProcessOutputResult(
+                    success=False,
+                    error=f"Process {process_id} not found"
+                )
 
             bg_process = self.processes[process_id]
             bg_process.last_accessed = datetime.now()
@@ -361,69 +389,35 @@ class BackgroundProcessManager:
                     new_stdout = [line for line in new_stdout if pattern.search(line)]
                     new_stderr = [line for line in new_stderr if pattern.search(line)]
                 except re.error as e:
-                    return error_response(f"Invalid regex pattern: {e}")
+                    return ProcessOutputResult(
+                        success=False,
+                        error=f"Invalid regex pattern: {e}"
+                    )
 
             # Format output
             stdout_text = '\n'.join(new_stdout) if new_stdout else ''
             stderr_text = '\n'.join(new_stderr) if new_stderr else ''
 
-            # Check if we have no new output (common for buffered processes or between outputs)
-            no_new_output = not stdout_text and not stderr_text and bg_process.status == "running"
-
-            # Create LLM content similar to Claude Code format
-            llm_content_text_parts = [f"<status>{bg_process.status}</status>"]
-
-            if bg_process.exit_code is not None:
-                llm_content_text_parts.append(f"<exit_code>{bg_process.exit_code}</exit_code>")
-
-            if stdout_text:
-                llm_content_text_parts.append(f"<stdout>\n{stdout_text}\n</stdout>")
-            elif no_new_output:
-                # Provide helpful context when no new output
-                time_running = (datetime.now() - bg_process.start_time).total_seconds()
-                hint = ""
-                if bg_process.is_python_script and time_running < 5:
-                    hint = " (Python unbuffered mode enabled, checking for output...)"
-                elif time_running > 10:
-                    hint = " (Process may be idle or computing)"
-
-                # For incremental mode, indicate no new output
-                llm_content_text_parts.append(f"<info>No new output since last check{hint}</info>")
-
-            if stderr_text:
-                llm_content_text_parts.append(f"<stderr>\n{stderr_text}\n</stderr>")
-
-            llm_content_text_parts.append(f"<timestamp>{datetime.now().isoformat()}Z</timestamp>")
-
-            # Add statistics for monitoring
+            # Get statistics
             with bg_process._output_lock:
                 total_stdout_lines = len(bg_process.stdout_buffer)
                 total_stderr_lines = len(bg_process.stderr_buffer)
 
-            llm_content_text_parts.append(f"<stats>")
-            llm_content_text_parts.append(f"  <new_lines>{len(new_stdout) + len(new_stderr)}</new_lines>")
-            llm_content_text_parts.append(f"  <total_lines>{total_stdout_lines + total_stderr_lines}</total_lines>")
-            llm_content_text_parts.append(f"  <runtime_seconds>{(datetime.now() - bg_process.start_time).total_seconds():.1f}</runtime_seconds>")
-            llm_content_text_parts.append(f"</stats>")
+            runtime_seconds = (datetime.now() - bg_process.start_time).total_seconds()
 
-            return success_response(
-                message="Retrieved incremental output from background process",
-                llm_content={
-                    "parts": [
-                        {"type": "text", "text": '\n\n'.join(llm_content_text_parts)}
-                    ]
-                },
+            return ProcessOutputResult(
+                success=True,
                 process_id=process_id,
                 status=bg_process.status,
                 exit_code=bg_process.exit_code,
+                command=bg_process.command,
                 stdout=stdout_text,
                 stderr=stderr_text,
-                command=bg_process.command,
                 has_new_output=(bool(stdout_text) or bool(stderr_text)),
-                incremental_mode=True,
                 new_line_count=len(new_stdout) + len(new_stderr),
                 total_line_count=total_stdout_lines + total_stderr_lines,
-                timestamp=datetime.now().isoformat()
+                is_python_script=bg_process.is_python_script,
+                runtime_seconds=runtime_seconds,
             )
 
     def kill_process(self, process_id: str) -> Dict[str, Any]:

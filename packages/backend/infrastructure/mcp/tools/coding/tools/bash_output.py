@@ -6,14 +6,50 @@ designed to match Claude Code's BashOutput tool behavior.
 """
 
 import asyncio
+from datetime import datetime
 from typing import Dict, Any, Optional
 from pydantic import Field
 from fastmcp.server.context import Context  # type: ignore
 
-from backend.infrastructure.mcp.utils.tool_result import error_response
-from backend.infrastructure.shell.background_process_manager import get_process_manager
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.shell.background_process_manager import (
+    get_process_manager,
+    ProcessOutputResult,
+)
 
 __all__ = ["bash_output", "register_bash_output_tool"]
+
+
+def _build_llm_content(result: ProcessOutputResult) -> str:
+    """Build LLM-friendly content from ProcessOutputResult."""
+    parts = [f"<status>{result.status}</status>"]
+
+    if result.exit_code is not None:
+        parts.append(f"<exit_code>{result.exit_code}</exit_code>")
+
+    if result.stdout:
+        parts.append(f"<stdout>\n{result.stdout}\n</stdout>")
+    elif not result.has_new_output and result.status == "running":
+        # Provide helpful context when no new output
+        hint = ""
+        if result.is_python_script and result.runtime_seconds < 5:
+            hint = " (Python unbuffered mode enabled, checking for output...)"
+        elif result.runtime_seconds > 10:
+            hint = " (Process may be idle or computing)"
+        parts.append(f"<info>No new output since last check{hint}</info>")
+
+    if result.stderr:
+        parts.append(f"<stderr>\n{result.stderr}\n</stderr>")
+
+    parts.append(f"<timestamp>{datetime.now().isoformat()}Z</timestamp>")
+
+    parts.append("<stats>")
+    parts.append(f"  <new_lines>{result.new_line_count}</new_lines>")
+    parts.append(f"  <total_lines>{result.total_line_count}</total_lines>")
+    parts.append(f"  <runtime_seconds>{result.runtime_seconds:.1f}</runtime_seconds>")
+    parts.append("</stats>")
+
+    return '\n\n'.join(parts)
 
 
 async def bash_output(
@@ -60,7 +96,31 @@ async def bash_output(
             return error_response(f"No shell found with ID: {bash_id}")
 
         # Retrieve output from the specified process
-        return process_manager.get_process_output(bash_id, filter)
+        result: ProcessOutputResult = process_manager.get_process_output(bash_id, filter)
+
+        # Convert infrastructure result to tool response
+        if not result.success:
+            return error_response(result.error or "Unknown error")
+
+        return success_response(
+            message="Retrieved incremental output from background process",
+            llm_content={
+                "parts": [
+                    {"type": "text", "text": _build_llm_content(result)}
+                ]
+            },
+            process_id=result.process_id,
+            status=result.status,
+            exit_code=result.exit_code,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            command=result.command,
+            has_new_output=result.has_new_output,
+            incremental_mode=True,
+            new_line_count=result.new_line_count,
+            total_line_count=result.total_line_count,
+            timestamp=datetime.now().isoformat()
+        )
     except Exception as e:
         return error_response(f"Failed to retrieve process output: {e}")
 
