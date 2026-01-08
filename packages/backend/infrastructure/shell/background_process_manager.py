@@ -57,6 +57,20 @@ class BackgroundProcess:
     _last_output_time: datetime = field(default_factory=datetime.now)
 
 
+@dataclass
+class StartProcessResult:
+    """Result of starting a background process.
+
+    Infrastructure layer returns this; tool layer converts to success_response/error_response.
+    """
+    success: bool
+    process_id: Optional[str] = None
+    command: Optional[str] = None
+    working_directory: Optional[str] = None
+    python_detected: bool = False
+    error: Optional[str] = None
+
+
 class BackgroundProcessManager:
     """
     Manages background bash processes with improved output handling.
@@ -182,7 +196,7 @@ class BackgroundProcessManager:
         session_id: str,
         command: str,
         description: Optional[str] = None
-    ) -> Dict[str, Any]:
+    ) -> StartProcessResult:
         """
         Start a background bash process with improved output handling.
 
@@ -192,14 +206,15 @@ class BackgroundProcessManager:
             description: Optional description for the command
 
         Returns:
-            Dict containing success/error response with process_id
+            StartProcessResult with process info or error
         """
         with self._lock:
             # Check session process limits
             session_process_count = len(self.session_processes.get(session_id, set()))
             if session_process_count >= self.MAX_PROCESSES_PER_SESSION:
-                return error_response(
-                    f"Maximum {self.MAX_PROCESSES_PER_SESSION} background processes per session exceeded"
+                return StartProcessResult(
+                    success=False,
+                    error=f"Maximum {self.MAX_PROCESSES_PER_SESSION} background processes per session exceeded"
                 )
 
             # Lazy import to avoid circular dependency with MCP tools
@@ -210,7 +225,10 @@ class BackgroundProcessManager:
 
             # Validate workspace access
             if not validate_path_in_workspace("."):
-                return error_response("Cannot access workspace directory")
+                return StartProcessResult(
+                    success=False,
+                    error="Cannot access workspace directory"
+                )
 
             work_dir = Path(str(WORKSPACE_ROOT))
 
@@ -277,27 +295,19 @@ class BackgroundProcessManager:
                 # Start notification service monitoring
                 self._start_notification_monitoring(session_id, process_id, command, description)
 
-                # Provide helpful hint for Python scripts
-                hint = ""
-                if is_python:
-                    hint = " (Python output will be unbuffered for real-time display)"
-
-                return success_response(
-                    message=f"Command running in background with ID: {process_id}{hint}",
-                    llm_content={
-                        "parts": [
-                            {"type": "text", "text": f"Command running in background with ID: {process_id}"}
-                        ]
-                    },
+                return StartProcessResult(
+                    success=True,
                     process_id=process_id,
                     command=command,
-                    background=True,
                     working_directory=str(work_dir),
                     python_detected=is_python
                 )
 
             except Exception as e:
-                return error_response(f"Failed to start background process: {e}")
+                return StartProcessResult(
+                    success=False,
+                    error=f"Failed to start background process: {e}"
+                )
 
     def get_process_output(
         self,

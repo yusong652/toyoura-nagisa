@@ -91,13 +91,39 @@ Working directory:
     # Handle background execution (separate path, not using ShellExecutor)
     if run_in_background:
         try:
-            from backend.infrastructure.shell.background_process_manager import get_process_manager
+            from backend.infrastructure.shell.background_process_manager import (
+                get_process_manager,
+                StartProcessResult,
+            )
             process_manager = get_process_manager()
             # Architecture guarantee: tool_manager.py always injects _meta.client_id
-            return process_manager.start_process(
+            result: StartProcessResult = process_manager.start_process(
                 session_id=cast(str, context.client_id),
                 command=command,
                 description=description
+            )
+
+            # Convert infrastructure result to tool response
+            if not result.success:
+                return error_response(result.error or "Unknown error")
+
+            # Build hint for Python scripts
+            hint = ""
+            if result.python_detected:
+                hint = " (Python output will be unbuffered for real-time display)"
+
+            return success_response(
+                message=f"Command running in background with ID: {result.process_id}{hint}",
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": f"Command running in background with ID: {result.process_id}"}
+                    ]
+                },
+                process_id=result.process_id,
+                command=result.command,
+                background=True,
+                working_directory=result.working_directory,
+                python_detected=result.python_detected
             )
         except Exception as e:
             return error_response(f"Failed to start background process: {e}")
