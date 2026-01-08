@@ -12,7 +12,7 @@ from .output_utils import (
     combine_stdout_stderr,
     truncate_output,
     process_shell_output,
-    DEFAULT_MAX_OUTPUT_LINES,
+    DEFAULT_MAX_OUTPUT_CHARS,
 )
 from .context_format import (
     format_for_llm_context,
@@ -30,5 +30,5 @@ __all__ = [
     "format_caveat_message",
     "format_with_caveat",
     "format_from_result",
-    "DEFAULT_MAX_OUTPUT_LINES",
+    "DEFAULT_MAX_OUTPUT_CHARS",
 ]

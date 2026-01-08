@@ -63,7 +63,7 @@ IMPORTANT: This tool is for terminal operations like git, npm, docker, pytest, e
 DO NOT use it for file operations - use specialized tools instead.
 
 Usage notes:
-  - Output truncated if exceeds 30000 characters
+  - Output truncated to 30000 characters max
   - Always quote paths with spaces: cd "path with spaces/file.txt"
 
 Avoid using these commands - use specialized tools instead:

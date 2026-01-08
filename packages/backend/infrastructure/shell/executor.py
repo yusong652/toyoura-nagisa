@@ -22,7 +22,7 @@ from backend.infrastructure.mcp.utils.path_normalization import normalize_window
 from backend.infrastructure.mcp.utils.shell import (
     ShellExecutionResult,
     process_shell_output,
-    DEFAULT_MAX_OUTPUT_LINES,
+    DEFAULT_MAX_OUTPUT_CHARS,
 )
 from .utils import prepare_shell_env
 
@@ -77,16 +77,16 @@ class ShellExecutor:
 
     def __init__(
         self,
-        max_output_lines: int = DEFAULT_MAX_OUTPUT_LINES,
+        max_output_chars: int = DEFAULT_MAX_OUTPUT_CHARS,
         normalize_paths: bool = True,
     ):
         """Initialize the executor.
 
         Args:
-            max_output_lines: Maximum output lines before truncation (foreground only)
+            max_output_chars: Maximum output characters before truncation (foreground only)
             normalize_paths: Whether to normalize Windows paths in output
         """
-        self.max_output_lines = max_output_lines
+        self.max_output_chars = max_output_chars
         self.normalize_paths = normalize_paths
 
     def _prepare_command(self, command: str) -> str:
@@ -250,7 +250,7 @@ class ShellExecutor:
         process_shell_output(
             stdout=stdout,
             stderr=stderr,
-            max_lines=self.max_output_lines,
+            max_chars=self.max_output_chars,
             normalize_paths=self.normalize_paths,
         )
 
