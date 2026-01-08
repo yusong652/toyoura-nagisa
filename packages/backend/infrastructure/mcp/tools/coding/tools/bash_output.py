@@ -5,7 +5,6 @@ Provides output retrieval functionality for toyoura-nagisa's background bash exe
 designed to match Claude Code's BashOutput tool behavior.
 """
 
-import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional
 from pydantic import Field
@@ -60,27 +59,15 @@ async def bash_output(
     ),
     filter: Optional[str] = Field(
         None,
-        description="Optional regular expression to filter the output lines. Only lines matching this regex will be included in the result. Any lines that do not match will no longer be available to read."
-    ),
-    wait: int = Field(
-        1,
-        description="Wait time in seconds before checking output (default: 1). Use longer wait times for long-running tasks to avoid excessive polling."
+        description="Optional regex to filter output lines"
     )
 ) -> Dict[str, Any]:
     """
     Retrieves output from a running or completed background bash shell.
 
-    Takes a shell_id parameter identifying the shell and always returns only new output since the last check.
-    Returns stdout and stderr output along with shell status.
-    Supports optional regex filtering to show only lines matching a pattern.
-    Use this tool when you need to monitor or check the output of a long-running shell.
+    Returns only new output since the last check, along with shell status.
+    Use this tool to monitor long-running background processes.
     """
-    # Parameter is pre-validated by Pydantic (min_length=1)
-
-    # Wait before checking output (prevents excessive polling, non-blocking)
-    if wait > 0:
-        await asyncio.sleep(wait)
-
     try:
         # Get session ID from MCP context for session isolation
         # Architecture guarantee: tool_manager.py always injects _meta.client_id
