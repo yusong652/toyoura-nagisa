@@ -33,8 +33,8 @@ class BackgroundProcessNotificationService:
     """
 
     # Configuration
-    NOTIFICATION_INTERVAL_SECONDS = 5  # Check interval
-    MIN_PUSH_INTERVAL_SECONDS = 2      # Minimum time between pushes
+    NOTIFICATION_INTERVAL_SECONDS = 2  # Check interval (seconds)
+    MIN_PUSH_INTERVAL_SECONDS = 1      # Minimum time between pushes (seconds)
     RECENT_OUTPUT_LINES = 5            # Number of lines to display
 
     def __init__(self, connection_manager: ConnectionManager):

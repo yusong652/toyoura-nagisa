@@ -127,11 +127,10 @@ export const BackgroundTaskMonitor: React.FC<BackgroundTaskMonitorProps> = ({
   }
 
   return (
-    <Box flexDirection="column">
-      {/* Task list - compact inline format */}
+    <>
       {sortedTasks.map(task => (
         <TaskItem key={task.process_id} task={task} />
       ))}
-    </Box>
+    </>
   );
 };
