@@ -33,11 +33,7 @@ def _build_llm_content(result: ProcessOutputResult) -> str:
         parts.append(f"<stdout>\n{truncated_stdout}\n</stdout>")
     elif not result.has_new_output and result.status == "running":
         # Provide helpful context when no new output
-        hint = ""
-        if result.is_python_script and result.runtime_seconds < 5:
-            hint = " (Python unbuffered mode enabled, checking for output...)"
-        elif result.runtime_seconds > 10:
-            hint = " (Process may be idle or computing)"
+        hint = " (Process may be idle or computing)" if result.runtime_seconds > 10 else ""
         parts.append(f"<info>No new output since last check{hint}</info>")
 
     if result.stderr:
