@@ -3,6 +3,7 @@
 Provides common functionality for shell command execution:
 - Python command detection and enhancement
 - Environment preparation for subprocess execution
+- Output buffer limits
 
 Used by both ShellExecutor (synchronous) and BackgroundProcessManager (async streaming).
 """
@@ -10,8 +11,12 @@ Used by both ShellExecutor (synchronous) and BackgroundProcessManager (async str
 import os
 import re
 import sys
-from typing import Dict, Tuple, Optional
+from typing import Dict, Optional
 
+
+# Background process buffer limits (memory protection)
+MAX_LINE_LENGTH = 10000   # Single line max (10KB), prevents minified JS issues
+MAX_BUFFER_LINES = 10000  # Circular buffer size for streaming output
 
 # Python invocation patterns for detection
 PYTHON_PATTERNS = [
@@ -44,35 +49,6 @@ def detect_python_command(command: str) -> bool:
         if re.match(pattern, command, re.IGNORECASE):
             return True
     return False
-
-
-def enhance_python_command(command: str) -> Tuple[str, bool]:
-    """Enhance Python commands to force unbuffered output.
-
-    For Python scripts on Unix, adds PYTHONUNBUFFERED=1 prefix to ensure
-    real-time output streaming instead of buffered output.
-    On Windows, the environment variable is set via prepare_shell_env instead.
-
-    Args:
-        command: Original shell command
-
-    Returns:
-        Tuple of (enhanced_command, is_python)
-        - enhanced_command: Command with unbuffered flag if Python (Unix only)
-        - is_python: Whether Python was detected
-    """
-    is_python = detect_python_command(command)
-    if not is_python:
-        return command, False
-
-    # On Windows, env var prefix syntax doesn't work
-    # PYTHONUNBUFFERED is set via prepare_shell_env instead
-    if sys.platform == "win32":
-        return command, True
-
-    # Add PYTHONUNBUFFERED environment variable prefix (Unix only)
-    # This is more reliable than -u flag since it works with all Python invocations
-    return f"PYTHONUNBUFFERED=1 {command}", True
 
 
 def prepare_shell_env(

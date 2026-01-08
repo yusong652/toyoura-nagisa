@@ -19,7 +19,6 @@ from backend.infrastructure.shell import ShellExecutor
 from backend.infrastructure.shell.executor import (
     ShellExecutorError,
     TimeoutError as ShellTimeoutError,
-    ValidationError as ShellValidationError,
 )
 
 __all__ = ["bash", "register_bash_tool"]
@@ -40,19 +39,22 @@ async def bash(
     context: Context,
     command: str = Field(
         ...,
+        min_length=1,
         description="The command to execute"
     ),
     description: Optional[str] = Field(
         None,
         description=" Clear, concise description of what this command does in 5-10 words. Examples:\nInput: ls\nOutput: Lists files in current directory\n\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: mkdir foo\nOutput: Creates directory 'foo'"
     ),
-    timeout: Optional[int] = Field(
-        None,
-        description="Optional timeout in milliseconds (max 600000)"
-    ),
     run_in_background: bool = Field(
         False,
         description="Set to true to run in background without blocking, returns process ID immediately. Use BashOutput to monitor output. Default (false) blocks until completion and returns output directly. Use for: long builds, tests, dev servers."
+    ),
+    timeout: int = Field(
+        default=120000,
+        ge=1000,
+        le=600000,
+        description="Timeout in milliseconds (foreground mode only, ignored when run_in_background=true)"
     )
 ) -> Dict[str, Any]:
     """Executes bash commands in a persistent shell session with timeout and security.
@@ -60,12 +62,13 @@ async def bash(
 IMPORTANT: This tool is for terminal operations like git, npm, docker, pytest, etc.
 DO NOT use it for file operations - use specialized tools instead.
 
+Directory verification:
+  - Before creating directories/files, use `ls` to verify parent directory exists
+  - Example: before "mkdir foo/bar", first "ls foo" to check "foo" exists
+
 Usage notes:
-  - Command argument is required
-  - Timeout: 120000ms (2 minutes) default, 600000ms (10 minutes) max
-  - Output truncated if exceeds 30000 characters
+  - Output truncated to 30000 characters max
   - Always quote paths with spaces: cd "path with spaces/file.txt"
-  - Use `run_in_background` for long-running processes (builds, tests, dev servers)
 
 Avoid using these commands - use specialized tools instead:
   - File search: Use Glob (NOT find or ls)
@@ -100,20 +103,16 @@ Working directory:
             result: StartProcessResult = process_manager.start_process(
                 session_id=cast(str, context.client_id),
                 command=command,
-                description=description
+                cwd=str(work_dir),
+                description=description,
             )
 
             # Convert infrastructure result to tool response
             if not result.success:
                 return error_response(result.error or "Unknown error")
 
-            # Build hint for Python scripts
-            hint = ""
-            if result.python_detected:
-                hint = " (Python output will be unbuffered for real-time display)"
-
             return success_response(
-                message=f"Command running in background with ID: {result.process_id}{hint}",
+                message=f"Command running in background with ID: {result.process_id}",
                 llm_content={
                     "parts": [
                         {"type": "text", "text": f"Command running in background with ID: {result.process_id}"}
@@ -123,7 +122,6 @@ Working directory:
                 command=result.command,
                 background=True,
                 working_directory=result.working_directory,
-                python_detected=result.python_detected
             )
         except Exception as e:
             return error_response(f"Failed to start background process: {e}")
@@ -131,7 +129,7 @@ Working directory:
     # Execute command using infrastructure layer ShellExecutor
     try:
         executor = _get_executor()
-        result = await executor.execute(
+        exec_result = await executor.execute(
             command=command,
             cwd=str(work_dir),
             timeout_ms=timeout,
@@ -139,15 +137,15 @@ Working directory:
 
         # Process output for LLM consumption
         combined_output = process_shell_output(
-            stdout=result.stdout,
-            stderr=result.stderr,
+            stdout=exec_result.stdout,
+            stderr=exec_result.stderr,
         )
 
         # Build response message
-        if result.exit_code == 0:
-            message = f"Command executed successfully (exit code {result.exit_code}, {result.execution_time:.1f}s)"
+        if exec_result.exit_code == 0:
+            message = f"Command executed successfully (exit code {exec_result.exit_code}, {exec_result.execution_time:.1f}s)"
         else:
-            message = f"Command failed with exit code {result.exit_code} ({result.execution_time:.1f}s)"
+            message = f"Command failed with exit code {exec_result.exit_code} ({exec_result.execution_time:.1f}s)"
 
         # Return complete terminal output for both success and failure
         return success_response(
@@ -157,17 +155,15 @@ Working directory:
                     {"type": "text", "text": combined_output}
                 ]
             },
-            exit_code=result.exit_code,
-            execution_time=result.execution_time,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            command=result.command,
-            original_command=result.original_command,
-            working_directory=result.working_directory,
+            exit_code=exec_result.exit_code,
+            execution_time=exec_result.execution_time,
+            stdout=exec_result.stdout,
+            stderr=exec_result.stderr,
+            command=exec_result.command,
+            original_command=exec_result.original_command,
+            working_directory=exec_result.working_directory,
         )
 
-    except ShellValidationError as e:
-        return error_response(str(e))
     except ShellTimeoutError as e:
         return error_response(str(e))
     except ShellExecutorError as e:

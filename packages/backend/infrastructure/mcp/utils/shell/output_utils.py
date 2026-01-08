@@ -6,10 +6,8 @@ Provides functions for processing shell command output:
 - Normalizing paths for LLM consumption
 """
 
-from typing import Optional
-
 # Output limits for LLM consumption
-DEFAULT_MAX_OUTPUT_LINES = 1000  # Line-based limit (more predictable than bytes)
+DEFAULT_MAX_OUTPUT_CHARS = 30000  # ~7500-10000 tokens, matches Claude Code
 
 
 def combine_stdout_stderr(stdout: str, stderr: str) -> str:
@@ -30,31 +28,27 @@ def combine_stdout_stderr(stdout: str, stderr: str) -> str:
     return stdout or stderr
 
 
-def truncate_output(output: str, max_lines: int = DEFAULT_MAX_OUTPUT_LINES) -> str:
-    """Truncate output if it exceeds the maximum line count.
+def truncate_output(output: str, max_chars: int = DEFAULT_MAX_OUTPUT_CHARS) -> str:
+    """Truncate output if it exceeds the maximum character count.
 
     Args:
         output: The output string to truncate
-        max_lines: Maximum allowed number of lines
+        max_chars: Maximum allowed number of characters
 
     Returns:
         Original output if within limit, or truncated with notice appended
     """
-    if not output:
+    if not output or len(output) <= max_chars:
         return output
 
-    lines = output.split('\n')
-    if len(lines) <= max_lines:
-        return output
-
-    truncated = '\n'.join(lines[:max_lines])
-    return f"{truncated}\n\n... [TRUNCATED - showing {max_lines} of {len(lines)} lines] ..."
+    truncated = output[:max_chars]
+    return f"{truncated}\n\n... [TRUNCATED - showing {max_chars:,} of {len(output):,} characters] ..."
 
 
 def process_shell_output(
     stdout: str,
     stderr: str,
-    max_lines: int = DEFAULT_MAX_OUTPUT_LINES,
+    max_chars: int = DEFAULT_MAX_OUTPUT_CHARS,
     normalize_paths: bool = True
 ) -> str:
     """Process shell output for LLM consumption.
@@ -64,7 +58,7 @@ def process_shell_output(
     Args:
         stdout: Standard output from command
         stderr: Standard error from command
-        max_lines: Maximum output lines before truncation
+        max_chars: Maximum output characters before truncation
         normalize_paths: Whether to normalize Windows paths to forward slashes
 
     Returns:
@@ -80,5 +74,5 @@ def process_shell_output(
         )
         combined = normalize_output_paths_to_llm_format(combined)
 
-    # Truncate if too many lines
-    return truncate_output(combined, max_lines)
+    # Truncate if too long
+    return truncate_output(combined, max_chars)

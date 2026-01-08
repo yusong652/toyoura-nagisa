@@ -61,7 +61,7 @@ async def kill_shell(
             message=kill_message,
             llm_content={
                 "parts": [
-                    {"type": "text", "text": f'{{"message":"{kill_message}","shell_id":"{result.process_id}"}}'}
+                    {"type": "text", "text": kill_message}
                 ]
             },
             shell_id=result.process_id,
