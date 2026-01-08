@@ -46,15 +46,15 @@ async def bash(
         None,
         description=" Clear, concise description of what this command does in 5-10 words. Examples:\nInput: ls\nOutput: Lists files in current directory\n\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: mkdir foo\nOutput: Creates directory 'foo'"
     ),
-    timeout: Optional[int] = Field(
-        None,
-        ge=1000,      # Minimum 1 second
-        le=600000,    # Maximum 10 minutes
-        description="Optional timeout in milliseconds (1000-600000, default: 120000)"
-    ),
     run_in_background: bool = Field(
         False,
         description="Set to true to run in background without blocking, returns process ID immediately. Use BashOutput to monitor output. Default (false) blocks until completion and returns output directly. Use for: long builds, tests, dev servers."
+    ),
+    timeout: int = Field(
+        default=120000,
+        ge=1000,
+        le=600000,
+        description="Timeout in milliseconds (foreground mode only, ignored when run_in_background=true)"
     )
 ) -> Dict[str, Any]:
     """Executes bash commands in a persistent shell session with timeout and security.
@@ -63,11 +63,8 @@ IMPORTANT: This tool is for terminal operations like git, npm, docker, pytest, e
 DO NOT use it for file operations - use specialized tools instead.
 
 Usage notes:
-  - Command argument is required
-  - Timeout: 120000ms (2 minutes) default, 600000ms (10 minutes) max
   - Output truncated if exceeds 30000 characters
   - Always quote paths with spaces: cd "path with spaces/file.txt"
-  - Use `run_in_background` for long-running processes (builds, tests, dev servers)
 
 Avoid using these commands - use specialized tools instead:
   - File search: Use Glob (NOT find or ls)
