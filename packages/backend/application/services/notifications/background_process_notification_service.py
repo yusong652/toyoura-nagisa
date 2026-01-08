@@ -68,7 +68,7 @@ class BackgroundProcessNotificationService:
             description: Optional command description
         """
         # Import here to avoid circular dependency
-        from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import get_process_manager
+        from backend.infrastructure.shell.background_process_manager import get_process_manager
 
         # Send initial STARTED notification
         await self._send_notification(

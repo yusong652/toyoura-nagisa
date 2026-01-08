@@ -91,7 +91,7 @@ Working directory:
     # Handle background execution (separate path, not using ShellExecutor)
     if run_in_background:
         try:
-            from ..utils.background_process_manager import get_process_manager
+            from backend.infrastructure.shell.background_process_manager import get_process_manager
             process_manager = get_process_manager()
             # Architecture guarantee: tool_manager.py always injects _meta.client_id
             return process_manager.start_process(

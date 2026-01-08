@@ -24,7 +24,6 @@ from backend.infrastructure.shell.utils import (
     enhance_python_command,
     prepare_shell_env,
 )
-from ..utils.path_security import validate_path_in_workspace, WORKSPACE_ROOT
 
 
 @dataclass
@@ -202,6 +201,12 @@ class BackgroundProcessManager:
                 return error_response(
                     f"Maximum {self.MAX_PROCESSES_PER_SESSION} background processes per session exceeded"
                 )
+
+            # Lazy import to avoid circular dependency with MCP tools
+            from backend.infrastructure.mcp.tools.coding.utils.path_security import (
+                validate_path_in_workspace,
+                WORKSPACE_ROOT,
+            )
 
             # Validate workspace access
             if not validate_path_in_workspace("."):
@@ -715,7 +720,7 @@ def shutdown_all_processes() -> None:
     """
     process_manager = get_process_manager()
 
-    for process_id, bg_process in list(process_manager.processes.items()):
+    for _, bg_process in list(process_manager.processes.items()):
         if bg_process.status == "running":
             try:
                 bg_process.process.terminate()

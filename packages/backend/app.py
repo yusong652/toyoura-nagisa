@@ -88,7 +88,7 @@ async def lifespan(app: FastAPI):
 
             # Cleanup background processes
             try:
-                from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import shutdown_all_processes
+                from backend.infrastructure.shell.background_process_manager import shutdown_all_processes
                 shutdown_all_processes()
                 print("[SHUTDOWN] Background processes cleanup complete")
             except Exception as e:

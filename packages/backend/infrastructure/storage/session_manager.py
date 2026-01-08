@@ -113,7 +113,7 @@ def delete_session_data(session_id: str) -> bool:
     try:
         # Clean up background processes for this session
         try:
-            from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import cleanup_session_processes
+            from backend.infrastructure.shell.background_process_manager import cleanup_session_processes
             cleanup_session_processes(session_id)
         except Exception as e:
             print(f"[WARNING] Failed to cleanup background processes for session {session_id}: {e}")

@@ -28,7 +28,7 @@ class BackgroundProcessMonitor(BaseMonitor):
             List[str]: Background process reminder blocks (with system-reminder tags)
         """
         try:
-            from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import get_process_manager
+            from backend.infrastructure.shell.background_process_manager import get_process_manager
 
             process_manager = get_process_manager()
             process_reminders = process_manager.get_system_reminders(self.session_id)

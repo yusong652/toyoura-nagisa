@@ -11,7 +11,7 @@ from pydantic import Field
 from fastmcp.server.context import Context  # type: ignore
 
 from backend.infrastructure.mcp.utils.tool_result import error_response
-from ..utils.background_process_manager import get_process_manager
+from backend.infrastructure.shell.background_process_manager import get_process_manager
 
 __all__ = ["bash_output", "register_bash_output_tool"]
 
