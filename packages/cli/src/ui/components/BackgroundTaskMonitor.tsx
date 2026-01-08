@@ -69,28 +69,29 @@ interface TaskItemProps {
 const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const { indicator, color } = getStatusDisplay(task.status, task.exit_code);
   const runtime = formatRuntime(task.runtime_seconds);
-  const displayCommand = task.description || truncateCommand(task.command);
+  const displayCommand = task.description || truncateCommand(task.command, 50);
+
+  // Get last line of output for inline display
+  const lastOutput = task.recent_output.length > 0
+    ? task.recent_output[task.recent_output.length - 1].slice(0, 40)
+    : '';
 
   return (
-    <Box flexDirection="column" marginLeft={2}>
-      {/* Task header: [status] id | runtime | command */}
-      <Box>
-        <Text color={color}>[{indicator}]</Text>
-        <Text color={theme.text.secondary}> {task.process_id} | </Text>
-        <Text color={theme.text.accent}>{runtime}</Text>
-        <Text color={theme.text.secondary}> | </Text>
-        <Text color={theme.text.primary}>{displayCommand}</Text>
-      </Box>
-
-      {/* Recent output (only for running tasks with output) */}
-      {task.status === 'running' && task.recent_output.length > 0 && (
-        <Box flexDirection="column" marginLeft={2} marginTop={0}>
-          {task.recent_output.slice(-3).map((line, index) => (
-            <Text key={index} color={theme.text.secondary} dimColor>
-              {line.slice(0, 60)}{line.length > 60 ? '...' : ''}
-            </Text>
-          ))}
-        </Box>
+    <Box>
+      {/* Compact single-line format: [status] id runtime command (output) */}
+      <Text color={theme.text.secondary}>[</Text>
+      <Text color={color}>{indicator}</Text>
+      <Text color={theme.text.secondary}>] </Text>
+      <Text color={theme.text.muted}>{task.process_id}</Text>
+      <Text color={theme.text.secondary}> </Text>
+      <Text color={theme.text.accent}>{runtime}</Text>
+      <Text color={theme.text.secondary}> </Text>
+      <Text color={theme.text.primary}>{displayCommand}</Text>
+      {lastOutput && (
+        <>
+          <Text color={theme.text.secondary}> | </Text>
+          <Text color={theme.text.muted} dimColor>{lastOutput}</Text>
+        </>
       )}
     </Box>
   );
@@ -129,23 +130,8 @@ export const BackgroundTaskMonitor: React.FC<BackgroundTaskMonitorProps> = ({
   }
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={theme.border.default}
-      paddingX={1}
-      marginBottom={1}
-    >
-      {/* Header */}
-      <Box>
-        <Text color={theme.status.info}>$</Text>
-        <Text color={theme.text.secondary}> </Text>
-        <Text color={theme.text.primary}>
-          {activeCount} background {activeCount === 1 ? 'task' : 'tasks'}
-        </Text>
-      </Box>
-
-      {/* Task list */}
+    <Box flexDirection="column">
+      {/* Task list - compact inline format */}
       {sortedTasks.map(task => (
         <TaskItem key={task.process_id} task={task} />
       ))}
