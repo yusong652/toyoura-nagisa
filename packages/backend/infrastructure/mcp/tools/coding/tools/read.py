@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from pydantic import Field
-from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 from fastmcp.server.context import Context  # type: ignore
 
@@ -103,12 +102,6 @@ Usage:
     # ------------------------------------------------------------------
     # Parameter validation and normalization
     # ------------------------------------------------------------------
-
-    # Handle Pydantic FieldInfo objects when invoked programmatically
-    if isinstance(offset, FieldInfo):
-        offset = None
-    if isinstance(limit, FieldInfo):
-        limit = None
 
     # Validate parameters
     if offset is not None and offset < 0:

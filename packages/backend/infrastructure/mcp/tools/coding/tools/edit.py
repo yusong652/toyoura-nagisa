@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 
 from pydantic import Field
-from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 from fastmcp.server.context import Context  # type: ignore
 
@@ -167,16 +166,6 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
     # ------------------------------------------------------------------
     # Parameter validation and normalization
     # ------------------------------------------------------------------
-
-    # Handle Pydantic FieldInfo objects when invoked programmatically
-    if isinstance(file_path, FieldInfo):
-        file_path = ""
-    if isinstance(old_string, FieldInfo):
-        old_string = ""
-    if isinstance(new_string, FieldInfo):
-        new_string = ""
-    if isinstance(replace_all, FieldInfo):
-        replace_all = False
 
     # file_path is pre-validated by Pydantic (min_length=1)
 

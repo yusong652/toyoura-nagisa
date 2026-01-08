@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Set
 
 from pydantic import Field
-from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 from fastmcp.server.context import Context  # type: ignore
 
@@ -287,29 +286,6 @@ async def grep(
   - Output modes: "content" shows matching lines, "files_with_matches" shows file paths (default), "count" shows match counts
   - Automatically skips binary files and files larger than 10MB
 """
-
-    # Handle Pydantic FieldInfo objects when invoked programmatically
-    if isinstance(path, FieldInfo):
-        path = None
-    if isinstance(glob, FieldInfo):
-        glob = None
-    if isinstance(type, FieldInfo):
-        type = None
-    if isinstance(output_mode, FieldInfo):
-        output_mode = "files_with_matches"
-    if isinstance(case_insensitive, FieldInfo):
-        case_insensitive = False
-    if isinstance(show_line_numbers, FieldInfo):
-        show_line_numbers = False
-    if isinstance(context_after, FieldInfo):
-        context_after = None
-    if isinstance(context_before, FieldInfo):
-        context_before = None
-    if isinstance(context_both, FieldInfo):
-        context_both = None
-    if isinstance(head_limit, FieldInfo):
-        head_limit = None
-
     # Validate pattern
     if not pattern or not pattern.strip():
         return error_response("Search pattern is required and cannot be empty")

@@ -85,16 +85,6 @@ Working directory:
   - Good: pytest /foo/bar/tests
   - Bad: cd /foo/bar && pytest tests
 """
-    
-    # Handle Pydantic FieldInfo objects when invoked programmatically
-    from pydantic.fields import FieldInfo
-    if isinstance(description, FieldInfo):
-        description = None
-    if isinstance(timeout, FieldInfo):
-        timeout = None
-    if isinstance(run_in_background, FieldInfo):
-        run_in_background = False
-
     # Get workspace root dynamically based on current session
     work_dir = await get_workspace_root_async(context)
 

@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from pydantic import Field
-from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 from fastmcp.server.context import Context  # type: ignore
 
@@ -96,10 +95,6 @@ async def glob(
 - Supports brace expansion like "**/*.{jpg,png,gif}"
 - Returns matching file and directory paths sorted by modification time
 - Use this tool when you need to find files or directories by name patterns"""
-
-    # Handle Pydantic FieldInfo objects when invoked programmatically
-    if isinstance(path, FieldInfo):
-        path = None
 
     # pattern is pre-validated by Pydantic (min_length=1)
 
