@@ -30,6 +30,7 @@ import { TodoStatusIndicator } from '../components/TodoStatusIndicator.js';
 import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js';
 import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
 import { FullContextView } from '../components/FullContextView.js';
+import { BackgroundTaskMonitor } from '../components/BackgroundTaskMonitor.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
@@ -810,6 +811,14 @@ export const MainLayout: React.FC = () => {
             showNumbers={false}
             showDescriptions={false}
             maxItemsToShow={10}
+          />
+        )}
+
+        {/* Background task monitor - above todo status */}
+        {appState.isInputActive && !appState.pendingConfirmation && !isDialogActive && (
+          <BackgroundTaskMonitor
+            activeTasks={appState.backgroundTasks}
+            activeCount={appState.activeBackgroundTaskCount}
           />
         )}
 

@@ -11,6 +11,7 @@ import { createContext, useContext } from 'react';
 import type { TokenUsage } from '@toyoura-nagisa/core';
 import type { HistoryItem, HistoryItemWithoutId, ToolConfirmationData, ConnectionStatus, AgentProfileType, AgentProfileInfo } from '../types.js';
 import type { TodoItem } from '../hooks/useTodoStatus.js';
+import type { BackgroundTask } from '../types/streamEvents.js';
 import { StreamingState } from './StreamingContext.js';
 
 /**
@@ -62,6 +63,10 @@ export interface AppState {
 
   // Full context mode (Ctrl+O toggle - show full thinking/tool results)
   isFullContextMode: boolean;
+
+  // Background tasks
+  backgroundTasks: BackgroundTask[];
+  activeBackgroundTaskCount: number;
 }
 
 export interface AppActions {
@@ -118,6 +123,8 @@ const defaultState: AppState = {
   tokenUsage: null,
   currentTodo: null,
   isFullContextMode: false,
+  backgroundTasks: [],
+  activeBackgroundTaskCount: 0,
 };
 
 const defaultActions: AppActions = {

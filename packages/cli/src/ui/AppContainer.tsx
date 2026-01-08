@@ -38,6 +38,7 @@ import { useConnectionState } from './hooks/useConnectionState.js';
 import { useSessionManagement } from './hooks/useSessionManagement.js';
 import { useProfileManager } from './hooks/useProfileManager.js';
 import { useTodoStatus } from './hooks/useTodoStatus.js';
+import { useBackgroundProcesses } from './hooks/useBackgroundProcesses.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { MessageType } from './types.js';
 import type { Config } from '../config/settings.js';
@@ -156,6 +157,11 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
   // Todo status (current in-progress task)
   const { currentTodo } = useTodoStatus({
+    connectionManager,
+  });
+
+  // Background processes (running bash tasks)
+  const { activeTasks: backgroundTasks, activeCount: activeBackgroundTaskCount } = useBackgroundProcesses({
     connectionManager,
   });
 
@@ -398,6 +404,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     tokenUsage: tokenUsage || sessionTokenUsage,
     currentTodo,
     isFullContextMode,
+    backgroundTasks,
+    activeBackgroundTaskCount,
   }), [
     connectionStatus,
     error,
@@ -417,6 +425,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     sessionTokenUsage,
     currentTodo,
     isFullContextMode,
+    backgroundTasks,
+    activeBackgroundTaskCount,
   ]);
 
   const appActions: AppActions = useMemo(() => ({
