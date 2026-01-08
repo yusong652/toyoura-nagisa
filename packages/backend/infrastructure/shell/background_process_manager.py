@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Set, Optional, List, Any, Literal
 from threading import Lock, Thread
 
-from .executor import ShellExecutor, BackgroundProcessHandle, ValidationError, ShellExecutorError
+from .executor import ShellExecutor, BackgroundProcessHandle, ShellExecutorError
 
 
 @dataclass
@@ -339,11 +339,6 @@ class BackgroundProcessManager:
                     python_detected=handle.is_python
                 )
 
-            except ValidationError as e:
-                return StartProcessResult(
-                    success=False,
-                    error=str(e)
-                )
             except ShellExecutorError as e:
                 return StartProcessResult(
                     success=False,

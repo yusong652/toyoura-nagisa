@@ -19,7 +19,6 @@ from backend.infrastructure.shell import ShellExecutor
 from backend.infrastructure.shell.executor import (
     ShellExecutorError,
     TimeoutError as ShellTimeoutError,
-    ValidationError as ShellValidationError,
 )
 
 __all__ = ["bash", "register_bash_tool"]
@@ -40,6 +39,7 @@ async def bash(
     context: Context,
     command: str = Field(
         ...,
+        min_length=1,
         description="The command to execute"
     ),
     description: Optional[str] = Field(
@@ -48,7 +48,9 @@ async def bash(
     ),
     timeout: Optional[int] = Field(
         None,
-        description="Optional timeout in milliseconds (max 600000)"
+        ge=1000,      # Minimum 1 second
+        le=600000,    # Maximum 10 minutes
+        description="Optional timeout in milliseconds (1000-600000, default: 120000)"
     ),
     run_in_background: bool = Field(
         False,
@@ -167,8 +169,6 @@ Working directory:
             working_directory=exec_result.working_directory,
         )
 
-    except ShellValidationError as e:
-        return error_response(str(e))
     except ShellTimeoutError as e:
         return error_response(str(e))
     except ShellExecutorError as e:

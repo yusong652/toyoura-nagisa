@@ -29,8 +29,6 @@ from .utils import enhance_python_command, prepare_shell_env
 
 # Constants
 DEFAULT_TIMEOUT_MS = 120000  # 2 minutes
-MAX_TIMEOUT_MS = 600000      # 10 minutes
-MIN_TIMEOUT_MS = 1000        # 1 second
 
 
 class ShellExecutorError(Exception):
@@ -40,11 +38,6 @@ class ShellExecutorError(Exception):
 
 class TimeoutError(ShellExecutorError):
     """Command execution timed out."""
-    pass
-
-
-class ValidationError(ShellExecutorError):
-    """Invalid parameters."""
     pass
 
 
@@ -185,20 +178,11 @@ class ShellExecutor:
             ShellExecutionResult with stdout, stderr, exit_code, etc.
 
         Raises:
-            ValidationError: If command is empty or timeout is invalid
             TimeoutError: If command exceeds timeout
             ShellExecutorError: If execution fails unexpectedly
         """
-        # Validate command
-        if not command or not command.strip():
-            raise ValidationError("Command cannot be empty")
-
-        # Validate and set timeout
+        # Set timeout (validation is done at tool layer via Pydantic)
         timeout_ms = timeout_ms if timeout_ms is not None else DEFAULT_TIMEOUT_MS
-        if timeout_ms > MAX_TIMEOUT_MS:
-            raise ValidationError(f"Timeout cannot exceed {MAX_TIMEOUT_MS}ms (10 minutes)")
-        if timeout_ms < MIN_TIMEOUT_MS:
-            raise ValidationError(f"Timeout must be at least {MIN_TIMEOUT_MS}ms (1 second)")
         timeout_seconds = timeout_ms / 1000.0
 
         # Prepare command
@@ -315,13 +299,8 @@ class ShellExecutor:
             BackgroundProcessHandle with process and metadata
 
         Raises:
-            ValidationError: If command is empty or cwd is invalid
             ShellExecutorError: If process creation fails
         """
-        # Validate command
-        if not command or not command.strip():
-            raise ValidationError("Command cannot be empty")
-
         # Prepare command
         enhanced_command, is_python = self._prepare_command(command)
 
