@@ -251,19 +251,25 @@ class BackgroundProcessManager:
             StartProcessResult with process info or error
         """
         with self._lock:
-            # Check global process limit
-            if len(self.processes) >= self.MAX_PROCESSES_GLOBAL:
+            # Check global process limit (only count running processes)
+            global_running = sum(
+                1 for p in self.processes.values() if p.status == "running"
+            )
+            if global_running >= self.MAX_PROCESSES_GLOBAL:
                 return StartProcessResult(
                     success=False,
-                    error=f"Maximum {self.MAX_PROCESSES_GLOBAL} global background processes exceeded"
+                    error=f"Maximum {self.MAX_PROCESSES_GLOBAL} concurrent global background processes"
                 )
 
-            # Check session process limits
-            session_process_count = len(self.session_processes.get(session_id, set()))
-            if session_process_count >= self.MAX_PROCESSES_PER_SESSION:
+            # Check session process limits (only count running processes)
+            running_count = sum(
+                1 for pid in self.session_processes.get(session_id, set())
+                if pid in self.processes and self.processes[pid].status == "running"
+            )
+            if running_count >= self.MAX_PROCESSES_PER_SESSION:
                 return StartProcessResult(
                     success=False,
-                    error=f"Maximum {self.MAX_PROCESSES_PER_SESSION} background processes per session exceeded"
+                    error=f"Maximum {self.MAX_PROCESSES_PER_SESSION} concurrent background processes per session"
                 )
 
             # Lazy import to avoid circular dependency with MCP tools
