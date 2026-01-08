@@ -1,7 +1,8 @@
-"""Stateless shell command executor.
+"""Unified shell command executor.
 
 Provides subprocess-based shell command execution with:
-- Timeout handling
+- Unified process creation for foreground and background execution
+- Timeout handling for foreground execution
 - Output processing (combine, normalize, truncate)
 - Cross-platform path normalization
 
@@ -14,6 +15,7 @@ import asyncio
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -47,13 +49,28 @@ class ValidationError(ShellExecutorError):
     pass
 
 
+@dataclass
+class BackgroundProcessHandle:
+    """Handle for a started background process.
+
+    Contains all information needed by BackgroundProcessManager
+    to track and manage the process lifecycle.
+    """
+    process: subprocess.Popen
+    command: str              # Original command
+    enhanced_command: str     # Command after enhancement
+    cwd: str
+    is_python: bool
+    start_time: float
+
+
 class ShellExecutor:
-    """Stateless shell command executor.
+    """Unified shell command executor.
 
-    Executes shell commands via subprocess with timeout and output processing.
-    Each execution is independent - no state is maintained between calls.
+    Provides both foreground (blocking) and background (non-blocking) execution
+    through a unified process creation mechanism.
 
-    Example:
+    Example (foreground):
         executor = ShellExecutor()
         result = await executor.execute(
             command="git status",
@@ -61,6 +78,14 @@ class ShellExecutor:
             timeout_ms=30000
         )
         print(result.stdout)
+
+    Example (background):
+        executor = ShellExecutor()
+        handle = executor.start_background(
+            command="npm run dev",
+            cwd="/path/to/project"
+        )
+        # handle.process is the Popen object for lifecycle management
     """
 
     def __init__(
@@ -71,11 +96,93 @@ class ShellExecutor:
         """Initialize the executor.
 
         Args:
-            max_output_lines: Maximum output lines before truncation
+            max_output_lines: Maximum output lines before truncation (foreground only)
             normalize_paths: Whether to normalize Windows paths in output
         """
         self.max_output_lines = max_output_lines
         self.normalize_paths = normalize_paths
+
+    def _validate_cwd(self, cwd: str) -> Path:
+        """Validate working directory exists and is a directory.
+
+        Args:
+            cwd: Working directory path
+
+        Returns:
+            Path object for the validated directory
+
+        Raises:
+            ValidationError: If cwd doesn't exist or isn't a directory
+        """
+        cwd_path = Path(cwd)
+        if not cwd_path.exists():
+            raise ValidationError(f"Working directory does not exist: {cwd}")
+        if not cwd_path.is_dir():
+            raise ValidationError(f"Path is not a directory: {cwd}")
+        return cwd_path
+
+    def _prepare_command(self, command: str) -> tuple[str, bool]:
+        """Prepare command for execution.
+
+        Performs:
+        - Windows path normalization
+        - Python command enhancement for unbuffered output
+        - Windows UTF-8 encoding setup
+
+        Args:
+            command: Raw command string
+
+        Returns:
+            Tuple of (enhanced_command, is_python)
+        """
+        # Normalize Windows paths in command
+        normalized_command = normalize_windows_paths(command)
+
+        # Enhance Python commands for unbuffered output
+        enhanced_command, is_python = enhance_python_command(normalized_command)
+
+        # On Windows, prepend chcp 65001 to force UTF-8 output from CMD
+        if sys.platform == "win32":
+            enhanced_command = f"chcp 65001 >nul && {enhanced_command}"
+
+        return enhanced_command, is_python
+
+    def _create_process(
+        self,
+        command: str,
+        cwd: str,
+        env: dict,
+        line_buffered: bool = False,
+    ) -> subprocess.Popen:
+        """Create a subprocess with unified configuration.
+
+        This is the single point of Popen creation, ensuring consistent
+        configuration across foreground and background execution.
+
+        Args:
+            command: The enhanced command to execute
+            cwd: Working directory
+            env: Environment variables
+            line_buffered: If True, use line buffering (for background processes
+                          that need real-time output). If False, use default
+                          buffering (for foreground processes).
+
+        Returns:
+            subprocess.Popen instance
+        """
+        return subprocess.Popen(
+            command,
+            shell=True,
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,  # Prevent blocking on interactive commands
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8',
+            errors='replace',  # Replace undecodable bytes instead of raising
+            bufsize=1 if line_buffered else -1,  # Line buffered or system default
+            env=env,
+        )
 
     async def execute(
         self,
@@ -84,7 +191,9 @@ class ShellExecutor:
         timeout_ms: Optional[int] = None,
         env: Optional[dict] = None,
     ) -> ShellExecutionResult:
-        """Execute a shell command.
+        """Execute a shell command (foreground, blocking).
+
+        Blocks until command completes or timeout is reached.
 
         Args:
             command: The shell command to execute
@@ -113,27 +222,16 @@ class ShellExecutor:
         timeout_seconds = timeout_ms / 1000.0
 
         # Validate cwd
-        cwd_path = Path(cwd)
-        if not cwd_path.exists():
-            raise ValidationError(f"Working directory does not exist: {cwd}")
-        if not cwd_path.is_dir():
-            raise ValidationError(f"Path is not a directory: {cwd}")
+        cwd_path = self._validate_cwd(cwd)
 
-        # Normalize Windows paths in command
-        normalized_command = normalize_windows_paths(command)
+        # Prepare command
+        enhanced_command, is_python = self._prepare_command(command)
 
-        # Enhance Python commands for unbuffered output
-        enhanced_command, is_python = enhance_python_command(normalized_command)
-
-        # On Windows, prepend chcp 65001 to force UTF-8 output from CMD
-        if sys.platform == "win32":
-            enhanced_command = f"chcp 65001 >nul && {enhanced_command}"
-
-        # Prepare environment with shell-friendly settings
+        # Prepare environment
         process_env = prepare_shell_env(base_env=env, force_unbuffered=is_python)
 
         try:
-            return await self._execute_subprocess(
+            return await self._execute_foreground(
                 command=enhanced_command,
                 original_command=command if enhanced_command != command else None,
                 cwd=str(cwd_path),
@@ -147,7 +245,7 @@ class ShellExecutor:
         except Exception as e:
             raise ShellExecutorError(f"Command execution failed: {type(e).__name__}: {e}") from e
 
-    async def _execute_subprocess(
+    async def _execute_foreground(
         self,
         command: str,
         cwd: str,
@@ -155,7 +253,7 @@ class ShellExecutor:
         env: dict,
         original_command: Optional[str] = None,
     ) -> ShellExecutionResult:
-        """Execute command via subprocess without blocking event loop.
+        """Execute command in foreground, blocking until completion.
 
         Uses asyncio.to_thread to run synchronous subprocess in a thread pool,
         which works reliably on all platforms including Windows.
@@ -164,17 +262,11 @@ class ShellExecutor:
 
         def _run_subprocess():
             """Run subprocess synchronously in thread pool."""
-            process = subprocess.Popen(
-                command,
-                shell=True,
+            process = self._create_process(
+                command=command,
                 cwd=cwd,
-                stdin=subprocess.DEVNULL,  # Prevent blocking on interactive commands
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding='utf-8',
-                errors='replace',  # Replace undecodable bytes instead of raising
                 env=env,
+                line_buffered=False,  # Foreground uses default buffering
             )
             try:
                 stdout, stderr = process.communicate(timeout=timeout_seconds)
@@ -205,8 +297,8 @@ class ShellExecutor:
         exit_code = result['exit_code']
         execution_time = time.time() - start_time
 
-        # Process output
-        combined_output = process_shell_output(
+        # Process output (foreground only - background handles its own output)
+        process_shell_output(
             stdout=stdout,
             stderr=stderr,
             max_lines=self.max_output_lines,
@@ -223,3 +315,63 @@ class ShellExecutor:
             timed_out=False,
             original_command=original_command,
         )
+
+    def start_background(
+        self,
+        command: str,
+        cwd: str,
+        env: Optional[dict] = None,
+    ) -> BackgroundProcessHandle:
+        """Start a background process (non-blocking).
+
+        Creates the process and returns immediately with a handle.
+        The caller (BackgroundProcessManager) is responsible for:
+        - Managing process lifecycle
+        - Reading output streams
+        - Cleanup on completion
+
+        Args:
+            command: The shell command to execute
+            cwd: Working directory for command execution
+            env: Optional environment variables (defaults to current env)
+
+        Returns:
+            BackgroundProcessHandle with process and metadata
+
+        Raises:
+            ValidationError: If command is empty or cwd is invalid
+            ShellExecutorError: If process creation fails
+        """
+        # Validate command
+        if not command or not command.strip():
+            raise ValidationError("Command cannot be empty")
+
+        # Validate cwd
+        cwd_path = self._validate_cwd(cwd)
+
+        # Prepare command
+        enhanced_command, is_python = self._prepare_command(command)
+
+        # Prepare environment - always force unbuffered for background
+        # to ensure real-time output availability
+        process_env = prepare_shell_env(base_env=env, force_unbuffered=True)
+
+        try:
+            process = self._create_process(
+                command=enhanced_command,
+                cwd=str(cwd_path),
+                env=process_env,
+                line_buffered=True,  # Background uses line buffering for real-time output
+            )
+
+            return BackgroundProcessHandle(
+                process=process,
+                command=command,
+                enhanced_command=enhanced_command,
+                cwd=str(cwd_path),
+                is_python=is_python,
+                start_time=time.time(),
+            )
+
+        except Exception as e:
+            raise ShellExecutorError(f"Failed to start background process: {type(e).__name__}: {e}") from e

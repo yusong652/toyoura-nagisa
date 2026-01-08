@@ -100,7 +100,8 @@ Working directory:
             result: StartProcessResult = process_manager.start_process(
                 session_id=cast(str, context.client_id),
                 command=command,
-                description=description
+                cwd=str(work_dir),
+                description=description,
             )
 
             # Convert infrastructure result to tool response
@@ -131,7 +132,7 @@ Working directory:
     # Execute command using infrastructure layer ShellExecutor
     try:
         executor = _get_executor()
-        result = await executor.execute(
+        exec_result = await executor.execute(
             command=command,
             cwd=str(work_dir),
             timeout_ms=timeout,
@@ -139,15 +140,15 @@ Working directory:
 
         # Process output for LLM consumption
         combined_output = process_shell_output(
-            stdout=result.stdout,
-            stderr=result.stderr,
+            stdout=exec_result.stdout,
+            stderr=exec_result.stderr,
         )
 
         # Build response message
-        if result.exit_code == 0:
-            message = f"Command executed successfully (exit code {result.exit_code}, {result.execution_time:.1f}s)"
+        if exec_result.exit_code == 0:
+            message = f"Command executed successfully (exit code {exec_result.exit_code}, {exec_result.execution_time:.1f}s)"
         else:
-            message = f"Command failed with exit code {result.exit_code} ({result.execution_time:.1f}s)"
+            message = f"Command failed with exit code {exec_result.exit_code} ({exec_result.execution_time:.1f}s)"
 
         # Return complete terminal output for both success and failure
         return success_response(
@@ -157,13 +158,13 @@ Working directory:
                     {"type": "text", "text": combined_output}
                 ]
             },
-            exit_code=result.exit_code,
-            execution_time=result.execution_time,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            command=result.command,
-            original_command=result.original_command,
-            working_directory=result.working_directory,
+            exit_code=exec_result.exit_code,
+            execution_time=exec_result.execution_time,
+            stdout=exec_result.stdout,
+            stderr=exec_result.stderr,
+            command=exec_result.command,
+            original_command=exec_result.original_command,
+            working_directory=exec_result.working_directory,
         )
 
     except ShellValidationError as e:

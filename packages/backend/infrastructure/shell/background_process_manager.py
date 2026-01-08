@@ -1,28 +1,25 @@
 """
-Improved Background Process Manager for toyoura-nagisa with better output handling.
+Background Process Manager for toyoura-nagisa.
 
-Key improvements:
-1. Force unbuffered output for Python scripts
-2. Provide helpful hints when no output is available
-3. Better align with Claude Code behavior while fixing its limitations
+Manages background bash process lifecycle:
+- Process tracking and session isolation
+- Output buffering and incremental reading
+- Resource limits and cleanup
+- Notification integration
+
+Uses ShellExecutor for unified process creation.
 """
 
 import asyncio
 import re
 import subprocess
-import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, Set, Optional, List, Any, Literal
 from threading import Lock, Thread
 
-from backend.infrastructure.shell.utils import (
-    detect_python_command,
-    enhance_python_command,
-    prepare_shell_env,
-)
+from .executor import ShellExecutor, BackgroundProcessHandle, ValidationError, ShellExecutorError
 
 
 @dataclass
@@ -110,13 +107,17 @@ class KillProcessResult:
 
 class BackgroundProcessManager:
     """
-    Manages background bash processes with improved output handling.
+    Manages background bash process lifecycle.
 
-    Design Philosophy:
-    1. Align with Claude Code's complete output approach (not incremental)
-    2. Fix Python buffering issues automatically
-    3. Provide helpful feedback when processes have no output
-    4. Maintain session isolation and resource limits
+    Responsibilities:
+    - Process tracking and session isolation
+    - Output buffering with incremental reading
+    - Resource limits (per-session, global)
+    - Automatic cleanup of old processes
+    - Notification integration
+
+    Uses ShellExecutor for process creation, ensuring unified
+    command preparation and Popen configuration.
     """
 
     # Configuration constants
@@ -127,8 +128,14 @@ class BackgroundProcessManager:
     PROCESS_TIMEOUT_HOURS = 2
     CLEANUP_INTERVAL_MINUTES = 10
 
-    def __init__(self):
-        """Initialize the background process manager."""
+    def __init__(self, executor: Optional[ShellExecutor] = None):
+        """Initialize the background process manager.
+
+        Args:
+            executor: ShellExecutor instance for process creation.
+                     If None, creates a default instance.
+        """
+        self.executor = executor or ShellExecutor()
         self.processes: Dict[str, BackgroundProcess] = {}
         self.session_processes: Dict[str, Set[str]] = {}  # session_id -> process_ids
         self._lock = Lock()
@@ -179,6 +186,7 @@ class BackgroundProcessManager:
 
     def _cleanup_worker(self) -> None:
         """Background worker for cleaning up old processes."""
+        import time
         while True:
             try:
                 time.sleep(self.CLEANUP_INTERVAL_MINUTES * 60)
@@ -237,14 +245,16 @@ class BackgroundProcessManager:
         self,
         session_id: str,
         command: str,
+        cwd: str,
         description: Optional[str] = None
     ) -> StartProcessResult:
         """
-        Start a background bash process with improved output handling.
+        Start a background bash process.
 
         Args:
             session_id: Session ID for process isolation
             command: Shell command to execute
+            cwd: Working directory for command execution
             description: Optional description for the command
 
         Returns:
@@ -272,69 +282,40 @@ class BackgroundProcessManager:
                     error=f"Maximum {self.MAX_PROCESSES_PER_SESSION} concurrent background processes per session"
                 )
 
-            # Lazy import to avoid circular dependency with MCP tools
-            from backend.infrastructure.mcp.tools.coding.utils.path_security import (
-                validate_path_in_workspace,
-                WORKSPACE_ROOT,
-            )
-
-            # Validate workspace access
-            if not validate_path_in_workspace("."):
-                return StartProcessResult(
-                    success=False,
-                    error="Cannot access workspace directory"
-                )
-
-            work_dir = Path(str(WORKSPACE_ROOT))
-
             try:
                 # Generate unique process ID
                 process_id = self._generate_process_id()
                 while process_id in self.processes:
                     process_id = self._generate_process_id()
 
-                # Detect and enhance Python commands using shared utils
-                is_python = detect_python_command(command)
-                enhanced_command, _ = enhance_python_command(command)
-
-                # Prepare environment with unbuffered output using shared utils
-                env = prepare_shell_env(base_env=None, force_unbuffered=True, encoding='utf-8')
-
-                # Start the subprocess with line buffering
-                popen = subprocess.Popen(
-                    enhanced_command,
-                    shell=True,
-                    cwd=str(work_dir),
-                    stdin=subprocess.DEVNULL,  # Prevent blocking on interactive commands
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    bufsize=1,  # Line buffered
-                    env=env
+                # Use ShellExecutor for unified process creation
+                handle: BackgroundProcessHandle = self.executor.start_background(
+                    command=command,
+                    cwd=cwd,
                 )
 
                 # Create process tracking object
                 bg_process = BackgroundProcess(
                     process_id=process_id,
                     session_id=session_id,
-                    command=command,  # Store original command
+                    command=handle.command,  # Original command
                     description=description,
-                    process=popen,
-                    start_time=datetime.now(),
+                    process=handle.process,
+                    start_time=datetime.fromtimestamp(handle.start_time),
                     status="running",
-                    working_directory=str(work_dir),
-                    is_python_script=is_python
+                    working_directory=handle.cwd,
+                    is_python_script=handle.is_python
                 )
 
                 # Start output reading threads
                 bg_process._stdout_thread = Thread(
                     target=self._read_output_stream,
-                    args=(bg_process, popen.stdout, False),
+                    args=(bg_process, handle.process.stdout, False),
                     daemon=True
                 )
                 bg_process._stderr_thread = Thread(
                     target=self._read_output_stream,
-                    args=(bg_process, popen.stderr, True),
+                    args=(bg_process, handle.process.stderr, True),
                     daemon=True
                 )
 
@@ -353,11 +334,21 @@ class BackgroundProcessManager:
                 return StartProcessResult(
                     success=True,
                     process_id=process_id,
-                    command=command,
-                    working_directory=str(work_dir),
-                    python_detected=is_python
+                    command=handle.command,
+                    working_directory=handle.cwd,
+                    python_detected=handle.is_python
                 )
 
+            except ValidationError as e:
+                return StartProcessResult(
+                    success=False,
+                    error=str(e)
+                )
+            except ShellExecutorError as e:
+                return StartProcessResult(
+                    success=False,
+                    error=str(e)
+                )
             except Exception as e:
                 return StartProcessResult(
                     success=False,
