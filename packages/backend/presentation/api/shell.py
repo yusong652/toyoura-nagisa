@@ -17,8 +17,7 @@ from backend.presentation.models.api_models import ApiResponse
 from backend.application.services.shell import ShellService
 from backend.infrastructure.shell.executor import (
     ShellExecutorError,
-    TimeoutError as ShellTimeoutError,
-    ValidationError as ShellValidationError,
+    TimeoutError as ShellTimeoutError
 )
 from backend.infrastructure.monitoring.status_monitor import get_status_monitor
 from backend.shared.utils.workspace import get_workspace_for_profile
@@ -113,20 +112,6 @@ async def execute_shell_command(request: ExecuteRequest) -> ApiResponse[ShellExe
             )
         )
 
-    except ShellValidationError as e:
-        service = await _get_shell_service(request.session_id, request.agent_profile)
-        return ApiResponse(
-            success=False,
-            message=str(e),
-            error_code="VALIDATION_ERROR",
-            data=ShellExecuteData(
-                stdout="",
-                stderr=str(e),
-                exit_code=1,
-                cwd=service.get_cwd(),
-                context="",
-            )
-        )
     except ShellTimeoutError as e:
         service = await _get_shell_service(request.session_id, request.agent_profile)
         return ApiResponse(
