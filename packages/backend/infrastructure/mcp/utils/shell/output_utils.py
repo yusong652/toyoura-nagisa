@@ -8,8 +8,8 @@ Provides functions for processing shell command output:
 
 from typing import Optional
 
-# Constants matching Claude Code behavior
-DEFAULT_MAX_OUTPUT_SIZE = 30000  # 30KB output limit
+# Output limits for LLM consumption
+DEFAULT_MAX_OUTPUT_LINES = 1000  # Line-based limit (more predictable than bytes)
 
 
 def combine_stdout_stderr(stdout: str, stderr: str) -> str:
@@ -30,27 +30,31 @@ def combine_stdout_stderr(stdout: str, stderr: str) -> str:
     return stdout or stderr
 
 
-def truncate_output(output: str, max_size: int = DEFAULT_MAX_OUTPUT_SIZE) -> str:
-    """Truncate output if it exceeds the maximum size.
+def truncate_output(output: str, max_lines: int = DEFAULT_MAX_OUTPUT_LINES) -> str:
+    """Truncate output if it exceeds the maximum line count.
 
     Args:
         output: The output string to truncate
-        max_size: Maximum allowed size in characters
+        max_lines: Maximum allowed number of lines
 
     Returns:
         Original output if within limit, or truncated with notice appended
     """
-    if not output or len(output) <= max_size:
+    if not output:
         return output
 
-    truncated = output[:max_size]
-    return f"{truncated}\n\n... [OUTPUT TRUNCATED - exceeded {max_size} character limit] ..."
+    lines = output.split('\n')
+    if len(lines) <= max_lines:
+        return output
+
+    truncated = '\n'.join(lines[:max_lines])
+    return f"{truncated}\n\n... [TRUNCATED - showing {max_lines} of {len(lines)} lines] ..."
 
 
 def process_shell_output(
     stdout: str,
     stderr: str,
-    max_size: int = DEFAULT_MAX_OUTPUT_SIZE,
+    max_lines: int = DEFAULT_MAX_OUTPUT_LINES,
     normalize_paths: bool = True
 ) -> str:
     """Process shell output for LLM consumption.
@@ -60,7 +64,7 @@ def process_shell_output(
     Args:
         stdout: Standard output from command
         stderr: Standard error from command
-        max_size: Maximum output size before truncation
+        max_lines: Maximum output lines before truncation
         normalize_paths: Whether to normalize Windows paths to forward slashes
 
     Returns:
@@ -76,5 +80,5 @@ def process_shell_output(
         )
         combined = normalize_output_paths_to_llm_format(combined)
 
-    # Truncate if too large
-    return truncate_output(combined, max_size)
+    # Truncate if too many lines
+    return truncate_output(combined, max_lines)

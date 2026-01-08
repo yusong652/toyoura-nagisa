@@ -12,6 +12,7 @@ from pydantic import Field
 from fastmcp.server.context import Context  # type: ignore
 
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.shell import truncate_output
 from backend.infrastructure.shell.background_process_manager import (
     get_process_manager,
     ProcessOutputResult,
@@ -28,7 +29,8 @@ def _build_llm_content(result: ProcessOutputResult) -> str:
         parts.append(f"<exit_code>{result.exit_code}</exit_code>")
 
     if result.stdout:
-        parts.append(f"<stdout>\n{result.stdout}\n</stdout>")
+        truncated_stdout = truncate_output(result.stdout)
+        parts.append(f"<stdout>\n{truncated_stdout}\n</stdout>")
     elif not result.has_new_output and result.status == "running":
         # Provide helpful context when no new output
         hint = ""
@@ -39,7 +41,8 @@ def _build_llm_content(result: ProcessOutputResult) -> str:
         parts.append(f"<info>No new output since last check{hint}</info>")
 
     if result.stderr:
-        parts.append(f"<stderr>\n{result.stderr}\n</stderr>")
+        truncated_stderr = truncate_output(result.stderr)
+        parts.append(f"<stderr>\n{truncated_stderr}\n</stderr>")
 
     parts.append(f"<timestamp>{datetime.now().isoformat()}Z</timestamp>")
 
