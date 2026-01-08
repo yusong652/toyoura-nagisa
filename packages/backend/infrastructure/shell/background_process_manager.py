@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Dict, Set, Optional, List, Any, Literal
 from threading import Lock, Thread
 
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.shell.utils import (
     detect_python_command,
     enhance_python_command,
@@ -93,6 +92,19 @@ class ProcessOutputResult:
     is_python_script: bool = False
     runtime_seconds: float = 0.0
     # Error
+    error: Optional[str] = None
+
+
+@dataclass
+class KillProcessResult:
+    """Result of killing a background process.
+
+    Infrastructure layer returns this; tool layer converts to success_response/error_response.
+    """
+    success: bool
+    process_id: Optional[str] = None
+    command: Optional[str] = None
+    final_output: str = ""
     error: Optional[str] = None
 
 
@@ -420,7 +432,7 @@ class BackgroundProcessManager:
                 runtime_seconds=runtime_seconds,
             )
 
-    def kill_process(self, process_id: str) -> Dict[str, Any]:
+    def kill_process(self, process_id: str) -> KillProcessResult:
         """
         Kill a background process.
 
@@ -428,16 +440,22 @@ class BackgroundProcessManager:
             process_id: Process ID to kill
 
         Returns:
-            Dict containing kill result
+            KillProcessResult with kill status or error
         """
         with self._lock:
             if process_id not in self.processes:
-                return error_response(f"Process {process_id} not found")
+                return KillProcessResult(
+                    success=False,
+                    error=f"Process {process_id} not found"
+                )
 
             bg_process = self.processes[process_id]
 
             if bg_process.status != "running":
-                return error_response(f"Process {process_id} is not running (status: {bg_process.status})")
+                return KillProcessResult(
+                    success=False,
+                    error=f"Process {process_id} is not running (status: {bg_process.status})"
+                )
 
             try:
                 # Get any remaining output before killing
@@ -459,25 +477,18 @@ class BackgroundProcessManager:
                 bg_process.status = "killed"
                 bg_process.exit_code = bg_process.process.returncode
 
-                # Format response similar to Claude Code
-                kill_message = f"Successfully killed shell: {process_id} ({bg_process.command})"
-
-                return success_response(
-                    message=kill_message,
-                    llm_content={
-                        "parts": [
-                            {"type": "text", "text": f'{{"message":"{kill_message}","shell_id":"{process_id}"}}'}
-                        ]
-                    },
-                    shell_id=process_id,
+                return KillProcessResult(
+                    success=True,
+                    process_id=process_id,
                     command=bg_process.command,
-                    kill_successful=True,
                     final_output=final_stdout + final_stderr,
-                    timestamp=datetime.now().isoformat()
                 )
 
             except Exception as e:
-                return error_response(f"Failed to kill process {process_id}: {e}")
+                return KillProcessResult(
+                    success=False,
+                    error=f"Failed to kill process {process_id}: {e}"
+                )
 
     def has_active_processes(self, session_id: str) -> bool:
         """

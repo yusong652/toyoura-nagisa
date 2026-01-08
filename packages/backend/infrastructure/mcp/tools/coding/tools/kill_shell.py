@@ -5,12 +5,16 @@ Provides process termination functionality for toyoura-nagisa's background bash 
 designed to match Claude Code's KillShell tool behavior.
 """
 
+from datetime import datetime
 from typing import Dict, Any
 from pydantic import Field
 from fastmcp.server.context import Context  # type: ignore
 
-from backend.infrastructure.mcp.utils.tool_result import error_response
-from backend.infrastructure.shell.background_process_manager import get_process_manager
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.shell.background_process_manager import (
+    get_process_manager,
+    KillProcessResult,
+)
 
 __all__ = ["kill_shell", "register_kill_shell_tool"]
 
@@ -45,7 +49,27 @@ async def kill_shell(
             return error_response(f"Process {shell_id} not found in your session")
 
         # Kill the specified process
-        return process_manager.kill_process(shell_id)
+        result: KillProcessResult = process_manager.kill_process(shell_id)
+
+        # Convert infrastructure result to tool response
+        if not result.success:
+            return error_response(result.error or "Unknown error")
+
+        kill_message = f"Successfully killed shell: {result.process_id} ({result.command})"
+
+        return success_response(
+            message=kill_message,
+            llm_content={
+                "parts": [
+                    {"type": "text", "text": f'{{"message":"{kill_message}","shell_id":"{result.process_id}"}}'}
+                ]
+            },
+            shell_id=result.process_id,
+            command=result.command,
+            kill_successful=True,
+            final_output=result.final_output,
+            timestamp=datetime.now().isoformat()
+        )
     except Exception as e:
         return error_response(f"Failed to kill process: {e}")
 
