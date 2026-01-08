@@ -24,7 +24,7 @@ from backend.infrastructure.mcp.utils.shell import (
     process_shell_output,
     DEFAULT_MAX_OUTPUT_LINES,
 )
-from .utils import enhance_python_command, prepare_shell_env
+from .utils import prepare_shell_env
 
 
 # Constants
@@ -50,9 +50,8 @@ class BackgroundProcessHandle:
     """
     process: subprocess.Popen
     command: str              # Original command
-    enhanced_command: str     # Command after enhancement
+    prepared_command: str     # Command after preparation (path normalization, etc.)
     cwd: str
-    is_python: bool
     start_time: float
 
 
@@ -94,31 +93,27 @@ class ShellExecutor:
         self.max_output_lines = max_output_lines
         self.normalize_paths = normalize_paths
 
-    def _prepare_command(self, command: str) -> tuple[str, bool]:
+    def _prepare_command(self, command: str) -> str:
         """Prepare command for execution.
 
         Performs:
         - Windows path normalization
-        - Python command enhancement for unbuffered output
         - Windows UTF-8 encoding setup
 
         Args:
             command: Raw command string
 
         Returns:
-            Tuple of (enhanced_command, is_python)
+            Prepared command string
         """
         # Normalize Windows paths in command
-        normalized_command = normalize_windows_paths(command)
-
-        # Enhance Python commands for unbuffered output
-        enhanced_command, is_python = enhance_python_command(normalized_command)
+        prepared_command = normalize_windows_paths(command)
 
         # On Windows, prepend chcp 65001 to force UTF-8 output from CMD
         if sys.platform == "win32":
-            enhanced_command = f"chcp 65001 >nul && {enhanced_command}"
+            prepared_command = f"chcp 65001 >nul && {prepared_command}"
 
-        return enhanced_command, is_python
+        return prepared_command
 
     def _create_process(
         self,
@@ -186,15 +181,15 @@ class ShellExecutor:
         timeout_seconds = timeout_ms / 1000.0
 
         # Prepare command
-        enhanced_command, is_python = self._prepare_command(command)
+        prepared_command = self._prepare_command(command)
 
-        # Prepare environment
-        process_env = prepare_shell_env(base_env=env, force_unbuffered=is_python)
+        # Prepare environment (always unbuffered for real-time output)
+        process_env = prepare_shell_env(base_env=env, force_unbuffered=True)
 
         try:
             return await self._execute_foreground(
-                command=enhanced_command,
-                original_command=command if enhanced_command != command else None,
+                command=prepared_command,
+                original_command=command if prepared_command != command else None,
                 cwd=cwd,
                 timeout_seconds=timeout_seconds,
                 env=process_env,
@@ -302,15 +297,14 @@ class ShellExecutor:
             ShellExecutorError: If process creation fails
         """
         # Prepare command
-        enhanced_command, is_python = self._prepare_command(command)
+        prepared_command = self._prepare_command(command)
 
-        # Prepare environment - always force unbuffered for background
-        # to ensure real-time output availability
+        # Prepare environment (always unbuffered for real-time output)
         process_env = prepare_shell_env(base_env=env, force_unbuffered=True)
 
         try:
             process = self._create_process(
-                command=enhanced_command,
+                command=prepared_command,
                 cwd=cwd,
                 env=process_env,
                 line_buffered=True,  # Background uses line buffering for real-time output
@@ -319,9 +313,8 @@ class ShellExecutor:
             return BackgroundProcessHandle(
                 process=process,
                 command=command,
-                enhanced_command=enhanced_command,
+                prepared_command=prepared_command,
                 cwd=cwd,
-                is_python=is_python,
                 start_time=time.time(),
             )
 

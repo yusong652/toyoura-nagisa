@@ -43,7 +43,6 @@ class BackgroundProcess:
     # Metadata
     last_accessed: datetime = field(default_factory=datetime.now)
     working_directory: str = ""
-    is_python_script: bool = False  # Track if command is running Python
     completion_notified: bool = False  # Track if completion/error has been notified
 
     # Output reading tracking
@@ -63,7 +62,6 @@ class StartProcessResult:
     process_id: Optional[str] = None
     command: Optional[str] = None
     working_directory: Optional[str] = None
-    python_detected: bool = False
     error: Optional[str] = None
 
 
@@ -85,8 +83,7 @@ class ProcessOutputResult:
     has_new_output: bool = False
     new_line_count: int = 0
     total_line_count: int = 0
-    # Metadata for hint generation
-    is_python_script: bool = False
+    # Metadata
     runtime_seconds: float = 0.0
     # Error
     error: Optional[str] = None
@@ -304,7 +301,6 @@ class BackgroundProcessManager:
                     start_time=datetime.fromtimestamp(handle.start_time),
                     status="running",
                     working_directory=handle.cwd,
-                    is_python_script=handle.is_python
                 )
 
                 # Start output reading threads
@@ -336,7 +332,6 @@ class BackgroundProcessManager:
                     process_id=process_id,
                     command=handle.command,
                     working_directory=handle.cwd,
-                    python_detected=handle.is_python
                 )
 
             except ShellExecutorError as e:
@@ -432,7 +427,6 @@ class BackgroundProcessManager:
                 has_new_output=(bool(stdout_text) or bool(stderr_text)),
                 new_line_count=len(new_stdout) + len(new_stderr),
                 total_line_count=total_stdout_lines + total_stderr_lines,
-                is_python_script=bg_process.is_python_script,
                 runtime_seconds=runtime_seconds,
             )
 
