@@ -16,7 +16,6 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 from backend.infrastructure.mcp.utils.path_normalization import normalize_windows_paths
@@ -101,25 +100,6 @@ class ShellExecutor:
         """
         self.max_output_lines = max_output_lines
         self.normalize_paths = normalize_paths
-
-    def _validate_cwd(self, cwd: str) -> Path:
-        """Validate working directory exists and is a directory.
-
-        Args:
-            cwd: Working directory path
-
-        Returns:
-            Path object for the validated directory
-
-        Raises:
-            ValidationError: If cwd doesn't exist or isn't a directory
-        """
-        cwd_path = Path(cwd)
-        if not cwd_path.exists():
-            raise ValidationError(f"Working directory does not exist: {cwd}")
-        if not cwd_path.is_dir():
-            raise ValidationError(f"Path is not a directory: {cwd}")
-        return cwd_path
 
     def _prepare_command(self, command: str) -> tuple[str, bool]:
         """Prepare command for execution.
@@ -221,9 +201,6 @@ class ShellExecutor:
             raise ValidationError(f"Timeout must be at least {MIN_TIMEOUT_MS}ms (1 second)")
         timeout_seconds = timeout_ms / 1000.0
 
-        # Validate cwd
-        cwd_path = self._validate_cwd(cwd)
-
         # Prepare command
         enhanced_command, is_python = self._prepare_command(command)
 
@@ -234,7 +211,7 @@ class ShellExecutor:
             return await self._execute_foreground(
                 command=enhanced_command,
                 original_command=command if enhanced_command != command else None,
-                cwd=str(cwd_path),
+                cwd=cwd,
                 timeout_seconds=timeout_seconds,
                 env=process_env,
             )
@@ -345,9 +322,6 @@ class ShellExecutor:
         if not command or not command.strip():
             raise ValidationError("Command cannot be empty")
 
-        # Validate cwd
-        cwd_path = self._validate_cwd(cwd)
-
         # Prepare command
         enhanced_command, is_python = self._prepare_command(command)
 
@@ -358,7 +332,7 @@ class ShellExecutor:
         try:
             process = self._create_process(
                 command=enhanced_command,
-                cwd=str(cwd_path),
+                cwd=cwd,
                 env=process_env,
                 line_buffered=True,  # Background uses line buffering for real-time output
             )
@@ -367,7 +341,7 @@ class ShellExecutor:
                 process=process,
                 command=command,
                 enhanced_command=enhanced_command,
-                cwd=str(cwd_path),
+                cwd=cwd,
                 is_python=is_python,
                 start_time=time.time(),
             )
