@@ -121,7 +121,9 @@ class BackgroundProcessManager:
 
     # Configuration constants
     MAX_PROCESSES_PER_SESSION = 10
+    MAX_PROCESSES_GLOBAL = 50  # Global limit across all sessions
     MAX_BUFFER_LINES = 10000  # Store more lines since we return complete output
+    MAX_LINE_LENGTH = 10000  # Single line max length (10KB)
     PROCESS_TIMEOUT_HOURS = 2
     CLEANUP_INTERVAL_MINUTES = 10
 
@@ -208,6 +210,9 @@ class BackgroundProcessManager:
                 with process._output_lock:
                     # Store lines for incremental reading
                     cleaned_line = line.rstrip('\n\r')
+                    # Truncate very long lines to prevent memory issues
+                    if len(cleaned_line) > self.MAX_LINE_LENGTH:
+                        cleaned_line = cleaned_line[:self.MAX_LINE_LENGTH] + "... (truncated)"
                     buffer.append(cleaned_line)
                     process._last_output_time = datetime.now()
 
@@ -246,6 +251,13 @@ class BackgroundProcessManager:
             StartProcessResult with process info or error
         """
         with self._lock:
+            # Check global process limit
+            if len(self.processes) >= self.MAX_PROCESSES_GLOBAL:
+                return StartProcessResult(
+                    success=False,
+                    error=f"Maximum {self.MAX_PROCESSES_GLOBAL} global background processes exceeded"
+                )
+
             # Check session process limits
             session_process_count = len(self.session_processes.get(session_id, set()))
             if session_process_count >= self.MAX_PROCESSES_PER_SESSION:
