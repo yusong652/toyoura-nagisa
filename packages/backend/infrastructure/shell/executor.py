@@ -21,7 +21,7 @@ from backend.infrastructure.mcp.utils.path_normalization import normalize_window
 from backend.infrastructure.mcp.utils.shell import (
     ShellExecutionResult,
     process_shell_output,
-    DEFAULT_MAX_OUTPUT_SIZE,
+    DEFAULT_MAX_OUTPUT_LINES,
 )
 from .utils import enhance_python_command, prepare_shell_env
 
@@ -65,16 +65,16 @@ class ShellExecutor:
 
     def __init__(
         self,
-        max_output_size: int = DEFAULT_MAX_OUTPUT_SIZE,
+        max_output_lines: int = DEFAULT_MAX_OUTPUT_LINES,
         normalize_paths: bool = True,
     ):
         """Initialize the executor.
 
         Args:
-            max_output_size: Maximum output size before truncation
+            max_output_lines: Maximum output lines before truncation
             normalize_paths: Whether to normalize Windows paths in output
         """
-        self.max_output_size = max_output_size
+        self.max_output_lines = max_output_lines
         self.normalize_paths = normalize_paths
 
     async def execute(
@@ -209,7 +209,7 @@ class ShellExecutor:
         combined_output = process_shell_output(
             stdout=stdout,
             stderr=stderr,
-            max_size=self.max_output_size,
+            max_lines=self.max_output_lines,
             normalize_paths=self.normalize_paths,
         )
 
