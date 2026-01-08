@@ -26,6 +26,9 @@ from backend.infrastructure.mcp.utils.shell import (
 )
 from .utils import prepare_shell_env
 
+# Default timeout for foreground execution (30 seconds)
+DEFAULT_TIMEOUT_MS = 30000
+
 
 class ShellExecutorError(Exception):
     """Base exception for shell executor errors."""
@@ -152,7 +155,7 @@ class ShellExecutor:
         self,
         command: str,
         cwd: str,
-        timeout_ms: int,
+        timeout_ms: Optional[int] = None,
         env: Optional[dict] = None,
     ) -> ShellExecutionResult:
         """Execute a shell command (foreground, blocking).
@@ -162,7 +165,7 @@ class ShellExecutor:
         Args:
             command: The shell command to execute
             cwd: Working directory for command execution
-            timeout_ms: Timeout in milliseconds
+            timeout_ms: Timeout in milliseconds (defaults to DEFAULT_TIMEOUT_MS)
             env: Optional environment variables (defaults to current env)
 
         Returns:
@@ -172,7 +175,8 @@ class ShellExecutor:
             TimeoutError: If command exceeds timeout
             ShellExecutorError: If execution fails unexpectedly
         """
-        timeout_seconds = timeout_ms / 1000.0
+        effective_timeout = timeout_ms if timeout_ms is not None else DEFAULT_TIMEOUT_MS
+        timeout_seconds = effective_timeout / 1000.0
 
         # Prepare command
         prepared_command = self._prepare_command(command)

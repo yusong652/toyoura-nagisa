@@ -14,7 +14,13 @@ circular imports with MCP tools. Import directly from submodule:
     from backend.infrastructure.shell.background_process_manager import get_process_manager
 """
 
-from .executor import ShellExecutor, BackgroundProcessHandle
+from .executor import (
+    ShellExecutor,
+    BackgroundProcessHandle,
+    ShellExecutorError,
+    TimeoutError,
+    DEFAULT_TIMEOUT_MS,
+)
 from .state import ShellState, ShellStateStorage
 from .utils import (
     detect_python_command,
@@ -27,6 +33,8 @@ __all__ = [
     # Executor
     "ShellExecutor",
     "BackgroundProcessHandle",
+    "ShellExecutorError",
+    "TimeoutError",
     # State
     "ShellState",
     "ShellStateStorage",
@@ -36,4 +44,5 @@ __all__ = [
     # Constants
     "MAX_LINE_LENGTH",
     "MAX_BUFFER_LINES",
+    "DEFAULT_TIMEOUT_MS",
 ]

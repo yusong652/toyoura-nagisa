@@ -15,9 +15,9 @@ from pydantic import BaseModel, Field
 
 from backend.presentation.models.api_models import ApiResponse
 from backend.application.services.shell import ShellService
-from backend.infrastructure.shell.executor import (
+from backend.infrastructure.shell import (
     ShellExecutorError,
-    TimeoutError as ShellTimeoutError
+    TimeoutError as ShellTimeoutError,
 )
 from backend.infrastructure.monitoring.status_monitor import get_status_monitor
 from backend.shared.utils.workspace import get_workspace_for_profile
