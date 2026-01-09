@@ -207,34 +207,40 @@ class ShellExecutor:
         env: dict,
         original_command: Optional[str] = None,
     ) -> ShellExecutionResult:
-        """Execute command in foreground using native asyncio subprocess.
+        """Execute command in foreground using subprocess with asyncio.
 
-        Uses asyncio.create_subprocess_shell for true async execution
-        without blocking the event loop or consuming thread pool resources.
+        Uses subprocess.Popen with asyncio.to_thread for cross-platform
+        compatibility. This works on Windows with both ProactorEventLoop
+        and SelectorEventLoop (uvicorn reload mode uses SelectorEventLoop,
+        which does not support asyncio.create_subprocess_shell).
         """
         start_time = time.time()
 
+        process: Optional[subprocess.Popen] = None
         try:
-            # Create subprocess using native asyncio
-            process = await asyncio.create_subprocess_shell(
+            # Create subprocess using standard subprocess module
+            # This works regardless of the asyncio event loop type
+            process = subprocess.Popen(
                 command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                stdin=asyncio.subprocess.DEVNULL,
+                shell=True,
                 cwd=cwd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 env=env,
             )
 
-            # Wait for completion with timeout
+            # Wait for completion with timeout using asyncio.to_thread
+            # This runs communicate() in a thread pool, freeing the event loop
             try:
                 stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                    process.communicate(),
+                    asyncio.to_thread(process.communicate),
                     timeout=timeout_seconds
                 )
             except asyncio.TimeoutError:
                 # Kill the process on timeout
                 process.kill()
-                await process.communicate()  # Clean up
+                process.communicate()  # Clean up (blocking, but process is dead)
                 raise TimeoutError(f"Command timed out after {timeout_seconds:.1f} seconds")
 
             # Decode output (handle encoding errors gracefully)
@@ -246,6 +252,10 @@ class ShellExecutor:
         except TimeoutError:
             raise
         except Exception as e:
+            # Ensure process cleanup on unexpected errors
+            if process is not None and process.poll() is None:
+                process.kill()
+                process.communicate()
             raise ShellExecutorError(f"Subprocess execution failed: {type(e).__name__}: {e}") from e
 
         execution_time = time.time() - start_time
