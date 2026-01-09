@@ -76,6 +76,13 @@ export interface SemanticTheme {
     addedText: string;
     removedText: string;
   };
+  /** Background task monitor colors */
+  task: {
+    indicator: string;   // Running indicator (▶)
+    title: string;       // Task description
+    meta: string;        // Runtime, metadata
+    output: string;      // Output lines
+  };
   /** Gradient colors for header/branding */
   gradient: string[];
 }
@@ -242,7 +249,21 @@ interface DiffColors {
   removedText: string;
 }
 
-function createSemanticTheme(colors: ThemeColors, gradient?: string[], diff?: DiffColors): SemanticTheme {
+interface TaskColors {
+  indicator: string;
+  title: string;
+  meta: string;
+  output: string;
+}
+
+interface SemanticThemeOptions {
+  gradient?: string[];
+  diff?: DiffColors;
+  task?: TaskColors;
+}
+
+function createSemanticTheme(colors: ThemeColors, options?: SemanticThemeOptions): SemanticTheme {
+  const { gradient, diff, task } = options || {};
   return {
     text: {
       primary: colors.text,
@@ -276,65 +297,127 @@ function createSemanticTheme(colors: ThemeColors, gradient?: string[], diff?: Di
       focused: colors.primary,
     },
     diff: diff || {
-      addedBg: '#145a24',      // Bright vivid green bg
-      removedBg: '#8b2525',    // Bright vivid red bg
+      addedBg: '#145a24',
+      removedBg: '#8b2525',
       addedText: colors.success,
       removedText: colors.error,
+    },
+    task: task || {
+      indicator: colors.success,
+      title: colors.primary,
+      meta: colors.textDim,
+      output: colors.textMuted,
     },
     gradient: gradient || [colors.primary, colors.accent],
   };
 }
 
-// Theme definitions with custom gradients
+// Theme definitions with custom colors
 export const themes: Record<ThemeName, ThemeDefinition> = {
   github: {
     name: 'github',
     displayName: 'GitHub Dark',
     description: 'GitHub-inspired dark theme with blue accents',
     colors: githubColors,
-    semantic: createSemanticTheme(githubColors, ['#58a6ff', '#a371f7', '#f778ba']),
+    semantic: createSemanticTheme(githubColors, {
+      gradient: ['#58a6ff', '#a371f7', '#f778ba'],
+      task: {
+        indicator: '#39c5cf',  // Teal
+        title: '#39c5cf',
+        meta: '#7ee787',      // Light green
+        output: '#8b949e',
+      },
+    }),
   },
   monokai: {
     name: 'monokai',
     displayName: 'Monokai',
     description: 'Classic editor theme with vibrant colors',
     colors: monokaiColors,
-    semantic: createSemanticTheme(monokaiColors, ['#66d9ef', '#a6e22e', '#f92672']),
+    semantic: createSemanticTheme(monokaiColors, {
+      gradient: ['#66d9ef', '#a6e22e', '#f92672'],
+      task: {
+        indicator: '#fd971f',  // Orange
+        title: '#fd971f',
+        meta: '#e6db74',       // Yellow
+        output: '#a59f85',
+      },
+    }),
   },
   dracula: {
     name: 'dracula',
     displayName: 'Dracula',
     description: 'Dark theme with purple and pink accents',
     colors: draculaColors,
-    semantic: createSemanticTheme(draculaColors, ['#bd93f9', '#ff79c6', '#8be9fd']),
+    semantic: createSemanticTheme(draculaColors, {
+      gradient: ['#bd93f9', '#ff79c6', '#8be9fd'],
+      task: {
+        indicator: '#ff79c6',  // Pink
+        title: '#ff79c6',
+        meta: '#8be9fd',       // Cyan
+        output: '#6272a4',
+      },
+    }),
   },
   nord: {
     name: 'nord',
     displayName: 'Nord',
     description: 'Arctic, north-bluish color palette',
     colors: nordColors,
-    semantic: createSemanticTheme(nordColors, ['#88c0d0', '#81a1c1', '#b48ead']),
+    semantic: createSemanticTheme(nordColors, {
+      gradient: ['#88c0d0', '#81a1c1', '#b48ead'],
+      task: {
+        indicator: '#88c0d0',  // Frost cyan
+        title: '#88c0d0',
+        meta: '#81a1c1',       // Frost blue
+        output: '#d8dee9',
+      },
+    }),
   },
   catppuccin: {
     name: 'catppuccin',
     displayName: 'Catppuccin',
     description: 'Soft pastel colors, easy on the eyes',
     colors: catppuccinColors,
-    semantic: createSemanticTheme(catppuccinColors, ['#89b4fa', '#cba6f7', '#f38ba8']),
+    semantic: createSemanticTheme(catppuccinColors, {
+      gradient: ['#89b4fa', '#cba6f7', '#f38ba8'],
+      task: {
+        indicator: '#fab387',  // Peach
+        title: '#fab387',
+        meta: '#94e2d5',       // Teal
+        output: '#a6adc8',
+      },
+    }),
   },
   everforest: {
     name: 'everforest',
     displayName: 'Everforest',
     description: 'Green forest theme, nature-inspired',
     colors: everforestColors,
-    semantic: createSemanticTheme(everforestColors, ['#a7c080', '#7fbbb3', '#d699b6']),
+    semantic: createSemanticTheme(everforestColors, {
+      gradient: ['#a7c080', '#7fbbb3', '#d699b6'],
+      task: {
+        indicator: '#83c092',  // Bright aqua
+        title: '#83c092',
+        meta: '#7fbbb3',       // Aqua
+        output: '#9da9a0',
+      },
+    }),
   },
   rosepine: {
     name: 'rosepine',
     displayName: 'Rosé Pine',
     description: 'Soft rose and pine colors',
     colors: rosepineColors,
-    semantic: createSemanticTheme(rosepineColors, ['#9ccfd8', '#c4a7e7', '#eb6f92']),
+    semantic: createSemanticTheme(rosepineColors, {
+      gradient: ['#9ccfd8', '#c4a7e7', '#eb6f92'],
+      task: {
+        indicator: '#ebbcba',  // Rose
+        title: '#ebbcba',
+        meta: '#f6c177',       // Gold
+        output: '#908caa',
+      },
+    }),
   },
 };
 

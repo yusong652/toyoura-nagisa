@@ -30,6 +30,16 @@ function formatRuntime(seconds: number): string {
   return `${hours}h${mins}m`;
 }
 
+/**
+ * Truncate string with ellipsis
+ */
+function truncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return text.slice(0, maxLength - 3) + '...';
+}
+
 export interface PfcTaskMonitorProps {
   currentTask: PfcTask | null;
 }
@@ -59,13 +69,14 @@ export const PfcTaskMonitor: React.FC<PfcTaskMonitorProps> = ({ currentTask }) =
 
   return (
     <Text>
-      <Text color={blink ? theme.status.info : theme.text.muted}>▶ </Text>
-      <Text color={theme.text.primary}>{desc.slice(0, 50)}</Text>
-      <Text color={theme.text.muted}> ({runtime})</Text>
+      <Text color={blink ? theme.task.indicator : theme.text.muted}>▶ </Text>
+      <Text color={theme.task.title} inverse>PFC</Text>
+      <Text color={theme.task.title}> {truncate(desc, 45)}</Text>
+      <Text color={theme.task.meta}> ({runtime})</Text>
       {lastLine && (
         <>
           {'\n'}
-          <Text color={theme.text.secondary} dimColor>  {lastLine}</Text>
+          <Text color={theme.task.output}>  {lastLine}</Text>
         </>
       )}
     </Text>
