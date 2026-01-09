@@ -279,6 +279,21 @@ class ToolExecutor:
             except Exception as e:
                 print(f"[ToolExecutor] Failed to send todo update: {e}")
 
+        # Start PFC task polling if background task submitted
+        if tool_name == 'pfc_execute_task':
+            tool_args = tool_call.get('arguments', {})
+            run_in_background = tool_args.get('run_in_background', True)
+            if run_in_background and result.get('status') == 'success':
+                try:
+                    from backend.application.services.notifications.pfc_task_notification_service import (
+                        get_pfc_task_notification_service
+                    )
+                    service = get_pfc_task_notification_service()
+                    if service:
+                        await service.start_polling(self.notification_session_id)
+                except Exception as e:
+                    print(f"[ToolExecutor] Failed to start PFC task polling: {e}")
+
     async def save_results_to_context(
         self,
         tool_calls: List[Dict],

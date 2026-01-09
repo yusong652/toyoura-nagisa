@@ -202,6 +202,10 @@ export class ConnectionManager extends WebSocketManager {
         this.emit('background_process_notification', message);
         break;
 
+      case 'PFC_TASK_UPDATE':
+        this.emit('pfc_task_notification', message);
+        break;
+
       case 'TOOL_RESULT_UPDATE':
         this.emit('tool_result_update', {
           message_id: message.message_id,

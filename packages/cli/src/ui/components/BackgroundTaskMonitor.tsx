@@ -5,7 +5,7 @@
  * Shows task ID, command, status, and recent output.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../colors.js';
 import type { BackgroundTask } from '../types/streamEvents.js';
@@ -64,9 +64,10 @@ function getStatusDisplay(status: BackgroundTask['status'], exitCode?: number): 
  */
 interface TaskItemProps {
   task: BackgroundTask;
+  blink: boolean;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, blink }) => {
   const { indicator, color } = getStatusDisplay(task.status, task.exit_code);
   const runtime = formatRuntime(task.runtime_seconds);
   const displayCommand = task.description || truncateCommand(task.command, 60);
@@ -76,11 +77,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     ? task.recent_output[task.recent_output.length - 1].slice(0, 70)
     : '';
 
+  // Blink effect for running tasks
+  const displayColor = task.status === 'running' && !blink ? theme.text.muted : color;
+
   return (
     <Box flexDirection="column">
       {/* Line 1: symbol command runtime */}
       <Box>
-        <Text color={color}>{indicator} </Text>
+        <Text color={displayColor}>{indicator} </Text>
         <Text color={theme.text.primary}>{displayCommand}</Text>
         <Text color={theme.text.muted}> ({runtime})</Text>
       </Box>
@@ -114,6 +118,19 @@ export const BackgroundTaskMonitor: React.FC<BackgroundTaskMonitorProps> = ({
   activeTasks,
   activeCount,
 }) => {
+  const [blink, setBlink] = useState(true);
+
+  // Blink effect for running tasks
+  useEffect(() => {
+    if (activeCount === 0) return;
+
+    const interval = setInterval(() => {
+      setBlink(prev => !prev);
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [activeCount]);
+
   // Sort tasks by start time (oldest first)
   const sortedTasks = useMemo(() => {
     return [...activeTasks].sort((a, b) => {
@@ -129,7 +146,7 @@ export const BackgroundTaskMonitor: React.FC<BackgroundTaskMonitorProps> = ({
   return (
     <>
       {sortedTasks.map(task => (
-        <TaskItem key={task.process_id} task={task} />
+        <TaskItem key={task.process_id} task={task} blink={blink} />
       ))}
     </>
   );

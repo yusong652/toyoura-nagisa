@@ -48,6 +48,9 @@ from backend.presentation.websocket.messages.queue import (
 # Background process notifications
 from backend.presentation.websocket.messages.background_process import BackgroundProcessNotification
 
+# PFC task notifications
+from backend.presentation.websocket.messages.pfc_task import PfcTaskNotification
+
 # Tool execution and confirmation
 from backend.presentation.websocket.messages.tool import (
     ToolConfirmationRequestMessage,
@@ -93,6 +96,8 @@ __all__ = [
     "MessageQueuedMessage",
     # Background process notifications
     "BackgroundProcessNotification",
+    # PFC task notifications
+    "PfcTaskNotification",
     # Tool execution and confirmation
     "ToolConfirmationRequestMessage",
     "ToolConfirmationResponseMessage",

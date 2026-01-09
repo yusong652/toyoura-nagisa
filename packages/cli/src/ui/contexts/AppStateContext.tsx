@@ -11,7 +11,7 @@ import { createContext, useContext } from 'react';
 import type { TokenUsage } from '@toyoura-nagisa/core';
 import type { HistoryItem, HistoryItemWithoutId, ToolConfirmationData, ConnectionStatus, AgentProfileType, AgentProfileInfo } from '../types.js';
 import type { TodoItem } from '../hooks/useTodoStatus.js';
-import type { BackgroundTask } from '../types/streamEvents.js';
+import type { BackgroundTask, PfcTask } from '../types/streamEvents.js';
 import { StreamingState } from './StreamingContext.js';
 
 /**
@@ -67,6 +67,9 @@ export interface AppState {
   // Background tasks
   backgroundTasks: BackgroundTask[];
   activeBackgroundTaskCount: number;
+
+  // PFC task (single task - PFC only supports one)
+  pfcTask: PfcTask | null;
 }
 
 export interface AppActions {
@@ -125,6 +128,7 @@ const defaultState: AppState = {
   isFullContextMode: false,
   backgroundTasks: [],
   activeBackgroundTaskCount: 0,
+  pfcTask: null,
 };
 
 const defaultActions: AppActions = {

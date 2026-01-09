@@ -62,10 +62,12 @@ class WebSocketHandler:
         from backend.application.services.notifications.tool_confirmation_service import ToolConfirmationService
         from backend.application.services.notifications.emotion_notification_service import EmotionNotificationService
         from backend.application.services.notifications.background_process_notification_service import BackgroundProcessNotificationService
+        from backend.application.services.notifications.pfc_task_notification_service import PfcTaskNotificationService
         self.status_service = MessageStatusService(self.connection_manager)
         self.tool_confirmation_service = ToolConfirmationService(self.connection_manager)
         self.emotion_service = EmotionNotificationService(self.connection_manager)
         self.background_process_notification_service = BackgroundProcessNotificationService(self.connection_manager)
+        self.pfc_task_notification_service = PfcTaskNotificationService(self.connection_manager)
 
         # Set global instances for external services to access
         set_connection_manager(self.connection_manager)  # For TTS streaming, notifications

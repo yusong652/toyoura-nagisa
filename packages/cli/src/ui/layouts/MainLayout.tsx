@@ -31,6 +31,7 @@ import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js'
 import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
 import { FullContextView } from '../components/FullContextView.js';
 import { BackgroundTaskMonitor } from '../components/BackgroundTaskMonitor.js';
+import { PfcTaskMonitor } from '../components/PfcTaskMonitor.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
@@ -820,6 +821,17 @@ export const MainLayout: React.FC = () => {
             activeTasks={appState.backgroundTasks}
             activeCount={appState.activeBackgroundTaskCount}
           />
+        )}
+
+        {/* PFC task monitor - above todo status */}
+        {appState.isInputActive && !appState.pendingConfirmation && !isDialogActive && (
+          <PfcTaskMonitor currentTask={appState.pfcTask} />
+        )}
+
+        {/* Spacer between task monitors and todo indicator */}
+        {appState.isInputActive && !appState.pendingConfirmation && !isDialogActive &&
+          (appState.activeBackgroundTaskCount > 0 || (appState.pfcTask && appState.pfcTask.status === 'running')) && (
+          <Box height={1} />
         )}
 
         {/* Todo status indicator - above input */}

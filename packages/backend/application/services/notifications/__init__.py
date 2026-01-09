@@ -18,11 +18,19 @@ from .emotion_notification_service import (
     get_emotion_notification_service
 )
 
+from .pfc_task_notification_service import (
+    PfcTaskNotificationService,
+    get_pfc_task_notification_service
+)
+
 __all__ = [
     # Message Status Services
     'MessageStatusService',
     'get_message_status_service',
     # Emotion Notification Services
     'EmotionNotificationService',
-    'get_emotion_notification_service'
+    'get_emotion_notification_service',
+    # PFC Task Notification Services
+    'PfcTaskNotificationService',
+    'get_pfc_task_notification_service'
 ]

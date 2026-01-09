@@ -160,3 +160,50 @@ export interface BackgroundProcessNotificationEvent {
   session_id?: string;
   timestamp: string;
 }
+
+/**
+ * PFC task status representation.
+ * Mirrors backend PfcTaskNotification for consistency.
+ * Note: PFC only supports single-task execution.
+ */
+export interface PfcTask {
+  task_id: string;                         // Unique 8-char identifier
+  session_id: string;                      // Session that owns this task
+  script_name: string;                     // Script file name (e.g., "main.py")
+  description: string;                     // Task description from agent
+  status: 'running' | 'completed' | 'failed' | 'interrupted';
+  source: 'agent' | 'user_console';        // Task source
+
+  // Output display (last N lines)
+  recent_output: string[];                 // Recent output lines
+  has_more_output: boolean;                // More output available
+
+  // Timing
+  start_time?: number;                     // Unix timestamp
+  elapsed_time: number;                    // Elapsed time in seconds
+
+  // Metadata
+  git_commit?: string;                     // Git commit hash (agent tasks)
+  error?: string;                          // Error message if failed
+}
+
+/**
+ * PFC task notification event from ConnectionManager.
+ * Received when a PFC background task updates its status.
+ */
+export interface PfcTaskNotificationEvent {
+  type: 'PFC_TASK_UPDATE';
+  task_id: string;
+  session_id: string;
+  script_name: string;
+  entry_script?: string;
+  description: string;
+  status: 'running' | 'completed' | 'failed' | 'interrupted';
+  source: 'agent' | 'user_console';
+  git_commit?: string;
+  start_time?: number;
+  elapsed_time: number;
+  recent_output: string[];
+  has_more_output: boolean;
+  error?: string;
+}
