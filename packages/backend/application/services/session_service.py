@@ -15,6 +15,7 @@ from backend.infrastructure.storage.session_manager import (
     load_token_usage
 )
 from backend.domain.models.message_factory import message_factory
+from backend.domain.utils import filter_message_content
 from backend.config import get_llm_settings
 
 
@@ -87,16 +88,20 @@ class SessionService:
         # Load complete message history
         history = load_all_message_history(session_id)
         history_msgs = [
-            message_factory(msg) if isinstance(msg, dict) else msg 
+            message_factory(msg) if isinstance(msg, dict) else msg
             for msg in history
         ]
-        
+
+        # Filter system tags from message content for clean display
+        filtered_history = []
+        for msg in history_msgs:
+            msg_dict = msg.model_dump() | {"role": msg.role}  # type: ignore
+            msg_dict["content"] = filter_message_content(msg_dict.get("content", ""))
+            filtered_history.append(msg_dict)
+
         return {
             "session": session,
-            "history": [
-                msg.model_dump() | {"role": msg.role} # type: ignore
-                for msg in history_msgs
-            ],
+            "history": filtered_history,
             "message_count": len(history_msgs)
         }
     
@@ -146,19 +151,23 @@ class SessionService:
         # Get recent messages for context
         recent_messages_length = get_llm_settings().recent_messages_length
         recent_messages = (
-            history_msgs[-recent_messages_length:] 
-            if len(history_msgs) > recent_messages_length 
+            history_msgs[-recent_messages_length:]
+            if len(history_msgs) > recent_messages_length
             else history_msgs
         )
-        
+
+        # Filter system tags from message content for clean display
+        filtered_recent = []
+        for msg in recent_messages:
+            msg_dict = msg.model_dump() | {"role": msg.role}  # type: ignore
+            msg_dict["content"] = filter_message_content(msg_dict.get("content", ""))
+            filtered_recent.append(msg_dict)
+
         return {
             "session_id": session_id,
             "success": True,
             "message_count": len(history_msgs),
-            "recent_messages": [
-                msg.model_dump() | {"role": msg.role} # type: ignore
-                for msg in recent_messages
-            ]
+            "recent_messages": filtered_recent
         }
     
     async def delete_session(

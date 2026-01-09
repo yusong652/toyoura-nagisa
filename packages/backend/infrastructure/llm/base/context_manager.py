@@ -216,14 +216,14 @@ class BaseContextManager(ABC):
         This method is called for each new user input, adding it to the
         existing context without re-processing historical messages.
 
-        Supports async reminder injection for background tasks, interrupt status,
-        and queue messages (during tool recursion).
+        Note: System reminders (status, memory, file mentions) are already injected
+        by ReminderInjector in chat_service before this method is called.
+        This method only handles message formatting and interrupt merge logic.
 
         Args:
             user_message: New user message to add
         """
         # Track conversation turn for periodic todo reminders
-        # Must happen BEFORE get_all_reminders() to ensure correct count
         self._status_monitor.todo_monitor.track_conversation_turn()
 
         # Check if previous response was interrupted (determines merge behavior)
@@ -242,18 +242,9 @@ class BaseContextManager(ABC):
                 if last_role == 'user':
                     needs_merge = True
 
-        # Get all system reminders (interrupt, bash processes, PFC tasks, etc.)
-        # StatusMonitor automatically includes interrupt reminder and clears the flag
-        # Note: check_queue=False (default) because user messages have already been
-        # processed from the queue at this point. Queue messages are only checked
-        # during tool result injection (when user sends new messages while tools are executing).
-        reminders = await self._status_monitor.get_all_reminders(
-            agent_profile=self.agent_profile
-        )
-
         if needs_merge:
             # Merge with previous user message instead of creating new one
-            # Extract new message content
+            # Extract new message content (already includes reminders from ReminderInjector)
             new_content = ""
             if isinstance(user_message.content, str):
                 new_content = user_message.content
@@ -266,15 +257,8 @@ class BaseContextManager(ABC):
                 new_content = "".join(text_parts)
 
             # Build merged content with LLM-friendly format:
-            # 1. System reminders (already wrapped in system-reminder tags by StatusMonitor)
-            # 2. Natural transition: "User sent another message:"
-            # 3. New message content
-            if reminders:
-                reminder_text = "\n\n".join(reminders)  # Complete blocks from StatusMonitor
-                transition = "\n\nUser sent another message:"
-                merge_text = f"\n\n{reminder_text}{transition}\n\n{new_content}"
-            else:
-                merge_text = f"\n\nUser sent another message:\n\n{new_content}"
+            # Note: new_content already contains system reminders from ReminderInjector
+            merge_text = f"\n\nUser sent another message:\n\n{new_content}"
 
             # Merge into last message
             last_msg = self.working_contents[-1]
@@ -334,23 +318,8 @@ class BaseContextManager(ABC):
                 save_history(self.session_id, history_msgs)
 
         else:
-            # Normal flow: add reminders and create new message
-            if reminders:
-                # StatusMonitor now returns complete system-reminder blocks
-                # Just join them with newlines
-                reminder_text = "\n\n" + "\n\n".join(reminders)
-
-                # Modify user_message.content to inject reminders
-                if isinstance(user_message.content, str):
-                    user_message.content += reminder_text
-                elif isinstance(user_message.content, list):
-                    # Find last text item and append
-                    for item in reversed(user_message.content):
-                        if isinstance(item, dict) and 'text' in item:
-                            item['text'] += reminder_text
-                            break
-
-            # Format and add to working contents
+            # Normal flow: format and add to working contents
+            # Note: reminders already injected by ReminderInjector in chat_service
             formatter_class = get_message_formatter_class(self._provider_name)
             formatted_message = formatter_class.format_single_message(user_message)
             self.working_contents.append(formatted_message)

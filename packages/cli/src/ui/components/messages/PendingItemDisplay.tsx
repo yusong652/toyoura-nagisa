@@ -25,6 +25,7 @@ import { getCachedStringWidth } from '../../utils/textUtils.js';
 import { MarkdownText } from '../MarkdownText.js';
 import { useAppState } from '../../contexts/AppStateContext.js';
 import { ReadToolResultDisplay } from './ReadToolResultDisplay.js';
+import { formatToolParams } from '../../utils/toolFormat.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
 // Keep in sync with AssistantMessage.tsx for consistent display
@@ -144,40 +145,6 @@ const MAX_RESULT_LINES_FULL = Infinity;
 // Maximum SubAgent tools to show (shows most recent, older ones collapsed)
 const MAX_SUBAGENT_TOOLS_SHOWN = 5;
 
-/**
- * Get tool description from input parameters
- * (matches ToolCallMessage logic)
- */
-function getToolDescription(toolName: string, input: Record<string, unknown>): string {
-  // For edit/write tools, show file name
-  if (toolName === 'edit' || toolName === 'write') {
-    if (input.file_path !== undefined) {
-      const filePath = String(input.file_path);
-      const parts = filePath.split(/[/\\]/);
-      return parts[parts.length - 1] || filePath;
-    }
-  }
-
-  // Common tool input patterns
-  if (input.command !== undefined) return String(input.command);
-  if (input.file_path !== undefined) return String(input.file_path);
-  if (input.path !== undefined) return String(input.path);
-  if (input.pattern !== undefined) return String(input.pattern);
-  if (input.query !== undefined) return String(input.query);
-  if (input.url !== undefined) return String(input.url);
-
-  // For other tools, show a summary of the input
-  const keys = Object.keys(input);
-  if (keys.length > 0) {
-    const firstKey = keys[0];
-    const value = input[firstKey];
-    if (typeof value === 'string' && value.length < 100) {
-      return value;
-    }
-    return `${firstKey}: ...`;
-  }
-  return '';
-}
 
 // SubAgent Tool Item (nested under invoke_agent)
 // Displayed with additional indentation
@@ -189,7 +156,7 @@ const SubagentToolItemDisplay: React.FC<{
   isError?: boolean;     // True if tool execution resulted in error
   parentCompleted: boolean;  // Fallback: when invoke_agent has result, all SubAgent tools are done
 }> = ({ toolName, toolInput, hasResult, isError, parentCompleted }) => {
-  const description = getToolDescription(toolName, toolInput);
+  const toolParams = formatToolParams(toolInput);
   // Additional indent for nested tools (2 spaces)
   const SUBAGENT_INDENT = 2;
 
@@ -211,13 +178,14 @@ const SubagentToolItemDisplay: React.FC<{
           <BlinkingCircle color={theme.text.secondary} />
         )}
       </Box>
+      {/* Claude Code style: toolName(param1: "value1", param2: "value2") */}
       <Text wrap="truncate">
         <Text bold color={textColor}>
           {toolName}
         </Text>
-        {description && (
-          <Text color={textColor}> {description}</Text>
-        )}
+        <Text color={textColor}>
+          ({toolParams})
+        </Text>
       </Text>
     </Box>
   );
@@ -235,10 +203,8 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
   const isInvokeAgent = item.toolName === 'invoke_agent';
   const subagentType = isInvokeAgent ? String(item.toolInput.subagent_type || 'SubAgent') : '';
 
-  // For invoke_agent: show description (task summary), otherwise use standard description
-  const description = isInvokeAgent
-    ? String(item.toolInput.description || '')
-    : getToolDescription(item.toolName, item.toolInput);
+  // Claude Code style params for standard tools
+  const toolParams = formatToolParams(item.toolInput);
 
   // Color based on result status: success (green) or error (red)
   const statusColor = isError ? theme.status.error : theme.status.success;
@@ -267,19 +233,19 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
             <Text bold color={theme.text.accent} inverse>
               {subagentType}
             </Text>
-            {description && (
-              <Text color={theme.text.secondary}> {description}</Text>
+            {item.toolInput.description !== undefined && (
+              <Text color={theme.text.secondary}> {String(item.toolInput.description)}</Text>
             )}
           </Text>
         ) : (
-          // Standard tool display
+          // Claude Code style: toolName(param1: "value1", param2: "value2")
           <Text wrap="truncate">
             <Text bold color={theme.text.primary}>
               {item.toolName}
             </Text>
-            {description && (
-              <Text color={theme.text.secondary}> {description}</Text>
-            )}
+            <Text color={theme.text.secondary}>
+              ({toolParams})
+            </Text>
           </Text>
         )}
       </Box>

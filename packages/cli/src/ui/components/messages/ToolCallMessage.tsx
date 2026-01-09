@@ -1,9 +1,9 @@
 /**
  * Tool Call Message Component
- * Reference: Gemini CLI ui/components/messages/ToolMessage.tsx and ToolShared.tsx
  *
- * Displays committed (historical) tool calls with status indicator,
- * tool name, and description/command.
+ * Displays committed (historical) tool calls with Claude Code style formatting:
+ * - Function call syntax: ToolName(param1: "value1", param2: "value2")
+ * - All parameters visible at a glance
  *
  * Note: Pending tool calls during streaming are rendered by PendingItemDisplay.
  * Diff visualization is shown in ToolResultMessage after execution completes.
@@ -14,6 +14,7 @@ import { Box, Text } from 'ink';
 import type { ToolCallHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
 import { TOOL_STATUS } from '../../markers.js';
+import { formatToolParams } from '../../utils/toolFormat.js';
 
 // Status indicator width (matching "● " prefix width = 2)
 const STATUS_INDICATOR_WIDTH = 2;
@@ -22,57 +23,6 @@ interface ToolCallMessageProps {
   item: ToolCallHistoryItem;
   isCompleted?: boolean;  // Tool execution has completed (has result)
   terminalWidth?: number;
-}
-
-/**
- * Get file name from path
- */
-function getFileName(filePath: string): string {
-  const parts = filePath.split(/[/\\]/);
-  return parts[parts.length - 1] || filePath;
-}
-
-/**
- * Get tool description from input parameters
- */
-function getToolDescription(toolName: string, input: Record<string, unknown>): string {
-  // For edit/write tools, show file name
-  if (toolName === 'edit' || toolName === 'write') {
-    if (input.file_path !== undefined) {
-      return getFileName(String(input.file_path));
-    }
-  }
-
-  // Common tool input patterns
-  if (input.command !== undefined) {
-    return String(input.command);
-  }
-  if (input.file_path !== undefined) {
-    return String(input.file_path);
-  }
-  if (input.path !== undefined) {
-    return String(input.path);
-  }
-  if (input.pattern !== undefined) {
-    return String(input.pattern);
-  }
-  if (input.query !== undefined) {
-    return String(input.query);
-  }
-  if (input.url !== undefined) {
-    return String(input.url);
-  }
-  // For other tools, show a summary of the input
-  const keys = Object.keys(input);
-  if (keys.length > 0) {
-    const firstKey = keys[0];
-    const value = input[firstKey];
-    if (typeof value === 'string' && value.length < 100) {
-      return value;
-    }
-    return `${firstKey}: ...`;
-  }
-  return '';
 }
 
 export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
@@ -96,10 +46,9 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
   const isInvokeAgent = item.toolName === 'invoke_agent';
   const subagentType = isInvokeAgent ? String(item.toolInput.subagent_type || 'SubAgent') : '';
 
-  // For invoke_agent: show description (task summary), otherwise use standard description
-  const description = isInvokeAgent
-    ? String(item.toolInput.description || '')
-    : getToolDescription(item.toolName, item.toolInput);
+  // For invoke_agent: show description (task summary)
+  // For standard tools: Claude Code style params
+  const toolParams = formatToolParams(item.toolInput);
 
   const boxWidth = terminalWidth ? terminalWidth : undefined;
 
@@ -114,19 +63,19 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
           <Text bold color={theme.text.accent} inverse>
             {subagentType}
           </Text>
-          {description && (
-            <Text color={theme.text.secondary}> {description}</Text>
+          {item.toolInput.description !== undefined && (
+            <Text color={theme.text.secondary}> {String(item.toolInput.description)}</Text>
           )}
         </Text>
       ) : (
-        // Standard tool display
+        // Claude Code style: ToolName(param1: "value1", param2: "value2")
         <Text wrap="truncate">
           <Text bold color={theme.text.primary}>
             {item.toolName}
           </Text>
-          {description && (
-            <Text color={theme.text.secondary}> {description}</Text>
-          )}
+          <Text color={theme.text.secondary}>
+            ({toolParams})
+          </Text>
         </Text>
       )}
     </Box>
