@@ -59,7 +59,7 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
       </Box>
       {isInvokeAgent ? (
         // Special display for invoke_agent: show SubAgent type with accent background
-        <Text wrap="truncate">
+        <Text wrap="wrap">
           <Text bold color={theme.text.accent} inverse>
             {subagentType}
           </Text>
@@ -69,7 +69,7 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
         </Text>
       ) : (
         // Claude Code style: ToolName(param1: "value1", param2: "value2")
-        <Text wrap="truncate">
+        <Text wrap="wrap">
           <Text bold color={theme.text.primary}>
             {item.toolName}
           </Text>

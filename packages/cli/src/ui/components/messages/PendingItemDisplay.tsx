@@ -179,7 +179,7 @@ const SubagentToolItemDisplay: React.FC<{
         )}
       </Box>
       {/* Claude Code style: toolName(param1: "value1", param2: "value2") */}
-      <Text wrap="truncate">
+      <Text wrap="wrap">
         <Text bold color={textColor}>
           {toolName}
         </Text>
@@ -229,7 +229,7 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
         </Box>
         {isInvokeAgent ? (
           // Special display for invoke_agent: show SubAgent type with accent background
-          <Text wrap="truncate">
+          <Text wrap="wrap">
             <Text bold color={theme.text.accent} inverse>
               {subagentType}
             </Text>
@@ -239,7 +239,7 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
           </Text>
         ) : (
           // Claude Code style: toolName(param1: "value1", param2: "value2")
-          <Text wrap="truncate">
+          <Text wrap="wrap">
             <Text bold color={theme.text.primary}>
               {item.toolName}
             </Text>
@@ -273,6 +273,7 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
 
 // Pending Tool Result Message
 // Layout matches ToolResultMessage for visual consistency
+// Error results are displayed in red color
 // Note: Status indicator removed - success/error is shown on tool call block instead
 const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId }> = ({ item }) => {
   const { isFullContextMode } = useAppState();
@@ -297,12 +298,16 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
   const truncated = allLines.length > maxResultLines;
   const lines = truncated ? allLines.slice(0, maxResultLines) : allLines;
 
+  // Error results displayed in red
+  const isError = item.isError === true;
+  const textColor = isError ? theme.status.error : theme.text.secondary;
+
   return (
     <Box flexDirection="column" paddingX={1} marginBottom={1}>
-      {/* Content lines - indented to align with tool call description */}
+      {/* Content lines - red for errors, secondary for success */}
       {lines.map((line, index) => (
         <Box key={index} paddingLeft={STATUS_INDICATOR_WIDTH}>
-          <Text wrap="truncate-end" color={theme.text.secondary}>
+          <Text wrap="truncate-end" color={textColor}>
             {line}
           </Text>
         </Box>

@@ -14,11 +14,17 @@ to provide context to the LLM. These should be filtered when:
 import re
 from typing import Any, Dict, List, Union
 
-# Top-level tags that need to be filtered
+# Top-level tags that need to be filtered (remove tag and content)
 # Note: bash-*, pfc-python etc. are nested inside system-reminder
 SYSTEM_TAGS = frozenset({
     "system-reminder",
     "memory-context",
+})
+
+# Tags to unwrap (remove tag but keep content)
+# These are display-related markers, content should be shown
+UNWRAP_TAGS = frozenset({
+    "error",
 })
 
 
@@ -60,25 +66,73 @@ def strip_system_tags(
     return result
 
 
+def unwrap_tags(
+    text: str,
+    tags: frozenset[str] = UNWRAP_TAGS
+) -> str:
+    """
+    Remove XML tags but keep their content (unwrap).
+
+    Used for display-related markers like <error> where the content
+    should be shown but the tags should be removed.
+
+    Args:
+        text: Text content potentially containing tags to unwrap
+        tags: Set of tag names to unwrap (default: UNWRAP_TAGS)
+
+    Returns:
+        Text with tags removed but content preserved
+
+    Example:
+        >>> text = "<error>File not found</error>"
+        >>> unwrap_tags(text)
+        'File not found'
+    """
+    if not text:
+        return text
+
+    result = text
+    for tag in tags:
+        # Pattern matches: <tag>...content...</tag>, captures content
+        # Using DOTALL flag via (?s) for multiline content
+        pattern = rf"(?s)<{tag}>(.*?)</{tag}>"
+        result = re.sub(pattern, r"\1", result)
+
+    return result
+
+
+def _clean_text(text: str) -> str:
+    """
+    Apply all text cleaning operations:
+    1. Strip system tags (remove tag and content)
+    2. Unwrap display tags (remove tag, keep content)
+    """
+    result = strip_system_tags(text, SYSTEM_TAGS)
+    result = unwrap_tags(result, UNWRAP_TAGS)
+    return result
+
+
 def filter_message_content(
     content: Union[str, List[Dict[str, Any]]],
-    tags: frozenset[str] = SYSTEM_TAGS
 ) -> Union[str, List[Dict[str, Any]]]:
     """
-    Filter system tags from message content.
+    Filter and clean message content for display.
+
+    Operations:
+    1. Strip system tags (<system-reminder>, <memory-context>) - remove entirely
+    2. Unwrap display tags (<error>) - remove tags but keep content
 
     Handles both string content and content block list formats.
     Recursively filters nested content in tool_result blocks.
 
     Args:
         content: Message content (string or list of content blocks)
-        tags: Set of tag names to strip (default: SYSTEM_TAGS)
 
     Returns:
-        Filtered content in the same format as input
+        Cleaned content in the same format as input
     """
     if isinstance(content, str):
-        return strip_system_tags(content, tags)
+        return _clean_text(content)
 
     if isinstance(content, list):
         filtered_blocks = []
@@ -88,7 +142,7 @@ def filter_message_content(
 
                 # Filter text content in text blocks
                 if block.get("type") == "text" and "text" in block:
-                    filtered_block["text"] = strip_system_tags(block["text"], tags)
+                    filtered_block["text"] = _clean_text(block["text"])
 
                 # Filter nested content in tool_result blocks
                 # Structure: {"type": "tool_result", "content": {"parts": [{"type": "text", "text": "..."}]}}
@@ -100,7 +154,7 @@ def filter_message_content(
                             if isinstance(part, dict):
                                 filtered_part = part.copy()
                                 if part.get("type") == "text" and "text" in part:
-                                    filtered_part["text"] = strip_system_tags(part["text"], tags)
+                                    filtered_part["text"] = _clean_text(part["text"])
                                 filtered_parts.append(filtered_part)
                             else:
                                 filtered_parts.append(part)

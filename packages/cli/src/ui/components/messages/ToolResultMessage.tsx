@@ -96,6 +96,7 @@ const DiffToolResultDisplay: React.FC<{
 /**
  * Default tool result display (text output)
  * Shows content with markdown rendering and consistent indentation
+ * Error results are displayed in red color
  * Note: Status indicator removed - success/error is shown on tool call block instead
  */
 const DefaultToolResultDisplay: React.FC<{
@@ -110,6 +111,10 @@ const DefaultToolResultDisplay: React.FC<{
   // Width constraint prevents Ink rendering bug with borders spanning multiple lines
   const boxWidth = terminalWidth ? terminalWidth : undefined;
 
+  // Error results displayed in red
+  const isError = item.isError === true;
+  const textColor = isError ? theme.status.error : undefined;
+
   return (
     <Box
       flexDirection="column"
@@ -117,9 +122,13 @@ const DefaultToolResultDisplay: React.FC<{
       width={boxWidth}
       marginBottom={1}
     >
-      {/* Content with markdown rendering */}
+      {/* Content - red for errors, markdown for success */}
       <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
-        <MarkdownText>{text}</MarkdownText>
+        {isError ? (
+          <Text color={textColor}>{text}</Text>
+        ) : (
+          <MarkdownText>{text}</MarkdownText>
+        )}
       </Box>
       {truncated && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH}>

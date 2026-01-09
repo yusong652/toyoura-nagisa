@@ -8,7 +8,7 @@
  */
 
 /** Maximum length for individual parameter values before truncation */
-const MAX_PARAM_VALUE_LENGTH = 120;
+const MAX_PARAM_VALUE_LENGTH = 512;
 
 /** Parameters to skip in display (too verbose or internal) */
 const SKIP_PARAMS = new Set(['old_string', 'new_string', 'content', 'code']);
