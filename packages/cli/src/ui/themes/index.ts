@@ -6,7 +6,7 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
-export type ThemeName = 'github' | 'monokai' | 'dracula' | 'nord' | 'catppuccin' | 'everforest' | 'rosepine';
+export type ThemeName = 'github' | 'monokai' | 'dracula' | 'nord' | 'catppuccin' | 'everforest' | 'rosepine' | 'gruvbox';
 
 export interface ThemeColors {
   // Primary colors
@@ -201,6 +201,7 @@ const catppuccinColors: ThemeColors = {
 };
 
 // Everforest theme (green forest, easy on eyes)
+// Text color adjusted to be less yellow/more neutral
 const everforestColors: ThemeColors = {
   primary: '#a7c080',    // Green
   secondary: '#859289',  // Grey1
@@ -209,13 +210,13 @@ const everforestColors: ThemeColors = {
   error: '#e67e80',      // Red
   warning: '#dbbc7f',    // Yellow
   info: '#7fbbb3',       // Aqua
-  text: '#d3c6aa',       // Fg
+  text: '#e0ddd4',       // Fg (adjusted: more neutral/white)
   textDim: '#9da9a0',    // Grey0
   textMuted: '#5c6a72',  // Grey2
   bg: '#2d353b',         // Bg0
   bgLight: '#3d484d',    // Bg1
   user: '#7fbbb3',       // Aqua
-  assistant: '#d3c6aa',  // Fg
+  assistant: '#e0ddd4',  // Fg (adjusted)
   system: '#5c6a72',     // Grey2
   tool: '#dbbc7f',       // Yellow
   thinking: '#5c6a72',   // Grey2
@@ -240,6 +241,28 @@ const rosepineColors: ThemeColors = {
   system: '#6e6a86',     // Muted
   tool: '#f6c177',       // Gold
   thinking: '#6e6a86',   // Muted
+};
+
+// Gruvbox Material theme (retro groove, soft contrast)
+// Based on https://github.com/sainnhe/gruvbox-material
+const gruvboxColors: ThemeColors = {
+  primary: '#a9b665',    // Green
+  secondary: '#928374',  // Grey
+  accent: '#d3869b',     // Purple
+  success: '#a9b665',    // Green
+  error: '#ea6962',      // Red
+  warning: '#d8a657',    // Yellow
+  info: '#7daea3',       // Blue
+  text: '#e0ddd4',       // Adjusted: more neutral/white (same as everforest)
+  textDim: '#a89984',    // Grey
+  textMuted: '#665c54',  // Bg4
+  bg: '#282828',         // Bg0 medium
+  bgLight: '#3c3836',    // Bg1
+  user: '#7daea3',       // Blue
+  assistant: '#e0ddd4',  // Adjusted
+  system: '#665c54',     // Bg4
+  tool: '#d8a657',       // Yellow
+  thinking: '#665c54',   // Bg4
 };
 
 interface DiffColors {
@@ -416,6 +439,21 @@ export const themes: Record<ThemeName, ThemeDefinition> = {
         title: '#ebbcba',
         meta: '#f6c177',       // Gold
         output: '#908caa',
+      },
+    }),
+  },
+  gruvbox: {
+    name: 'gruvbox',
+    displayName: 'Gruvbox Material',
+    description: 'Retro groove with soft contrast',
+    colors: gruvboxColors,
+    semantic: createSemanticTheme(gruvboxColors, {
+      gradient: ['#a9b665', '#89b482', '#d3869b'],
+      task: {
+        indicator: '#e78a4e',  // Orange
+        title: '#e78a4e',
+        meta: '#89b482',       // Aqua
+        output: '#a89984',
       },
     }),
   },

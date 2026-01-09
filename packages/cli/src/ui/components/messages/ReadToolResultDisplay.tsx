@@ -1,26 +1,18 @@
 /**
  * Read Tool Result Display Component
  *
- * Specialized display for read tool results.
- * Removes line numbers from content and renders as clean text.
- * Works with both new tool results and historical session data.
+ * Claude Code style display: shows "Read X lines" summary
+ * instead of full content (user can view in IDE or with bash)
  */
 
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ToolResultHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
-import { MarkdownText } from '../MarkdownText.js';
+import { TOOL_RESULT_PREFIX } from '../../markers.js';
 
-// Note: Text and theme are used for truncation indicator
-
-// Maximum lines to show before truncating
-const MAX_RESULT_LINES = 10;
 // Status indicator width (matches other tool displays)
-const STATUS_INDICATOR_WIDTH = 3;
-
-// Regex to detect line number format: "     1→content" or "    10→content"
-const LINE_NUMBER_PATTERN = /^\s*\d+→/;
+const STATUS_INDICATOR_WIDTH = 2;
 
 interface ReadToolResultDisplayProps {
   item: ToolResultHistoryItem;
@@ -29,69 +21,30 @@ interface ReadToolResultDisplayProps {
 }
 
 /**
- * Check if content has line number format from read tool
+ * Count lines in content
  */
-function hasLineNumberFormat(content: string): boolean {
-  const firstLine = content.split('\n')[0] || '';
-  return LINE_NUMBER_PATTERN.test(firstLine);
-}
-
-/**
- * Remove line numbers from read tool output
- * Format: "     1→content" (spaces + number + arrow + content)
- */
-function removeLineNumbers(content: string): string {
-  const lines = content.split('\n');
-  return lines.map(line => {
-    // Match pattern: spaces + number + arrow + content
-    const match = line.match(/^\s*\d+→(.*)$/);
-    if (match) {
-      return match[1];
-    }
-    return line;
-  }).join('\n');
-}
-
-/**
- * Truncate content to maximum lines
- */
-function truncateContent(content: string, maxLines: number): { text: string; truncated: boolean } {
-  const lines = content.split('\n');
-  if (lines.length <= maxLines) {
-    return { text: content, truncated: false };
-  }
-  return {
-    text: lines.slice(0, maxLines).join('\n'),
-    truncated: true,
-  };
+function countLines(content: string): number {
+  if (!content || content.trim() === '') return 0;
+  return content.split('\n').length;
 }
 
 export const ReadToolResultDisplay: React.FC<ReadToolResultDisplayProps> = ({
   item,
-  terminalWidth: _terminalWidth,
-  maxResultLines = MAX_RESULT_LINES,
 }) => {
   const content = item.content || '';
+  const lineCount = countLines(content);
 
-  // Check if content has line number format and remove them
-  const hasLineNumbers = hasLineNumberFormat(content);
-  const cleanContent = hasLineNumbers ? removeLineNumbers(content) : content;
-  const { text, truncated } = truncateContent(cleanContent.trimEnd(), maxResultLines);
+  // Claude Code style: "Read X lines"
+  const summary = lineCount === 0
+    ? 'Empty file'
+    : lineCount === 1
+    ? 'Read 1 line'
+    : `Read ${lineCount} lines`;
 
   return (
-    <Box flexDirection="column" paddingX={1} marginBottom={1}>
-      {/* Content - rendered as markdown without line numbers */}
-      <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
-        <MarkdownText>{text}</MarkdownText>
-      </Box>
-
-      {truncated && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
-          <Text color={theme.text.muted}>
-            ... (output truncated)
-          </Text>
-        </Box>
-      )}
+    <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
+      <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
+      <Text color={theme.text.secondary}>{summary}</Text>
     </Box>
   );
 };

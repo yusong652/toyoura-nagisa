@@ -9,3 +9,6 @@ export const TOOL_STATUS = {
   SUCCESS: '●',
   ERROR: '●',
 } as const;
+
+// Tool result prefix (Claude Code style: ⎿)
+export const TOOL_RESULT_PREFIX = '⎿';

@@ -14,7 +14,7 @@ import { Box, Text } from 'ink';
 import type { ToolCallHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
 import { TOOL_STATUS } from '../../markers.js';
-import { formatToolParams } from '../../utils/toolFormat.js';
+import { formatToolDisplay, getToolLayoutConfig } from '../../utils/toolFormat.js';
 
 // Status indicator width (matching "● " prefix width = 2)
 const STATUS_INDICATOR_WIDTH = 2;
@@ -46,14 +46,21 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
   const isInvokeAgent = item.toolName === 'invoke_agent';
   const subagentType = isInvokeAgent ? String(item.toolInput.subagent_type || 'SubAgent') : '';
 
-  // For invoke_agent: show description (task summary)
-  // For standard tools: Claude Code style params
-  const toolParams = formatToolParams(item.toolInput);
+  // Get tool-specific display formatting
+  const toolDisplayResult = formatToolDisplay(item.toolName, item.toolInput);
+
+  // Build full display text including multiline content
+  const fullDisplay = toolDisplayResult.isMultiline && toolDisplayResult.additionalLines
+    ? [toolDisplayResult.display, ...toolDisplayResult.additionalLines].join('\n')
+    : toolDisplayResult.display;
 
   const boxWidth = terminalWidth ? terminalWidth : undefined;
 
+  // Get tool-specific layout configuration
+  const layoutConfig = getToolLayoutConfig(item.toolName);
+
   return (
-    <Box width={boxWidth} marginBottom={1}>
+    <Box width={boxWidth} marginBottom={layoutConfig.marginBottom}>
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
         <Text color={statusColor}>{statusIndicator}</Text>
       </Box>
@@ -68,14 +75,9 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
           )}
         </Text>
       ) : (
-        // Claude Code style: ToolName(param1: "value1", param2: "value2")
-        <Text wrap="wrap">
-          <Text bold color={theme.text.primary}>
-            {item.toolName}
-          </Text>
-          <Text color={theme.text.secondary}>
-            ({toolParams})
-          </Text>
+        // Tool-specific display format
+        <Text wrap="wrap" bold color={theme.text.primary}>
+          {fullDisplay}
         </Text>
       )}
     </Box>

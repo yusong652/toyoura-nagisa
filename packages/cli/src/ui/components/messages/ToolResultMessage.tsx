@@ -16,8 +16,8 @@ import { MarkdownText } from '../MarkdownText.js';
 import { useAppState } from '../../contexts/AppStateContext.js';
 import { ReadToolResultDisplay } from './ReadToolResultDisplay.js';
 
-// Maximum lines to show before truncating
-const MAX_RESULT_LINES = 10;
+// Maximum lines to show before truncating (Claude Code style: 3-4 lines)
+const MAX_RESULT_LINES = 3;
 // No limit when in full context mode
 const MAX_RESULT_LINES_FULL = Infinity;
 const STATUS_INDICATOR_WIDTH = 2;  // Match "● " prefix width
@@ -41,14 +41,15 @@ function getFileName(filePath: string): string {
 /**
  * Truncate content to a maximum number of lines
  */
-function truncateContent(content: string, maxLines: number): { text: string; truncated: boolean } {
+function truncateContent(content: string, maxLines: number): { text: string; truncated: boolean; hiddenLines: number } {
   const lines = content.split('\n');
   if (lines.length <= maxLines) {
-    return { text: content, truncated: false };
+    return { text: content, truncated: false, hiddenLines: 0 };
   }
   return {
     text: lines.slice(0, maxLines).join('\n'),
     truncated: true,
+    hiddenLines: lines.length - maxLines,
   };
 }
 
@@ -106,7 +107,7 @@ const DefaultToolResultDisplay: React.FC<{
 }> = ({ item, terminalWidth, maxResultLines }) => {
   // Only trim trailing whitespace to preserve line number indentation
   // (some LLM APIs add trailing newlines, but leading spaces are part of formatting)
-  const { text, truncated } = truncateContent(item.content.trimEnd(), maxResultLines);
+  const { text, truncated, hiddenLines } = truncateContent(item.content.trimEnd(), maxResultLines);
 
   // Width constraint prevents Ink rendering bug with borders spanning multiple lines
   const boxWidth = terminalWidth ? terminalWidth : undefined;
@@ -133,7 +134,7 @@ const DefaultToolResultDisplay: React.FC<{
       {truncated && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
           <Text color={theme.text.muted}>
-            ... (output truncated)
+            ... +{hiddenLines} lines (ctrl+o to expand)
           </Text>
         </Box>
       )}

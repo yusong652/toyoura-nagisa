@@ -25,7 +25,7 @@ import { getCachedStringWidth } from '../../utils/textUtils.js';
 import { MarkdownText } from '../MarkdownText.js';
 import { useAppState } from '../../contexts/AppStateContext.js';
 import { ReadToolResultDisplay } from './ReadToolResultDisplay.js';
-import { formatToolParams } from '../../utils/toolFormat.js';
+import { formatToolDisplay, formatToolParams, getToolLayoutConfig } from '../../utils/toolFormat.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
 // Keep in sync with AssistantMessage.tsx for consistent display
@@ -139,8 +139,8 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
 
 // Status indicator width (matches ToolCallMessage and ToolResultMessage)
 const STATUS_INDICATOR_WIDTH = 2;  // Match "● " prefix width
-// Maximum lines for tool result content
-const MAX_RESULT_LINES = 10;
+// Maximum lines for tool result content (Claude Code style: 3-4 lines)
+const MAX_RESULT_LINES = 3;
 const MAX_RESULT_LINES_FULL = Infinity;
 // Maximum SubAgent tools to show (shows most recent, older ones collapsed)
 const MAX_SUBAGENT_TOOLS_SHOWN = 5;
@@ -156,7 +156,8 @@ const SubagentToolItemDisplay: React.FC<{
   isError?: boolean;     // True if tool execution resulted in error
   parentCompleted: boolean;  // Fallback: when invoke_agent has result, all SubAgent tools are done
 }> = ({ toolName, toolInput, hasResult, isError, parentCompleted }) => {
-  const toolParams = formatToolParams(toolInput);
+  // Get tool-specific display formatting
+  const toolDisplayResult = formatToolDisplay(toolName, toolInput);
   // Additional indent for nested tools (2 spaces)
   const SUBAGENT_INDENT = 2;
 
@@ -169,6 +170,11 @@ const SubagentToolItemDisplay: React.FC<{
     ? (isError ? theme.status.error : theme.status.success)
     : theme.text.secondary;
 
+  // Build full display text including multiline content
+  const fullDisplay = toolDisplayResult.isMultiline && toolDisplayResult.additionalLines
+    ? [toolDisplayResult.display, ...toolDisplayResult.additionalLines].join('\n')
+    : toolDisplayResult.display;
+
   return (
     <Box paddingLeft={STATUS_INDICATOR_WIDTH + SUBAGENT_INDENT}>
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
@@ -178,14 +184,9 @@ const SubagentToolItemDisplay: React.FC<{
           <BlinkingCircle color={theme.text.secondary} />
         )}
       </Box>
-      {/* Claude Code style: toolName(param1: "value1", param2: "value2") */}
-      <Text wrap="wrap">
-        <Text bold color={textColor}>
-          {toolName}
-        </Text>
-        <Text color={textColor}>
-          ({toolParams})
-        </Text>
+      {/* Tool-specific display format */}
+      <Text wrap="wrap" bold color={textColor}>
+        {fullDisplay}
       </Text>
     </Box>
   );
@@ -203,8 +204,8 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
   const isInvokeAgent = item.toolName === 'invoke_agent';
   const subagentType = isInvokeAgent ? String(item.toolInput.subagent_type || 'SubAgent') : '';
 
-  // Claude Code style params for standard tools
-  const toolParams = formatToolParams(item.toolInput);
+  // Get tool-specific display formatting
+  const toolDisplayResult = formatToolDisplay(item.toolName, item.toolInput);
 
   // Color based on result status: success (green) or error (red)
   const statusColor = isError ? theme.status.error : theme.status.success;
@@ -217,8 +218,16 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
     ? subagentTools.slice(-MAX_SUBAGENT_TOOLS_SHOWN)
     : subagentTools;
 
+  // Build full display text including multiline content
+  const fullDisplay = toolDisplayResult.isMultiline && toolDisplayResult.additionalLines
+    ? [toolDisplayResult.display, ...toolDisplayResult.additionalLines].join('\n')
+    : toolDisplayResult.display;
+
+  // Get tool-specific layout configuration
+  const layoutConfig = getToolLayoutConfig(item.toolName);
+
   return (
-    <Box flexDirection="column" marginBottom={1}>
+    <Box flexDirection="column" marginBottom={layoutConfig.marginBottom}>
       <Box>
         <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
           {hasResult ? (
@@ -238,14 +247,9 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
             )}
           </Text>
         ) : (
-          // Claude Code style: toolName(param1: "value1", param2: "value2")
-          <Text wrap="wrap">
-            <Text bold color={theme.text.primary}>
-              {item.toolName}
-            </Text>
-            <Text color={theme.text.secondary}>
-              ({toolParams})
-            </Text>
+          // Tool-specific display format
+          <Text wrap="wrap" bold color={theme.text.primary}>
+            {fullDisplay}
           </Text>
         )}
       </Box>
@@ -297,6 +301,7 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
   const allLines = content.split('\n');
   const truncated = allLines.length > maxResultLines;
   const lines = truncated ? allLines.slice(0, maxResultLines) : allLines;
+  const hiddenLines = allLines.length - maxResultLines;
 
   // Error results displayed in red
   const isError = item.isError === true;
@@ -315,7 +320,7 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
       {truncated && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
           <Text color={theme.text.muted}>
-            ... (output truncated)
+            ... +{hiddenLines} lines (ctrl+o to expand)
           </Text>
         </Box>
       )}
