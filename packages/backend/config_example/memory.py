@@ -14,38 +14,41 @@ from backend.config.memory import MemoryConfig
 
 # ===== Example Configurations for Different Use Cases =====
 
-# Example 1: Default Configuration (Balanced)
+# Example 1: Default Configuration (Balanced) - Using OpenRouter for embeddings
 default_config = MemoryConfig(
     # Debug settings
     debug_mode=False,  # Quiet operation (only errors)
     save_conversations=True,
-    
+
     # Time constraints
     min_memory_age_minutes=0,  # All memories are active
     max_memory_age_days=None,  # No upper limit
-    
-    # Search parameters  
+
+    # Search parameters
     max_memories_to_inject=16,
     memory_relevance_threshold=0.3,
     memory_search_timeout_ms=200,
     enable_performance_logging=True,
-    
+
     # Mem0 settings
     mem0_user_id="default",
     mem0_collection_name="nagisa_memories",
     vector_db_path="memory_db",
-    embedding_model="models/gemini-embedding-001",
-    
+
+    # Embedding configuration (via OpenRouter)
+    embedder_provider="openrouter",  # 'openrouter' or 'gemini'
+    embedding_model="google/gemini-embedding-001",  # OpenRouter model name
+
     # LLM for memory extraction
     mem0_llm_provider="gemini",
     mem0_llm_model="gemini-2.0-flash",
     mem0_llm_temperature=0.1,
     mem0_llm_max_tokens=500,
-    
+
     # Multimodal support
     mem0_enable_vision=True,
     mem0_vision_details="high",
-    
+
     # Custom prompts and provider settings
     use_custom_prompts=False,
     mem0_gemini_safety_block_none=True,
@@ -159,17 +162,43 @@ debug_config = MemoryConfig(
 minimal_config = MemoryConfig(
     debug_mode=False,  # No debug output
     save_conversations=False,  # Don't save new memories
-    
+
     # Minimal settings
     max_memories_to_inject=1,
     memory_relevance_threshold=0.8,  # Very strict
     memory_search_timeout_ms=50,  # Very fast
     enable_performance_logging=False,
-    
+
     # Basic model
     mem0_llm_model="gemini-2.0-flash",
     mem0_enable_vision=False,
     use_custom_prompts=False,
+)
+
+# Example 8: Direct Gemini API for embeddings (alternative to OpenRouter)
+gemini_direct_config = MemoryConfig(
+    debug_mode=False,
+    save_conversations=True,
+
+    # Mem0 settings
+    mem0_user_id="default",
+    mem0_collection_name="nagisa_memories",
+    vector_db_path="memory_db",
+
+    # Direct Gemini API for embeddings (requires GOOGLE_API_KEY)
+    embedder_provider="gemini",
+    embedding_model="models/gemini-embedding-001",  # Gemini API format
+
+    # LLM for memory extraction
+    mem0_llm_provider="gemini",
+    mem0_llm_model="gemini-2.0-flash",
+    mem0_llm_temperature=0.1,
+    mem0_llm_max_tokens=500,
+
+    # Standard settings
+    max_memories_to_inject=16,
+    memory_relevance_threshold=0.3,
+    mem0_enable_vision=True,
 )
 
 
@@ -189,7 +218,11 @@ MEMORY_MAX_MEMORY_AGE_DAYS=
 MEMORY_MEM0_USER_ID=default
 MEMORY_MEM0_COLLECTION_NAME=nagisa_memories
 MEMORY_VECTOR_DB_PATH=memory_db
-MEMORY_EMBEDDING_MODEL=models/gemini-embedding-001
+
+# Embedder configuration
+MEMORY_EMBEDDER_PROVIDER=openrouter  # 'openrouter' or 'gemini'
+MEMORY_EMBEDDING_MODEL=google/gemini-embedding-001  # For OpenRouter
+# MEMORY_EMBEDDING_MODEL=models/gemini-embedding-001  # For direct Gemini API
 
 # LLM configuration
 MEMORY_MEM0_LLM_PROVIDER=gemini
@@ -224,7 +257,8 @@ MEMORY_CUSTOM_FACT_EXTRACTION_PROMPT="Extract customer support information, orde
 MEMORY_CUSTOM_UPDATE_MEMORY_PROMPT="You are a smart memory manager which controls..."
 
 # API Keys (required based on provider)
-GOOGLE_API_KEY=your_google_api_key_here
+OPENROUTER_API_KEY=your_openrouter_api_key_here  # Required for embedder_provider=openrouter
+GOOGLE_API_KEY=your_google_api_key_here  # Required for embedder_provider=gemini
 OPENAI_API_KEY=your_openai_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 """
