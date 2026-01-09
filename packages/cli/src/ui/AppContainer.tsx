@@ -39,6 +39,7 @@ import { useSessionManagement } from './hooks/useSessionManagement.js';
 import { useProfileManager } from './hooks/useProfileManager.js';
 import { useTodoStatus } from './hooks/useTodoStatus.js';
 import { useBackgroundProcesses } from './hooks/useBackgroundProcesses.js';
+import { usePfcTasks } from './hooks/usePfcTasks.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { MessageType } from './types.js';
 import type { Config } from '../config/settings.js';
@@ -162,6 +163,11 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
   // Background processes (running bash tasks)
   const { activeTasks: backgroundTasks, activeCount: activeBackgroundTaskCount } = useBackgroundProcesses({
+    connectionManager,
+  });
+
+  // PFC task (single running simulation)
+  const { currentTask: pfcTask } = usePfcTasks({
     connectionManager,
   });
 
@@ -406,6 +412,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     isFullContextMode,
     backgroundTasks,
     activeBackgroundTaskCount,
+    pfcTask,
   }), [
     connectionStatus,
     error,
@@ -427,6 +434,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     isFullContextMode,
     backgroundTasks,
     activeBackgroundTaskCount,
+    pfcTask,
   ]);
 
   const appActions: AppActions = useMemo(() => ({

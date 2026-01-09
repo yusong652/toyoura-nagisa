@@ -29,6 +29,7 @@ from backend.presentation.websocket.messages.queue import (
     MessageQueuedMessage
 )
 from backend.presentation.websocket.messages.background_process import BackgroundProcessNotification
+from backend.presentation.websocket.messages.pfc_task import PfcTaskNotification
 from backend.presentation.websocket.messages.tool import (
     ToolConfirmationRequestMessage,
     ToolConfirmationResponseMessage,
@@ -72,6 +73,8 @@ OUTGOING_MESSAGE_SCHEMAS = {
     MessageType.QUEUE_UPDATE: QueueUpdateMessage,
     MessageType.MESSAGE_PROCESSING_START: ProcessingStartMessage,
     MessageType.MESSAGE_QUEUED: MessageQueuedMessage,
+    # PFC task notifications
+    MessageType.PFC_TASK_UPDATE: PfcTaskNotification,
 }
 
 
