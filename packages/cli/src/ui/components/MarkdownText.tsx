@@ -8,14 +8,17 @@
  * - `inline code`
  * - ```code blocks```
  * - # headings (h1-h6)
- * - - list items
+ * - - list items (with or without space after dash)
+ * - 1. numbered lists
  * - > blockquotes
  * - --- horizontal rules
+ * - | table | support |
  */
 
 import React from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../colors.js';
+import { getCachedStringWidth } from '../utils/textUtils.js';
 
 interface MarkdownTextProps {
   children: string;
@@ -26,9 +29,193 @@ interface MarkdownTextProps {
 }
 
 interface Segment {
-  type: 'text' | 'bold' | 'italic' | 'code' | 'boldItalic';
+  type: 'text' | 'bold' | 'italic' | 'code' | 'boldItalic' | 'strikethrough' | 'link' | 'underline' | 'mark' | 'kbd' | 'math';
+  content: string;
+  url?: string;  // For links
+}
+
+// Table alignment type
+type TableAlignment = 'left' | 'center' | 'right';
+
+/**
+ * Simple syntax highlighting for code
+ * Highlights: keywords, strings, numbers, comments
+ */
+interface CodeToken {
+  type: 'keyword' | 'string' | 'number' | 'comment' | 'function' | 'operator' | 'text';
   content: string;
 }
+
+// Common programming keywords
+const KEYWORDS = new Set([
+  // Python
+  'def', 'class', 'if', 'elif', 'else', 'for', 'while', 'try', 'except', 'finally',
+  'with', 'as', 'import', 'from', 'return', 'yield', 'raise', 'pass', 'break',
+  'continue', 'and', 'or', 'not', 'in', 'is', 'lambda', 'None', 'True', 'False',
+  'async', 'await', 'global', 'nonlocal', 'assert', 'del',
+  // JavaScript/TypeScript
+  'const', 'let', 'var', 'function', 'async', 'await', 'return', 'if', 'else',
+  'for', 'while', 'do', 'switch', 'case', 'break', 'continue', 'try', 'catch',
+  'finally', 'throw', 'new', 'delete', 'typeof', 'instanceof', 'void', 'this',
+  'super', 'class', 'extends', 'static', 'get', 'set', 'import', 'export',
+  'default', 'from', 'as', 'null', 'undefined', 'true', 'false', 'of',
+  // Common
+  'print', 'console', 'log', 'error', 'warn', 'info',
+]);
+
+function tokenizeCode(code: string): CodeToken[] {
+  const tokens: CodeToken[] = [];
+  let remaining = code;
+
+  while (remaining.length > 0) {
+    // Single-line comment (// or #)
+    let match = remaining.match(/^(\/\/.*|#.*)/);
+    if (match) {
+      tokens.push({ type: 'comment', content: match[1] });
+      remaining = remaining.slice(match[0].length);
+      continue;
+    }
+
+    // String (double or single quotes, including template literals)
+    match = remaining.match(/^(["'`])(?:[^\\]|\\.)*?\1/);
+    if (match) {
+      tokens.push({ type: 'string', content: match[0] });
+      remaining = remaining.slice(match[0].length);
+      continue;
+    }
+
+    // Number (integer, float, hex)
+    match = remaining.match(/^(0x[0-9a-fA-F]+|\d+\.?\d*(?:[eE][+-]?\d+)?)/);
+    if (match) {
+      tokens.push({ type: 'number', content: match[0] });
+      remaining = remaining.slice(match[0].length);
+      continue;
+    }
+
+    // Word (identifier or keyword)
+    match = remaining.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+    if (match) {
+      const word = match[0];
+      const type = KEYWORDS.has(word) ? 'keyword' : 'text';
+      tokens.push({ type, content: word });
+      remaining = remaining.slice(word.length);
+      continue;
+    }
+
+    // Operators
+    match = remaining.match(/^(=>|->|<=|>=|==|!=|&&|\|\||[+\-*/%=<>!&|^~])/);
+    if (match) {
+      tokens.push({ type: 'operator', content: match[0] });
+      remaining = remaining.slice(match[0].length);
+      continue;
+    }
+
+    // Any other character
+    tokens.push({ type: 'text', content: remaining[0] });
+    remaining = remaining.slice(1);
+  }
+
+  return tokens;
+}
+
+/**
+ * Render a line of code with syntax highlighting
+ */
+const CodeLine: React.FC<{ code: string; dimColor?: boolean }> = ({ code, dimColor }) => {
+  const tokens = tokenizeCode(code);
+
+  return (
+    <Text dimColor={dimColor}>
+      {tokens.map((token, i) => {
+        switch (token.type) {
+          case 'keyword':
+            return <Text key={i} color={theme.status.warning} bold>{token.content}</Text>;
+          case 'string':
+            return <Text key={i} color={theme.status.success}>{token.content}</Text>;
+          case 'number':
+            return <Text key={i} color={theme.text.accent}>{token.content}</Text>;
+          case 'comment':
+            return <Text key={i} color={theme.text.muted} italic>{token.content}</Text>;
+          case 'operator':
+            return <Text key={i} color={theme.status.info}>{token.content}</Text>;
+          default:
+            return <Text key={i} color={theme.text.primary}>{token.content}</Text>;
+        }
+      })}
+    </Text>
+  );
+};
+
+/**
+ * Inline markdown patterns with their types
+ * Order matters: more specific patterns first
+ */
+const INLINE_PATTERNS: Array<{
+  pattern: RegExp;
+  type: Segment['type'];
+  getContent: (match: RegExpMatchArray) => { content: string; url?: string };
+}> = [
+  // Inline math $...$ (block math $$ handled separately in main loop)
+  {
+    pattern: /^\$([^$\n]+?)\$/,
+    type: 'math',
+    getContent: (m) => ({ content: m[1] }),
+  },
+  // Bold italic ***text*** or ___text___
+  {
+    pattern: /^(\*\*\*|___)(.+?)\1/,
+    type: 'boldItalic',
+    getContent: (m) => ({ content: m[2] }),
+  },
+  // Bold **text** or __text__
+  {
+    pattern: /^(\*\*|__)(.+?)\1/,
+    type: 'bold',
+    getContent: (m) => ({ content: m[2] }),
+  },
+  // Strikethrough ~~text~~
+  {
+    pattern: /^~~(.+?)~~/,
+    type: 'strikethrough',
+    getContent: (m) => ({ content: m[1] }),
+  },
+  // HTML underline <u>text</u>
+  {
+    pattern: /^<u>(.+?)<\/u>/i,
+    type: 'underline',
+    getContent: (m) => ({ content: m[1] }),
+  },
+  // HTML mark (highlight) <mark>text</mark>
+  {
+    pattern: /^<mark>(.+?)<\/mark>/i,
+    type: 'mark',
+    getContent: (m) => ({ content: m[1] }),
+  },
+  // HTML kbd (keyboard) <kbd>text</kbd>
+  {
+    pattern: /^<kbd>(.+?)<\/kbd>/i,
+    type: 'kbd',
+    getContent: (m) => ({ content: m[1] }),
+  },
+  // Italic *text* or _text_ (but not inside words for underscore)
+  {
+    pattern: /^(\*|_)([^*_]+?)\1/,
+    type: 'italic',
+    getContent: (m) => ({ content: m[2] }),
+  },
+  // Inline code `text`
+  {
+    pattern: /^`([^`]+)`/,
+    type: 'code',
+    getContent: (m) => ({ content: m[1] }),
+  },
+  // Link [text](url)
+  {
+    pattern: /^\[([^\]]+)\]\(([^)]+)\)/,
+    type: 'link',
+    getContent: (m) => ({ content: m[1], url: m[2] }),
+  },
+];
 
 /**
  * Parse inline markdown within a line
@@ -38,49 +225,82 @@ function parseInline(text: string): Segment[] {
   let remaining = text;
 
   while (remaining.length > 0) {
-    // Bold italic ***text***
-    let match = remaining.match(/^\*\*\*(.+?)\*\*\*/);
-    if (match) {
-      segments.push({ type: 'boldItalic', content: match[1] });
-      remaining = remaining.slice(match[0].length);
-      continue;
+    let matched = false;
+
+    // Try each pattern
+    for (const { pattern, type, getContent } of INLINE_PATTERNS) {
+      const match = remaining.match(pattern);
+      if (match) {
+        const { content, url } = getContent(match);
+        segments.push({ type, content, url });
+        remaining = remaining.slice(match[0].length);
+        matched = true;
+        break;
+      }
     }
 
-    // Bold **text**
-    match = remaining.match(/^\*\*(.+?)\*\*/);
-    if (match) {
-      segments.push({ type: 'bold', content: match[1] });
-      remaining = remaining.slice(match[0].length);
-      continue;
+    if (!matched) {
+      // Regular character - append to last text segment or create new one
+      const lastSeg = segments[segments.length - 1];
+      if (lastSeg && lastSeg.type === 'text') {
+        lastSeg.content += remaining[0];
+      } else {
+        segments.push({ type: 'text', content: remaining[0] });
+      }
+      remaining = remaining.slice(1);
     }
-
-    // Italic *text*
-    match = remaining.match(/^\*([^*]+?)\*/);
-    if (match) {
-      segments.push({ type: 'italic', content: match[1] });
-      remaining = remaining.slice(match[0].length);
-      continue;
-    }
-
-    // Inline code `text`
-    match = remaining.match(/^`([^`]+)`/);
-    if (match) {
-      segments.push({ type: 'code', content: match[1] });
-      remaining = remaining.slice(match[0].length);
-      continue;
-    }
-
-    // Regular character
-    const lastSeg = segments[segments.length - 1];
-    if (lastSeg && lastSeg.type === 'text') {
-      lastSeg.content += remaining[0];
-    } else {
-      segments.push({ type: 'text', content: remaining[0] });
-    }
-    remaining = remaining.slice(1);
   }
 
   return segments;
+}
+
+/**
+ * Check if a line looks like a table row
+ * A table row must:
+ * - Start with | OR contain at least 2 | characters (column separators)
+ * - Not be a list item or other markdown structure
+ */
+function isTableRow(line: string): boolean {
+  const trimmed = line.trim();
+  // Skip if it looks like a list item
+  if (/^[-*]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) {
+    return false;
+  }
+  // Must start with | or contain at least 2 |
+  const pipeCount = (trimmed.match(/\|/g) || []).length;
+  return trimmed.startsWith('|') || pipeCount >= 2;
+}
+
+/**
+ * Check if a line is a table separator row (contains only |, -, :, and spaces)
+ */
+function isTableSeparator(line: string): boolean {
+  const trimmed = line.trim();
+  return /^\|?[\s\-:|]+\|?$/.test(trimmed) && trimmed.includes('-');
+}
+
+/**
+ * Parse table alignment from separator row
+ */
+function parseTableAlignments(separatorLine: string): TableAlignment[] {
+  const cells = separatorLine.split('|').filter(cell => cell.trim() !== '');
+  return cells.map(cell => {
+    const trimmed = cell.trim();
+    if (trimmed.startsWith(':') && trimmed.endsWith(':')) return 'center';
+    if (trimmed.endsWith(':')) return 'right';
+    return 'left';
+  });
+}
+
+/**
+ * Parse a table row into cells
+ */
+function parseTableRow(line: string): string[] {
+  // Remove leading/trailing pipes and split
+  const trimmed = line.trim();
+  const withoutPipes = trimmed.startsWith('|') ? trimmed.slice(1) : trimmed;
+  const withoutEndPipe = withoutPipes.endsWith('|') ? withoutPipes.slice(0, -1) : withoutPipes;
+  return withoutEndPipe.split('|').map(cell => cell.trim());
 }
 
 /**
@@ -105,12 +325,141 @@ const InlineLine: React.FC<{
           case 'boldItalic':
             return <Text key={i} bold italic color={textColor}>{seg.content}</Text>;
           case 'code':
-            return <Text key={i} color={theme.status.info}>{seg.content}</Text>;
+            // Inline code with visible markers
+            return (
+              <Text key={i}>
+                <Text color={theme.text.muted}>`</Text>
+                <Text color={theme.status.info} bold>{seg.content}</Text>
+                <Text color={theme.text.muted}>`</Text>
+              </Text>
+            );
+          case 'strikethrough':
+            return <Text key={i} strikethrough color={theme.text.muted}>{seg.content}</Text>;
+          case 'underline':
+            return <Text key={i} underline color={textColor}>{seg.content}</Text>;
+          case 'mark':
+            // Highlight with inverse (background swap)
+            return <Text key={i} inverse color={theme.status.warning}>{seg.content}</Text>;
+          case 'kbd':
+            // Keyboard key style with brackets
+            return (
+              <Text key={i}>
+                <Text color={theme.text.muted}>[</Text>
+                <Text bold color={theme.text.primary}>{seg.content}</Text>
+                <Text color={theme.text.muted}>]</Text>
+              </Text>
+            );
+          case 'math':
+            // Inline math with special color
+            return (
+              <Text key={i}>
+                <Text color={theme.text.muted}>$</Text>
+                <Text italic color={theme.text.accent}>{seg.content}</Text>
+                <Text color={theme.text.muted}>$</Text>
+              </Text>
+            );
+          case 'link':
+            // Display as text (url) with link color
+            return (
+              <Text key={i}>
+                <Text color={theme.text.link} underline>{seg.content}</Text>
+                <Text color={theme.text.muted}> ({seg.url})</Text>
+              </Text>
+            );
           default:
             return <Text key={i} color={textColor}>{seg.content}</Text>;
         }
       })}
     </Text>
+  );
+};
+
+/**
+ * Table renderer component
+ */
+const TableDisplay: React.FC<{
+  headers: string[];
+  alignments: TableAlignment[];
+  rows: string[][];
+  dimColor?: boolean;
+  baseColor?: string;
+}> = ({ headers, alignments, rows, dimColor, baseColor }) => {
+  const textColor = baseColor || theme.text.primary;
+
+  // Calculate column widths using display width (handles CJK characters correctly)
+  // Minimum width is 3 characters
+  const columnCount = Math.max(headers.length, ...rows.map(r => r.length));
+  const columnWidths: number[] = Array(columnCount).fill(3);
+
+  // Update widths based on content display width
+  headers.forEach((header, i) => {
+    columnWidths[i] = Math.max(columnWidths[i] || 3, getCachedStringWidth(header));
+  });
+  rows.forEach(row => {
+    row.forEach((cell, i) => {
+      columnWidths[i] = Math.max(columnWidths[i] || 3, getCachedStringWidth(cell));
+    });
+  });
+
+  // Helper to pad cell content based on alignment (uses display width)
+  const padCell = (content: string, width: number, align: 'left' | 'center' | 'right'): string => {
+    const contentWidth = getCachedStringWidth(content);
+    const padding = width - contentWidth;
+    if (padding <= 0) return content;
+    switch (align) {
+      case 'center': {
+        const left = Math.floor(padding / 2);
+        const right = padding - left;
+        return ' '.repeat(left) + content + ' '.repeat(right);
+      }
+      case 'right':
+        return ' '.repeat(padding) + content;
+      default:
+        return content + ' '.repeat(padding);
+    }
+  };
+
+  // Render a row of cells
+  const renderRow = (cells: string[], isHeader: boolean, key: string) => (
+    <Box key={key} flexDirection="row">
+      <Text color={theme.text.muted} dimColor={dimColor}>│</Text>
+      {columnWidths.map((width, i) => {
+        const cell = cells[i] || '';
+        const align = alignments[i] || 'left';
+        const paddedContent = padCell(cell, width, align);
+        return (
+          <React.Fragment key={i}>
+            <Text color={isHeader ? theme.status.info : textColor} bold={isHeader} dimColor={dimColor}>
+              {' '}{paddedContent}{' '}
+            </Text>
+            <Text color={theme.text.muted} dimColor={dimColor}>│</Text>
+          </React.Fragment>
+        );
+      })}
+    </Box>
+  );
+
+  // Render separator line
+  const renderSeparator = (key: string, isTop = false, isBottom = false) => {
+    const left = isTop ? '┌' : isBottom ? '└' : '├';
+    const right = isTop ? '┐' : isBottom ? '┘' : '┤';
+    const middle = isTop ? '┬' : isBottom ? '┴' : '┼';
+    const line = columnWidths.map(w => '─'.repeat(w + 2)).join(middle);
+    return (
+      <Box key={key}>
+        <Text color={theme.text.muted} dimColor={dimColor}>{left}{line}{right}</Text>
+      </Box>
+    );
+  };
+
+  return (
+    <Box flexDirection="column">
+      {renderSeparator('top', true)}
+      {renderRow(headers, true, 'header')}
+      {renderSeparator('header-sep')}
+      {rows.map((row, i) => renderRow(row, false, `row-${i}`))}
+      {renderSeparator('bottom', false, true)}
+    </Box>
   );
 };
 
@@ -122,20 +471,70 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, dimColor, 
   let inCodeBlock = false;
   let codeLines: string[] = [];
 
+  // Math block accumulator (for $$...$$)
+  let inMathBlock = false;
+  let mathLines: string[] = [];
+
+  // Table accumulator
+  let tableLines: string[] = [];
+  let inTable = false;
+
+  const flushTable = () => {
+    if (tableLines.length >= 2) {
+      // Need at least header + separator
+      const headerLine = tableLines[0];
+      const separatorLine = tableLines[1];
+
+      if (isTableSeparator(separatorLine)) {
+        const headers = parseTableRow(headerLine);
+        const alignments = parseTableAlignments(separatorLine);
+        const rows = tableLines.slice(2).map(parseTableRow);
+
+        elements.push(
+          <TableDisplay
+            key={`table-${elements.length}`}
+            headers={headers}
+            alignments={alignments}
+            rows={rows}
+            dimColor={dimColor}
+            baseColor={baseColor}
+          />
+        );
+        tableLines = [];
+        inTable = false;
+        return true;
+      }
+    }
+    // Not a valid table, render lines as regular text
+    tableLines.forEach((tl, idx) => {
+      elements.push(
+        <Box key={`tl-${elements.length}-${idx}`}>
+          <InlineLine text={tl} dimColor={dimColor} baseColor={baseColor} />
+        </Box>
+      );
+    });
+    tableLines = [];
+    inTable = false;
+    return false;
+  };
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
     // Code block delimiter
     if (line.startsWith('```')) {
+      // Flush any pending table
+      if (inTable) flushTable();
+
       if (!inCodeBlock) {
         inCodeBlock = true;
         codeLines = [];
       } else {
-        // End code block - render accumulated lines
+        // End code block - render with syntax highlighting
         elements.push(
           <Box key={`code-${i}`} flexDirection="column">
             {codeLines.map((cl, j) => (
-              <Text key={j} color={theme.status.success} dimColor={dimColor}>{cl}</Text>
+              <CodeLine key={j} code={cl} dimColor={dimColor} />
             ))}
           </Box>
         );
@@ -150,9 +549,49 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, dimColor, 
       continue;
     }
 
-    // Horizontal rule
-    if (/^-{3,}$/.test(line.trim())) {
-      elements.push(<Text key={`hr-${i}`} color={theme.text.muted} dimColor={dimColor}>───</Text>);
+    // Math block delimiter $$ (on its own line)
+    if (line.trim() === '$$') {
+      // Flush any pending table
+      if (inTable) flushTable();
+
+      if (!inMathBlock) {
+        inMathBlock = true;
+        mathLines = [];
+      } else {
+        // End math block - render accumulated lines
+        elements.push(
+          <Box key={`math-${i}`} flexDirection="column" marginY={0}>
+            <Text color={theme.text.muted} dimColor={dimColor}>$$</Text>
+            {mathLines.map((ml, j) => (
+              <Text key={j} italic color={theme.text.accent} dimColor={dimColor}>  {ml}</Text>
+            ))}
+            <Text color={theme.text.muted} dimColor={dimColor}>$$</Text>
+          </Box>
+        );
+        inMathBlock = false;
+      }
+      continue;
+    }
+
+    // Inside math block
+    if (inMathBlock) {
+      mathLines.push(line);
+      continue;
+    }
+
+    // Table detection and accumulation
+    if (isTableRow(line)) {
+      tableLines.push(line);
+      inTable = true;
+      continue;
+    } else if (inTable) {
+      // End of table
+      flushTable();
+    }
+
+    // Horizontal rule (---, ***, ___)
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+      elements.push(<Text key={`hr-${i}`} color={theme.text.muted} dimColor={dimColor}>───────────────────</Text>);
       continue;
     }
 
@@ -179,13 +618,39 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, dimColor, 
       continue;
     }
 
-    // List item
-    const listMatch = line.match(/^(\s*)[-*]\s+(.+)$/);
-    if (listMatch) {
+    // List item - careful with asterisks to avoid matching **bold** or *italic*
+    // - "-" can have optional space: "- text" or "-text"
+    // - "*" MUST have space after it: "* text" (to distinguish from *italic* or **bold**)
+    const dashListMatch = line.match(/^(\s*)-\s*(.+)$/);
+    if (dashListMatch) {
       elements.push(
         <Box key={`li-${i}`} flexDirection="row">
-          <Text color={theme.status.warning} dimColor={dimColor}>{listMatch[1]}- </Text>
-          <InlineLine text={listMatch[2]} dimColor={dimColor} baseColor={baseColor} />
+          <Text color={theme.status.warning} dimColor={dimColor}>{dashListMatch[1]}- </Text>
+          <InlineLine text={dashListMatch[2]} dimColor={dimColor} baseColor={baseColor} />
+        </Box>
+      );
+      continue;
+    }
+
+    // Asterisk list requires space after * to avoid matching **bold** or *italic*
+    const asteriskListMatch = line.match(/^(\s*)\*\s+(.+)$/);
+    if (asteriskListMatch) {
+      elements.push(
+        <Box key={`li-${i}`} flexDirection="row">
+          <Text color={theme.status.warning} dimColor={dimColor}>{asteriskListMatch[1]}- </Text>
+          <InlineLine text={asteriskListMatch[2]} dimColor={dimColor} baseColor={baseColor} />
+        </Box>
+      );
+      continue;
+    }
+
+    // Numbered list item (1. text, 2. text, etc.)
+    const numberedListMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+    if (numberedListMatch) {
+      elements.push(
+        <Box key={`nli-${i}`} flexDirection="row">
+          <Text color={theme.status.warning} dimColor={dimColor}>{numberedListMatch[1]}{numberedListMatch[2]}. </Text>
+          <InlineLine text={numberedListMatch[3]} dimColor={dimColor} baseColor={baseColor} />
         </Box>
       );
       continue;
@@ -204,10 +669,27 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, dimColor, 
     elements.push(
       <Box key="code-end" flexDirection="column">
         {codeLines.map((cl, j) => (
-          <Text key={j} color={theme.status.success} dimColor={dimColor}>{cl}</Text>
+          <CodeLine key={j} code={cl} dimColor={dimColor} />
         ))}
       </Box>
     );
+  }
+
+  // Handle unclosed math block
+  if (inMathBlock && mathLines.length > 0) {
+    elements.push(
+      <Box key="math-end" flexDirection="column">
+        <Text color={theme.text.muted} dimColor={dimColor}>$$</Text>
+        {mathLines.map((ml, j) => (
+          <Text key={j} italic color={theme.text.accent} dimColor={dimColor}>  {ml}</Text>
+        ))}
+      </Box>
+    );
+  }
+
+  // Flush any remaining table
+  if (inTable) {
+    flushTable();
   }
 
   return <Box flexDirection="column">{elements}</Box>;
