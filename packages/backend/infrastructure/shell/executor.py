@@ -161,6 +161,9 @@ class ShellExecutor:
         """Execute a shell command (foreground, blocking).
 
         Blocks until command completes or timeout is reached.
+        Uses subprocess.Popen with asyncio.to_thread for cross-platform
+        compatibility (works on Windows with both ProactorEventLoop
+        and SelectorEventLoop).
 
         Args:
             command: The shell command to execute
@@ -175,59 +178,23 @@ class ShellExecutor:
             TimeoutError: If command exceeds timeout
             ShellExecutorError: If execution fails unexpectedly
         """
-        effective_timeout = timeout_ms if timeout_ms is not None else DEFAULT_TIMEOUT_MS
-        timeout_seconds = effective_timeout / 1000.0
-
-        # Prepare command
+        timeout_seconds = (timeout_ms or DEFAULT_TIMEOUT_MS) / 1000.0
         prepared_command = self._prepare_command(command)
-
-        # Prepare environment (always unbuffered for real-time output)
+        original_command = command if prepared_command != command else None
         process_env = prepare_shell_env(base_env=env, force_unbuffered=True)
 
-        try:
-            return await self._execute_foreground(
-                command=prepared_command,
-                original_command=command if prepared_command != command else None,
-                cwd=cwd,
-                timeout_seconds=timeout_seconds,
-                env=process_env,
-            )
-        except TimeoutError:
-            raise
-        except ShellExecutorError:
-            raise
-        except Exception as e:
-            raise ShellExecutorError(f"Command execution failed: {type(e).__name__}: {e}") from e
-
-    async def _execute_foreground(
-        self,
-        command: str,
-        cwd: str,
-        timeout_seconds: float,
-        env: dict,
-        original_command: Optional[str] = None,
-    ) -> ShellExecutionResult:
-        """Execute command in foreground using subprocess with asyncio.
-
-        Uses subprocess.Popen with asyncio.to_thread for cross-platform
-        compatibility. This works on Windows with both ProactorEventLoop
-        and SelectorEventLoop (uvicorn reload mode uses SelectorEventLoop,
-        which does not support asyncio.create_subprocess_shell).
-        """
         start_time = time.time()
-
         process: Optional[subprocess.Popen] = None
+
         try:
-            # Create subprocess using standard subprocess module
-            # This works regardless of the asyncio event loop type
             process = subprocess.Popen(
-                command,
+                prepared_command,
                 shell=True,
                 cwd=cwd,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=env,
+                env=process_env,
             )
 
             # Wait for completion with timeout using asyncio.to_thread
@@ -238,7 +205,6 @@ class ShellExecutor:
                     timeout=timeout_seconds
                 )
             except asyncio.TimeoutError:
-                # Kill the process on timeout
                 process.kill()
                 process.communicate()  # Clean up (blocking, but process is dead)
                 raise TimeoutError(f"Command timed out after {timeout_seconds:.1f} seconds")
@@ -246,21 +212,18 @@ class ShellExecutor:
             # Decode output (handle encoding errors gracefully)
             stdout = stdout_bytes.decode('utf-8', errors='replace') if stdout_bytes else ''
             stderr = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ''
-            # returncode is guaranteed to be set after communicate() completes
             exit_code: int = process.returncode if process.returncode is not None else -1
 
         except TimeoutError:
             raise
         except Exception as e:
-            # Ensure process cleanup on unexpected errors
             if process is not None and process.poll() is None:
                 process.kill()
                 process.communicate()
-            raise ShellExecutorError(f"Subprocess execution failed: {type(e).__name__}: {e}") from e
+            raise ShellExecutorError(f"Command execution failed: {type(e).__name__}: {e}") from e
 
         execution_time = time.time() - start_time
 
-        # Process output (foreground only - background handles its own output)
         process_shell_output(
             stdout=stdout,
             stderr=stderr,
@@ -272,7 +235,7 @@ class ShellExecutor:
             stdout=stdout,
             stderr=stderr,
             exit_code=exit_code,
-            command=command,
+            command=prepared_command,
             execution_time=execution_time,
             working_directory=cwd,
             timed_out=False,
