@@ -11,7 +11,10 @@ Uses ShellExecutor for unified process creation.
 """
 
 import asyncio
+import os
+import signal
 import subprocess
+import sys
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -25,6 +28,51 @@ from .executor import (
     ForegroundExecutionHandle,
 )
 from .utils import MAX_LINE_LENGTH, MAX_BUFFER_LINES
+
+
+def _terminate_process_tree(process: subprocess.Popen, timeout: float = 5.0) -> None:
+    """Terminate a process and all its children.
+
+    On Unix with start_new_session=True, the process is a session leader
+    and can be killed along with all children using os.killpg().
+
+    On Windows, uses taskkill /T to kill the process tree.
+
+    Args:
+        process: The Popen process to terminate
+        timeout: Seconds to wait after SIGTERM before using SIGKILL
+    """
+    if process.poll() is not None:
+        return  # Already terminated
+
+    try:
+        if sys.platform == "win32":
+            # Windows: Use taskkill with /T flag to kill process tree
+            # /F = force, /T = tree (kill child processes), /PID = process ID
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                capture_output=True,
+                timeout=timeout,
+            )
+        else:
+            # Unix: Kill the entire process group with SIGTERM first
+            pgid = os.getpgid(process.pid)
+            os.killpg(pgid, signal.SIGTERM)
+
+            # Wait for termination
+            try:
+                process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                # Force kill if SIGTERM didn't work
+                try:
+                    os.killpg(pgid, signal.SIGKILL)
+                except (ProcessLookupError, OSError):
+                    pass
+                process.wait()
+
+    except (ProcessLookupError, OSError, subprocess.TimeoutExpired):
+        # Process already terminated or doesn't exist
+        pass
 
 
 @dataclass
@@ -518,13 +566,8 @@ class BackgroundProcessManager:
                     final_stdout = '\n'.join(final_stdout_lines) if final_stdout_lines else ''
                     final_stderr = '\n'.join(final_stderr_lines) if final_stderr_lines else ''
 
-                # Kill the process
-                bg_process.process.terminate()
-                try:
-                    bg_process.process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    bg_process.process.kill()
-                    bg_process.process.wait()
+                # Kill the process and all its children
+                _terminate_process_tree(bg_process.process, timeout=5.0)
 
                 bg_process.status = "killed"
                 bg_process.exit_code = bg_process.process.returncode
@@ -687,15 +730,7 @@ class BackgroundProcessManager:
                 if process_id in self.processes:
                     bg_process = self.processes[process_id]
                     if bg_process.status == "running":
-                        try:
-                            bg_process.process.terminate()
-                            bg_process.process.wait(timeout=5)
-                        except (subprocess.TimeoutExpired, Exception):
-                            try:
-                                bg_process.process.kill()
-                                bg_process.process.wait()
-                            except Exception:
-                                pass
+                        _terminate_process_tree(bg_process.process, timeout=5.0)
                         bg_process.status = "killed"
 
                     # Remove from tracking
@@ -724,15 +759,7 @@ class BackgroundProcessManager:
                 # Kill processes that have been running too long
                 elif (bg_process.status == "running" and
                       bg_process.start_time < datetime.now() - timedelta(hours=self.PROCESS_TIMEOUT_HOURS)):
-                    try:
-                        bg_process.process.terminate()
-                        bg_process.process.wait(timeout=5)
-                    except (subprocess.TimeoutExpired, Exception):
-                        try:
-                            bg_process.process.kill()
-                            bg_process.process.wait()
-                        except Exception:
-                            pass
+                    _terminate_process_tree(bg_process.process, timeout=5.0)
                     bg_process.status = "killed"
                     processes_to_remove.append(process_id)
 
@@ -789,12 +816,5 @@ def shutdown_all_processes() -> None:
 
     for _, bg_process in list(process_manager.processes.items()):
         if bg_process.status == "running":
-            try:
-                bg_process.process.terminate()
-                bg_process.process.wait(timeout=2)
-            except Exception:
-                try:
-                    bg_process.process.kill()
-                except Exception:
-                    pass
+            _terminate_process_tree(bg_process.process, timeout=2.0)
             bg_process.status = "killed"

@@ -12,6 +12,8 @@ by the application layer.
 """
 
 import asyncio
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -31,6 +33,35 @@ from .utils import prepare_shell_env
 
 # Default timeout for foreground execution (30 seconds)
 DEFAULT_TIMEOUT_MS = 30000
+
+
+def _kill_process_group(process: subprocess.Popen) -> None:
+    """Kill a process and all its children using process group.
+
+    On Unix with start_new_session=True, we can kill all children
+    by killing the process group.
+
+    On Windows, uses taskkill /T to kill the process tree.
+    """
+    if process.poll() is not None:
+        return  # Already dead
+
+    try:
+        if sys.platform == "win32":
+            # Windows: Use taskkill with /T flag to kill process tree
+            # /F = force, /T = tree (kill child processes), /PID = process ID
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                capture_output=True,
+                timeout=5,
+            )
+        else:
+            # Unix: Kill the entire process group with SIGKILL
+            pgid = os.getpgid(process.pid)
+            os.killpg(pgid, signal.SIGKILL)
+    except (ProcessLookupError, OSError, subprocess.TimeoutExpired):
+        # Process already terminated or taskkill timed out
+        pass
 
 
 class ShellExecutorError(Exception):
@@ -138,7 +169,7 @@ class ForegroundExecutionHandle:
             # Case 2: Timeout (neither task completed)
             if not done:
                 signal_task.cancel()
-                self.process.kill()
+                _kill_process_group(self.process)
                 # Wait for the thread to finish (communicate will return quickly after kill)
                 try:
                     await asyncio.wait_for(wait_task, timeout=5.0)
@@ -179,7 +210,7 @@ class ForegroundExecutionHandle:
         except Exception as e:
             signal_task.cancel()
             if self.process.poll() is None:
-                self.process.kill()
+                _kill_process_group(self.process)
                 # Wait for the thread to finish
                 try:
                     await asyncio.wait_for(wait_task, timeout=5.0)
@@ -272,19 +303,26 @@ class ShellExecutor:
         Returns:
             subprocess.Popen instance
         """
-        return subprocess.Popen(
-            command,
-            shell=True,
-            cwd=cwd,
-            stdin=subprocess.DEVNULL,  # Prevent blocking on interactive commands
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8',
-            errors='replace',  # Replace undecodable bytes instead of raising
-            bufsize=1 if line_buffered else -1,  # Line buffered or system default
-            env=env,
-        )
+        # On Unix, start_new_session=True creates a new process group
+        # This allows us to kill all child processes with os.killpg()
+        popen_kwargs: dict = {
+            "shell": True,
+            "cwd": cwd,
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "text": True,
+            "encoding": "utf-8",
+            "errors": "replace",
+            "bufsize": 1 if line_buffered else -1,
+            "env": env,
+        }
+
+        # Enable process group for proper cleanup on Unix systems
+        if sys.platform != "win32":
+            popen_kwargs["start_new_session"] = True
+
+        return subprocess.Popen(command, **popen_kwargs)
 
     async def execute(
         self,
@@ -340,7 +378,7 @@ class ShellExecutor:
                     timeout=timeout_seconds
                 )
             except asyncio.TimeoutError:
-                process.kill()
+                _kill_process_group(process)
                 process.communicate()  # Clean up (blocking, but process is dead)
                 raise TimeoutError(f"Command timed out after {timeout_seconds:.1f} seconds")
 
@@ -353,7 +391,7 @@ class ShellExecutor:
             raise
         except Exception as e:
             if process is not None and process.poll() is None:
-                process.kill()
+                _kill_process_group(process)
                 process.communicate()
             raise ShellExecutorError(f"Command execution failed: {type(e).__name__}: {e}") from e
 
@@ -456,15 +494,21 @@ class ShellExecutor:
         process_env = prepare_shell_env(base_env=env, force_unbuffered=True)
 
         try:
-            process = subprocess.Popen(
-                prepared_command,
-                shell=True,
-                cwd=cwd,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=process_env,
-            )
+            # Build Popen kwargs with process group support on Unix
+            popen_kwargs: dict = {
+                "shell": True,
+                "cwd": cwd,
+                "stdin": subprocess.DEVNULL,
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.PIPE,
+                "env": process_env,
+            }
+
+            # Enable process group for proper cleanup on Unix systems
+            if sys.platform != "win32":
+                popen_kwargs["start_new_session"] = True
+
+            process = subprocess.Popen(prepared_command, **popen_kwargs)
 
             return ForegroundExecutionHandle(
                 process=process,
