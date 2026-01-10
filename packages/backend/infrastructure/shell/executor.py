@@ -137,10 +137,13 @@ class ForegroundExecutionHandle:
 
             # Case 2: Timeout (neither task completed)
             if not done:
-                wait_task.cancel()
                 signal_task.cancel()
                 self.process.kill()
-                self.process.communicate()
+                # Wait for the thread to finish (communicate will return quickly after kill)
+                try:
+                    await asyncio.wait_for(wait_task, timeout=5.0)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    wait_task.cancel()
                 raise TimeoutError(f"Command timed out after {self.timeout_seconds:.1f} seconds")
 
             # Case 3: Process completed normally
@@ -171,12 +174,18 @@ class ForegroundExecutionHandle:
                 original_command=self.command if self.prepared_command != self.command else None,
             )
 
+        except TimeoutError:
+            raise
         except Exception as e:
-            wait_task.cancel()
             signal_task.cancel()
             if self.process.poll() is None:
                 self.process.kill()
-                self.process.communicate()
+                # Wait for the thread to finish
+                try:
+                    await asyncio.wait_for(wait_task, timeout=5.0)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    pass
+            wait_task.cancel()
             raise ShellExecutorError(f"Command execution failed: {type(e).__name__}: {e}") from e
 
 
