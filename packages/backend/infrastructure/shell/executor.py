@@ -15,8 +15,11 @@ import asyncio
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Optional, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .executor import ShellExecutor
 
 from backend.infrastructure.mcp.utils.path_normalization import normalize_windows_paths
 from backend.infrastructure.mcp.utils.shell import (
@@ -52,6 +55,129 @@ class BackgroundProcessHandle:
     prepared_command: str     # Command after preparation (path normalization, etc.)
     cwd: str
     start_time: float
+
+
+@dataclass
+class MoveToBackgroundRequest:
+    """Request to move a foreground process to background.
+
+    Returned by ForegroundExecutionHandle.wait() when user triggers ctrl+b.
+    This is a normal control flow result, not an exception.
+    """
+    handle: "ForegroundExecutionHandle"
+
+
+@dataclass
+class ForegroundExecutionHandle:
+    """Handle for a foreground process with interruptible wait.
+
+    Supports ctrl+b to move the process to background without killing it.
+    The wait() method returns either ShellExecutionResult (normal completion)
+    or MoveToBackgroundRequest (user requested background conversion).
+    """
+    process: subprocess.Popen
+    command: str              # Original command
+    prepared_command: str     # Command after preparation
+    cwd: str
+    start_time: float
+    timeout_seconds: float
+    process_env: dict
+    max_output_chars: int
+    normalize_paths: bool
+    _move_to_bg_event: asyncio.Event = field(default_factory=asyncio.Event)
+
+    def request_move_to_background(self) -> None:
+        """Signal the wait() method to return MoveToBackgroundRequest.
+
+        Called by ForegroundTaskRegistry when user presses ctrl+b.
+        """
+        self._move_to_bg_event.set()
+
+    def to_background_handle(self) -> BackgroundProcessHandle:
+        """Convert this handle to a BackgroundProcessHandle for adoption."""
+        return BackgroundProcessHandle(
+            process=self.process,
+            command=self.command,
+            prepared_command=self.prepared_command,
+            cwd=self.cwd,
+            start_time=self.start_time,
+        )
+
+    async def wait(self) -> Union[ShellExecutionResult, MoveToBackgroundRequest]:
+        """Wait for process completion or move-to-background signal.
+
+        Returns:
+            ShellExecutionResult: Process completed normally
+            MoveToBackgroundRequest: User pressed ctrl+b
+
+        Raises:
+            TimeoutError: Process exceeded timeout
+            ShellExecutorError: Unexpected execution error
+        """
+        # Task 1: Wait for process completion
+        wait_task = asyncio.create_task(
+            asyncio.to_thread(self.process.communicate)
+        )
+        # Task 2: Wait for move-to-background signal
+        signal_task = asyncio.create_task(
+            self._move_to_bg_event.wait()
+        )
+
+        try:
+            done, pending = await asyncio.wait(
+                [wait_task, signal_task],
+                timeout=self.timeout_seconds,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+
+            # Case 1: Move-to-background signal received
+            if signal_task in done:
+                wait_task.cancel()
+                return MoveToBackgroundRequest(handle=self)
+
+            # Case 2: Timeout (neither task completed)
+            if not done:
+                wait_task.cancel()
+                signal_task.cancel()
+                self.process.kill()
+                self.process.communicate()
+                raise TimeoutError(f"Command timed out after {self.timeout_seconds:.1f} seconds")
+
+            # Case 3: Process completed normally
+            signal_task.cancel()
+            stdout_bytes, stderr_bytes = wait_task.result()
+
+            stdout = stdout_bytes.decode('utf-8', errors='replace') if stdout_bytes else ''
+            stderr = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ''
+            exit_code: int = self.process.returncode if self.process.returncode is not None else -1
+
+            execution_time = time.time() - self.start_time
+
+            process_shell_output(
+                stdout=stdout,
+                stderr=stderr,
+                max_chars=self.max_output_chars,
+                normalize_paths=self.normalize_paths,
+            )
+
+            return ShellExecutionResult(
+                stdout=stdout,
+                stderr=stderr,
+                exit_code=exit_code,
+                command=self.prepared_command,
+                execution_time=execution_time,
+                working_directory=self.cwd,
+                timed_out=False,
+                original_command=self.command if self.prepared_command != self.command else None,
+            )
+
+        except Exception as e:
+            wait_task.cancel()
+            signal_task.cancel()
+            if self.process.poll() is None:
+                self.process.kill()
+                self.process.communicate()
+            raise ShellExecutorError(f"Command execution failed: {type(e).__name__}: {e}") from e
 
 
 class ShellExecutor:
@@ -291,3 +417,57 @@ class ShellExecutor:
 
         except Exception as e:
             raise ShellExecutorError(f"Failed to start background process: {type(e).__name__}: {e}") from e
+
+    def start_foreground(
+        self,
+        command: str,
+        cwd: str,
+        timeout_ms: Optional[int] = None,
+        env: Optional[dict] = None,
+    ) -> ForegroundExecutionHandle:
+        """Start a foreground process with interruptible wait support.
+
+        Creates the process and returns a handle that can be awaited.
+        The handle supports ctrl+b to move the process to background.
+
+        Args:
+            command: The shell command to execute
+            cwd: Working directory for command execution
+            timeout_ms: Timeout in milliseconds (defaults to DEFAULT_TIMEOUT_MS)
+            env: Optional environment variables (defaults to current env)
+
+        Returns:
+            ForegroundExecutionHandle with wait() method
+
+        Raises:
+            ShellExecutorError: If process creation fails
+        """
+        timeout_seconds = (timeout_ms or DEFAULT_TIMEOUT_MS) / 1000.0
+        prepared_command = self._prepare_command(command)
+        process_env = prepare_shell_env(base_env=env, force_unbuffered=True)
+
+        try:
+            process = subprocess.Popen(
+                prepared_command,
+                shell=True,
+                cwd=cwd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=process_env,
+            )
+
+            return ForegroundExecutionHandle(
+                process=process,
+                command=command,
+                prepared_command=prepared_command,
+                cwd=cwd,
+                start_time=time.time(),
+                timeout_seconds=timeout_seconds,
+                process_env=process_env,
+                max_output_chars=self.max_output_chars,
+                normalize_paths=self.normalize_paths,
+            )
+
+        except Exception as e:
+            raise ShellExecutorError(f"Failed to start foreground process: {type(e).__name__}: {e}") from e

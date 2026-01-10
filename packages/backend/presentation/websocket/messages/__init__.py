@@ -55,7 +55,8 @@ from backend.presentation.websocket.messages.pfc_task import PfcTaskNotification
 from backend.presentation.websocket.messages.tool import (
     ToolConfirmationRequestMessage,
     ToolConfirmationResponseMessage,
-    UserInterruptMessage
+    UserInterruptMessage,
+    MoveToBackgroundMessage,
 )
 
 # Chat and streaming
@@ -102,6 +103,7 @@ __all__ = [
     "ToolConfirmationRequestMessage",
     "ToolConfirmationResponseMessage",
     "UserInterruptMessage",
+    "MoveToBackgroundMessage",
     # Chat and streaming
     "ChatMessageRequest",
     "MessageCreateMessage",

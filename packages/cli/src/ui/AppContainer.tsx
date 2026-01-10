@@ -368,12 +368,23 @@ export const AppContainer: React.FC<AppContainerProps> = ({
       // Note: pendingConfirmation ESC is handled by ToolConfirmationPrompt component
     }
 
+    // Ctrl+B: move foreground bash to background
+    if (key.ctrl && key.name === 'b') {
+      if (isStreaming && currentSessionId) {
+        // Send move-to-background signal to backend
+        connectionManager.send({
+          type: 'MOVE_TO_BACKGROUND',
+          session_id: currentSessionId,
+        });
+      }
+    }
+
     // Ctrl+O: toggle full context mode (show full thinking/tool results)
     // Only handle here when NOT in full context mode (FullContextView handles its own Ctrl+O)
     if (key.ctrl && key.name === 'o' && !isFullContextMode) {
       toggleFullContextMode();
     }
-  }, [quit, isStreaming, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager, toggleFullContextMode, isFullContextMode]);
+  }, [quit, isStreaming, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager, toggleFullContextMode, isFullContextMode, currentSessionId, connectionManager]);
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 

@@ -52,6 +52,9 @@ class MessageType(str, Enum):
     # User interrupt control
     USER_INTERRUPT = "USER_INTERRUPT"
 
+    # Foreground-to-background conversion (ctrl+b)
+    MOVE_TO_BACKGROUND = "MOVE_TO_BACKGROUND"
+
     # Background process notifications
     BACKGROUND_PROCESS_STARTED = "BACKGROUND_PROCESS_STARTED"
     BACKGROUND_PROCESS_OUTPUT_UPDATE = "BACKGROUND_PROCESS_OUTPUT_UPDATE"

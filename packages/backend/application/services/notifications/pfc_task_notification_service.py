@@ -38,7 +38,7 @@ class PfcTaskNotificationService:
     """
 
     # Configuration
-    POLLING_INTERVAL_SECONDS = 2.0   # Poll interval (seconds)
+    POLLING_INTERVAL_SECONDS = 1.0   # Poll interval (seconds)
     RECENT_OUTPUT_LINES = 10         # Number of output lines to display
 
     def __init__(self, connection_manager: ConnectionManager):

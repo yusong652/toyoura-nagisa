@@ -1,11 +1,15 @@
-"""Shell service for user shell command execution.
+"""Shell services for command execution.
 
 Provides business logic for:
-- Executing shell commands with cwd management
-- Parsing cd commands to update working directory
-- Formatting results for LLM context injection
+- User shell commands (CLI `!` prefix) with cwd management
+- Bash tool execution with ctrl+b foreground-to-background support
 """
 
 from .shell_service import ShellService
+from .bash_execution_service import BashExecutionService, get_bash_execution_service
 
-__all__ = ["ShellService"]
+__all__ = [
+    "ShellService",
+    "BashExecutionService",
+    "get_bash_execution_service",
+]

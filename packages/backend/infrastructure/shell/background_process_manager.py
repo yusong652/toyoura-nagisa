@@ -18,7 +18,12 @@ from datetime import datetime, timedelta
 from typing import Dict, Set, Optional, List, Any, Literal
 from threading import Lock, Thread
 
-from .executor import ShellExecutor, BackgroundProcessHandle, ShellExecutorError
+from .executor import (
+    ShellExecutor,
+    BackgroundProcessHandle,
+    ShellExecutorError,
+    ForegroundExecutionHandle,
+)
 from .utils import MAX_LINE_LENGTH, MAX_BUFFER_LINES
 
 
@@ -342,6 +347,74 @@ class BackgroundProcessManager:
                     success=False,
                     error=f"Failed to start background process: {e}"
                 )
+
+    def adopt_process(
+        self,
+        session_id: str,
+        handle: ForegroundExecutionHandle,
+        description: Optional[str] = None,
+    ) -> str:
+        """Adopt a running foreground process into background management.
+
+        Called when user presses ctrl+b to move a foreground process to background.
+        The process is already running; we just need to start tracking it.
+
+        Args:
+            session_id: Session ID for process isolation
+            handle: ForegroundExecutionHandle from the foreground process
+            description: Optional description for the command
+
+        Returns:
+            process_id: The assigned background process ID
+        """
+        with self._lock:
+            # Generate unique process ID
+            process_id = self._generate_process_id()
+            while process_id in self.processes:
+                process_id = self._generate_process_id()
+
+            # Convert to background handle
+            bg_handle = handle.to_background_handle()
+
+            # Create process tracking object
+            bg_process = BackgroundProcess(
+                process_id=process_id,
+                session_id=session_id,
+                command=bg_handle.command,
+                description=description,
+                process=bg_handle.process,
+                start_time=datetime.fromtimestamp(bg_handle.start_time),
+                status="running",
+                working_directory=bg_handle.cwd,
+            )
+
+            # Start output reading threads
+            bg_process._stdout_thread = Thread(
+                target=self._read_output_stream,
+                args=(bg_process, bg_handle.process.stdout, False),
+                daemon=True
+            )
+            bg_process._stderr_thread = Thread(
+                target=self._read_output_stream,
+                args=(bg_process, bg_handle.process.stderr, True),
+                daemon=True
+            )
+
+            bg_process._stdout_thread.start()
+            bg_process._stderr_thread.start()
+
+            # Register the process
+            self.processes[process_id] = bg_process
+            if session_id not in self.session_processes:
+                self.session_processes[session_id] = set()
+            self.session_processes[session_id].add(process_id)
+
+            # Start notification service monitoring
+            self._start_notification_monitoring(
+                session_id, process_id, bg_handle.command, description
+            )
+
+            return process_id
 
     def get_process_output(self, process_id: str) -> ProcessOutputResult:
         """

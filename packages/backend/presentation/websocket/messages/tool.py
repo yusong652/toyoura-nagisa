@@ -90,3 +90,14 @@ class UserInterruptMessage(BaseWebSocketMessage):
     stop the current operation.
     """
     type: MessageType = MessageType.USER_INTERRUPT
+
+
+class MoveToBackgroundMessage(BaseWebSocketMessage):
+    """
+    Move foreground bash to background message schema (ctrl+b pressed).
+
+    Sent by frontend when user presses ctrl+b to move a running foreground
+    bash command to background execution. The command continues running
+    but returns immediately, allowing the user to continue interacting.
+    """
+    type: MessageType = MessageType.MOVE_TO_BACKGROUND

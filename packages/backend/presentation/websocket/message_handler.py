@@ -25,6 +25,7 @@ from backend.infrastructure.websocket.connection_manager import ConnectionManage
 from backend.presentation.websocket.message_types import (
     MessageType, BaseWebSocketMessage, parse_incoming_websocket_message, create_message
 )
+from backend.application.services.shell import get_bash_execution_service
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +55,16 @@ class WebSocketMessageProcessor:
         # Initialize user interrupt handler
         user_interrupt_handler = UserInterruptHandler(connection_manager)
 
+        # Initialize move-to-background handler (ctrl+b)
+        move_to_background_handler = MoveToBackgroundHandler(connection_manager)
+
         self.handlers: Dict[MessageType, MessageHandler] = {
             MessageType.HEARTBEAT_ACK: heartbeat_handler,
             MessageType.LOCATION_RESPONSE: location_handler,  # Only handle responses from frontend
             MessageType.CHAT_MESSAGE: chat_handler,
             MessageType.TOOL_CONFIRMATION_RESPONSE: tool_confirmation_handler,
             MessageType.USER_INTERRUPT: user_interrupt_handler,
+            MessageType.MOVE_TO_BACKGROUND: move_to_background_handler,
         }
         
         # Store location handler for external tool access
@@ -393,5 +398,43 @@ class ToolConfirmationHandler(MessageHandler):
                     session_id,
                     "CONFIRMATION_PROCESSING_ERROR",
                     f"Failed to process confirmation response: {str(e)}"
+                )
+
+
+class MoveToBackgroundHandler(MessageHandler):
+    """
+    Handle move-to-background requests (ctrl+b pressed).
+
+    Purpose: Process ctrl+b key presses from frontend to move a running
+    foreground bash command to background execution. The command continues
+    running but the tool call returns immediately, allowing the user to
+    continue interacting.
+    """
+
+    async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
+        if message.type == MessageType.MOVE_TO_BACKGROUND:
+            try:
+                print(f"[MoveToBackgroundHandler] Processing MOVE_TO_BACKGROUND from session {session_id}", flush=True)
+
+                # Signal the foreground process to move to background
+                service = get_bash_execution_service()
+                success = service.request_move_to_background(session_id)
+
+                if success:
+                    print(f"[MoveToBackgroundHandler] Successfully signaled move-to-background for session {session_id}", flush=True)
+                else:
+                    logger.warning(f"No foreground process found for session {session_id}")
+                    await self.send_error(
+                        session_id,
+                        "NO_FOREGROUND_PROCESS",
+                        "No foreground bash process is currently running"
+                    )
+
+            except Exception as e:
+                logger.error(f"Error processing move-to-background request: {e}")
+                await self.send_error(
+                    session_id,
+                    "MOVE_TO_BACKGROUND_ERROR",
+                    f"Failed to move process to background: {str(e)}"
                 )
 

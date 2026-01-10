@@ -33,7 +33,8 @@ from backend.presentation.websocket.messages.pfc_task import PfcTaskNotification
 from backend.presentation.websocket.messages.tool import (
     ToolConfirmationRequestMessage,
     ToolConfirmationResponseMessage,
-    UserInterruptMessage
+    UserInterruptMessage,
+    MoveToBackgroundMessage,
 )
 from backend.presentation.websocket.messages.chat import (
     ChatMessageRequest,
@@ -49,6 +50,7 @@ INCOMING_MESSAGE_SCHEMAS = {
     MessageType.CHAT_MESSAGE: ChatMessageRequest,
     MessageType.TOOL_CONFIRMATION_RESPONSE: ToolConfirmationResponseMessage,
     MessageType.USER_INTERRUPT: UserInterruptMessage,
+    MessageType.MOVE_TO_BACKGROUND: MoveToBackgroundMessage,
 }
 
 # Outgoing message schemas (backend creates these messages to send to frontend)

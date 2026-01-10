@@ -19,6 +19,11 @@ from backend.infrastructure.shell import ShellExecutor
 from backend.infrastructure.shell.executor import (
     ShellExecutorError,
     TimeoutError as ShellTimeoutError,
+    ForegroundExecutionHandle,
+    MoveToBackgroundRequest,
+)
+from backend.infrastructure.shell.foreground_task_registry import (
+    get_foreground_task_registry,
 )
 
 __all__ = ["bash", "register_bash_tool"]
@@ -126,28 +131,61 @@ Working directory:
         except Exception as e:
             return error_response(f"Failed to start background process: {e}")
 
-    # Execute command using infrastructure layer ShellExecutor
+    # Foreground execution with ctrl+b support
+    executor = _get_executor()
+    session_id = cast(str, context.client_id)
+    registry = get_foreground_task_registry()
+
     try:
-        executor = _get_executor()
-        exec_result = await executor.execute(
+        # Start process and register for ctrl+b signal handling
+        handle: ForegroundExecutionHandle = executor.start_foreground(
             command=command,
             cwd=str(work_dir),
             timeout_ms=timeout,
         )
+        registry.register(session_id, handle)
 
-        # Process output for LLM consumption
+        try:
+            wait_result = await handle.wait()
+        finally:
+            registry.unregister(session_id)
+
+        # Handle move-to-background request (user pressed ctrl+b)
+        if isinstance(wait_result, MoveToBackgroundRequest):
+            from backend.infrastructure.shell.background_process_manager import (
+                get_process_manager,
+            )
+            process_manager = get_process_manager()
+            process_id = process_manager.adopt_process(
+                session_id=session_id,
+                handle=wait_result.handle,
+                description=description,
+            )
+            return success_response(
+                message=f"Command was manually backgrounded by user with ID: {process_id}. Use BashOutput tool to check output.",
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": f"Command was manually backgrounded by user with ID: {process_id}. Use BashOutput tool to check output."}
+                    ]
+                },
+                process_id=process_id,
+                command=command,
+                background=True,
+                working_directory=str(work_dir),
+            )
+
+        # Normal completion
+        exec_result = wait_result
         combined_output = process_shell_output(
             stdout=exec_result.stdout,
             stderr=exec_result.stderr,
         )
 
-        # Build response message
         if exec_result.exit_code == 0:
             message = f"Command executed successfully (exit code {exec_result.exit_code}, {exec_result.execution_time:.1f}s)"
         else:
             message = f"Command failed with exit code {exec_result.exit_code} ({exec_result.execution_time:.1f}s)"
 
-        # Return complete terminal output for both success and failure
         return success_response(
             message,
             llm_content={

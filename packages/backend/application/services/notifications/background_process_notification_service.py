@@ -33,8 +33,7 @@ class BackgroundProcessNotificationService:
     """
 
     # Configuration
-    NOTIFICATION_INTERVAL_SECONDS = 2  # Check interval (seconds)
-    MIN_PUSH_INTERVAL_SECONDS = 1      # Minimum time between pushes (seconds)
+    NOTIFICATION_INTERVAL_SECONDS = 1  # Check and push interval (seconds)
     RECENT_OUTPUT_LINES = 5            # Number of lines to display
 
     def __init__(self, connection_manager: ConnectionManager):
@@ -46,7 +45,6 @@ class BackgroundProcessNotificationService:
         """
         self.connection_manager = connection_manager
         self._monitoring_tasks: Dict[str, asyncio.Task] = {}  # process_id -> monitoring task
-        self._last_push_time: Dict[str, datetime] = {}  # process_id -> last notification time
 
     async def start_monitoring(
         self,
@@ -86,7 +84,6 @@ class BackgroundProcessNotificationService:
         async def monitor_loop():
             """Async monitoring loop for process output."""
             process_manager = get_process_manager()
-            last_line_count = 0
 
             try:
                 while True:
@@ -101,57 +98,37 @@ class BackgroundProcessNotificationService:
                         process.status = "completed"
                         process.exit_code = process.process.returncode
 
-                    # Check for new output
+                    # Get output info under lock
                     with process._output_lock:
-                        current_line_count = len(process.stdout_buffer) + len(process.stderr_buffer)
-                        has_new_output = current_line_count > last_line_count
-
-                        # Get recent output (last 5 lines)
+                        total_lines = len(process.stdout_buffer) + len(process.stderr_buffer)
                         recent_lines = self._get_recent_lines(process)
 
                     # Calculate runtime
                     runtime = (datetime.now() - process.start_time).total_seconds()
 
-                    # Send notification if:
-                    # 1. Has new output AND minimum interval elapsed
-                    # 2. Process status changed (completed/killed)
-                    should_notify = False
-                    if has_new_output:
-                        last_push = self._last_push_time.get(process_id)
-                        if last_push is None or (datetime.now() - last_push).total_seconds() >= self.MIN_PUSH_INTERVAL_SECONDS:
-                            should_notify = True
+                    # Determine message type
+                    if process.status == "completed":
+                        msg_type = MessageType.BACKGROUND_PROCESS_COMPLETED
+                    elif process.status == "killed":
+                        msg_type = MessageType.BACKGROUND_PROCESS_KILLED
+                    else:
+                        msg_type = MessageType.BACKGROUND_PROCESS_OUTPUT_UPDATE
 
-                    if process.status != "running":
-                        should_notify = True
+                    # Check if there's more output beyond what we're showing
+                    has_more = total_lines > self.RECENT_OUTPUT_LINES
 
-                    if should_notify:
-                        # Determine message type
-                        if process.status == "completed":
-                            msg_type = MessageType.BACKGROUND_PROCESS_COMPLETED
-                        elif process.status == "killed":
-                            msg_type = MessageType.BACKGROUND_PROCESS_KILLED
-                        else:
-                            msg_type = MessageType.BACKGROUND_PROCESS_OUTPUT_UPDATE
-
-                        # Check if there's more output beyond what we're showing
-                        total_lines = current_line_count
-                        has_more = total_lines > self.RECENT_OUTPUT_LINES
-
-                        await self._send_notification(
-                            session_id=session_id,
-                            process_id=process_id,
-                            command=command,
-                            description=description,
-                            status=process.status,
-                            message_type=msg_type,
-                            recent_output=recent_lines,
-                            runtime_seconds=runtime,
-                            has_more_output=has_more,
-                            exit_code=process.exit_code
-                        )
-
-                        self._last_push_time[process_id] = datetime.now()
-                        last_line_count = current_line_count
+                    await self._send_notification(
+                        session_id=session_id,
+                        process_id=process_id,
+                        command=command,
+                        description=description,
+                        status=process.status,
+                        message_type=msg_type,
+                        recent_output=recent_lines,
+                        runtime_seconds=runtime,
+                        has_more_output=has_more,
+                        exit_code=process.exit_code
+                    )
 
                     # Stop monitoring if process completed/killed
                     if process.status in ["completed", "killed"]:
@@ -167,8 +144,6 @@ class BackgroundProcessNotificationService:
                 # Cleanup
                 if process_id in self._monitoring_tasks:
                     del self._monitoring_tasks[process_id]
-                if process_id in self._last_push_time:
-                    del self._last_push_time[process_id]
 
         # Start monitoring task
         task = asyncio.create_task(monitor_loop())
@@ -276,8 +251,6 @@ class BackgroundProcessNotificationService:
         # Cleanup
         if process_id in self._monitoring_tasks:
             del self._monitoring_tasks[process_id]
-        if process_id in self._last_push_time:
-            del self._last_push_time[process_id]
 
     def cleanup_session(self, session_id: str) -> None:
         """
