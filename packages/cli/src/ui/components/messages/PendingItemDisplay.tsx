@@ -204,6 +204,9 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
   const isInvokeAgent = item.toolName === 'invoke_agent';
   const subagentType = isInvokeAgent ? String(item.toolInput.subagent_type || 'SubAgent') : '';
 
+  // Check if this is a foreground bash command (can be converted to background)
+  const isBashForeground = item.toolName === 'bash' && !item.toolInput.run_in_background && !hasResult;
+
   // Get tool-specific display formatting
   const toolDisplayResult = formatToolDisplay(item.toolName, item.toolInput);
 
@@ -253,6 +256,14 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
           </Text>
         )}
       </Box>
+      {/* Hint for foreground bash: ctrl+b to run in background */}
+      {isBashForeground && (
+        <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
+          <Text color={theme.text.muted} dimColor>
+            ctrl+b to run in background
+          </Text>
+        </Box>
+      )}
       {/* Render SubAgent tools (for invoke_agent) with auto-scroll effect */}
       {hiddenCount > 0 && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH + 2}>
