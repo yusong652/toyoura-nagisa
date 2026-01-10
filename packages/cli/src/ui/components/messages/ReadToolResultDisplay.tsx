@@ -42,7 +42,7 @@ export const ReadToolResultDisplay: React.FC<ReadToolResultDisplayProps> = ({
     : `Read ${lineCount} lines`;
 
   return (
-    <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
+    <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginBottom={1}>
       <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
       <Text color={theme.text.secondary}>{summary}</Text>
     </Box>
