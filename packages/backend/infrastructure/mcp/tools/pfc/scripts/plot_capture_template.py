@@ -152,15 +152,18 @@ BALL_COLOR_BY_SPECS = {
 }
 
 # Wall color-by specifications (subset of ball attributes applicable to walls)
+# Text attribute syntax differs:
+#   - "name": color-by text-attribute "name" (no filter)
+#   - "group": color-by text-attribute "group" 'Any' piece off (requires filter)
 WALL_COLOR_BY_SPECS = {
     # Vector attributes
     "position":      {"type": "vector", "attribute": "position"},
     "velocity":      {"type": "vector", "attribute": "velocity"},
     "displacement":  {"type": "vector", "attribute": "displacement"},
     "force-contact": {"type": "vector", "attribute": "force-contact"},
-    # Text attributes - all use 'Any' piece off filter
-    "name":          {"type": "text", "attribute": "name"},
-    "group":         {"type": "text", "attribute": "group"},
+    # Text attributes - different filter requirements
+    "name":          {"type": "text-name", "attribute": "name"},       # no filter needed
+    "group":         {"type": "text-group", "attribute": "group"},     # requires 'Any' piece off
 }
 
 # Contact color-by specifications
@@ -335,10 +338,14 @@ def _build_wall_color_by_command(
         if spec["type"] == "vector":
             color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
-        elif spec["type"] == "text":
-            # Wall text attributes need 'Any' filter to show all values
+        elif spec["type"] == "text-name":
+            # Wall "name" attribute - no filter needed
+            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+            color_options = "color-options named maximum-names 1000000 name-controls true"
+        elif spec["type"] == "text-group":
+            # Wall "group" attribute - requires 'Any' piece off filter
             # Escape single quotes for embedding in itasca.command('...')
-            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
+            color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\' piece off"
             color_options = "color-options named maximum-names 1000000 name-controls true"
         else:
             return ""

@@ -155,6 +155,12 @@ const INLINE_PATTERNS: Array<{
   type: Segment['type'];
   getContent: (match: RegExpMatchArray) => { content: string; url?: string };
 }> = [
+  // HTML line break <br> or <br/> - convert to space in inline context
+  {
+    pattern: /^<br\s*\/?>/i,
+    type: 'text',
+    getContent: () => ({ content: ' ' }),
+  },
   // Inline math $...$ (block math $$ handled separately in main loop)
   {
     pattern: /^\$([^$\n]+?)\$/,
@@ -304,6 +310,30 @@ function parseTableRow(line: string): string[] {
 }
 
 /**
+ * Strip markdown formatting to get plain text for width calculation
+ * Removes: **bold**, *italic*, `code`, ~~strikethrough~~, [link](url), <br>, <tag>
+ */
+function stripMarkdownForWidth(text: string): string {
+  return text
+    // Remove <br> and <br/> tags
+    .replace(/<br\s*\/?>/gi, ' ')
+    // Remove HTML tags like <u>, </u>, <mark>, etc.
+    .replace(/<\/?[a-z][a-z0-9]*[^>]*>/gi, '')
+    // Remove bold/italic markers (*** or ___)
+    .replace(/(\*\*\*|___)(.+?)\1/g, '$2')
+    // Remove bold markers (** or __)
+    .replace(/(\*\*|__)(.+?)\1/g, '$2')
+    // Remove strikethrough markers (~~)
+    .replace(/~~(.+?)~~/g, '$1')
+    // Remove italic markers (* or _)
+    .replace(/(\*|_)([^*_]+?)\1/g, '$2')
+    // Remove inline code markers (`)
+    .replace(/`([^`]+)`/g, '$1')
+    // Remove links, keep text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+}
+
+/**
  * Render inline segments
  */
 const InlineLine: React.FC<{
@@ -376,6 +406,7 @@ const InlineLine: React.FC<{
 
 /**
  * Table renderer component
+ * Supports inline markdown in cells: **bold**, *italic*, `code`, etc.
  */
 const TableDisplay: React.FC<{
   headers: string[];
@@ -386,53 +417,62 @@ const TableDisplay: React.FC<{
 }> = ({ headers, alignments, rows, dimColor, baseColor }) => {
   const textColor = baseColor || theme.text.primary;
 
-  // Calculate column widths using display width (handles CJK characters correctly)
-  // Minimum width is 3 characters
+  // Calculate column widths using display width of STRIPPED content
+  // This ensures markdown markers don't affect column sizing
   const columnCount = Math.max(headers.length, ...rows.map(r => r.length));
   const columnWidths: number[] = Array(columnCount).fill(3);
 
-  // Update widths based on content display width
+  // Update widths based on stripped content display width
   headers.forEach((header, i) => {
-    columnWidths[i] = Math.max(columnWidths[i] || 3, getCachedStringWidth(header));
+    const stripped = stripMarkdownForWidth(header);
+    columnWidths[i] = Math.max(columnWidths[i] || 3, getCachedStringWidth(stripped));
   });
   rows.forEach(row => {
     row.forEach((cell, i) => {
-      columnWidths[i] = Math.max(columnWidths[i] || 3, getCachedStringWidth(cell));
+      const stripped = stripMarkdownForWidth(cell);
+      columnWidths[i] = Math.max(columnWidths[i] || 3, getCachedStringWidth(stripped));
     });
   });
 
-  // Helper to pad cell content based on alignment (uses display width)
-  const padCell = (content: string, width: number, align: 'left' | 'center' | 'right'): string => {
-    const contentWidth = getCachedStringWidth(content);
-    const padding = width - contentWidth;
-    if (padding <= 0) return content;
-    switch (align) {
-      case 'center': {
-        const left = Math.floor(padding / 2);
-        const right = padding - left;
-        return ' '.repeat(left) + content + ' '.repeat(right);
-      }
-      case 'right':
-        return ' '.repeat(padding) + content;
-      default:
-        return content + ' '.repeat(padding);
-    }
-  };
-
-  // Render a row of cells
+  // Render a row of cells with markdown support
   const renderRow = (cells: string[], isHeader: boolean, key: string) => (
     <Box key={key} flexDirection="row">
       <Text color={theme.text.muted} dimColor={dimColor}>│</Text>
       {columnWidths.map((width, i) => {
         const cell = cells[i] || '';
         const align = alignments[i] || 'left';
-        const paddedContent = padCell(cell, width, align);
+
+        // Calculate padding based on stripped content width
+        const strippedContent = stripMarkdownForWidth(cell);
+        const contentWidth = getCachedStringWidth(strippedContent);
+        const padding = Math.max(0, width - contentWidth);
+
+        // Calculate left/right padding based on alignment
+        let leftPad = 0;
+        let rightPad = 0;
+        switch (align) {
+          case 'center':
+            leftPad = Math.floor(padding / 2);
+            rightPad = padding - leftPad;
+            break;
+          case 'right':
+            leftPad = padding;
+            break;
+          default: // left
+            rightPad = padding;
+        }
+
         return (
           <React.Fragment key={i}>
-            <Text color={isHeader ? theme.status.info : textColor} bold={isHeader} dimColor={dimColor}>
-              {' '}{paddedContent}{' '}
-            </Text>
-            <Text color={theme.text.muted} dimColor={dimColor}>│</Text>
+            <Text color={theme.text.muted} dimColor={dimColor}> </Text>
+            {leftPad > 0 && <Text>{' '.repeat(leftPad)}</Text>}
+            {isHeader ? (
+              <Text color={theme.status.info} bold dimColor={dimColor}>{strippedContent}</Text>
+            ) : (
+              <InlineLine text={cell} dimColor={dimColor} baseColor={baseColor} />
+            )}
+            {rightPad > 0 && <Text>{' '.repeat(rightPad)}</Text>}
+            <Text color={theme.text.muted} dimColor={dimColor}> │</Text>
           </React.Fragment>
         );
       })}

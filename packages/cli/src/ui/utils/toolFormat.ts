@@ -101,6 +101,9 @@ function formatFilePath(filePath: string): string {
   return filePath;
 }
 
+/** Maximum length for formatted array display before falling back to [N items] */
+const MAX_ARRAY_DISPLAY_LENGTH = 40;
+
 /**
  * Format a single parameter value for display
  */
@@ -115,12 +118,49 @@ function formatParamValue(value: unknown): string {
     return String(value);
   }
   if (Array.isArray(value)) {
-    return `[${value.length} items]`;
+    return formatArrayValue(value);
   }
   if (value === null || value === undefined) {
     return String(value);
   }
   return '{...}';
+}
+
+/**
+ * Format array value for display
+ * - Short arrays of primitives: show actual values [800, 600]
+ * - Long/complex arrays: show [N items]
+ */
+function formatArrayValue(arr: unknown[]): string {
+  if (arr.length === 0) {
+    return '[]';
+  }
+
+  // Check if all elements are primitives (string, number, boolean)
+  const allPrimitives = arr.every(
+    item => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'
+  );
+
+  if (!allPrimitives) {
+    return `[${arr.length} items]`;
+  }
+
+  // Format primitive array
+  const formatted = arr.map(item => {
+    if (typeof item === 'string') {
+      return `"${item}"`;
+    }
+    return String(item);
+  }).join(', ');
+
+  const result = `[${formatted}]`;
+
+  // Fall back to [N items] if too long
+  if (result.length > MAX_ARRAY_DISPLAY_LENGTH) {
+    return `[${arr.length} items]`;
+  }
+
+  return result;
 }
 
 /**
