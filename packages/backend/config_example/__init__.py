@@ -15,6 +15,7 @@ from .llm import LLMSettings, get_llm_settings
 from .tts import TTSSettings, get_tts_settings
 from .email import EmailConfig, AuthConfig, SearchConfig, get_email_config, get_auth_config, get_search_config
 from .text_to_image import TextToImageSettings, get_text_to_image_settings
+from .dev import DevelopmentConfig
 
 
 class AppSettings(BaseSettings):
@@ -62,6 +63,11 @@ class AppSettings(BaseSettings):
 def get_app_settings() -> AppSettings:
     """Get application configuration instance - recreate each time to ensure latest config"""
     return AppSettings()
+
+
+def get_dev_config() -> DevelopmentConfig:
+    """Get development configuration instance"""
+    return DevelopmentConfig()
 
 
 # -----------------------------------------------------------------------------
@@ -184,19 +190,20 @@ __all__ = [
     # New configuration system
     "AppSettings",
     "get_app_settings",
-    
-    # Configuration getter functions
-    # "get_base_config" removed - not used in actual configuration
-    
+
+    # Development configuration
+    "DevelopmentConfig",
+    "get_dev_config",
+
     # Prompt functions
     "get_base_prompt",
-    "get_expression_prompt", 
+    "get_expression_prompt",
     "get_tool_prompt",
     "get_system_prompt",
-    
+
     # Backward compatibility function
     "get_text_to_image_config",
-    
+
     # Path constants
     "BASE_DIR",
     "CHAT_DIR",

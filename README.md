@@ -100,10 +100,16 @@ Beyond the core PFC integration, toyoura-nagisa includes:
 **Requirements**: Python 3.10+ with [uv](https://github.com/astral-sh/uv), Node.js 18+
 
 ```bash
-# Clone and install
+# Clone the repository
 git clone https://github.com/yusong652/toyoura-nagisa.git
 cd toyoura-nagisa
-npm install && uv sync
+
+# Install dependencies
+npm install           # Frontend packages (workspaces)
+uv sync               # Python backend
+
+# Build all packages (required for first run)
+npm run build:all
 
 # Configure
 cp -r packages/backend/config_example/ packages/backend/config/
