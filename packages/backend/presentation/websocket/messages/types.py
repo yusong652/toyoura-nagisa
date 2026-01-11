@@ -64,6 +64,10 @@ class MessageType(str, Enum):
     # PFC task notifications
     PFC_TASK_UPDATE = "PFC_TASK_UPDATE"
 
+    # User shell commands (! prefix in CLI)
+    USER_SHELL_EXECUTE = "USER_SHELL_EXECUTE"
+    USER_SHELL_RESULT = "USER_SHELL_RESULT"
+
     # Message queue management
     QUEUE_UPDATE = "QUEUE_UPDATE"
     MESSAGE_PROCESSING_START = "MESSAGE_PROCESSING_START"

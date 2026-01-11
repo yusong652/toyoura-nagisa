@@ -2,20 +2,14 @@
  * useShellCommand Hook
  *
  * Provides shell command execution for ! prefix user commands.
- * Calls the backend REST API endpoint /api/shell/execute.
+ * Uses WebSocket communication for real-time execution and future Ctrl+B support.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { apiClient } from '@toyoura-nagisa/core';
+import { useConnectionManager } from '../contexts/ConnectionContext.js';
 
-export interface ShellExecuteRequest {
-  command: string;
-  session_id: string;
-  agent_profile: string;
-  timeout_ms?: number;
-}
-
-/** Response data from shell execution (unwrapped from ApiResponse) */
+/** Response data from shell execution */
 export interface ShellExecuteData {
   stdout: string;
   stderr: string;
@@ -27,6 +21,17 @@ export interface ShellExecuteData {
 /** Response data from cwd query (unwrapped from ApiResponse) */
 export interface CwdData {
   cwd: string;
+}
+
+/** WebSocket result event data */
+interface ShellResultEvent {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+  cwd: string;
+  context: string;
+  success: boolean;
+  error_message?: string;
 }
 
 export interface UseShellCommandReturn {
@@ -44,17 +49,23 @@ export function useShellCommand(
   sessionId: string | null,
   agentProfile: string = 'general'
 ): UseShellCommandReturn {
+  const connectionManager = useConnectionManager();
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cwd, setCwd] = useState<string | null>(null);
 
-  // Fetch initial cwd when session and profile are available
+  // Store pending resolve/reject for the current execution
+  const pendingRef = useRef<{
+    resolve: (data: ShellExecuteData | null) => void;
+    reject: (error: Error) => void;
+  } | null>(null);
+
+  // Fetch initial cwd when session and profile are available (still uses REST for this one-time query)
   useEffect(() => {
     if (!sessionId) return;
 
     const fetchCwd = async () => {
       try {
-        // Use query params (new format) with fallback to legacy path format
         const response = await apiClient.get<CwdData>(
           `/api/shell/cwd?session_id=${encodeURIComponent(sessionId)}&agent_profile=${encodeURIComponent(agentProfile)}`
         );
@@ -69,6 +80,40 @@ export function useShellCommand(
     fetchCwd();
   }, [sessionId, agentProfile]);
 
+  // Handle WebSocket result
+  useEffect(() => {
+    const handleResult = (event: ShellResultEvent) => {
+      // Update cwd from response
+      if (event.cwd) {
+        setCwd(event.cwd);
+      }
+
+      // Resolve pending promise
+      if (pendingRef.current) {
+        if (event.success) {
+          pendingRef.current.resolve({
+            stdout: event.stdout,
+            stderr: event.stderr,
+            exit_code: event.exit_code,
+            cwd: event.cwd,
+            context: event.context,
+          });
+        } else {
+          setError(event.error_message || 'Shell command failed');
+          pendingRef.current.resolve(null);
+        }
+        pendingRef.current = null;
+        setIsExecuting(false);
+      }
+    };
+
+    connectionManager.on('user_shell_result', handleResult);
+
+    return () => {
+      connectionManager.off('user_shell_result', handleResult);
+    };
+  }, [connectionManager]);
+
   const executeCommand = useCallback(
     async (command: string): Promise<ShellExecuteData | null> => {
       if (!sessionId) {
@@ -79,32 +124,20 @@ export function useShellCommand(
       setError(null);
       setIsExecuting(true);
 
-      try {
-        const response = await apiClient.post<ShellExecuteData>(
-          '/api/shell/execute',
-          {
-            command,
-            session_id: sessionId,
-            agent_profile: agentProfile,
-          } as ShellExecuteRequest
-        );
+      return new Promise((resolve, reject) => {
+        // Store resolve/reject for when we receive the result
+        pendingRef.current = { resolve, reject };
 
-        // Update cwd from response
-        if (response.cwd) {
-          setCwd(response.cwd);
-        }
-
-        return response;
-      } catch (err: unknown) {
-        // Extract error message
-        const errorMessage = err instanceof Error ? err.message : 'Shell command failed';
-        setError(errorMessage);
-        return null;
-      } finally {
-        setIsExecuting(false);
-      }
+        // Send command via WebSocket
+        connectionManager.send({
+          type: 'USER_SHELL_EXECUTE',
+          session_id: sessionId,
+          command,
+          agent_profile: agentProfile,
+        });
+      });
     },
-    [sessionId, agentProfile]
+    [sessionId, agentProfile, connectionManager]
   );
 
   return {

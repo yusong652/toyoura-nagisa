@@ -248,6 +248,18 @@ export class ConnectionManager extends WebSocketManager {
         });
         break;
 
+      case 'USER_SHELL_RESULT':
+        this.emit('user_shell_result', {
+          stdout: message.stdout,
+          stderr: message.stderr,
+          exit_code: message.exit_code,
+          cwd: message.cwd,
+          context: message.context,
+          success: message.success,
+          error_message: message.error_message
+        });
+        break;
+
       default:
         // Emit generic message for unhandled types
         this.emit('unhandled_message', message);

@@ -32,6 +32,7 @@ import {
   type AppState,
   type AppActions,
 } from './contexts/AppStateContext.js';
+import { ConnectionProvider } from './contexts/ConnectionContext.js';
 import { useHistoryManager } from './hooks/useHistoryManager.js';
 import { useChatStream } from './hooks/useChatStream.js';
 import { useConnectionState } from './hooks/useConnectionState.js';
@@ -483,10 +484,12 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   ]);
 
   return (
-    <AppStateContext.Provider value={appState}>
-      <AppActionsContext.Provider value={appActions}>
-        <App />
-      </AppActionsContext.Provider>
-    </AppStateContext.Provider>
+    <ConnectionProvider value={connectionManager}>
+      <AppStateContext.Provider value={appState}>
+        <AppActionsContext.Provider value={appActions}>
+          <App />
+        </AppActionsContext.Provider>
+      </AppStateContext.Provider>
+    </ConnectionProvider>
   );
 };

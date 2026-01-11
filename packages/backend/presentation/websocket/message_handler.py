@@ -25,6 +25,7 @@ from backend.infrastructure.websocket.connection_manager import ConnectionManage
 from backend.presentation.websocket.message_types import (
     MessageType, BaseWebSocketMessage, parse_incoming_websocket_message, create_message
 )
+from backend.presentation.websocket.messages.user_shell import UserShellResultMessage
 from backend.application.services.shell import get_bash_execution_service
 from backend.application.services.pfc import get_pfc_execution_service
 
@@ -59,6 +60,9 @@ class WebSocketMessageProcessor:
         # Initialize move-to-background handler (ctrl+b)
         move_to_background_handler = MoveToBackgroundHandler(connection_manager)
 
+        # Initialize user shell handler (! prefix commands)
+        user_shell_handler = UserShellHandler(connection_manager)
+
         self.handlers: Dict[MessageType, MessageHandler] = {
             MessageType.HEARTBEAT_ACK: heartbeat_handler,
             MessageType.LOCATION_RESPONSE: location_handler,  # Only handle responses from frontend
@@ -66,6 +70,7 @@ class WebSocketMessageProcessor:
             MessageType.TOOL_CONFIRMATION_RESPONSE: tool_confirmation_handler,
             MessageType.USER_INTERRUPT: user_interrupt_handler,
             MessageType.MOVE_TO_BACKGROUND: move_to_background_handler,
+            MessageType.USER_SHELL_EXECUTE: user_shell_handler,
         }
         
         # Store location handler for external tool access
@@ -445,4 +450,99 @@ class MoveToBackgroundHandler(MessageHandler):
                     "MOVE_TO_BACKGROUND_ERROR",
                     f"Failed to move process to background: {str(e)}"
                 )
+
+
+class UserShellHandler(MessageHandler):
+    """
+    Handle user shell command execution requests (! prefix commands).
+
+    Purpose: Execute shell commands initiated by user via CLI `!` prefix.
+    This WebSocket-based approach replaces the REST API to enable future
+    Ctrl+B backgrounding support.
+
+    Flow:
+    1. Frontend sends USER_SHELL_EXECUTE with command
+    2. Backend executes via ShellService
+    3. Backend sends USER_SHELL_RESULT with output
+    4. Frontend displays result and injects context for LLM
+    """
+
+    # Cache ShellService instances per session+profile
+    _shell_services: dict = {}
+
+    async def _get_shell_service(self, session_id: str, agent_profile: str):
+        """Get or create ShellService for a session and profile."""
+        from backend.application.services.shell.shell_service import ShellService
+        from backend.shared.utils.workspace import get_workspace_for_profile
+
+        cache_key = (session_id, agent_profile)
+        if cache_key not in self._shell_services:
+            workspace_root = await get_workspace_for_profile(agent_profile, session_id)
+            self._shell_services[cache_key] = ShellService(workspace_root=workspace_root)
+        return self._shell_services[cache_key]
+
+    async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
+        if message.type != MessageType.USER_SHELL_EXECUTE:
+            return
+
+        command = getattr(message, 'command', '')
+        agent_profile = getattr(message, 'agent_profile', 'general')
+        timeout_ms = getattr(message, 'timeout_ms', None)
+
+        logger.info(f"[UserShellHandler] Executing command for session {session_id}: {command[:50]}...")
+
+        try:
+            service = await self._get_shell_service(session_id, agent_profile)
+            result, context = await service.execute(
+                command=command,
+                timeout_ms=timeout_ms,
+            )
+
+            # Store context for LLM injection (intent awareness)
+            from backend.infrastructure.monitoring.status_monitor import get_status_monitor
+            status_monitor = get_status_monitor(session_id)
+            status_monitor.add_user_bash_context(
+                command=command,
+                stdout=result.stdout,
+                stderr=result.stderr,
+            )
+
+            # Send result back to frontend
+            result_msg = UserShellResultMessage(
+                type=MessageType.USER_SHELL_RESULT,
+                session_id=session_id,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                exit_code=result.exit_code,
+                cwd=service.get_cwd(),
+                context=context,
+                success=True,
+            )
+            await self.connection_manager.send_json(session_id, result_msg.model_dump())
+
+            logger.info(f"[UserShellHandler] Command completed with exit code {result.exit_code}")
+
+        except Exception as e:
+            logger.error(f"[UserShellHandler] Error executing command: {e}")
+
+            # Try to get cwd even on error
+            try:
+                service = await self._get_shell_service(session_id, agent_profile)
+                cwd = service.get_cwd()
+            except Exception:
+                cwd = ""
+
+            # Send error result
+            result_msg = UserShellResultMessage(
+                type=MessageType.USER_SHELL_RESULT,
+                session_id=session_id,
+                stdout="",
+                stderr=str(e),
+                exit_code=1,
+                cwd=cwd,
+                context="",
+                success=False,
+                error_message=str(e),
+            )
+            await self.connection_manager.send_json(session_id, result_msg.model_dump())
 

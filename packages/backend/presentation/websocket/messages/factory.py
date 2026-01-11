@@ -41,6 +41,10 @@ from backend.presentation.websocket.messages.chat import (
     MessageCreateMessage,
     StreamingUpdateMessage
 )
+from backend.presentation.websocket.messages.user_shell import (
+    UserShellExecuteMessage,
+    UserShellResultMessage,
+)
 
 
 # Incoming message schemas (messages that frontend sends to backend)
@@ -51,6 +55,7 @@ INCOMING_MESSAGE_SCHEMAS = {
     MessageType.TOOL_CONFIRMATION_RESPONSE: ToolConfirmationResponseMessage,
     MessageType.USER_INTERRUPT: UserInterruptMessage,
     MessageType.MOVE_TO_BACKGROUND: MoveToBackgroundMessage,
+    MessageType.USER_SHELL_EXECUTE: UserShellExecuteMessage,
 }
 
 # Outgoing message schemas (backend creates these messages to send to frontend)
@@ -77,6 +82,8 @@ OUTGOING_MESSAGE_SCHEMAS = {
     MessageType.MESSAGE_QUEUED: MessageQueuedMessage,
     # PFC task notifications
     MessageType.PFC_TASK_UPDATE: PfcTaskNotification,
+    # User shell commands
+    MessageType.USER_SHELL_RESULT: UserShellResultMessage,
 }
 
 

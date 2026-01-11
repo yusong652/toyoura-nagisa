@@ -1,25 +1,19 @@
 """
-Shell Command Execution API (2025 Standard).
+Shell Working Directory API.
 
-Provides REST endpoints for executing user shell commands (CLI `!` prefix).
-Manages working directory state and returns results with LLM context formatting.
+Provides REST endpoints for querying and setting the current working directory
+for user shell commands. Command execution is handled via WebSocket (see
+presentation/websocket/message_handler.py UserShellHandler).
 
 Routes:
-    POST /api/shell/execute     - Execute shell command
     GET  /api/shell/cwd         - Get current working directory
     PUT  /api/shell/cwd         - Set current working directory
 """
-from typing import Optional
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from backend.presentation.models.api_models import ApiResponse
-from backend.application.services.shell import ShellService
-from backend.infrastructure.shell import (
-    ShellExecutorError,
-    TimeoutError as ShellTimeoutError,
-)
-from backend.infrastructure.monitoring.status_monitor import get_status_monitor
+from backend.application.services.shell.shell_service import ShellService
 from backend.shared.utils.workspace import get_workspace_for_profile
 
 router = APIRouter(prefix="/api/shell", tags=["shell"])
@@ -40,15 +34,6 @@ async def _get_shell_service(session_id: str, agent_profile: str) -> ShellServic
 # =====================
 # Response Data Models
 # =====================
-class ShellExecuteData(BaseModel):
-    """Response data for shell command execution."""
-    stdout: str = Field(..., description="Standard output")
-    stderr: str = Field(..., description="Standard error")
-    exit_code: int = Field(..., description="Exit code")
-    cwd: str = Field(..., description="Current working directory")
-    context: str = Field(..., description="LLM context with caveat")
-
-
 class CwdData(BaseModel):
     """Response data for current working directory."""
     cwd: str = Field(..., description="Current working directory path")
@@ -57,14 +42,6 @@ class CwdData(BaseModel):
 # =====================
 # Request Models
 # =====================
-class ExecuteRequest(BaseModel):
-    """Request body for shell command execution."""
-    command: str = Field(..., description="Shell command to execute")
-    session_id: str = Field(..., description="Session ID for state management")
-    agent_profile: str = Field(default="general", description="Agent profile")
-    timeout_ms: Optional[int] = Field(default=None, description="Timeout in milliseconds")
-
-
 class SetCwdRequest(BaseModel):
     """Request body for setting current working directory."""
     session_id: str = Field(..., description="Session ID")
@@ -75,91 +52,6 @@ class SetCwdRequest(BaseModel):
 # =====================
 # API Endpoints
 # =====================
-@router.post("/execute", response_model=ApiResponse[ShellExecuteData])
-async def execute_shell_command(request: ExecuteRequest) -> ApiResponse[ShellExecuteData]:
-    """Execute a shell command.
-
-    Executes the command in the session's current working directory.
-    Handles `cd` commands specially to update the persistent cwd state.
-    """
-    try:
-        service = await _get_shell_service(request.session_id, request.agent_profile)
-        result, context = await service.execute(
-            command=request.command,
-            timeout_ms=request.timeout_ms,
-        )
-
-        # Store context for LLM injection (intent awareness)
-        status_monitor = get_status_monitor(request.session_id)
-        status_monitor.add_user_bash_context(
-            command=request.command,
-            stdout=result.stdout,
-            stderr=result.stderr,
-        )
-
-        # Command execution was successful (even if exit_code != 0).
-        # Non-zero exit codes are valid outcomes (e.g., grep returns 1 when no match).
-        # Only infrastructure errors (timeout, validation) should set success=False.
-        return ApiResponse(
-            success=True,
-            message="Command executed" if result.exit_code == 0 else f"Command exited with code {result.exit_code}",
-            data=ShellExecuteData(
-                stdout=result.stdout,
-                stderr=result.stderr,
-                exit_code=result.exit_code,
-                cwd=service.get_cwd(),
-                context=context,
-            )
-        )
-
-    except ShellTimeoutError as e:
-        service = await _get_shell_service(request.session_id, request.agent_profile)
-        return ApiResponse(
-            success=False,
-            message=str(e),
-            error_code="TIMEOUT",
-            data=ShellExecuteData(
-                stdout="",
-                stderr=str(e),
-                exit_code=124,
-                cwd=service.get_cwd(),
-                context="",
-            )
-        )
-    except ShellExecutorError as e:
-        service = await _get_shell_service(request.session_id, request.agent_profile)
-        return ApiResponse(
-            success=False,
-            message=str(e),
-            error_code="EXECUTOR_ERROR",
-            data=ShellExecuteData(
-                stdout="",
-                stderr=str(e),
-                exit_code=1,
-                cwd=service.get_cwd(),
-                context="",
-            )
-        )
-    except Exception as e:
-        try:
-            service = await _get_shell_service(request.session_id, request.agent_profile)
-            cwd = service.get_cwd()
-        except Exception:
-            cwd = ""
-        return ApiResponse(
-            success=False,
-            message=f"Unexpected error: {e}",
-            error_code="INTERNAL_ERROR",
-            data=ShellExecuteData(
-                stdout="",
-                stderr=str(e),
-                exit_code=1,
-                cwd=cwd,
-                context="",
-            )
-        )
-
-
 @router.get("/cwd", response_model=ApiResponse[CwdData])
 async def get_current_directory(
     session_id: str = Query(..., description="Session ID"),
