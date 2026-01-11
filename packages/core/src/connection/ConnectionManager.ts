@@ -256,7 +256,9 @@ export class ConnectionManager extends WebSocketManager {
           cwd: message.cwd,
           context: message.context,
           success: message.success,
-          error_message: message.error_message
+          error_message: message.error_message,
+          backgrounded: message.backgrounded,
+          process_id: message.process_id
         });
         break;
 

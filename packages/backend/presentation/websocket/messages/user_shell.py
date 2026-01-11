@@ -43,6 +43,8 @@ class UserShellResultMessage(BaseWebSocketMessage):
         context: LLM context string with caveat formatting
         success: Whether execution completed without infrastructure errors
         error_message: Error message if execution failed
+        backgrounded: Whether command was moved to background via Ctrl+B
+        process_id: Background process ID if backgrounded
     """
     type: MessageType = MessageType.USER_SHELL_RESULT
     stdout: str = ""
@@ -52,3 +54,5 @@ class UserShellResultMessage(BaseWebSocketMessage):
     context: str = ""
     success: bool = True
     error_message: Optional[str] = None
+    backgrounded: bool = False
+    process_id: Optional[str] = None

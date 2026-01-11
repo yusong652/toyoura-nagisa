@@ -32,6 +32,8 @@ interface ShellResultEvent {
   context: string;
   success: boolean;
   error_message?: string;
+  backgrounded?: boolean;
+  process_id?: string;
 }
 
 export interface UseShellCommandReturn {
