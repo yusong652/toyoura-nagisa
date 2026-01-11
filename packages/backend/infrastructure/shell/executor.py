@@ -179,10 +179,11 @@ class ForegroundExecutionHandle:
 
             # Case 3: Process completed normally
             signal_task.cancel()
-            stdout_bytes, stderr_bytes = wait_task.result()
+            stdout, stderr = wait_task.result()
 
-            stdout = stdout_bytes.decode('utf-8', errors='replace') if stdout_bytes else ''
-            stderr = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ''
+            # With text mode (from _create_process), output is already str
+            stdout = stdout if stdout else ''
+            stderr = stderr if stderr else ''
             exit_code: int = self.process.returncode if self.process.returncode is not None else -1
 
             execution_time = time.time() - self.start_time
