@@ -310,6 +310,199 @@ class PfcTaskNotificationService:
         lines = output.strip().split('\n')
         return lines[-self.RECENT_OUTPUT_LINES:]
 
+    # ===== Foreground Task Notification Methods =====
+    # These are called directly by pfc_execute_task tool during foreground wait
+
+    async def notify_foreground_started(
+        self,
+        session_id: str,
+        task_id: str,
+        script_path: str,
+        description: Optional[str] = None,
+        git_commit: Optional[str] = None,
+    ) -> None:
+        """
+        Send notification when foreground PFC task starts running.
+
+        Args:
+            session_id: WebSocket session ID
+            task_id: PFC task ID
+            script_path: Path to entry script
+            description: Optional task description
+            git_commit: Optional git commit hash
+        """
+        import os
+        script_name = os.path.basename(script_path)
+
+        notification = create_message(
+            MessageType.PFC_TASK_UPDATE,
+            task_id=task_id,
+            session_id=session_id,
+            script_name=script_name,
+            entry_script=script_path,
+            description=description or "",
+            status="running",
+            source="agent",
+            git_commit=git_commit,
+            elapsed_time=0.0,
+            recent_output=[],
+            has_more_output=False,
+            is_foreground=True,
+        )
+
+        await self._send_notification(session_id, notification)
+        logger.debug(f"Sent foreground started notification for task {task_id}")
+
+    async def notify_foreground_output_update(
+        self,
+        session_id: str,
+        task_id: str,
+        script_path: str,
+        output: str,
+        elapsed_seconds: float,
+        description: Optional[str] = None,
+        git_commit: Optional[str] = None,
+    ) -> None:
+        """
+        Send notification with latest output during foreground wait.
+
+        Called periodically by foreground polling loop.
+
+        Args:
+            session_id: WebSocket session ID
+            task_id: PFC task ID
+            script_path: Path to entry script
+            output: Full output text
+            elapsed_seconds: Task runtime
+            description: Optional task description
+            git_commit: Optional git commit hash
+        """
+        import os
+        script_name = os.path.basename(script_path)
+
+        recent_lines = self._get_recent_lines(output)
+        total_lines = len(output.split('\n')) if output else 0
+        has_more = total_lines > self.RECENT_OUTPUT_LINES
+
+        notification = create_message(
+            MessageType.PFC_TASK_UPDATE,
+            task_id=task_id,
+            session_id=session_id,
+            script_name=script_name,
+            entry_script=script_path,
+            description=description or "",
+            status="running",
+            source="agent",
+            git_commit=git_commit,
+            elapsed_time=elapsed_seconds,
+            recent_output=recent_lines,
+            has_more_output=has_more,
+            is_foreground=True,
+        )
+
+        await self._send_notification(session_id, notification)
+
+    async def notify_foreground_backgrounded(
+        self,
+        session_id: str,
+        task_id: str,
+        script_path: str,
+        reason: str,
+        elapsed_seconds: float,
+        description: Optional[str] = None,
+        git_commit: Optional[str] = None,
+    ) -> None:
+        """
+        Send notification when foreground task is moved to background (ctrl+b or timeout).
+
+        Args:
+            session_id: WebSocket session ID
+            task_id: PFC task ID
+            script_path: Path to entry script
+            reason: Reason for backgrounding ("user_request" or "timeout")
+            elapsed_seconds: Task runtime at backgrounding
+            description: Optional task description
+            git_commit: Optional git commit hash
+        """
+        import os
+        script_name = os.path.basename(script_path)
+
+        notification = create_message(
+            MessageType.PFC_TASK_UPDATE,
+            task_id=task_id,
+            session_id=session_id,
+            script_name=script_name,
+            entry_script=script_path,
+            description=description or "",
+            status="backgrounded",
+            source="agent",
+            git_commit=git_commit,
+            elapsed_time=elapsed_seconds,
+            recent_output=[],
+            has_more_output=False,
+            is_foreground=False,
+            background_reason=reason,
+        )
+
+        await self._send_notification(session_id, notification)
+        logger.info(f"Sent backgrounded notification for task {task_id}: reason={reason}")
+
+    async def notify_foreground_completed(
+        self,
+        session_id: str,
+        task_id: str,
+        script_path: str,
+        status: str,
+        output: str,
+        elapsed_seconds: float,
+        description: Optional[str] = None,
+        git_commit: Optional[str] = None,
+        result: Optional[Any] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        """
+        Send notification when foreground task completes (success/failed/interrupted).
+
+        Args:
+            session_id: WebSocket session ID
+            task_id: PFC task ID
+            script_path: Path to entry script
+            status: Final status (completed/failed/interrupted)
+            output: Full output text
+            elapsed_seconds: Total task runtime
+            description: Optional task description
+            git_commit: Optional git commit hash
+            result: Optional script result
+            error: Optional error message
+        """
+        import os
+        script_name = os.path.basename(script_path)
+
+        recent_lines = self._get_recent_lines(output)
+        total_lines = len(output.split('\n')) if output else 0
+        has_more = total_lines > self.RECENT_OUTPUT_LINES
+
+        notification = create_message(
+            MessageType.PFC_TASK_UPDATE,
+            task_id=task_id,
+            session_id=session_id,
+            script_name=script_name,
+            entry_script=script_path,
+            description=description or "",
+            status=status,
+            source="agent",
+            git_commit=git_commit,
+            elapsed_time=elapsed_seconds,
+            recent_output=recent_lines,
+            has_more_output=has_more,
+            is_foreground=False,
+            error=error,
+            result=str(result) if result else None,
+        )
+
+        await self._send_notification(session_id, notification)
+        logger.info(f"Sent foreground completed notification for task {task_id}: status={status}")
+
     def stop_polling(self, session_id: str) -> None:
         """
         Stop polling for a session.

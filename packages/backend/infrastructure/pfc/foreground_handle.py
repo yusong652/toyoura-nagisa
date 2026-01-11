@@ -42,6 +42,11 @@ StatusPollResult = tuple[bool, str, str, Optional[Any], Optional[str], Optional[
 StatusPollCallback = Callable[[str], Awaitable[StatusPollResult]]
 
 
+# Type alias for notification callback
+# Called with (output, elapsed_seconds) when new output is available
+NotificationCallback = Callable[[str, float], Awaitable[None]]
+
+
 @dataclass
 class PfcForegroundExecutionHandle:
     """Handle for foreground PFC task execution with interruptible wait.
@@ -55,11 +60,13 @@ class PfcForegroundExecutionHandle:
     - No local subprocess; task runs remotely on pfc-server
     - Polls pfc-server for status (via callback) instead of waiting on Future
     - Status polling callback provided at construction time
+    - Optional notification callback for real-time updates to frontend
     """
     task_id: str
     poll_status_callback: StatusPollCallback  # Callback to poll pfc-server
     timeout_seconds: Optional[float] = None   # None = no timeout
     poll_interval_seconds: float = 2.0        # Status polling interval
+    notification_callback: Optional[NotificationCallback] = None  # Optional callback for frontend updates
 
     # Internal state
     _move_to_bg_event: asyncio.Event = field(default_factory=asyncio.Event)
@@ -95,6 +102,13 @@ class PfcForegroundExecutionHandle:
                 self._last_error = error
                 self._last_git_commit = git_commit
                 self._elapsed_seconds = time.time() - start_time
+
+                # Send notification if callback is provided and output changed
+                if self.notification_callback:
+                    try:
+                        await self.notification_callback(output, self._elapsed_seconds)
+                    except Exception as e:
+                        print(f"[PfcForegroundHandle] Notification callback error: {e}")
 
                 if is_terminal:
                     self._completion_event.set()
