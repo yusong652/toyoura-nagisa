@@ -6,7 +6,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ShellCommandHistoryItem } from '../../types.js';
-import { theme, colors } from '../../colors.js';
+import { colors } from '../../colors.js';
 
 interface ShellCommandMessageProps {
   item: ShellCommandHistoryItem;
@@ -17,11 +17,9 @@ export const ShellCommandMessage: React.FC<ShellCommandMessageProps> = ({ item, 
   const prefix = '! ';
 
   return (
-    <Box marginBottom={1} width={terminalWidth}>
-      <Text backgroundColor={colors.bgLight}>
-        <Text color={theme.status.warning} bold>{prefix}</Text>
-        <Text color={theme.status.warning}>{item.command}</Text>
-      </Text>
+    <Box marginBottom={0} width={terminalWidth}>
+      <Text color={colors.primary} bold>{prefix}</Text>
+      <Text color={colors.primary}>{item.command}</Text>
     </Box>
   );
 };
