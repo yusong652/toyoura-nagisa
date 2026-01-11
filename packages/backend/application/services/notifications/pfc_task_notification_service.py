@@ -1,12 +1,13 @@
 """
 PFC Task Notification Service - DDD Application Layer
 
-This service manages real-time notifications for PFC background tasks,
-coordinating between the PFC WebSocket client and frontend WebSocket.
+This service manages real-time notifications for PFC tasks (both foreground and background),
+coordinating between the PFC WebSocket client, frontend WebSocket, and foreground handles.
 
 DDD Role: Application Service
-- Polls PFC server for task status updates
-- Pushes real-time output for running tasks to frontend
+- Unified polling loop for both foreground and background tasks
+- Pushes real-time output to frontend via WebSocket
+- Signals foreground handles when tasks complete
 - Handles task lifecycle notifications
 
 Note: PFC only supports single-task execution, so this service
@@ -14,27 +15,45 @@ monitors one active task at a time.
 """
 import asyncio
 import logging
-from typing import Dict, Optional, List, Any
+import time
+from dataclasses import dataclass
+from typing import Dict, Optional, List, Any, TYPE_CHECKING
 
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
 from backend.presentation.websocket.messages.types import MessageType
 from backend.presentation.websocket.messages.factory import create_message
 
+if TYPE_CHECKING:
+    from backend.infrastructure.pfc.foreground_handle import PfcForegroundExecutionHandle
+
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ForegroundTaskContext:
+    """Context for a foreground task being polled."""
+    task_id: str
+    session_id: str
+    script_path: str
+    description: str
+    git_commit: Optional[str]
+    handle: "PfcForegroundExecutionHandle"
+    start_time: float  # time.time() when registered
 
 
 class PfcTaskNotificationService:
     """
     Application Service for PFC Task Notifications.
 
-    Polls PFC server for task status and sends real-time updates to frontend
-    via WebSocket. Each session has one polling loop that monitors the active task.
+    Unified polling service for both foreground and background PFC tasks:
+    - Polls PFC server for task status updates
+    - Sends real-time output to frontend via WebSocket
+    - Signals foreground handles when their tasks complete
 
     Architecture:
     - One async polling loop per session
-    - Polls list_tasks() to get current task status
-    - Calls check_task_status() for running tasks to get output
-    - Automatically stops when no running task exists
+    - Tracks foreground handles for completion signaling
+    - Automatically stops when no running task and no foreground handle
     """
 
     # Configuration
@@ -51,6 +70,68 @@ class PfcTaskNotificationService:
         self.connection_manager = connection_manager
         self._polling_tasks: Dict[str, asyncio.Task] = {}  # session_id -> polling task
         self._last_task_id: Dict[str, Optional[str]] = {}  # session_id -> last task_id for state change detection
+
+        # Foreground handle tracking (by task_id for completion signaling)
+        self._foreground_contexts: Dict[str, ForegroundTaskContext] = {}  # task_id -> context
+
+    def register_foreground_handle(
+        self,
+        task_id: str,
+        session_id: str,
+        script_path: str,
+        description: str,
+        git_commit: Optional[str],
+        handle: "PfcForegroundExecutionHandle",
+    ) -> None:
+        """
+        Register a foreground handle for completion signaling.
+
+        Called by pfc_execute_task when starting foreground execution.
+        The polling loop will signal this handle when the task completes.
+
+        Args:
+            task_id: PFC task ID
+            session_id: WebSocket session ID
+            script_path: Path to entry script
+            description: Task description
+            git_commit: Git commit hash (if any)
+            handle: Foreground execution handle to signal
+        """
+        self._foreground_contexts[task_id] = ForegroundTaskContext(
+            task_id=task_id,
+            session_id=session_id,
+            script_path=script_path,
+            description=description,
+            git_commit=git_commit,
+            handle=handle,
+            start_time=time.time(),
+        )
+        logger.debug(f"Registered foreground handle for task {task_id}")
+
+    def unregister_foreground_handle(self, task_id: str) -> None:
+        """
+        Unregister a foreground handle.
+
+        Called when foreground wait completes or is cancelled.
+
+        Args:
+            task_id: PFC task ID
+        """
+        if task_id in self._foreground_contexts:
+            del self._foreground_contexts[task_id]
+            logger.debug(f"Unregistered foreground handle for task {task_id}")
+
+    def get_foreground_context(self, task_id: str) -> Optional[ForegroundTaskContext]:
+        """
+        Get foreground context for a task.
+
+        Args:
+            task_id: PFC task ID
+
+        Returns:
+            ForegroundTaskContext if task has a registered foreground handle
+        """
+        return self._foreground_contexts.get(task_id)
 
     async def start_polling(self, session_id: str) -> None:
         """
@@ -78,8 +159,12 @@ class PfcTaskNotificationService:
         """
         Main polling loop for a session.
 
-        Polls PFC server for task status and pushes updates to frontend.
-        Automatically stops when no running task exists.
+        Unified polling for both foreground and background tasks:
+        - Polls PFC server for task status
+        - Sends real-time updates to frontend via WebSocket
+        - Signals foreground handles when their tasks complete
+
+        Stops when no running task AND no active foreground handle for this session.
 
         Args:
             session_id: Session ID to poll for
@@ -91,6 +176,12 @@ class PfcTaskNotificationService:
 
             while True:
                 try:
+                    # Check if we have any foreground handle for this session
+                    has_foreground = any(
+                        ctx.session_id == session_id
+                        for ctx in self._foreground_contexts.values()
+                    )
+
                     # Get PFC client
                     client = await get_pfc_client()
 
@@ -129,11 +220,13 @@ class PfcTaskNotificationService:
                                 None
                             )
                             if completed_task:
-                                await self._send_final_status(session_id, completed_task, client)
+                                await self._handle_task_completion(session_id, completed_task, client)
                             self._last_task_id[session_id] = None
 
                         consecutive_empty += 1
-                        if consecutive_empty >= 2:
+
+                        # Stop only if no running task AND no foreground handle waiting
+                        if consecutive_empty >= 2 and not has_foreground:
                             logger.info(f"No running PFC task for session {session_id}, stopping polling")
                             break
 
@@ -160,7 +253,10 @@ class PfcTaskNotificationService:
         client: Any
     ) -> None:
         """
-        Process a running task - get output and push update.
+        Process a running task - get output, update foreground handle, and optionally push to frontend.
+
+        For foreground tasks: only update handle (no frontend notification, like bash)
+        For background tasks: send frontend notification
 
         Args:
             session_id: Session ID
@@ -184,11 +280,18 @@ class PfcTaskNotificationService:
             current_output = data.get("current_output") or data.get("output") or ""
             elapsed_time = data.get("elapsed_time", 0)
 
-            # Get recent lines
+            # Check if this is a foreground task
+            fg_ctx = self._foreground_contexts.get(task_id)
+
+            if fg_ctx:
+                # Foreground task: only update handle, NO frontend notification (like bash)
+                fg_ctx.handle.update_elapsed(elapsed_time)
+                return
+
+            # Background task: send frontend notification
             recent_lines = self._get_recent_lines(current_output)
             total_lines = len(current_output.split('\n')) if current_output else 0
 
-            # Send notification using create_message
             notification = create_message(
                 MessageType.PFC_TASK_UPDATE,
                 task_id=task_id,
@@ -202,7 +305,7 @@ class PfcTaskNotificationService:
                 start_time=task_info.get("start_time"),
                 elapsed_time=elapsed_time,
                 recent_output=recent_lines,
-                has_more_output=total_lines > self.RECENT_OUTPUT_LINES
+                has_more_output=total_lines > self.RECENT_OUTPUT_LINES,
             )
 
             await self._send_notification(session_id, notification)
@@ -210,14 +313,18 @@ class PfcTaskNotificationService:
         except Exception as e:
             logger.error(f"Error processing running task {task_id}: {e}")
 
-    async def _send_final_status(
+    async def _handle_task_completion(
         self,
         session_id: str,
         task_info: Dict[str, Any],
         client: Any
     ) -> None:
         """
-        Send final status notification when task completes/fails/interrupts.
+        Handle task completion - signal foreground handle and send frontend notification.
+
+        This is the unified completion handler for both foreground and background tasks:
+        - For foreground: signals the handle to unblock pfc_execute_task.wait()
+        - For all tasks: sends final status notification to frontend
 
         Args:
             session_id: Session ID
@@ -241,15 +348,39 @@ class PfcTaskNotificationService:
             current_output = data.get("current_output") or data.get("output") or ""
             elapsed_time = data.get("elapsed_time", 0)
             error = data.get("error")
+            result = data.get("result")
+            git_commit = task_info.get("git_commit") or data.get("git_commit")
+
+            # Map server status to display status
+            server_status = task_info.get("status", "completed")
+            status_map = {
+                "success": "completed",
+                "error": "failed",
+                "interrupted": "interrupted",
+            }
+            mapped_status = status_map.get(server_status, server_status)
 
             # Get recent lines
             recent_lines = self._get_recent_lines(current_output)
             total_lines = len(current_output.split('\n')) if current_output else 0
 
-            # Map status
-            status = task_info.get("status", "completed")
+            # Check if this is a foreground task
+            fg_ctx = self._foreground_contexts.get(task_id)
 
-            # Send final notification
+            if fg_ctx:
+                # Foreground task: signal handle, NO frontend notification (like bash)
+                fg_ctx.handle.signal_completion(
+                    status=mapped_status,
+                    output=current_output,
+                    elapsed_seconds=elapsed_time,
+                    result=result,
+                    error=error,
+                    git_commit=git_commit,
+                )
+                logger.info(f"Signaled foreground handle completion for task {task_id}: status={mapped_status}")
+                return
+
+            # Background task: send final notification to frontend
             notification = create_message(
                 MessageType.PFC_TASK_UPDATE,
                 task_id=task_id,
@@ -257,21 +388,22 @@ class PfcTaskNotificationService:
                 script_name=task_info.get("name", ""),
                 entry_script=task_info.get("entry_script", ""),
                 description=task_info.get("description", ""),
-                status=status,
+                status=mapped_status,
                 source=task_info.get("source", "agent"),
-                git_commit=task_info.get("git_commit"),
+                git_commit=git_commit,
                 start_time=task_info.get("start_time"),
                 elapsed_time=elapsed_time,
                 recent_output=recent_lines,
                 has_more_output=total_lines > self.RECENT_OUTPUT_LINES,
-                error=error
+                error=error,
+                result=str(result) if result else None,
             )
 
             await self._send_notification(session_id, notification)
-            logger.info(f"Sent final status '{status}' for task {task_id}")
+            logger.info(f"Sent final status '{mapped_status}' for task {task_id}")
 
         except Exception as e:
-            logger.error(f"Error sending final status for task {task_id}: {e}")
+            logger.error(f"Error handling task completion for {task_id}: {e}")
 
     async def _send_notification(
         self,
@@ -311,7 +443,7 @@ class PfcTaskNotificationService:
         return lines[-self.RECENT_OUTPUT_LINES:]
 
     # ===== Foreground Task Notification Methods =====
-    # These are called directly by pfc_execute_task tool during foreground wait
+    # These are called directly by pfc_execute_task tool for specific events
 
     async def notify_foreground_started(
         self,
@@ -323,6 +455,9 @@ class PfcTaskNotificationService:
     ) -> None:
         """
         Send notification when foreground PFC task starts running.
+
+        Called by pfc_execute_task when task is submitted in foreground mode.
+        Subsequent updates are handled by the unified polling loop.
 
         Args:
             session_id: WebSocket session ID
@@ -353,55 +488,6 @@ class PfcTaskNotificationService:
         await self._send_notification(session_id, notification)
         logger.debug(f"Sent foreground started notification for task {task_id}")
 
-    async def notify_foreground_output_update(
-        self,
-        session_id: str,
-        task_id: str,
-        script_path: str,
-        output: str,
-        elapsed_seconds: float,
-        description: Optional[str] = None,
-        git_commit: Optional[str] = None,
-    ) -> None:
-        """
-        Send notification with latest output during foreground wait.
-
-        Called periodically by foreground polling loop.
-
-        Args:
-            session_id: WebSocket session ID
-            task_id: PFC task ID
-            script_path: Path to entry script
-            output: Full output text
-            elapsed_seconds: Task runtime
-            description: Optional task description
-            git_commit: Optional git commit hash
-        """
-        import os
-        script_name = os.path.basename(script_path)
-
-        recent_lines = self._get_recent_lines(output)
-        total_lines = len(output.split('\n')) if output else 0
-        has_more = total_lines > self.RECENT_OUTPUT_LINES
-
-        notification = create_message(
-            MessageType.PFC_TASK_UPDATE,
-            task_id=task_id,
-            session_id=session_id,
-            script_name=script_name,
-            entry_script=script_path,
-            description=description or "",
-            status="running",
-            source="agent",
-            git_commit=git_commit,
-            elapsed_time=elapsed_seconds,
-            recent_output=recent_lines,
-            has_more_output=has_more,
-            is_foreground=True,
-        )
-
-        await self._send_notification(session_id, notification)
-
     async def notify_foreground_backgrounded(
         self,
         session_id: str,
@@ -415,6 +501,9 @@ class PfcTaskNotificationService:
         """
         Send notification when foreground task is moved to background (ctrl+b or timeout).
 
+        This is the FIRST frontend notification for this task (foreground mode has no UI).
+        Queries pfc-server for latest output to provide complete status.
+
         Args:
             session_id: WebSocket session ID
             task_id: PFC task ID
@@ -425,7 +514,27 @@ class PfcTaskNotificationService:
             git_commit: Optional git commit hash
         """
         import os
+        from backend.infrastructure.pfc import get_pfc_client
+
         script_name = os.path.basename(script_path)
+
+        # Query pfc-server for latest output (first notification needs complete data)
+        recent_lines: List[str] = []
+        has_more = False
+        actual_elapsed = elapsed_seconds
+
+        try:
+            client = await get_pfc_client()
+            status_result = await client.check_task_status(task_id)
+            if status_result.get("status") not in ("not_found", "error"):
+                data = status_result.get("data", {})
+                current_output = data.get("current_output") or data.get("output") or ""
+                actual_elapsed = data.get("elapsed_time", elapsed_seconds)
+                recent_lines = self._get_recent_lines(current_output)
+                total_lines = len(current_output.split('\n')) if current_output else 0
+                has_more = total_lines > self.RECENT_OUTPUT_LINES
+        except Exception as e:
+            logger.warning(f"Failed to get latest output for backgrounded task {task_id}: {e}")
 
         notification = create_message(
             MessageType.PFC_TASK_UPDATE,
@@ -437,9 +546,9 @@ class PfcTaskNotificationService:
             status="backgrounded",
             source="agent",
             git_commit=git_commit,
-            elapsed_time=elapsed_seconds,
-            recent_output=[],
-            has_more_output=False,
+            elapsed_time=actual_elapsed,
+            recent_output=recent_lines,
+            has_more_output=has_more,
             is_foreground=False,
             background_reason=reason,
         )
@@ -447,61 +556,8 @@ class PfcTaskNotificationService:
         await self._send_notification(session_id, notification)
         logger.info(f"Sent backgrounded notification for task {task_id}: reason={reason}")
 
-    async def notify_foreground_completed(
-        self,
-        session_id: str,
-        task_id: str,
-        script_path: str,
-        status: str,
-        output: str,
-        elapsed_seconds: float,
-        description: Optional[str] = None,
-        git_commit: Optional[str] = None,
-        result: Optional[Any] = None,
-        error: Optional[str] = None,
-    ) -> None:
-        """
-        Send notification when foreground task completes (success/failed/interrupted).
-
-        Args:
-            session_id: WebSocket session ID
-            task_id: PFC task ID
-            script_path: Path to entry script
-            status: Final status (completed/failed/interrupted)
-            output: Full output text
-            elapsed_seconds: Total task runtime
-            description: Optional task description
-            git_commit: Optional git commit hash
-            result: Optional script result
-            error: Optional error message
-        """
-        import os
-        script_name = os.path.basename(script_path)
-
-        recent_lines = self._get_recent_lines(output)
-        total_lines = len(output.split('\n')) if output else 0
-        has_more = total_lines > self.RECENT_OUTPUT_LINES
-
-        notification = create_message(
-            MessageType.PFC_TASK_UPDATE,
-            task_id=task_id,
-            session_id=session_id,
-            script_name=script_name,
-            entry_script=script_path,
-            description=description or "",
-            status=status,
-            source="agent",
-            git_commit=git_commit,
-            elapsed_time=elapsed_seconds,
-            recent_output=recent_lines,
-            has_more_output=has_more,
-            is_foreground=False,
-            error=error,
-            result=str(result) if result else None,
-        )
-
-        await self._send_notification(session_id, notification)
-        logger.info(f"Sent foreground completed notification for task {task_id}: status={status}")
+    # Note: notify_foreground_completed is no longer needed - completion is handled
+    # by the unified polling loop via _handle_task_completion()
 
     def stop_polling(self, session_id: str) -> None:
         """

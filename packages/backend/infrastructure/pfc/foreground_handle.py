@@ -2,15 +2,15 @@
 
 Provides interruptible wait for foreground PFC task execution:
 - Wait for task completion OR move-to-background signal
-- Timeout handling with automatic conversion to background
-- Polling pfc-server for status updates (not local cache)
+- No polling logic - polling is handled by PfcTaskNotificationService
+- Receives completion signal from notification service
 
 Mirrors ForegroundExecutionHandle from shell module.
 """
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import Optional, Union, Any, Callable, Awaitable
+from typing import Optional, Union, Any
 
 
 @dataclass
@@ -36,17 +36,6 @@ class PfcForegroundExecutionResult:
     git_commit: Optional[str] = None
 
 
-# Type alias for the status polling callback
-# Returns (is_terminal, status, output, result, error, git_commit)
-StatusPollResult = tuple[bool, str, str, Optional[Any], Optional[str], Optional[str]]
-StatusPollCallback = Callable[[str], Awaitable[StatusPollResult]]
-
-
-# Type alias for notification callback
-# Called with (output, elapsed_seconds) when new output is available
-NotificationCallback = Callable[[str, float], Awaitable[None]]
-
-
 @dataclass
 class PfcForegroundExecutionHandle:
     """Handle for foreground PFC task execution with interruptible wait.
@@ -56,26 +45,25 @@ class PfcForegroundExecutionHandle:
     - PfcForegroundExecutionResult (normal completion)
     - PfcMoveToBackgroundRequest (user requested background conversion)
 
-    Key differences from shell ForegroundExecutionHandle:
-    - No local subprocess; task runs remotely on pfc-server
-    - Polls pfc-server for status (via callback) instead of waiting on Future
-    - Status polling callback provided at construction time
-    - Optional notification callback for real-time updates to frontend
+    This handle does NOT poll - it only waits for signals:
+    - Completion signal from PfcTaskNotificationService
+    - Move-to-background signal from ctrl+b handler
+
+    The polling and notification logic is centralized in PfcTaskNotificationService.
     """
     task_id: str
-    poll_status_callback: StatusPollCallback  # Callback to poll pfc-server
-    timeout_seconds: Optional[float] = None   # None = no timeout
-    poll_interval_seconds: float = 2.0        # Status polling interval
-    notification_callback: Optional[NotificationCallback] = None  # Optional callback for frontend updates
+    timeout_seconds: Optional[float] = None  # None = no timeout
 
-    # Internal state
+    # Internal state - set by external signals
     _move_to_bg_event: asyncio.Event = field(default_factory=asyncio.Event)
     _completion_event: asyncio.Event = field(default_factory=asyncio.Event)
-    _last_status: str = field(default="running")
-    _last_output: str = field(default="")
-    _last_result: Optional[Any] = field(default=None)
-    _last_error: Optional[str] = field(default=None)
-    _last_git_commit: Optional[str] = field(default=None)
+
+    # Result data - set by notification service when signaling completion
+    _status: str = field(default="running")
+    _output: str = field(default="")
+    _result: Optional[Any] = field(default=None)
+    _error: Optional[str] = field(default=None)
+    _git_commit: Optional[str] = field(default=None)
     _elapsed_seconds: float = field(default=0.0)
 
     def request_move_to_background(self) -> None:
@@ -85,68 +73,71 @@ class PfcForegroundExecutionHandle:
         """
         self._move_to_bg_event.set()
 
-    async def _poll_status(self) -> None:
-        """Poll pfc-server for task status until completion or interruption."""
-        import time
-        start_time = time.time()
+    def signal_completion(
+        self,
+        status: str,
+        output: str,
+        elapsed_seconds: float,
+        result: Optional[Any] = None,
+        error: Optional[str] = None,
+        git_commit: Optional[str] = None,
+    ) -> None:
+        """Signal that the task has completed.
 
-        while not self._completion_event.is_set() and not self._move_to_bg_event.is_set():
-            try:
-                # Poll pfc-server via callback
-                is_terminal, status, output, result, error, git_commit = await self.poll_status_callback(self.task_id)
+        Called by PfcTaskNotificationService when task reaches terminal state.
 
-                # Update cached state
-                self._last_status = status
-                self._last_output = output
-                self._last_result = result
-                self._last_error = error
-                self._last_git_commit = git_commit
-                self._elapsed_seconds = time.time() - start_time
+        Args:
+            status: Final task status (completed/failed/interrupted)
+            output: Full task output
+            elapsed_seconds: Total elapsed time
+            result: Script result (if any)
+            error: Error message (if failed)
+            git_commit: Git commit hash (if any)
+        """
+        self._status = status
+        self._output = output
+        self._elapsed_seconds = elapsed_seconds
+        self._result = result
+        self._error = error
+        self._git_commit = git_commit
+        self._completion_event.set()
 
-                # Send notification if callback is provided and output changed
-                if self.notification_callback:
-                    try:
-                        await self.notification_callback(output, self._elapsed_seconds)
-                    except Exception as e:
-                        print(f"[PfcForegroundHandle] Notification callback error: {e}")
+    def update_elapsed(self, elapsed_seconds: float) -> None:
+        """Update elapsed time (called periodically by notification service).
 
-                if is_terminal:
-                    self._completion_event.set()
-                    return
-
-            except Exception as e:
-                # Log but continue polling on transient errors
-                print(f"[PfcForegroundHandle] Poll error: {e}")
-
-            await asyncio.sleep(self.poll_interval_seconds)
+        Args:
+            elapsed_seconds: Current elapsed time
+        """
+        self._elapsed_seconds = elapsed_seconds
 
     async def wait(self) -> Union[PfcForegroundExecutionResult, PfcMoveToBackgroundRequest]:
         """Wait for task completion or move-to-background signal.
 
+        This method does NOT poll - it waits for external signals:
+        - PfcTaskNotificationService signals completion via signal_completion()
+        - ctrl+b handler signals via request_move_to_background()
+
         Returns:
             PfcForegroundExecutionResult: Task completed normally
             PfcMoveToBackgroundRequest: User pressed ctrl+b or timeout
-
-        Note:
-            Unlike bash tasks, PFC tasks continue running on pfc-server
-            even when moved to background. The move-to-background just
-            changes how the backend tracks and reports the task.
         """
-        # Task 1: Poll pfc-server for task completion
-        poll_task = asyncio.create_task(self._poll_status())
-        # Task 2: Wait for move-to-background signal
+        # Create tasks for both events
+        completion_task = asyncio.create_task(self._completion_event.wait())
         signal_task = asyncio.create_task(self._move_to_bg_event.wait())
 
         try:
             done, pending = await asyncio.wait(
-                [poll_task, signal_task],
+                [completion_task, signal_task],
                 timeout=self.timeout_seconds,
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
-            # Case 1: Move-to-background signal received
+            # Cancel pending tasks
+            for task in pending:
+                task.cancel()
+
+            # Case 1: Move-to-background signal received (ctrl+b)
             if signal_task in done:
-                poll_task.cancel()
                 return PfcMoveToBackgroundRequest(
                     task_id=self.task_id,
                     reason="user_request"
@@ -154,33 +145,28 @@ class PfcForegroundExecutionHandle:
 
             # Case 2: Timeout (neither completed)
             if not done:
-                poll_task.cancel()
-                signal_task.cancel()
-                # Task continues in background on pfc-server
                 return PfcMoveToBackgroundRequest(
                     task_id=self.task_id,
                     reason="timeout"
                 )
 
-            # Case 3: Task completed (poll_task finished)
-            signal_task.cancel()
-
+            # Case 3: Task completed
             return PfcForegroundExecutionResult(
                 task_id=self.task_id,
-                status=self._last_status,
-                output=self._last_output,
-                result=self._last_result,
-                error=self._last_error,
+                status=self._status,
+                output=self._output,
+                result=self._result,
+                error=self._error,
                 elapsed_seconds=self._elapsed_seconds,
-                git_commit=self._last_git_commit,
+                git_commit=self._git_commit,
             )
 
         except asyncio.CancelledError:
-            poll_task.cancel()
+            completion_task.cancel()
             signal_task.cancel()
             raise
         except Exception as e:
-            poll_task.cancel()
+            completion_task.cancel()
             signal_task.cancel()
             # Return error result instead of raising
             return PfcForegroundExecutionResult(

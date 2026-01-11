@@ -20,7 +20,6 @@ from backend.infrastructure.pfc.foreground_handle import (
     PfcForegroundExecutionHandle,
     PfcMoveToBackgroundRequest,
     PfcForegroundExecutionResult,
-    StatusPollResult,
 )
 from backend.infrastructure.pfc.foreground_registry import get_pfc_foreground_registry
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -153,83 +152,45 @@ def register_pfc_task_tool(mcp: FastMCP):
                 )
 
             # ===== Foreground Mode: Wait with ctrl+b support =====
+            # Uses unified polling service for both frontend notifications and handle signaling
             registry = get_pfc_foreground_registry()
 
-            # Send started notification to frontend
-            if notification_service:
-                await notification_service.notify_foreground_started(
-                    session_id=session_id,
-                    task_id=task_id,
-                    script_path=script_path,
-                    description=description,
-                    git_commit=git_commit,
-                )
-
-            # Create status polling callback that queries pfc-server
-            async def poll_status_callback(tid: str) -> StatusPollResult:
-                """Poll pfc-server for task status."""
-                poll_result = await client.check_task_status(tid)
-                poll_status = poll_result.get("status", "unknown")
-                poll_data = poll_result.get("data", {})
-
-                # Determine if terminal state
-                is_terminal = poll_status in ("success", "error", "interrupted", "not_found")
-
-                # Map server status to display status
-                status_map = {
-                    "pending": "running",
-                    "running": "running",
-                    "success": "completed",
-                    "error": "failed",
-                    "interrupted": "interrupted",
-                    "not_found": "failed",
-                }
-                mapped_status = status_map.get(poll_status, poll_status)
-
-                return (
-                    is_terminal,
-                    mapped_status,
-                    poll_data.get("output", ""),
-                    poll_data.get("result"),
-                    poll_result.get("message") if poll_status == "error" else poll_data.get("error"),
-                    poll_data.get("git_commit"),
-                )
-
-            # Create notification callback for frontend updates during foreground wait
-            async def notification_callback(output: str, elapsed_seconds: float) -> None:
-                """Send output updates to frontend during foreground wait."""
-                if notification_service:
-                    await notification_service.notify_foreground_output_update(
-                        session_id=session_id,
-                        task_id=task_id,
-                        script_path=script_path,
-                        output=output,
-                        elapsed_seconds=elapsed_seconds,
-                        description=description,
-                        git_commit=git_commit,
-                    )
-
-            # Create foreground handle with timeout and notification callback
+            # Create foreground handle (no polling - waits for signals from notification service)
             timeout_seconds = timeout / 1000.0 if timeout else None
             handle = PfcForegroundExecutionHandle(
                 task_id=task_id,
-                poll_status_callback=poll_status_callback,
                 timeout_seconds=timeout_seconds,
-                poll_interval_seconds=2.0,
-                notification_callback=notification_callback,
             )
 
             # Register handle for ctrl+b signal handling
             registry.register(session_id, handle)
 
+            # Register handle with notification service for completion signaling
+            # Foreground mode: NO frontend notifications (like bash)
+            # - Polling only signals foreground handle, doesn't notify frontend
+            # - Frontend notifications start only after ctrl+b (backgrounded)
+            if notification_service:
+                notification_service.register_foreground_handle(
+                    task_id=task_id,
+                    session_id=session_id,
+                    script_path=script_path,
+                    description=description,
+                    git_commit=git_commit,
+                    handle=handle,
+                )
+                # Start polling (for foreground handle signaling only, no frontend updates)
+                await notification_service.start_polling(session_id)
+
             try:
                 wait_result = await handle.wait()
             finally:
                 registry.unregister(session_id)
+                if notification_service:
+                    notification_service.unregister_foreground_handle(task_id)
 
             # ===== Handle Move-to-Background Request (ctrl+b or timeout) =====
             if isinstance(wait_result, PfcMoveToBackgroundRequest):
-                # Send backgrounded notification and start polling
+                # Send backgrounded notification (polling continues for frontend updates)
                 if notification_service:
                     await notification_service.notify_foreground_backgrounded(
                         session_id=session_id,
@@ -240,8 +201,7 @@ def register_pfc_task_tool(mcp: FastMCP):
                         description=description,
                         git_commit=git_commit,
                     )
-                    # Start background polling (same as run_in_background=True)
-                    await notification_service.start_polling(session_id)
+                    # Note: polling already running, will continue for frontend updates
 
                 # Build LLM content based on reason (similar to bash tool)
                 if wait_result.reason == "user_request":
@@ -266,6 +226,7 @@ def register_pfc_task_tool(mcp: FastMCP):
                 )
 
             # ===== Handle Normal Completion =====
+            # (Frontend notification already sent by unified polling service)
             exec_result: PfcForegroundExecutionResult = wait_result
 
             # Update local task manager with final state
@@ -277,21 +238,6 @@ def register_pfc_task_tool(mcp: FastMCP):
             )
             if exec_result.output:
                 task_manager.set_output(task_id, exec_result.output)
-
-            # Send completed notification to frontend
-            if notification_service:
-                await notification_service.notify_foreground_completed(
-                    session_id=session_id,
-                    task_id=task_id,
-                    script_path=script_path,
-                    status=exec_result.status,
-                    output=exec_result.output,
-                    elapsed_seconds=exec_result.elapsed_seconds,
-                    description=description,
-                    git_commit=exec_result.git_commit or git_commit,
-                    result=exec_result.result,
-                    error=exec_result.error,
-                )
 
             # Build response
             task_data = TaskStatusData(
