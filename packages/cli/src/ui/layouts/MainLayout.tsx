@@ -127,6 +127,11 @@ export const MainLayout: React.FC = () => {
     appState.currentProfile
   );
 
+  // Sync shell execution state to AppState for Ctrl+B handling
+  useEffect(() => {
+    appActions.setShellExecuting(isShellExecuting);
+  }, [isShellExecuting, appActions]);
+
   // Shell mode state (for UI indicator)
   const [isShellMode, setIsShellMode] = useState(false);
 

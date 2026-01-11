@@ -48,6 +48,9 @@ export interface AppState {
   streamingState: StreamingStateData;
   isStreaming: boolean;
 
+  // User shell execution (for Ctrl+B backgrounding)
+  isShellExecuting: boolean;
+
   // Tool confirmation
   pendingConfirmation: ToolConfirmationData | null;
 
@@ -101,6 +104,9 @@ export interface AppActions {
   clearScreen: () => void;
   toggleFullContextMode: () => void;
 
+  // Shell execution state (for Ctrl+B)
+  setShellExecuting: (executing: boolean) => void;
+
   // Error
   clearError: () => void;
 }
@@ -120,6 +126,7 @@ const defaultState: AppState = {
     thinkingContent: null,
   },
   isStreaming: false,
+  isShellExecuting: false,
   pendingConfirmation: null,
   isQuitting: false,
   isInputActive: true,
@@ -146,6 +153,7 @@ const defaultActions: AppActions = {
   quit: () => {},
   clearScreen: () => {},
   toggleFullContextMode: () => {},
+  setShellExecuting: () => {},
   clearError: () => {},
 };
 

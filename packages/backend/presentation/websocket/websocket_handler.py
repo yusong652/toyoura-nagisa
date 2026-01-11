@@ -110,8 +110,22 @@ class WebSocketHandler:
         except Exception as e:
             logger.error(f"Unexpected error in WebSocket handler for session {session_id}: {e}")
         finally:
-            # Critical: Always clean up connection resources
+            # Clean up handler-specific resources first
+            self._cleanup_session_handlers(session_id)
+            # Then disconnect the WebSocket connection
             await self.connection_manager.disconnect(session_id)
+
+    def _cleanup_session_handlers(self, session_id: str) -> None:
+        """Clean up handler-specific resources when session disconnects.
+
+        This ensures background tasks are cancelled before the connection
+        is closed, preventing orphaned tasks from trying to send messages.
+        """
+        # Clean up UserShellHandler background tasks
+        from backend.presentation.websocket.messages.types import MessageType
+        user_shell_handler = self.message_processor.handlers.get(MessageType.USER_SHELL_EXECUTE)
+        if user_shell_handler and hasattr(user_shell_handler, 'cleanup_session'):
+            user_shell_handler.cleanup_session(session_id)
     
     def get_connection_manager(self) -> ConnectionManager:
         """Get connection manager instance for external access"""

@@ -105,6 +105,9 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   // Full context mode (Ctrl+O toggle)
   const [isFullContextMode, setIsFullContextMode] = useState(false);
 
+  // User shell execution state (for Ctrl+B backgrounding)
+  const [isShellExecuting, setShellExecuting] = useState(false);
+
   // ========== Hooks ==========
 
   // Connection state management
@@ -370,8 +373,9 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     }
 
     // Ctrl+B: move foreground bash to background
+    // Supports both agent bash (during isStreaming) and user shell (! prefix commands)
     if (key.ctrl && key.name === 'b') {
-      if (isStreaming && currentSessionId) {
+      if ((isStreaming || isShellExecuting) && currentSessionId) {
         // Send move-to-background signal to backend
         connectionManager.send({
           type: 'MOVE_TO_BACKGROUND',
@@ -385,7 +389,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     if (key.ctrl && key.name === 'o' && !isFullContextMode) {
       toggleFullContextMode();
     }
-  }, [quit, isStreaming, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager, toggleFullContextMode, isFullContextMode, currentSessionId, connectionManager]);
+  }, [quit, isStreaming, isShellExecuting, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager, toggleFullContextMode, isFullContextMode, currentSessionId, connectionManager]);
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 
@@ -415,6 +419,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
       thinkingContent,
     },
     isStreaming,
+    isShellExecuting,
     pendingConfirmation,
     isQuitting,
     isInputActive: connectionStatus === 'connected' && !isQuitting,
@@ -438,6 +443,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     streamingStateEnum,
     thinkingContent,
     isStreaming,
+    isShellExecuting,
     pendingConfirmation,
     isQuitting,
     tokenUsage,
@@ -464,6 +470,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     quit,
     clearScreen,
     toggleFullContextMode,
+    setShellExecuting,
     clearError,
   }), [
     historyManager.addItem,
@@ -480,6 +487,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     quit,
     clearScreen,
     toggleFullContextMode,
+    setShellExecuting,
     clearError,
   ]);
 

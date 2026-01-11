@@ -462,12 +462,21 @@ class UserShellHandler(MessageHandler):
     Flow:
     1. Frontend sends USER_SHELL_EXECUTE with command
     2. Backend starts foreground execution (registered for Ctrl+B)
-    3. If Ctrl+B: adopt to background, notify frontend
-    4. If completed: send USER_SHELL_RESULT with output
+    3. Handler returns immediately, wait runs in background task
+    4. If Ctrl+B: adopt to background, notify frontend
+    5. If completed: send USER_SHELL_RESULT with output
+
+    Architecture:
+    - Uses asyncio.create_task() to avoid blocking the WebSocket message loop
+    - This allows MOVE_TO_BACKGROUND messages to be processed during execution
+    - Task tracking enables cleanup when WebSocket disconnects
     """
 
     # Cache ShellService instances per session+profile
     _shell_services: dict = {}
+
+    # Track waiting tasks per session for cleanup on disconnect
+    _waiting_tasks: dict = {}  # session_id -> asyncio.Task
 
     async def _get_shell_service(self, session_id: str, agent_profile: str):
         """Get or create ShellService for a session and profile."""
@@ -507,15 +516,53 @@ class UserShellHandler(MessageHandler):
 
             # Register for Ctrl+B signal handling
             from backend.infrastructure.shell.foreground_task_registry import get_foreground_task_registry
-            from backend.infrastructure.shell.executor import MoveToBackgroundRequest
 
             registry = get_foreground_task_registry()
             registry.register(session_id, handle)
 
-            try:
-                wait_result = await handle.wait()
-            finally:
-                registry.unregister(session_id)
+            # Run wait in background task to avoid blocking message loop
+            # This allows MOVE_TO_BACKGROUND messages to be processed while waiting
+            import asyncio
+
+            task = asyncio.create_task(
+                self._wait_and_send_result(
+                    session_id=session_id,
+                    service=service,
+                    handle=handle,
+                    command=command,
+                    has_cd=has_cd,
+                    agent_profile=agent_profile,
+                    registry=registry,
+                )
+            )
+            self._waiting_tasks[session_id] = task
+
+            logger.info(f"[UserShellHandler] Command scheduled in background task: {command[:50]}...")
+
+        except Exception as e:
+            logger.error(f"[UserShellHandler] Error starting command: {e}")
+            await self._send_error(session_id, agent_profile, str(e))
+
+    async def _wait_and_send_result(
+        self,
+        session_id: str,
+        service,
+        handle,
+        command: str,
+        has_cd: bool,
+        agent_profile: str,
+        registry,
+    ) -> None:
+        """Background task: wait for shell command completion and send result.
+
+        This runs in a separate task to avoid blocking the WebSocket message loop,
+        allowing Ctrl+B (MOVE_TO_BACKGROUND) messages to be processed during execution.
+        """
+        import asyncio
+        from backend.infrastructure.shell.executor import MoveToBackgroundRequest
+
+        try:
+            wait_result = await handle.wait()
 
             # Handle Ctrl+B: user wants to background the process
             if isinstance(wait_result, MoveToBackgroundRequest):
@@ -556,9 +603,37 @@ class UserShellHandler(MessageHandler):
 
             await self._send_result(session_id, service, command, result, context)
 
+        except asyncio.CancelledError:
+            logger.info(f"[UserShellHandler] Background task cancelled for session {session_id}")
+            # Don't send error on cancellation (session likely disconnected)
+            raise
         except Exception as e:
-            logger.error(f"[UserShellHandler] Error executing command: {e}")
+            logger.error(f"[UserShellHandler] Error in background wait: {e}")
             await self._send_error(session_id, agent_profile, str(e))
+        finally:
+            # Always unregister from Ctrl+B handling
+            registry.unregister(session_id)
+            # Remove from tracking
+            if session_id in self._waiting_tasks:
+                del self._waiting_tasks[session_id]
+
+    def cleanup_session(self, session_id: str) -> None:
+        """Clean up background tasks for a session.
+
+        Called when WebSocket disconnects to cancel any pending shell tasks.
+        This prevents orphaned tasks from trying to send to disconnected sessions.
+        """
+        if session_id in self._waiting_tasks:
+            task = self._waiting_tasks[session_id]
+            if not task.done():
+                task.cancel()
+                logger.info(f"[UserShellHandler] Cancelled waiting task for session {session_id}")
+            del self._waiting_tasks[session_id]
+
+        # Also clean up shell service cache for this session
+        keys_to_remove = [k for k in self._shell_services if k[0] == session_id]
+        for key in keys_to_remove:
+            del self._shell_services[key]
 
     async def _send_result(self, session_id: str, service, command: str, result, context: str):
         """Send successful execution result to frontend."""
