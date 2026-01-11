@@ -207,6 +207,9 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
   // Check if this is a foreground bash command (can be converted to background)
   const isBashForeground = item.toolName === 'bash' && !item.toolInput.run_in_background && !hasResult;
 
+  // Check if this is a foreground PFC task (can be converted to background)
+  const isPfcForeground = item.toolName === 'pfc_execute_task' && !item.toolInput.run_in_background && !hasResult;
+
   // Get tool-specific display formatting
   const toolDisplayResult = formatToolDisplay(item.toolName, item.toolInput);
 
@@ -256,8 +259,8 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
           </Text>
         )}
       </Box>
-      {/* Hint for foreground bash: ctrl+b to run in background */}
-      {isBashForeground && (
+      {/* Hint for foreground bash/pfc: ctrl+b to run in background */}
+      {(isBashForeground || isPfcForeground) && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
           <Text color={theme.text.muted} dimColor>
             ctrl+b to run in background
