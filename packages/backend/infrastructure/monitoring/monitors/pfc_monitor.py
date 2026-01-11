@@ -2,6 +2,7 @@
 PFC Monitor - PFC simulation task tracking.
 
 Monitors PFC simulation tasks with intelligent notification tracking.
+Queries pfc-server for persistent task data.
 """
 
 import asyncio
@@ -16,12 +17,13 @@ class PfcMonitor(BaseMonitor):
     """
     Monitor for PFC simulation tasks.
 
-    Implements persistent notification tracking:
+    Implements persistent notification tracking via pfc-server:
     1. Unnotified completed/failed tasks → One-time completion notification + mark as notified
     2. Running tasks → Continuous status reminders
     3. Already notified completed/failed tasks → Excluded (no reminder)
 
     Note: This monitor requires agent_profile for profile-based filtering.
+    Task state is persisted in pfc-server.
     """
 
     async def get_reminders(self, agent_profile: str = "general") -> List[str]:

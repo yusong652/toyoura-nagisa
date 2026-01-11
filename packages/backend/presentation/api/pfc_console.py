@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import InternalServerError
 from backend.infrastructure.pfc.client import get_pfc_client
+from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 from backend.infrastructure.monitoring.status_monitor import get_status_monitor
 from backend.shared.utils.workspace import get_workspace_for_profile
 
@@ -185,9 +186,20 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
             request.session_id
         )
 
+        # Generate task_id before sending to pfc-server
+        task_manager = get_pfc_task_manager()
+        task_id = task_manager.create_task(
+            session_id=request.session_id,
+            script_path="user_console",  # Will be updated by pfc-server
+            description=request.code[:50] + "..." if len(request.code) > 50 else request.code,
+            source="user_console",
+        )
+
         try:
             client = await get_pfc_client()
         except ConnectionError as e:
+            # Update task status on failure
+            task_manager.update_status(task_id, "failed", error=str(e))
             return ApiResponse(
                 success=False,
                 message=f"PFC server not available: {e}. Please start PFC server in PFC GUI.",
@@ -198,6 +210,7 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
         result = await client.send_user_console(
             code=request.code,
             workspace_path=str(workspace_path),
+            task_id=task_id,
             session_id=request.session_id,
             timeout_ms=request.timeout_ms or 30000,
         )
@@ -206,7 +219,20 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
         message = result.get("message", "")
         data = result.get("data") or {}
 
-        task_id = data.get("task_id", "")
+        # Update task status based on result
+        task_status = "completed" if status == "success" else "failed"
+        task_manager.update_status(
+            task_id,
+            task_status,
+            result=data.get("result"),
+            error=data.get("error") if status == "error" else None,
+        )
+        # Update output
+        output_text = data.get("output", "")
+        if output_text:
+            task_manager.set_output(task_id, output_text)
+
+        # Response uses the task_id we generated (not from server)
         script_name = data.get("script_name", "")
         script_path = data.get("script_path", "")
         code_preview = data.get("code_preview", "")
@@ -251,6 +277,9 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
         )
 
     except ConnectionError as e:
+        # Update task status on connection failure
+        if 'task_id' in locals() and 'task_manager' in locals():
+            task_manager.update_status(task_id, "failed", error=str(e))
         return ApiResponse(
             success=False,
             message=f"Connection to PFC server lost: {e}",
@@ -258,6 +287,9 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
             data=ExecuteData(connected=False, context="")
         )
     except TimeoutError as e:
+        # Update task status on timeout
+        if 'task_id' in locals() and 'task_manager' in locals():
+            task_manager.update_status(task_id, "failed", error=str(e))
         return ApiResponse(
             success=False,
             message=f"Execution timed out: {e}",
@@ -265,6 +297,9 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
             data=ExecuteData(connected=True, context="")
         )
     except Exception as e:
+        # Update task status on unexpected error
+        if 'task_id' in locals() and 'task_manager' in locals():
+            task_manager.update_status(task_id, "failed", error=str(e))
         raise InternalServerError(message=f"Unexpected error: {e}")
 
 

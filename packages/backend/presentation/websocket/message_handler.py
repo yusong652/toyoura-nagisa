@@ -26,6 +26,7 @@ from backend.presentation.websocket.message_types import (
     MessageType, BaseWebSocketMessage, parse_incoming_websocket_message, create_message
 )
 from backend.application.services.shell import get_bash_execution_service
+from backend.application.services.pfc import get_pfc_execution_service
 
 logger = logging.getLogger(__name__)
 
@@ -406,9 +407,11 @@ class MoveToBackgroundHandler(MessageHandler):
     Handle move-to-background requests (ctrl+b pressed).
 
     Purpose: Process ctrl+b key presses from frontend to move a running
-    foreground bash command to background execution. The command continues
-    running but the tool call returns immediately, allowing the user to
-    continue interacting.
+    foreground process to background execution. Supports both bash commands
+    and PFC simulation tasks.
+
+    The process continues running but the tool call returns immediately,
+    allowing the user to continue interacting.
     """
 
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
@@ -416,18 +419,23 @@ class MoveToBackgroundHandler(MessageHandler):
             try:
                 print(f"[MoveToBackgroundHandler] Processing MOVE_TO_BACKGROUND from session {session_id}", flush=True)
 
-                # Signal the foreground process to move to background
-                service = get_bash_execution_service()
-                success = service.request_move_to_background(session_id)
+                # Try bash first, then PFC
+                bash_service = get_bash_execution_service()
+                pfc_service = get_pfc_execution_service()
 
-                if success:
-                    print(f"[MoveToBackgroundHandler] Successfully signaled move-to-background for session {session_id}", flush=True)
+                bash_success = bash_service.request_move_to_background(session_id)
+                pfc_success = pfc_service.request_move_to_background(session_id)
+
+                if bash_success:
+                    print(f"[MoveToBackgroundHandler] Successfully signaled move-to-background for bash process in session {session_id}", flush=True)
+                elif pfc_success:
+                    print(f"[MoveToBackgroundHandler] Successfully signaled move-to-background for PFC task in session {session_id}", flush=True)
                 else:
                     logger.warning(f"No foreground process found for session {session_id}")
                     await self.send_error(
                         session_id,
                         "NO_FOREGROUND_PROCESS",
-                        "No foreground bash process is currently running"
+                        "No foreground process is currently running"
                     )
 
             except Exception as e:

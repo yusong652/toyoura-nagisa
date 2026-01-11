@@ -4,17 +4,31 @@ PFC Task Execution Tool - MCP tool for executing PFC simulation tasks.
 Provides task execution functionality for PFC Python SDK operations.
 Each execution creates a versioned snapshot on the pfc-executions branch
 for complete traceability ("Script is Context" philosophy).
+
+Task lifecycle is managed by backend's PfcTaskManager:
+- Task ID generated before sending to pfc-server
+- Foreground mode supports ctrl+b to move task to background
+- Status tracked via polling pfc-server (persistent data)
 """
 
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any, cast
+from typing import Dict, Any, cast, Optional
 from backend.infrastructure.pfc import get_pfc_client
+from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
+from backend.infrastructure.pfc.foreground_handle import (
+    PfcForegroundExecutionHandle,
+    PfcMoveToBackgroundRequest,
+    PfcForegroundExecutionResult,
+    StatusPollResult,
+)
+from backend.infrastructure.pfc.foreground_registry import get_pfc_foreground_registry
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
 from .utils import (
     create_task_status_data,
     format_task_status_for_llm,
+    TaskStatusData,
     DEFAULT_OUTPUT_LINES,
     ScriptPath,
     TaskDescription,
@@ -59,59 +73,187 @@ def register_pfc_task_tool(mcp: FastMCP):
             # Normalize path separators for cross-platform compatibility
             script_path = normalize_path_separators(entry_script, target_platform='linux')
 
+            # Get task manager and create task (generates task_id)
+            task_manager = get_pfc_task_manager()
+            task_id = task_manager.create_task(
+                session_id=session_id,
+                script_path=script_path,
+                description=description,
+                source="agent",
+            )
+
+            # Update status to submitted
+            task_manager.update_status(task_id, "submitted")
+
             # Get WebSocket client (auto-connects if needed)
             client = await get_pfc_client()
 
-            # Execute script (server handles git versioning)
+            # Always submit to pfc-server with run_in_background=True
+            # For foreground mode, we poll for completion on backend side
             result = await client.execute_task(
                 script_path=script_path,
                 description=description,
+                task_id=task_id,
                 timeout_ms=timeout,
-                run_in_background=run_in_background,
+                run_in_background=True,  # Always background on server side
                 session_id=session_id
             )
 
-            # Validate background mode response
+            # Validate server accepted the task
             status = result.get("status")
             data = result.get("data")
 
-            if run_in_background and status != "pending":
+            if status != "pending":
+                task_manager.update_status(task_id, "failed", error="Unexpected server response")
                 return error_response(
-                    f"Unexpected server response in background mode: status={status} "
+                    f"Unexpected server response: status={status} "
                     f"(expected 'pending'). Server may have changed behavior."
                 )
 
-            # ===== Unified Response Building =====
-            # Status mapping: server status → display status
-            # - pending (background or foreground timeout): submitted/running
-            # - success/error/interrupted (foreground completed): completed/failed/interrupted
-            STATUS_MAP: dict[str, str] = {
-                "pending": "submitted" if run_in_background else "running",
-                "success": "completed",
-                "error": "failed",
-            }
-            display_status = STATUS_MAP.get(str(status), str(status))
+            # Update task manager with initial response
+            git_commit = data.get("git_commit") if data else None
+            task_manager.update_status(task_id, "running")
+            task = task_manager.get_task(task_id)
+            if task and git_commit:
+                task.git_commit = git_commit
 
-            # Create structured task data
-            task_id = data.get("task_id") if data else None
-            task_data = create_task_status_data(data or {}, task_id or "unknown")
-            task_data.status = display_status
-            task_data.description = description
+            # ===== Background Mode: Return immediately =====
+            if run_in_background:
+                task_data = TaskStatusData(
+                    task_id=task_id,
+                    status="submitted",
+                    description=description,
+                    entry_script=script_path,
+                    git_commit=git_commit,
+                )
 
-            # Set error message for failed tasks
-            if status == "error" and not task_data.error:
-                task_data.error = result.get("message", "Task execution failed")
+                formatted = format_task_status_for_llm(
+                    data=task_data,
+                    offset=0,
+                    limit=DEFAULT_OUTPUT_LINES,
+                )
 
-            # Format using unified formatter
+                return success_response(
+                    message=f"Task submitted: {script_path}",
+                    llm_content={"parts": [{"type": "text", "text": formatted.text}]},
+                    entry_script=script_path,
+                    task_id=task_id,
+                    git_commit=git_commit,
+                    pagination=formatted.pagination,
+                )
+
+            # ===== Foreground Mode: Wait with ctrl+b support =====
+            registry = get_pfc_foreground_registry()
+
+            # Create status polling callback that queries pfc-server
+            async def poll_status_callback(tid: str) -> StatusPollResult:
+                """Poll pfc-server for task status."""
+                poll_result = await client.check_task_status(tid)
+                poll_status = poll_result.get("status", "unknown")
+                poll_data = poll_result.get("data", {})
+
+                # Determine if terminal state
+                is_terminal = poll_status in ("success", "error", "interrupted", "not_found")
+
+                # Map server status to display status
+                status_map = {
+                    "pending": "running",
+                    "running": "running",
+                    "success": "completed",
+                    "error": "failed",
+                    "interrupted": "interrupted",
+                    "not_found": "failed",
+                }
+                mapped_status = status_map.get(poll_status, poll_status)
+
+                return (
+                    is_terminal,
+                    mapped_status,
+                    poll_data.get("output", ""),
+                    poll_data.get("result"),
+                    poll_result.get("message") if poll_status == "error" else poll_data.get("error"),
+                    poll_data.get("git_commit"),
+                )
+
+            # Create foreground handle with timeout
+            timeout_seconds = timeout / 1000.0 if timeout else None
+            handle = PfcForegroundExecutionHandle(
+                task_id=task_id,
+                poll_status_callback=poll_status_callback,
+                timeout_seconds=timeout_seconds,
+                poll_interval_seconds=2.0,
+            )
+
+            # Register handle for ctrl+b signal handling
+            registry.register(session_id, handle)
+
+            try:
+                wait_result = await handle.wait()
+            finally:
+                registry.unregister(session_id)
+
+            # ===== Handle Move-to-Background Request (ctrl+b or timeout) =====
+            if isinstance(wait_result, PfcMoveToBackgroundRequest):
+                reason_msg = "User pressed ctrl+b" if wait_result.reason == "user_request" else "Timeout reached"
+                task_data = TaskStatusData(
+                    task_id=task_id,
+                    status="running (backgrounded)",
+                    description=description,
+                    entry_script=script_path,
+                    git_commit=git_commit,
+                )
+
+                formatted = format_task_status_for_llm(
+                    data=task_data,
+                    offset=0,
+                    limit=DEFAULT_OUTPUT_LINES,
+                )
+
+                return success_response(
+                    message=f"{reason_msg}. Task continues in background. Use pfc_check_task_status('{task_id}') to monitor.",
+                    llm_content={"parts": [{"type": "text", "text": formatted.text}]},
+                    entry_script=script_path,
+                    task_id=task_id,
+                    git_commit=git_commit,
+                    backgrounded=True,
+                    background_reason=wait_result.reason,
+                    pagination=formatted.pagination,
+                )
+
+            # ===== Handle Normal Completion =====
+            exec_result: PfcForegroundExecutionResult = wait_result
+
+            # Update local task manager with final state
+            task_manager.update_status(
+                task_id,
+                exec_result.status,
+                result=exec_result.result,
+                error=exec_result.error,
+            )
+            if exec_result.output:
+                task_manager.set_output(task_id, exec_result.output)
+
+            # Build response
+            task_data = TaskStatusData(
+                task_id=task_id,
+                status=exec_result.status,
+                description=description,
+                entry_script=script_path,
+                git_commit=exec_result.git_commit or git_commit,
+                output=exec_result.output,
+                result=exec_result.result,
+                error=exec_result.error,
+                elapsed_time=exec_result.elapsed_seconds,
+            )
+
             formatted = format_task_status_for_llm(
                 data=task_data,
                 offset=0,
                 limit=DEFAULT_OUTPUT_LINES,
             )
 
-            # Build response
             response_kwargs: Dict[str, Any] = {
-                "message": result.get("message", f"Task {display_status}: {script_path}"),
+                "message": f"Task {exec_result.status}: {script_path}",
                 "llm_content": {"parts": [{"type": "text", "text": formatted.text}]},
                 "entry_script": script_path,
                 "task_id": task_id,
@@ -119,18 +261,23 @@ def register_pfc_task_tool(mcp: FastMCP):
                 "pagination": formatted.pagination,
             }
 
-            # Add status-specific fields for completed foreground tasks
-            if status == "success":
-                response_kwargs["script_result"] = task_data.result
-            elif status == "error":
-                response_kwargs["script_error"] = task_data.error
+            if exec_result.status == "completed":
+                response_kwargs["script_result"] = exec_result.result
+            elif exec_result.status == "failed":
+                response_kwargs["script_error"] = exec_result.error
 
             return success_response(**response_kwargs)
 
         except ConnectionError as e:
+            # Update task status on connection failure
+            if 'task_id' in locals():
+                task_manager.update_status(task_id, "failed", error=str(e))
             return error_response(f"Cannot connect to PFC server: {str(e)}")
 
         except Exception as e:
+            # Update task status on unexpected error
+            if 'task_id' in locals():
+                task_manager.update_status(task_id, "failed", error=str(e))
             return error_response(f"System error executing task: {str(e)}")
 
     print(f"[DEBUG] Registered PFC task tool: pfc_execute_task")
