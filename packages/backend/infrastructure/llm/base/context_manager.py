@@ -379,57 +379,16 @@ class BaseContextManager(ABC):
     
     def get_working_contents(self) -> List[Dict[str, Any]]:
         """
-        Get working contents with smart truncation preserving tool integrity.
+        Get all working contents without truncation.
 
-        Automatically retrieves recent_messages_length from configuration.
-        Ensures that exactly recent_messages_length non-tool messages are retained while
-        preserving the integrity of tool calls and their results. Guarantees
-        clean start boundary by ensuring the result starts with a non-tool message.
-
-        This method ensures that:
-        1. Tool calls and results are kept together
-        2. Most recent messages are prioritized
-        3. Clean message boundaries (no orphaned tool results)
+        Returns all messages to preserve prompt caching effectiveness.
+        Context length management is handled by automatic summarization
+        rather than sliding window truncation.
 
         Returns:
-            List[Dict[str, Any]]: Truncated messages with clean start boundary
+            List[Dict[str, Any]]: All working contents
         """
-        # Get recent_messages_length from configuration
-        from backend.config import get_llm_settings
-        recent_messages_length = get_llm_settings().recent_messages_length
-
-        messages = self.working_contents
-
-        # Count non-tool messages
-        non_tool_count = sum(
-            1 for msg in messages
-            if not self._is_tool_call(msg) and not self._is_tool_result(msg)
-        )
-
-        # If we already have fewer non-tool messages than recent_messages_length, return all
-        if non_tool_count <= recent_messages_length:
-            return messages
-        
-        # Work backwards to collect the most recent non-tool messages
-        # Tool messages are included but don't count toward the limit
-        result = []
-        non_tool_collected = 0
-        i = len(messages) - 1
-        
-        while i >= 0 and non_tool_collected < recent_messages_length:
-            msg = messages[i]
-            
-            if not self._is_tool_call(msg) and not self._is_tool_result(msg):
-                # Non-tool message: include and count
-                result.insert(0, msg)
-                non_tool_collected += 1
-            else:
-                # Tool message (call or result): include but don't count
-                result.insert(0, msg)
-            
-            i -= 1
-        
-        return result
+        return self.working_contents
     
     @abstractmethod
     def _is_tool_call(self, msg: Dict[str, Any]) -> bool:

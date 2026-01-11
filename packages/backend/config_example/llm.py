@@ -158,8 +158,6 @@ class LLMSettings(BaseSettings):
         description="LLM type (gpt, gemini, anthropic, kimi, zhipu, openrouter)"
     )
     debug: bool = Field(default=False, description="Enable debug mode")
-    recent_messages_length: int = Field(default=20, ge=1, le=100, description="Number of recent messages to use for context")
-    max_tool_iterations: int = Field(default=10, ge=1, le=50, description="Maximum number of tool calling iterations per request")
     model_config = SettingsConfigDict(
         env_file='.env',
         env_nested_delimiter='__',

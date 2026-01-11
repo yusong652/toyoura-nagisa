@@ -93,12 +93,6 @@ class AnthropicClientConfig(BaseModel):
         default=True,
         description="Enable tool calling functionality"
     )
-    max_tool_iterations: int = Field(
-        default=10,
-        ge=1,
-        le=50,
-        description="Maximum number of tool call iterations"
-    )
     tool_timeout: int = Field(
         default=30,
         ge=1,

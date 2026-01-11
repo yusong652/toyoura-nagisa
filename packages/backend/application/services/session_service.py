@@ -16,7 +16,6 @@ from backend.infrastructure.storage.session_manager import (
 )
 from backend.domain.models.message_factory import message_factory
 from backend.domain.utils import filter_message_content
-from backend.config import get_llm_settings
 
 
 class SessionService:
@@ -148,17 +147,9 @@ class SessionService:
             for msg in history
         ]
         
-        # Get recent messages for context
-        recent_messages_length = get_llm_settings().recent_messages_length
-        recent_messages = (
-            history_msgs[-recent_messages_length:]
-            if len(history_msgs) > recent_messages_length
-            else history_msgs
-        )
-
         # Filter system tags from message content for clean display
         filtered_recent = []
-        for msg in recent_messages:
+        for msg in history_msgs:
             msg_dict = msg.model_dump() | {"role": msg.role}  # type: ignore
             msg_dict["content"] = filter_message_content(msg_dict.get("content", ""))
             filtered_recent.append(msg_dict)
