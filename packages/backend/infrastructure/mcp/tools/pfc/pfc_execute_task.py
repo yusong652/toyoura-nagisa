@@ -229,8 +229,6 @@ def register_pfc_task_tool(mcp: FastMCP):
 
             # ===== Handle Move-to-Background Request (ctrl+b or timeout) =====
             if isinstance(wait_result, PfcMoveToBackgroundRequest):
-                reason_msg = "User pressed ctrl+b" if wait_result.reason == "user_request" else "Timeout reached"
-
                 # Send backgrounded notification and start polling
                 if notification_service:
                     await notification_service.notify_foreground_backgrounded(
@@ -245,29 +243,26 @@ def register_pfc_task_tool(mcp: FastMCP):
                     # Start background polling (same as run_in_background=True)
                     await notification_service.start_polling(session_id)
 
-                task_data = TaskStatusData(
-                    task_id=task_id,
-                    status="running (backgrounded)",
-                    description=description,
-                    entry_script=script_path,
-                    git_commit=git_commit,
-                )
-
-                formatted = format_task_status_for_llm(
-                    data=task_data,
-                    offset=0,
-                    limit=DEFAULT_OUTPUT_LINES,
-                )
+                # Build LLM content based on reason (similar to bash tool)
+                if wait_result.reason == "user_request":
+                    llm_text = (
+                        f"Task was manually backgrounded by user with ID: {task_id}. "
+                        f"Use pfc_check_task_status('{task_id}') to check output."
+                    )
+                else:
+                    llm_text = (
+                        f"Task timed out and continues in background with ID: {task_id}. "
+                        f"Use pfc_check_task_status('{task_id}') to check output."
+                    )
 
                 return success_response(
-                    message=f"{reason_msg}. Task continues in background. Use pfc_check_task_status('{task_id}') to monitor.",
-                    llm_content={"parts": [{"type": "text", "text": formatted.text}]},
+                    message=llm_text,
+                    llm_content={"parts": [{"type": "text", "text": llm_text}]},
                     entry_script=script_path,
                     task_id=task_id,
                     git_commit=git_commit,
                     backgrounded=True,
                     background_reason=wait_result.reason,
-                    pagination=formatted.pagination,
                 )
 
             # ===== Handle Normal Completion =====
