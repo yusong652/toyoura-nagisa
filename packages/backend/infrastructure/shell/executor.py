@@ -494,21 +494,15 @@ class ShellExecutor:
         process_env = prepare_shell_env(base_env=env, force_unbuffered=True)
 
         try:
-            # Build Popen kwargs with process group support on Unix
-            popen_kwargs: dict = {
-                "shell": True,
-                "cwd": cwd,
-                "stdin": subprocess.DEVNULL,
-                "stdout": subprocess.PIPE,
-                "stderr": subprocess.PIPE,
-                "env": process_env,
-            }
-
-            # Enable process group for proper cleanup on Unix systems
-            if sys.platform != "win32":
-                popen_kwargs["start_new_session"] = True
-
-            process = subprocess.Popen(prepared_command, **popen_kwargs)
+            # Use unified _create_process() for consistent text mode handling.
+            # This ensures compatibility with BackgroundProcessManager.adopt_process()
+            # when user presses Ctrl+B to move foreground process to background.
+            process = self._create_process(
+                command=prepared_command,
+                cwd=cwd,
+                env=process_env,
+                line_buffered=False,  # Foreground uses default buffering
+            )
 
             return ForegroundExecutionHandle(
                 process=process,
