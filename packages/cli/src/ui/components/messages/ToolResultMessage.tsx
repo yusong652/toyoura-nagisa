@@ -25,6 +25,10 @@ const STATUS_INDICATOR_WIDTH = 2;  // Match "● " prefix width
 const MAX_DIFF_HEIGHT = 15;
 const MAX_DIFF_HEIGHT_FULL = Infinity;
 
+// Tools that output file paths - use plain text to avoid markdown rendering issues
+// (e.g., file_name.py being rendered as italic due to underscores)
+const PLAIN_TEXT_TOOLS = new Set(['glob', 'grep', 'bash', 'bash_output', 'kill_shell']);
+
 interface ToolResultMessageProps {
   item: ToolResultHistoryItem;
   terminalWidth?: number;
@@ -116,6 +120,9 @@ const DefaultToolResultDisplay: React.FC<{
   const isError = item.isError === true;
   const textColor = isError ? theme.status.error : undefined;
 
+  // Use plain text for file system tools to preserve path accuracy
+  const usePlainText = isError || PLAIN_TEXT_TOOLS.has(item.toolName?.toLowerCase() || '');
+
   return (
     <Box
       flexDirection="column"
@@ -123,9 +130,9 @@ const DefaultToolResultDisplay: React.FC<{
       width={boxWidth}
       marginBottom={1}
     >
-      {/* Content - red for errors, markdown for success */}
+      {/* Content - plain text for errors and file tools, markdown for others */}
       <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
-        {isError ? (
+        {usePlainText ? (
           <Text color={textColor}>{text}</Text>
         ) : (
           <MarkdownText>{text}</MarkdownText>
