@@ -27,7 +27,10 @@ const MAX_DIFF_HEIGHT_FULL = Infinity;
 
 // Tools that output file paths - use plain text to avoid markdown rendering issues
 // (e.g., file_name.py being rendered as italic due to underscores)
-const PLAIN_TEXT_TOOLS = new Set(['glob', 'grep', 'bash', 'bash_output', 'kill_shell']);
+const PLAIN_TEXT_TOOLS = new Set([
+  'glob', 'grep', 'bash', 'bash_output', 'kill_shell',
+  'pfc_execute_task', 'pfc_check_task_status', 'pfc_list_tasks',
+]);
 
 interface ToolResultMessageProps {
   item: ToolResultHistoryItem;
