@@ -262,6 +262,24 @@ export class ConnectionManager extends WebSocketManager {
         });
         break;
 
+      case 'USER_PFC_CONSOLE_RESULT':
+        this.emit('user_pfc_console_result', {
+          task_id: message.task_id,
+          script_name: message.script_name,
+          script_path: message.script_path,
+          code_preview: message.code_preview,
+          output: message.output,
+          error: message.error,
+          result: message.result,
+          elapsed_time: message.elapsed_time,
+          context: message.context,
+          connected: message.connected,
+          success: message.success,
+          error_message: message.error_message,
+          backgrounded: message.backgrounded
+        });
+        break;
+
       default:
         // Emit generic message for unhandled types
         this.emit('unhandled_message', message);

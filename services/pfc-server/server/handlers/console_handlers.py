@@ -26,6 +26,10 @@ async def handle_user_console(ctx, data):
             - workspace_path: Absolute path to workspace
             - code: Python code to execute
             - timeout_ms: Timeout in milliseconds (default: 30000)
+            - run_in_background: Whether to run async (default: False)
+                False: Synchronous execution, waits for completion
+                True: Async execution, returns immediately with task_id
+                      Supports ctrl+b backgrounding and polling
             - task_id: Required backend-generated task ID (6-char hex)
 
     Returns:
@@ -48,6 +52,7 @@ async def handle_user_console(ctx, data):
 
     session_id = data.get("session_id", "default")
     timeout_ms = data.get("timeout_ms", 30000)
+    run_in_background = data.get("run_in_background", False)
 
     try:
         # Get or create UserConsoleManager for this workspace
@@ -60,13 +65,15 @@ async def handle_user_console(ctx, data):
             description=code_preview
         )
 
-        # Execute using script runner (synchronous for quick commands)
+        # Execute using script runner
+        # run_in_background=False (default): synchronous for quick commands
+        # run_in_background=True: async with polling, supports ctrl+b
         result = await ctx.script_runner.run(
             session_id=session_id,
             script_path=script_path,
             description=code_preview,
             timeout_ms=timeout_ms,
-            run_in_background=False,
+            run_in_background=run_in_background,
             source="user_console",
             enable_git_snapshot=False,
             task_id=task_id

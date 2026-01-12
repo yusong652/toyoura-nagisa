@@ -3,22 +3,36 @@
 Application layer service coordinating PFC task execution:
 - Foreground-to-background conversion (ctrl+b)
 - Task state queries
+- Foreground execution lifecycle management
 - Integration with pfc-server
 
-Bridges presentation layer (WebSocket handlers) and infrastructure layer
-(PfcForegroundTaskRegistry, PfcTaskManager).
+Bridges presentation layer (WebSocket handlers, MCP tools) and infrastructure layer
+(PfcForegroundTaskRegistry, PfcTaskManager, PfcTaskNotificationService).
+
+Used by both:
+- pfc_execute_task tool (agent tasks)
+- UserPfcConsoleHandler (user console commands)
 """
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from backend.infrastructure.pfc.foreground_registry import (
     get_pfc_foreground_registry,
     PfcForegroundTaskRegistry,
 )
+from backend.infrastructure.pfc.foreground_handle import (
+    PfcForegroundExecutionHandle,
+    PfcForegroundExecutionResult,
+)
 from backend.infrastructure.pfc.task_manager import (
     get_pfc_task_manager,
     PfcTaskManager,
 )
+
+if TYPE_CHECKING:
+    from backend.application.services.notifications.pfc_task_notification_service import (
+        PfcTaskNotificationService,
+    )
 
 
 class PfcExecutionService:

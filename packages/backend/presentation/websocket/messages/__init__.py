@@ -72,6 +72,12 @@ from backend.presentation.websocket.messages.user_shell import (
     UserShellResultMessage,
 )
 
+# User PFC console commands
+from backend.presentation.websocket.messages.user_pfc_console import (
+    UserPfcConsoleExecuteMessage,
+    UserPfcConsoleResultMessage,
+)
+
 # Factory functions and schemas (optional - can be imported from .factory directly)
 from backend.presentation.websocket.messages.factory import (
     INCOMING_MESSAGE_SCHEMAS,
@@ -117,6 +123,9 @@ __all__ = [
     # User shell commands
     "UserShellExecuteMessage",
     "UserShellResultMessage",
+    # User PFC console commands
+    "UserPfcConsoleExecuteMessage",
+    "UserPfcConsoleResultMessage",
     # Factory functions and schemas
     "INCOMING_MESSAGE_SCHEMAS",
     "OUTGOING_MESSAGE_SCHEMAS",

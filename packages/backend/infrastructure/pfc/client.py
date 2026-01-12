@@ -821,6 +821,7 @@ class PFCWebSocketClient:
         task_id: str,
         session_id: str = "default",
         timeout_ms: int = 30000,
+        run_in_background: bool = False,
         max_retries: int = 2
     ) -> Dict[str, Any]:
         """
@@ -832,6 +833,10 @@ class PFCWebSocketClient:
             task_id: Backend-generated task ID (6-char hex)
             session_id: Session identifier for task isolation (default: "default")
             timeout_ms: Execution timeout in milliseconds (default: 30000 = 30s)
+            run_in_background: Whether to run async (default: False)
+                False: Synchronous execution, waits for completion (original behavior)
+                True: Async execution, returns immediately with task_id.
+                      Supports ctrl+b backgrounding and polling via NotificationService.
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
@@ -841,8 +846,8 @@ class PFCWebSocketClient:
             ConnectionError: If connection to PFC server fails after retries
             TimeoutError: If execution times out
         """
-        # Calculate WebSocket timeout (execution timeout + buffer)
-        websocket_timeout_ms = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background=False)
+        # Calculate WebSocket timeout based on execution mode
+        websocket_timeout_ms = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background)
 
         for attempt in range(max_retries):
             try:
@@ -854,7 +859,8 @@ class PFCWebSocketClient:
                         "session_id": session_id,
                         "workspace_path": workspace_path,
                         "code": code,
-                        "timeout_ms": timeout_ms
+                        "timeout_ms": timeout_ms,
+                        "run_in_background": run_in_background
                     },
                     timeout=websocket_timeout_ms / 1000.0,
                     operation_name="User console execution"

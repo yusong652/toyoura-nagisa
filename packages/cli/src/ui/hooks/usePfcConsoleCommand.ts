@@ -2,20 +2,16 @@
  * usePfcConsoleCommand Hook
  *
  * Provides PFC Python command execution for > prefix user commands.
- * Calls the backend REST API endpoint /api/pfc/console/execute.
+ * Uses WebSocket communication for real-time execution with Ctrl+B support.
+ *
+ * Aligned with useShellCommand pattern for consistency.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { apiClient } from '@toyoura-nagisa/core';
+import { useConnectionManager } from '../contexts/ConnectionContext.js';
 
-export interface PfcConsoleExecuteRequest {
-  code: string;
-  session_id: string;
-  agent_profile: string;
-  timeout_ms?: number;
-}
-
-/** Response data from PFC execution (unwrapped from ApiResponse) */
+/** Response data from PFC execution */
 export interface PfcConsoleExecuteData {
   task_id: string | null;
   script_name: string | null;
@@ -27,11 +23,29 @@ export interface PfcConsoleExecuteData {
   elapsed_time: number | null;
   context: string;
   connected: boolean;
+  backgrounded?: boolean;
 }
 
 /** Response data from connection status (unwrapped from ApiResponse) */
 export interface PfcConsoleStatusData {
   connected: boolean;
+}
+
+/** WebSocket result event data */
+interface PfcConsoleResultEvent {
+  task_id: string | null;
+  script_name: string | null;
+  script_path: string | null;
+  code_preview: string | null;
+  output: string | null;
+  error: string | null;
+  result: unknown;
+  elapsed_time: number | null;
+  context: string;
+  connected: boolean;
+  success: boolean;
+  error_message?: string;
+  backgrounded?: boolean;
 }
 
 export interface UsePfcConsoleCommandReturn {
@@ -51,9 +65,16 @@ export function usePfcConsoleCommand(
   sessionId: string | null,
   agentProfile: string = 'pfc_expert'
 ): UsePfcConsoleCommandReturn {
+  const connectionManager = useConnectionManager();
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+
+  // Store pending resolve/reject for the current execution
+  const pendingRef = useRef<{
+    resolve: (data: PfcConsoleExecuteData | null) => void;
+    reject: (error: Error) => void;
+  } | null>(null);
 
   // Check connection on mount and when session/profile changes
   const checkConnection = useCallback(async (): Promise<boolean> => {
@@ -75,6 +96,44 @@ export function usePfcConsoleCommand(
     checkConnection();
   }, [sessionId, checkConnection]);
 
+  // Handle WebSocket result
+  useEffect(() => {
+    const handleResult = (event: PfcConsoleResultEvent) => {
+      // Update connection status from response
+      setIsConnected(event.connected);
+
+      // Resolve pending promise
+      if (pendingRef.current) {
+        if (event.success) {
+          pendingRef.current.resolve({
+            task_id: event.task_id,
+            script_name: event.script_name,
+            script_path: event.script_path,
+            code_preview: event.code_preview,
+            output: event.output,
+            error: event.error,
+            result: event.result,
+            elapsed_time: event.elapsed_time,
+            context: event.context,
+            connected: event.connected,
+            backgrounded: event.backgrounded,
+          });
+        } else {
+          setError(event.error_message || event.error || 'PFC command failed');
+          pendingRef.current.resolve(null);
+        }
+        pendingRef.current = null;
+        setIsExecuting(false);
+      }
+    };
+
+    connectionManager.on('user_pfc_console_result', handleResult);
+
+    return () => {
+      connectionManager.off('user_pfc_console_result', handleResult);
+    };
+  }, [connectionManager]);
+
   const executeCode = useCallback(
     async (code: string): Promise<PfcConsoleExecuteData | null> => {
       if (!sessionId) {
@@ -85,31 +144,20 @@ export function usePfcConsoleCommand(
       setError(null);
       setIsExecuting(true);
 
-      try {
-        const response = await apiClient.post<PfcConsoleExecuteData>(
-          '/api/pfc/console/execute',
-          {
-            code,
-            session_id: sessionId,
-            agent_profile: agentProfile,
-          } as PfcConsoleExecuteRequest
-        );
+      return new Promise((resolve, reject) => {
+        // Store resolve/reject for when we receive the result
+        pendingRef.current = { resolve, reject };
 
-        // Update connection status from response
-        setIsConnected(response.connected);
-
-        return response;
-      } catch (err: unknown) {
-        // Extract error message
-        const errorMessage = err instanceof Error ? err.message : 'PFC command failed';
-        setError(errorMessage);
-        setIsConnected(false);
-        return null;
-      } finally {
-        setIsExecuting(false);
-      }
+        // Send command via WebSocket
+        connectionManager.send({
+          type: 'USER_PFC_CONSOLE_EXECUTE',
+          session_id: sessionId,
+          code,
+          agent_profile: agentProfile,
+        });
+      });
     },
-    [sessionId, agentProfile]
+    [sessionId, agentProfile, connectionManager]
   );
 
   return {

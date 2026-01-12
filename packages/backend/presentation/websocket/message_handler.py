@@ -26,8 +26,14 @@ from backend.presentation.websocket.message_types import (
     MessageType, BaseWebSocketMessage, parse_incoming_websocket_message, create_message
 )
 from backend.presentation.websocket.messages.user_shell import UserShellResultMessage
+from backend.presentation.websocket.messages.user_pfc_console import UserPfcConsoleResultMessage
 from backend.application.services.shell import get_bash_execution_service
 from backend.application.services.pfc import get_pfc_execution_service
+from backend.application.services.pfc.pfc_console_service import (
+    get_pfc_console_service,
+    PfcConsoleExecutionResult,
+    PfcConsoleMoveToBackgroundRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +69,9 @@ class WebSocketMessageProcessor:
         # Initialize user shell handler (! prefix commands)
         user_shell_handler = UserShellHandler(connection_manager)
 
+        # Initialize user PFC console handler (> prefix commands)
+        user_pfc_console_handler = UserPfcConsoleHandler(connection_manager)
+
         self.handlers: Dict[MessageType, MessageHandler] = {
             MessageType.HEARTBEAT_ACK: heartbeat_handler,
             MessageType.LOCATION_RESPONSE: location_handler,  # Only handle responses from frontend
@@ -71,6 +80,7 @@ class WebSocketMessageProcessor:
             MessageType.USER_INTERRUPT: user_interrupt_handler,
             MessageType.MOVE_TO_BACKGROUND: move_to_background_handler,
             MessageType.USER_SHELL_EXECUTE: user_shell_handler,
+            MessageType.USER_PFC_CONSOLE_EXECUTE: user_pfc_console_handler,
         }
         
         # Store location handler for external tool access
@@ -679,6 +689,215 @@ class UserShellHandler(MessageHandler):
             context="",
             success=False,
             error_message=error,
+        )
+        await self.connection_manager.send_json(session_id, result_msg.model_dump())
+
+
+class UserPfcConsoleHandler(MessageHandler):
+    """
+    Handle user PFC console command execution requests (> prefix commands).
+
+    Purpose: Execute PFC Python commands initiated by user via CLI `>` prefix.
+    Uses foreground execution with Ctrl+B backgrounding support, aligned with
+    pfc_execute_task tool flow.
+
+    Flow:
+    1. Frontend sends USER_PFC_CONSOLE_EXECUTE with code
+    2. Backend starts foreground execution via PfcConsoleService
+    3. Handler returns immediately, wait runs in background task
+    4. If Ctrl+B: move to background, notify frontend
+    5. If completed: send USER_PFC_CONSOLE_RESULT with output
+
+    Architecture:
+    - Uses asyncio.create_task() to avoid blocking the WebSocket message loop
+    - Reuses same ForegroundHandle/Registry/NotificationService as pfc_execute_task
+    - Ctrl+B handled by MoveToBackgroundHandler via get_pfc_execution_service
+    """
+
+    # Track waiting tasks per session for cleanup on disconnect
+    _waiting_tasks: dict = {}  # session_id -> asyncio.Task
+
+    async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
+        if message.type != MessageType.USER_PFC_CONSOLE_EXECUTE:
+            return
+
+        code = getattr(message, 'code', '')
+        agent_profile = getattr(message, 'agent_profile', 'pfc_expert')
+        timeout_ms = getattr(message, 'timeout_ms', None)
+
+        logger.info(f"[UserPfcConsoleHandler] Executing code for session {session_id}: {code[:50]}...")
+
+        # Skip empty code
+        if not code.strip():
+            await self._send_empty_result(session_id)
+            return
+
+        try:
+            # Get workspace for profile
+            from backend.shared.utils.workspace import get_workspace_for_profile
+            workspace_path = await get_workspace_for_profile(agent_profile, session_id)
+
+            # Get console service
+            service = get_pfc_console_service(workspace_path, session_id)
+
+            # Run execution in background task to avoid blocking message loop
+            # This allows MOVE_TO_BACKGROUND messages to be processed while waiting
+            task = asyncio.create_task(
+                self._execute_and_send_result(
+                    session_id=session_id,
+                    service=service,
+                    code=code,
+                    timeout_ms=timeout_ms,
+                )
+            )
+            self._waiting_tasks[session_id] = task
+
+            logger.info(f"[UserPfcConsoleHandler] Code execution scheduled in background task")
+
+        except Exception as e:
+            logger.error(f"[UserPfcConsoleHandler] Error starting execution: {e}")
+            await self._send_error(session_id, str(e))
+
+    async def _execute_and_send_result(
+        self,
+        session_id: str,
+        service,
+        code: str,
+        timeout_ms: Optional[int],
+    ) -> None:
+        """Background task: execute PFC code and send result.
+
+        This runs in a separate task to avoid blocking the WebSocket message loop,
+        allowing Ctrl+B (MOVE_TO_BACKGROUND) messages to be processed during execution.
+        """
+        try:
+            # Execute with foreground support (asyncio.wait inside)
+            wait_result, task_id, error = await service.execute_foreground(
+                code=code,
+                timeout_ms=timeout_ms,
+            )
+
+            # Early error (connection failed, etc.)
+            if error:
+                await self._send_error(session_id, error, task_id=task_id)
+                return
+
+            # Empty code (shouldn't happen, checked above)
+            if wait_result is None:
+                await self._send_empty_result(session_id)
+                return
+
+            # Handle Ctrl+B: user wants to background the execution
+            if isinstance(wait_result, PfcConsoleMoveToBackgroundRequest):
+                context = await service.process_backgrounded(code, task_id, wait_result)
+
+                # Store context for LLM injection
+                from backend.infrastructure.monitoring.status_monitor import get_status_monitor
+                status_monitor = get_status_monitor(session_id)
+                status_monitor.add_user_pfc_python_context(
+                    code=code,
+                    task_id=task_id,
+                    output=f"Execution backgrounded. Task ID: {task_id}",
+                    error="",
+                )
+
+                if wait_result.reason == "user_request":
+                    output = f"Code execution backgrounded by user. Task ID: {task_id}"
+                else:
+                    output = f"Code execution timed out, continuing in background. Task ID: {task_id}"
+
+                result_msg = UserPfcConsoleResultMessage(
+                    type=MessageType.USER_PFC_CONSOLE_RESULT,
+                    session_id=session_id,
+                    task_id=task_id,
+                    output=output,
+                    context=context,
+                    success=True,
+                    backgrounded=True,
+                    connected=True,
+                )
+                await self.connection_manager.send_json(session_id, result_msg.model_dump())
+
+                logger.info(f"[UserPfcConsoleHandler] Execution moved to background: {task_id}")
+                return
+
+            # Normal completion
+            exec_result: PfcConsoleExecutionResult = wait_result
+            context = service.process_completion(code, exec_result)
+
+            # Store context for LLM injection
+            from backend.infrastructure.monitoring.status_monitor import get_status_monitor
+            status_monitor = get_status_monitor(session_id)
+            status_monitor.add_user_pfc_python_context(
+                code=code,
+                task_id=exec_result.task_id,
+                output=exec_result.output,
+                error=exec_result.error or "",
+            )
+
+            result_msg = UserPfcConsoleResultMessage(
+                type=MessageType.USER_PFC_CONSOLE_RESULT,
+                session_id=session_id,
+                task_id=exec_result.task_id,
+                output=exec_result.output,
+                error=exec_result.error,
+                result=exec_result.result,
+                elapsed_time=exec_result.elapsed_time,
+                context=context,
+                success=(exec_result.status == "completed"),
+                connected=True,
+            )
+            await self.connection_manager.send_json(session_id, result_msg.model_dump())
+
+            logger.info(f"[UserPfcConsoleHandler] Execution completed: {exec_result.status}")
+
+        except asyncio.CancelledError:
+            logger.info(f"[UserPfcConsoleHandler] Background task cancelled for session {session_id}")
+            raise
+        except Exception as e:
+            logger.error(f"[UserPfcConsoleHandler] Error in background execution: {e}")
+            await self._send_error(session_id, str(e))
+        finally:
+            # Remove from tracking
+            if session_id in self._waiting_tasks:
+                del self._waiting_tasks[session_id]
+
+    def cleanup_session(self, session_id: str) -> None:
+        """Clean up background tasks for a session.
+
+        Called when WebSocket disconnects to cancel any pending PFC tasks.
+        """
+        if session_id in self._waiting_tasks:
+            task = self._waiting_tasks[session_id]
+            if not task.done():
+                task.cancel()
+                logger.info(f"[UserPfcConsoleHandler] Cancelled waiting task for session {session_id}")
+            del self._waiting_tasks[session_id]
+
+    async def _send_empty_result(self, session_id: str):
+        """Send empty result for empty code."""
+        result_msg = UserPfcConsoleResultMessage(
+            type=MessageType.USER_PFC_CONSOLE_RESULT,
+            session_id=session_id,
+            output="",
+            context="",
+            success=True,
+            connected=True,
+        )
+        await self.connection_manager.send_json(session_id, result_msg.model_dump())
+
+    async def _send_error(self, session_id: str, error: str, task_id: Optional[str] = None):
+        """Send error result to frontend."""
+        result_msg = UserPfcConsoleResultMessage(
+            type=MessageType.USER_PFC_CONSOLE_RESULT,
+            session_id=session_id,
+            task_id=task_id,
+            output="",
+            error=error,
+            context="",
+            success=False,
+            error_message=error,
+            connected=False,
         )
         await self.connection_manager.send_json(session_id, result_msg.model_dump())
 

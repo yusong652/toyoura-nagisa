@@ -45,6 +45,10 @@ from backend.presentation.websocket.messages.user_shell import (
     UserShellExecuteMessage,
     UserShellResultMessage,
 )
+from backend.presentation.websocket.messages.user_pfc_console import (
+    UserPfcConsoleExecuteMessage,
+    UserPfcConsoleResultMessage,
+)
 
 
 # Incoming message schemas (messages that frontend sends to backend)
@@ -56,6 +60,7 @@ INCOMING_MESSAGE_SCHEMAS = {
     MessageType.USER_INTERRUPT: UserInterruptMessage,
     MessageType.MOVE_TO_BACKGROUND: MoveToBackgroundMessage,
     MessageType.USER_SHELL_EXECUTE: UserShellExecuteMessage,
+    MessageType.USER_PFC_CONSOLE_EXECUTE: UserPfcConsoleExecuteMessage,
 }
 
 # Outgoing message schemas (backend creates these messages to send to frontend)
@@ -84,6 +89,8 @@ OUTGOING_MESSAGE_SCHEMAS = {
     MessageType.PFC_TASK_UPDATE: PfcTaskNotification,
     # User shell commands
     MessageType.USER_SHELL_RESULT: UserShellResultMessage,
+    # User PFC console commands
+    MessageType.USER_PFC_CONSOLE_RESULT: UserPfcConsoleResultMessage,
 }
 
 
