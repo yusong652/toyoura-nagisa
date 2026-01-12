@@ -18,7 +18,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
-import { Box, Static } from 'ink';
+import { Box, Static, Text } from 'ink';
 import { useAppState, useAppActions } from '../contexts/AppStateContext.js';
 import { HistoryItemDisplay } from '../components/messages/HistoryItemDisplay.js';
 import { PendingItemDisplay } from '../components/messages/PendingItemDisplay.js';
@@ -39,7 +39,7 @@ import { useShellCommand } from '../hooks/useShellCommand.js';
 import { usePfcConsoleCommand } from '../hooks/usePfcConsoleCommand.js';
 import { useTextBuffer } from '../utils/text-buffer.js';
 import { MessageType, type AgentProfileType } from '../types.js';
-import { theme, themeManager } from '../colors.js';
+import { colors, theme, themeManager } from '../colors.js';
 import { themes, type ThemeName } from '../themes/index.js';
 import { apiClient } from '@toyoura-nagisa/core';
 
@@ -570,6 +570,8 @@ export const MainLayout: React.FC = () => {
         stderr: result.stderr || '',
         exitCode: result.exit_code,
         isError: result.exit_code !== 0,
+        backgrounded: result.backgrounded,
+        processId: result.process_id,
       });
     } else {
       appActions.addHistoryItem({
@@ -670,9 +672,16 @@ export const MainLayout: React.FC = () => {
             thinkingContent={appState.streamingState.thinkingContent}
           />
         )}
+        {/* Shell executing indicator */}
+        {isShellExecuting && (
+          <Box flexDirection="row" marginBottom={1}>
+            <Text color={colors.primary}>{'  ⎿  '}</Text>
+            <Text color={theme.text.muted} dimColor>Running... (Ctrl+B to background)</Text>
+          </Box>
+        )}
       </Box>
     ),
-    [appState.pendingHistoryItems, appState.isStreaming, appState.streamingState.thinkingContent],
+    [appState.pendingHistoryItems, appState.isStreaming, appState.streamingState.thinkingContent, isShellExecuting],
   );
 
   // Always render Static to prevent unmount/remount issues
@@ -869,7 +878,7 @@ export const MainLayout: React.FC = () => {
         )}
 
             {/* Status bar - below input */}
-            <Header isShellMode={isShellMode} isPfcConsoleMode={isPfcConsoleMode} cwd={shellCwd} />
+            <Header isShellMode={isShellMode} isShellExecuting={isShellExecuting} isPfcConsoleMode={isPfcConsoleMode} cwd={shellCwd} />
           </Box>
         </>
       )}

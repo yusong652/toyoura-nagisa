@@ -124,6 +124,8 @@ export interface ShellResultHistoryItem extends HistoryItemBase {
   stderr: string;
   exitCode: number;
   isError: boolean;
+  backgrounded?: boolean;
+  processId?: string;
 }
 
 export interface PfcConsoleCommandHistoryItem extends HistoryItemBase {
@@ -215,6 +217,8 @@ export interface ShellResultHistoryItemWithoutId {
   stderr: string;
   exitCode: number;
   isError: boolean;
+  backgrounded?: boolean;
+  processId?: string;
   timestamp?: number;
 }
 

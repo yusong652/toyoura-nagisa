@@ -16,6 +16,8 @@ export interface ShellExecuteData {
   exit_code: number;
   cwd: string;
   context: string;
+  backgrounded?: boolean;
+  process_id?: string;
 }
 
 /** Response data from cwd query (unwrapped from ApiResponse) */
@@ -99,6 +101,8 @@ export function useShellCommand(
             exit_code: event.exit_code,
             cwd: event.cwd,
             context: event.context,
+            backgrounded: event.backgrounded,
+            process_id: event.process_id,
           });
         } else {
           setError(event.error_message || 'Shell command failed');
