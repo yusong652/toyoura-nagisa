@@ -108,6 +108,9 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   // User shell execution state (for Ctrl+B backgrounding)
   const [isShellExecuting, setShellExecuting] = useState(false);
 
+  // User PFC console execution state (for Ctrl+B backgrounding)
+  const [isPfcExecuting, setPfcExecuting] = useState(false);
+
   // ========== Hooks ==========
 
   // Connection state management
@@ -372,10 +375,10 @@ export const AppContainer: React.FC<AppContainerProps> = ({
       // Note: pendingConfirmation ESC is handled by ToolConfirmationPrompt component
     }
 
-    // Ctrl+B: move foreground bash to background
-    // Supports both agent bash (during isStreaming) and user shell (! prefix commands)
+    // Ctrl+B: move foreground bash/pfc to background
+    // Supports agent bash (during isStreaming), user shell (! prefix), and user PFC console (> prefix)
     if (key.ctrl && key.name === 'b') {
-      if ((isStreaming || isShellExecuting) && currentSessionId) {
+      if ((isStreaming || isShellExecuting || isPfcExecuting) && currentSessionId) {
         // Send move-to-background signal to backend
         connectionManager.send({
           type: 'MOVE_TO_BACKGROUND',
@@ -389,7 +392,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     if (key.ctrl && key.name === 'o' && !isFullContextMode) {
       toggleFullContextMode();
     }
-  }, [quit, isStreaming, isShellExecuting, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager, toggleFullContextMode, isFullContextMode, currentSessionId, connectionManager]);
+  }, [quit, isStreaming, isShellExecuting, isPfcExecuting, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager, toggleFullContextMode, isFullContextMode, currentSessionId, connectionManager]);
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 
@@ -420,6 +423,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     },
     isStreaming,
     isShellExecuting,
+    isPfcExecuting,
     pendingConfirmation,
     isQuitting,
     isInputActive: connectionStatus === 'connected' && !isQuitting,
@@ -444,6 +448,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     thinkingContent,
     isStreaming,
     isShellExecuting,
+    isPfcExecuting,
     pendingConfirmation,
     isQuitting,
     tokenUsage,
@@ -471,6 +476,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     clearScreen,
     toggleFullContextMode,
     setShellExecuting,
+    setPfcExecuting,
     clearError,
   }), [
     historyManager.addItem,
@@ -488,6 +494,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     clearScreen,
     toggleFullContextMode,
     setShellExecuting,
+    setPfcExecuting,
     clearError,
   ]);
 

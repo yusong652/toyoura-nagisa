@@ -51,6 +51,9 @@ export interface AppState {
   // User shell execution (for Ctrl+B backgrounding)
   isShellExecuting: boolean;
 
+  // User PFC console execution (for Ctrl+B backgrounding)
+  isPfcExecuting: boolean;
+
   // Tool confirmation
   pendingConfirmation: ToolConfirmationData | null;
 
@@ -107,6 +110,9 @@ export interface AppActions {
   // Shell execution state (for Ctrl+B)
   setShellExecuting: (executing: boolean) => void;
 
+  // PFC console execution state (for Ctrl+B)
+  setPfcExecuting: (executing: boolean) => void;
+
   // Error
   clearError: () => void;
 }
@@ -127,6 +133,7 @@ const defaultState: AppState = {
   },
   isStreaming: false,
   isShellExecuting: false,
+  isPfcExecuting: false,
   pendingConfirmation: null,
   isQuitting: false,
   isInputActive: true,
@@ -154,6 +161,7 @@ const defaultActions: AppActions = {
   clearScreen: () => {},
   toggleFullContextMode: () => {},
   setShellExecuting: () => {},
+  setPfcExecuting: () => {},
   clearError: () => {},
 };
 

@@ -268,11 +268,35 @@ class PfcConsoleService:
         task_id: str,
         bg_request: PfcConsoleMoveToBackgroundRequest,
     ) -> str:
-        """Process Ctrl+B backgrounding, return LLM context."""
+        """Process Ctrl+B backgrounding, send notification, return LLM context."""
         if bg_request.reason == "user_request":
             output = f"Code execution backgrounded by user. Task ID: {task_id}"
         else:
             output = f"Code execution timed out, continuing in background. Task ID: {task_id}"
+
+        # Send PFC task notification to frontend for monitoring
+        # User console tasks are just PFC tasks with source="user_console"
+        from backend.application.services.notifications.pfc_task_notification_service import (
+            get_pfc_task_notification_service,
+        )
+        notification_service = get_pfc_task_notification_service()
+
+        # Get script path from task manager
+        task_info = self._task_manager.get_task(task_id)
+        script_path = task_info.script_path if task_info else "user_console"
+        description = code[:50] + "..." if len(code) > 50 else code
+
+        # Send backgrounded notification and start polling
+        await notification_service.notify_foreground_backgrounded(
+            session_id=self.session_id,
+            task_id=task_id,
+            script_path=script_path,
+            reason=bg_request.reason,
+            elapsed_seconds=0.0,
+            description=description,
+            source="user_console",
+        )
+        await notification_service.start_polling(self.session_id)
 
         return format_pfc_console_with_caveat(
             code=code,

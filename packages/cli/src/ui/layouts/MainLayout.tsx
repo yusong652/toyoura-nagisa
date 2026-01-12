@@ -132,6 +132,11 @@ export const MainLayout: React.FC = () => {
     appActions.setShellExecuting(isShellExecuting);
   }, [isShellExecuting, appActions]);
 
+  // Sync PFC console execution state to AppState for Ctrl+B handling
+  useEffect(() => {
+    appActions.setPfcExecuting(isPfcExecuting);
+  }, [isPfcExecuting, appActions]);
+
   // Shell mode state (for UI indicator)
   const [isShellMode, setIsShellMode] = useState(false);
 
@@ -679,9 +684,16 @@ export const MainLayout: React.FC = () => {
             <Text color={theme.text.muted} dimColor>Running... (Ctrl+B to background)</Text>
           </Box>
         )}
+        {/* PFC console executing indicator */}
+        {isPfcExecuting && (
+          <Box flexDirection="row" marginBottom={1}>
+            <Text color={colors.primary}>{'  ⎿  '}</Text>
+            <Text color={theme.text.muted} dimColor>PFC executing... (Ctrl+B to background)</Text>
+          </Box>
+        )}
       </Box>
     ),
-    [appState.pendingHistoryItems, appState.isStreaming, appState.streamingState.thinkingContent, isShellExecuting],
+    [appState.pendingHistoryItems, appState.isStreaming, appState.streamingState.thinkingContent, isShellExecuting, isPfcExecuting],
   );
 
   // Always render Static to prevent unmount/remount issues

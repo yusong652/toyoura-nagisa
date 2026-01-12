@@ -497,6 +497,7 @@ class PfcTaskNotificationService:
         elapsed_seconds: float,
         description: Optional[str] = None,
         git_commit: Optional[str] = None,
+        source: str = "agent",
     ) -> None:
         """
         Send notification when foreground task is moved to background (ctrl+b or timeout).
@@ -512,6 +513,7 @@ class PfcTaskNotificationService:
             elapsed_seconds: Task runtime at backgrounding
             description: Optional task description
             git_commit: Optional git commit hash
+            source: Task source ("agent" or "user_console")
         """
         import os
         from backend.infrastructure.pfc import get_pfc_client
@@ -544,7 +546,7 @@ class PfcTaskNotificationService:
             entry_script=script_path,
             description=description or "",
             status="backgrounded",
-            source="agent",
+            source=source,
             git_commit=git_commit,
             elapsed_time=actual_elapsed,
             recent_output=recent_lines,
@@ -554,7 +556,7 @@ class PfcTaskNotificationService:
         )
 
         await self._send_notification(session_id, notification)
-        logger.info(f"Sent backgrounded notification for task {task_id}: reason={reason}")
+        logger.info(f"Sent backgrounded notification for task {task_id}: source={source}, reason={reason}")
 
     # Note: notify_foreground_completed is no longer needed - completion is handled
     # by the unified polling loop via _handle_task_completion()
