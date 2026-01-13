@@ -405,7 +405,8 @@ class BackgroundProcessManager:
         """Adopt a running foreground process into background management.
 
         Called when user presses ctrl+b to move a foreground process to background.
-        The process is already running; we just need to start tracking it.
+        Reuses existing output reading threads and buffers from the foreground
+        handle for seamless handoff without stream ownership conflicts.
 
         Args:
             session_id: Session ID for process isolation
@@ -421,7 +422,7 @@ class BackgroundProcessManager:
             while process_id in self.processes:
                 process_id = self._generate_process_id()
 
-            # Convert to background handle
+            # Convert to background handle (includes threads and buffers)
             bg_handle = handle.to_background_handle()
 
             # Create process tracking object
@@ -436,20 +437,28 @@ class BackgroundProcessManager:
                 working_directory=bg_handle.cwd,
             )
 
-            # Start output reading threads
-            bg_process._stdout_thread = Thread(
-                target=self._read_output_stream,
-                args=(bg_process, bg_handle.process.stdout, False),
-                daemon=True
-            )
-            bg_process._stderr_thread = Thread(
-                target=self._read_output_stream,
-                args=(bg_process, bg_handle.process.stderr, True),
-                daemon=True
-            )
-
-            bg_process._stdout_thread.start()
-            bg_process._stderr_thread.start()
+            # Check if foreground handle has existing threads (Ctrl+B case)
+            if bg_handle.stdout_thread is not None and bg_handle.output_lock is not None:
+                # Reuse existing threads and buffers from foreground
+                bg_process._stdout_thread = bg_handle.stdout_thread
+                bg_process._stderr_thread = bg_handle.stderr_thread
+                bg_process._output_lock = bg_handle.output_lock
+                bg_process.stdout_buffer = bg_handle.stdout_buffer or []
+                bg_process.stderr_buffer = bg_handle.stderr_buffer or []
+            else:
+                # Fallback: start new threads (shouldn't happen with new code)
+                bg_process._stdout_thread = Thread(
+                    target=self._read_output_stream,
+                    args=(bg_process, bg_handle.process.stdout, False),
+                    daemon=True
+                )
+                bg_process._stderr_thread = Thread(
+                    target=self._read_output_stream,
+                    args=(bg_process, bg_handle.process.stderr, True),
+                    daemon=True
+                )
+                bg_process._stdout_thread.start()
+                bg_process._stderr_thread.start()
 
             # Register the process
             self.processes[process_id] = bg_process

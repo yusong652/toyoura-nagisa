@@ -18,7 +18,8 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import Optional, Union, TYPE_CHECKING
+from threading import Thread, Lock
+from typing import Optional, Union, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .executor import ShellExecutor
@@ -29,7 +30,7 @@ from backend.infrastructure.mcp.utils.shell import (
     process_shell_output,
     DEFAULT_MAX_OUTPUT_CHARS,
 )
-from .utils import prepare_shell_env, bounded_communicate, BoundedOutput
+from .utils import prepare_shell_env, read_stream_to_buffer
 
 # Default timeout for foreground execution (30 seconds)
 DEFAULT_TIMEOUT_MS = 30000
@@ -80,12 +81,21 @@ class BackgroundProcessHandle:
 
     Contains all information needed by BackgroundProcessManager
     to track and manage the process lifecycle.
+
+    When created from Ctrl+B (foreground -> background), includes
+    existing buffers and threads for seamless handoff.
     """
     process: subprocess.Popen
     command: str              # Original command
     prepared_command: str     # Command after preparation (path normalization, etc.)
     cwd: str
     start_time: float
+    # Optional: populated when converting from foreground (Ctrl+B)
+    stdout_buffer: Optional[List[str]] = None
+    stderr_buffer: Optional[List[str]] = None
+    stdout_thread: Optional[Thread] = None
+    stderr_thread: Optional[Thread] = None
+    output_lock: Optional[Lock] = None
 
 
 @dataclass
@@ -103,6 +113,8 @@ class ForegroundExecutionHandle:
     """Handle for a foreground process with interruptible wait.
 
     Supports ctrl+b to move the process to background without killing it.
+    Uses thread-based output reading for seamless Ctrl+B handoff.
+
     The wait() method returns either ShellExecutionResult (normal completion)
     or MoveToBackgroundRequest (user requested background conversion).
     """
@@ -115,6 +127,13 @@ class ForegroundExecutionHandle:
     process_env: dict
     max_output_chars: int
     normalize_paths: bool
+    # Thread-based output reading (enables seamless Ctrl+B handoff)
+    _stdout_buffer: List[str] = field(default_factory=list)
+    _stderr_buffer: List[str] = field(default_factory=list)
+    _output_lock: Lock = field(default_factory=Lock)
+    _stdout_thread: Optional[Thread] = None
+    _stderr_thread: Optional[Thread] = None
+    _threads_started: bool = False
     _move_to_bg_event: asyncio.Event = field(default_factory=asyncio.Event)
 
     def request_move_to_background(self) -> None:
@@ -124,20 +143,62 @@ class ForegroundExecutionHandle:
         """
         self._move_to_bg_event.set()
 
+    def _start_output_threads(self) -> None:
+        """Start stdout/stderr reading threads if not already started."""
+        if self._threads_started:
+            return
+
+        self._stdout_thread = Thread(
+            target=read_stream_to_buffer,
+            args=(self.process.stdout, self._stdout_buffer, self._output_lock),
+            daemon=True,
+        )
+        self._stderr_thread = Thread(
+            target=read_stream_to_buffer,
+            args=(self.process.stderr, self._stderr_buffer, self._output_lock),
+            daemon=True,
+        )
+        self._stdout_thread.start()
+        self._stderr_thread.start()
+        self._threads_started = True
+
+    def _wait_for_threads(self, timeout: float = 5.0) -> None:
+        """Wait for output threads to complete."""
+        if self._stdout_thread and self._stdout_thread.is_alive():
+            self._stdout_thread.join(timeout=timeout)
+        if self._stderr_thread and self._stderr_thread.is_alive():
+            self._stderr_thread.join(timeout=timeout)
+
+    def _get_output(self) -> tuple[str, str]:
+        """Get collected output from buffers."""
+        with self._output_lock:
+            stdout = '\n'.join(self._stdout_buffer)
+            stderr = '\n'.join(self._stderr_buffer)
+        return stdout, stderr
+
     def to_background_handle(self) -> BackgroundProcessHandle:
-        """Convert this handle to a BackgroundProcessHandle for adoption."""
+        """Convert this handle to a BackgroundProcessHandle for adoption.
+
+        Transfers buffers and threads to the background handle for
+        seamless Ctrl+B handoff without stream ownership conflicts.
+        """
         return BackgroundProcessHandle(
             process=self.process,
             command=self.command,
             prepared_command=self.prepared_command,
             cwd=self.cwd,
             start_time=self.start_time,
+            stdout_buffer=self._stdout_buffer,
+            stderr_buffer=self._stderr_buffer,
+            stdout_thread=self._stdout_thread,
+            stderr_thread=self._stderr_thread,
+            output_lock=self._output_lock,
         )
 
     async def wait(self) -> Union[ShellExecutionResult, MoveToBackgroundRequest]:
         """Wait for process completion or move-to-background signal.
 
-        Uses bounded_communicate() to prevent memory overflow from large outputs.
+        Uses thread-based output reading for seamless Ctrl+B handoff.
 
         Returns:
             ShellExecutionResult: Process completed normally
@@ -147,14 +208,19 @@ class ForegroundExecutionHandle:
             TimeoutError: Process exceeded timeout
             ShellExecutorError: Unexpected execution error
         """
-        # Task 1: Wait for process completion with bounded output reading
-        wait_task = asyncio.create_task(
-            asyncio.to_thread(bounded_communicate, self.process)
-        )
+        # Start output reading threads
+        self._start_output_threads()
+
+        # Task 1: Wait for process to exit
+        async def wait_for_process():
+            while self.process.poll() is None:
+                await asyncio.sleep(0.1)
+            return self.process.returncode
+
+        wait_task = asyncio.create_task(wait_for_process())
+
         # Task 2: Wait for move-to-background signal
-        signal_task = asyncio.create_task(
-            self._move_to_bg_event.wait()
-        )
+        signal_task = asyncio.create_task(self._move_to_bg_event.wait())
 
         try:
             done, _ = await asyncio.wait(
@@ -166,28 +232,26 @@ class ForegroundExecutionHandle:
             # Case 1: Move-to-background signal received
             if signal_task in done:
                 wait_task.cancel()
+                # Threads keep running - will be adopted by BackgroundProcessManager
                 return MoveToBackgroundRequest(handle=self)
 
             # Case 2: Timeout (neither task completed)
             if not done:
                 signal_task.cancel()
+                wait_task.cancel()
                 _kill_process_group(self.process)
-                # Wait for the thread to finish
-                try:
-                    await asyncio.wait_for(wait_task, timeout=5.0)
-                except (asyncio.TimeoutError, asyncio.CancelledError):
-                    wait_task.cancel()
+                # Wait for threads to finish reading
+                self._wait_for_threads(timeout=2.0)
                 raise TimeoutError(f"Command timed out after {self.timeout_seconds:.1f} seconds")
 
             # Case 3: Process completed normally
             signal_task.cancel()
-            stdout_result, stderr_result = wait_task.result()
+            exit_code = wait_task.result()
 
-            # Extract output with truncation notice if needed
-            stdout = stdout_result.with_truncation_notice()
-            stderr = stderr_result.with_truncation_notice()
-            exit_code: int = self.process.returncode if self.process.returncode is not None else -1
+            # Wait for threads to finish reading remaining output
+            self._wait_for_threads(timeout=5.0)
 
+            stdout, stderr = self._get_output()
             execution_time = time.time() - self.start_time
 
             process_shell_output(
@@ -200,7 +264,7 @@ class ForegroundExecutionHandle:
             return ShellExecutionResult(
                 stdout=stdout,
                 stderr=stderr,
-                exit_code=exit_code,
+                exit_code=exit_code if exit_code is not None else -1,
                 command=self.prepared_command,
                 execution_time=execution_time,
                 working_directory=self.cwd,
@@ -212,13 +276,10 @@ class ForegroundExecutionHandle:
             raise
         except Exception as e:
             signal_task.cancel()
+            wait_task.cancel()
             if self.process.poll() is None:
                 _kill_process_group(self.process)
-                try:
-                    self.process.wait(timeout=2.0)
-                except subprocess.TimeoutExpired:
-                    pass
-            wait_task.cancel()
+            self._wait_for_threads(timeout=2.0)
             raise ShellExecutorError(f"Command execution failed: {type(e).__name__}: {e}") from e
 
 

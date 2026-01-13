@@ -131,6 +131,46 @@ class BoundedOutput:
         )
 
 
+def read_stream_to_buffer(
+    stream,
+    buffer: list,
+    lock,
+    max_line_length: int = MAX_LINE_LENGTH,
+    max_buffer_lines: int = MAX_BUFFER_LINES,
+) -> None:
+    """Read lines from stream into buffer (thread worker function).
+
+    Shared by foreground and background process output reading.
+    Reads until EOF, storing lines in the buffer with truncation protection.
+
+    Args:
+        stream: File-like object (process.stdout or process.stderr)
+        buffer: List to append lines to
+        lock: Threading lock for buffer access
+        max_line_length: Maximum characters per line before truncation
+        max_buffer_lines: Maximum lines to keep (circular buffer)
+    """
+    try:
+        for line in iter(stream.readline, ''):
+            if not line:
+                break
+
+            with lock:
+                cleaned_line = line.rstrip('\n\r')
+                # Truncate very long lines to prevent memory issues
+                if len(cleaned_line) > max_line_length:
+                    cleaned_line = cleaned_line[:max_line_length] + "... (truncated)"
+                buffer.append(cleaned_line)
+
+                # Implement circular buffer to prevent memory issues
+                if len(buffer) > max_buffer_lines:
+                    excess = len(buffer) - max_buffer_lines
+                    del buffer[:excess]
+    except Exception:
+        # Stream closed or error - silently exit
+        pass
+
+
 def _bounded_communicate_windows(
     process: subprocess.Popen,
     max_bytes: int,
