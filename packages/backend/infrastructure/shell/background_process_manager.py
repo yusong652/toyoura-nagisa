@@ -86,6 +86,7 @@ class BackgroundProcess:
     start_time: datetime
     status: Literal["running", "completed", "killed"]
     exit_code: Optional[int] = None
+    completion_time: Optional[datetime] = None  # When process finished
 
     # Output management - Incremental tracking for efficiency
     stdout_buffer: List[str] = field(default_factory=list)
@@ -500,6 +501,7 @@ class BackgroundProcessManager:
             if bg_process.status == "running" and bg_process.process.poll() is not None:
                 bg_process.status = "completed"
                 bg_process.exit_code = bg_process.process.returncode
+                bg_process.completion_time = datetime.now()
 
             # Mark completion as notified when LLM actively checks the status
             # This prevents duplicate reminders via get_system_reminders()
@@ -525,7 +527,9 @@ class BackgroundProcessManager:
                 total_stdout_lines = len(bg_process.stdout_buffer)
                 total_stderr_lines = len(bg_process.stderr_buffer)
 
-            runtime_seconds = (datetime.now() - bg_process.start_time).total_seconds()
+            # Use completion_time for finished processes, now for running
+            end_time = bg_process.completion_time or datetime.now()
+            runtime_seconds = (end_time - bg_process.start_time).total_seconds()
 
             return ProcessOutputResult(
                 success=True,
@@ -580,6 +584,7 @@ class BackgroundProcessManager:
 
                 bg_process.status = "killed"
                 bg_process.exit_code = bg_process.process.returncode
+                bg_process.completion_time = datetime.now()
 
                 return KillProcessResult(
                     success=True,
@@ -615,6 +620,7 @@ class BackgroundProcessManager:
                     if bg_process.status == "running" and bg_process.process.poll() is not None:
                         bg_process.status = "completed"
                         bg_process.exit_code = bg_process.process.returncode
+                        bg_process.completion_time = datetime.now()
 
                     if bg_process.status == "running":
                         return True
@@ -641,6 +647,7 @@ class BackgroundProcessManager:
                         if bg_process.status == "running" and bg_process.process.poll() is not None:
                             bg_process.status = "completed"
                             bg_process.exit_code = bg_process.process.returncode
+                            bg_process.completion_time = datetime.now()
 
                         if bg_process.status == "running":
                             active_ids.append(process_id)
@@ -677,6 +684,7 @@ class BackgroundProcessManager:
                 if bg_process.status == "running" and bg_process.process.poll() is not None:
                     bg_process.status = "completed"
                     bg_process.exit_code = bg_process.process.returncode
+                    bg_process.completion_time = datetime.now()
 
                 # Use description if available, fallback to command
                 display_info = bg_process.description or bg_process.command
@@ -741,6 +749,7 @@ class BackgroundProcessManager:
                     if bg_process.status == "running":
                         _terminate_process_tree(bg_process.process, timeout=5.0)
                         bg_process.status = "killed"
+                        bg_process.completion_time = datetime.now()
 
                     # Remove from tracking
                     del self.processes[process_id]
@@ -759,6 +768,7 @@ class BackgroundProcessManager:
                 if bg_process.status == "running" and bg_process.process.poll() is not None:
                     bg_process.status = "completed"
                     bg_process.exit_code = bg_process.process.returncode
+                    bg_process.completion_time = datetime.now()
 
                 # Remove old completed/killed processes
                 if (bg_process.status in ["completed", "killed"] and
@@ -770,6 +780,7 @@ class BackgroundProcessManager:
                       bg_process.start_time < datetime.now() - timedelta(hours=self.PROCESS_TIMEOUT_HOURS)):
                     _terminate_process_tree(bg_process.process, timeout=5.0)
                     bg_process.status = "killed"
+                    bg_process.completion_time = datetime.now()
                     processes_to_remove.append(process_id)
 
             # Remove old processes
@@ -827,3 +838,4 @@ def shutdown_all_processes() -> None:
         if bg_process.status == "running":
             _terminate_process_tree(bg_process.process, timeout=2.0)
             bg_process.status = "killed"
+            bg_process.completion_time = datetime.now()
