@@ -389,6 +389,8 @@ class PfcTaskNotificationService:
                     result=result,
                     error=error,
                     git_commit=git_commit,
+                    start_time=task_info.get("start_time"),
+                    end_time=task_info.get("end_time"),
                 )
                 logger.info(f"Signaled foreground handle completion for task {task_id}: status={mapped_status}")
                 return

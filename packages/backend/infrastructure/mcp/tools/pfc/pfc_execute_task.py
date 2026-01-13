@@ -101,13 +101,13 @@ def register_pfc_task_tool(mcp: FastMCP):
             # Validate server accepted the task
             status = result.get("status")
             data = result.get("data")
+            server_message = result.get("message", "")
 
             if status != "pending":
-                task_manager.update_status(task_id, "failed", error="Unexpected server response")
-                return error_response(
-                    f"Unexpected server response: status={status} "
-                    f"(expected 'pending'). Server may have changed behavior."
-                )
+                # Pass through server's error message (e.g., "Script file not found: ...")
+                error_detail = server_message or f"Server returned status={status}"
+                task_manager.update_status(task_id, "failed", error=error_detail)
+                return error_response(error_detail)
 
             # Update task manager with initial response
             git_commit = data.get("git_commit") if data else None
@@ -249,6 +249,8 @@ def register_pfc_task_tool(mcp: FastMCP):
                 output=exec_result.output,
                 result=exec_result.result,
                 error=exec_result.error,
+                start_time=exec_result.start_time,
+                end_time=exec_result.end_time,
                 elapsed_time=exec_result.elapsed_seconds,
             )
 

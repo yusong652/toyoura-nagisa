@@ -34,6 +34,8 @@ class PfcForegroundExecutionResult:
     error: Optional[str] = None
     elapsed_seconds: float = 0.0
     git_commit: Optional[str] = None
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
 
 
 @dataclass
@@ -65,6 +67,8 @@ class PfcForegroundExecutionHandle:
     _error: Optional[str] = field(default=None)
     _git_commit: Optional[str] = field(default=None)
     _elapsed_seconds: float = field(default=0.0)
+    _start_time: Optional[float] = field(default=None)
+    _end_time: Optional[float] = field(default=None)
 
     def request_move_to_background(self) -> None:
         """Signal the wait() method to return PfcMoveToBackgroundRequest.
@@ -81,6 +85,8 @@ class PfcForegroundExecutionHandle:
         result: Optional[Any] = None,
         error: Optional[str] = None,
         git_commit: Optional[str] = None,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
     ) -> None:
         """Signal that the task has completed.
 
@@ -93,6 +99,8 @@ class PfcForegroundExecutionHandle:
             result: Script result (if any)
             error: Error message (if failed)
             git_commit: Git commit hash (if any)
+            start_time: Task start timestamp
+            end_time: Task end timestamp
         """
         self._status = status
         self._output = output
@@ -100,6 +108,8 @@ class PfcForegroundExecutionHandle:
         self._result = result
         self._error = error
         self._git_commit = git_commit
+        self._start_time = start_time
+        self._end_time = end_time
         self._completion_event.set()
 
     def update_elapsed(self, elapsed_seconds: float) -> None:
@@ -159,6 +169,8 @@ class PfcForegroundExecutionHandle:
                 error=self._error,
                 elapsed_seconds=self._elapsed_seconds,
                 git_commit=self._git_commit,
+                start_time=self._start_time,
+                end_time=self._end_time,
             )
 
         except asyncio.CancelledError:
