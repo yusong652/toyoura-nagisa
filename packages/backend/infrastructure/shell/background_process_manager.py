@@ -469,8 +469,15 @@ class BackgroundProcessManager:
                 bg_process._stdout_thread = bg_handle.stdout_thread
                 bg_process._stderr_thread = bg_handle.stderr_thread
                 bg_process._output_lock = bg_handle.output_lock
-                bg_process.stdout_buffer = bg_handle.stdout_buffer or []
-                bg_process.stderr_buffer = bg_handle.stderr_buffer or []
+                # CRITICAL: Use 'is not None' instead of 'or []' to preserve
+                # the exact list reference even when empty. The foreground thread
+                # continues writing to the original buffer after Ctrl+B handoff.
+                # Using 'or []' would create a new list when buffer is empty,
+                # breaking the connection to the foreground thread's output.
+                if bg_handle.stdout_buffer is not None:
+                    bg_process.stdout_buffer = bg_handle.stdout_buffer
+                if bg_handle.stderr_buffer is not None:
+                    bg_process.stderr_buffer = bg_handle.stderr_buffer
             else:
                 # Fallback: start new threads (shouldn't happen with new code)
                 bg_process._stdout_thread = Thread(
