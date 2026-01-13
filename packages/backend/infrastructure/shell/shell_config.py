@@ -2,16 +2,22 @@
 
 Provides automatic shell detection with platform-specific defaults:
 - Unix: $SHELL environment variable, fallback to /bin/bash
-- Windows: Git Bash (if in PATH), fallback to cmd.exe
+- Windows: Git Bash (if in PATH or common location), fallback to cmd.exe
 
 Override with TOYOURA_NAGISA_SHELL environment variable.
 """
 
+import logging
 import os
 import shutil
 import sys
 from dataclasses import dataclass
 from typing import List
+
+logger = logging.getLogger(__name__)
+
+# Common Git Bash location on Windows
+_GIT_BASH_COMMON_PATH = r"C:\Program Files\Git\usr\bin\bash.exe"
 
 
 @dataclass
@@ -45,7 +51,7 @@ class ShellConfig:
 
         Priority:
         1. TOYOURA_NAGISA_SHELL environment variable (cross-platform)
-        2. Windows: shutil.which("bash") -> cmd.exe
+        2. Windows: shutil.which("bash") -> common Git Bash path -> cmd.exe
         3. Unix: $SHELL -> /bin/bash
 
         Returns:
@@ -53,17 +59,28 @@ class ShellConfig:
         """
         # 1. Environment override (cross-platform, assumes bash-compatible)
         if shell := os.environ.get("TOYOURA_NAGISA_SHELL"):
+            logger.info(f"[ShellConfig] Using TOYOURA_NAGISA_SHELL: {shell}")
             return cls(path=shell, args=["-l", "-c"], is_cmd=False)
 
         if sys.platform == "win32":
             # 2. Try PATH detection (Git Bash in PATH)
-            if bash := shutil.which("bash"):
+            bash = shutil.which("bash")
+            if bash:
+                logger.info(f"[ShellConfig] Using Git Bash from PATH: {bash}")
                 return cls(path=bash, args=["-l", "-c"], is_cmd=False)
-            # 3. Fallback to cmd.exe
+
+            # 3. Try common Git Bash location (PATH may not include it)
+            if os.path.isfile(_GIT_BASH_COMMON_PATH):
+                logger.info(f"[ShellConfig] Using Git Bash from common path: {_GIT_BASH_COMMON_PATH}")
+                return cls(path=_GIT_BASH_COMMON_PATH, args=["-l", "-c"], is_cmd=False)
+
+            # 4. Fallback to cmd.exe
+            logger.info("[ShellConfig] Fallback to cmd.exe")
             return cls(path="cmd.exe", args=["/c"], is_cmd=True)
         else:
             # Unix: Use $SHELL or /bin/bash
             shell = os.environ.get("SHELL", "/bin/bash")
+            logger.info(f"[ShellConfig] Using Unix shell: {shell}")
             return cls(path=shell, args=["-l", "-c"], is_cmd=False)
 
 
@@ -76,4 +93,5 @@ def get_shell_config() -> ShellConfig:
     global _shell_config
     if _shell_config is None:
         _shell_config = ShellConfig.detect()
+        logger.info(f"[ShellConfig] Initialized: {_shell_config.path}")
     return _shell_config
