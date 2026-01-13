@@ -29,7 +29,7 @@ from backend.infrastructure.mcp.utils.shell import (
     process_shell_output,
     DEFAULT_MAX_OUTPUT_CHARS,
 )
-from .utils import prepare_shell_env
+from .utils import prepare_shell_env, bounded_communicate, BoundedOutput
 
 # Default timeout for foreground execution (30 seconds)
 DEFAULT_TIMEOUT_MS = 30000
@@ -137,6 +137,8 @@ class ForegroundExecutionHandle:
     async def wait(self) -> Union[ShellExecutionResult, MoveToBackgroundRequest]:
         """Wait for process completion or move-to-background signal.
 
+        Uses bounded_communicate() to prevent memory overflow from large outputs.
+
         Returns:
             ShellExecutionResult: Process completed normally
             MoveToBackgroundRequest: User pressed ctrl+b
@@ -145,9 +147,9 @@ class ForegroundExecutionHandle:
             TimeoutError: Process exceeded timeout
             ShellExecutorError: Unexpected execution error
         """
-        # Task 1: Wait for process completion
+        # Task 1: Wait for process completion with bounded output reading
         wait_task = asyncio.create_task(
-            asyncio.to_thread(self.process.communicate)
+            asyncio.to_thread(bounded_communicate, self.process)
         )
         # Task 2: Wait for move-to-background signal
         signal_task = asyncio.create_task(
@@ -155,7 +157,7 @@ class ForegroundExecutionHandle:
         )
 
         try:
-            done, pending = await asyncio.wait(
+            done, _ = await asyncio.wait(
                 [wait_task, signal_task],
                 timeout=self.timeout_seconds,
                 return_when=asyncio.FIRST_COMPLETED,
@@ -170,7 +172,7 @@ class ForegroundExecutionHandle:
             if not done:
                 signal_task.cancel()
                 _kill_process_group(self.process)
-                # Wait for the thread to finish (communicate will return quickly after kill)
+                # Wait for the thread to finish
                 try:
                     await asyncio.wait_for(wait_task, timeout=5.0)
                 except (asyncio.TimeoutError, asyncio.CancelledError):
@@ -179,11 +181,11 @@ class ForegroundExecutionHandle:
 
             # Case 3: Process completed normally
             signal_task.cancel()
-            stdout, stderr = wait_task.result()
+            stdout_result, stderr_result = wait_task.result()
 
-            # With text mode (from _create_process), output is already str
-            stdout = stdout if stdout else ''
-            stderr = stderr if stderr else ''
+            # Extract output with truncation notice if needed
+            stdout = stdout_result.with_truncation_notice()
+            stderr = stderr_result.with_truncation_notice()
             exit_code: int = self.process.returncode if self.process.returncode is not None else -1
 
             execution_time = time.time() - self.start_time
@@ -212,10 +214,9 @@ class ForegroundExecutionHandle:
             signal_task.cancel()
             if self.process.poll() is None:
                 _kill_process_group(self.process)
-                # Wait for the thread to finish
                 try:
-                    await asyncio.wait_for(wait_task, timeout=5.0)
-                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    self.process.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
                     pass
             wait_task.cancel()
             raise ShellExecutorError(f"Command execution failed: {type(e).__name__}: {e}") from e
@@ -372,20 +373,23 @@ class ShellExecutor:
             )
 
             # Wait for completion with timeout using asyncio.to_thread
-            # This runs communicate() in a thread pool, freeing the event loop
+            # Uses bounded_communicate() to prevent memory overflow from large outputs
             try:
-                stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                    asyncio.to_thread(process.communicate),
+                stdout_result, stderr_result = await asyncio.wait_for(
+                    asyncio.to_thread(bounded_communicate, process),
                     timeout=timeout_seconds
                 )
             except asyncio.TimeoutError:
                 _kill_process_group(process)
-                process.communicate()  # Clean up (blocking, but process is dead)
+                try:
+                    process.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    pass
                 raise TimeoutError(f"Command timed out after {timeout_seconds:.1f} seconds")
 
-            # Decode output (handle encoding errors gracefully)
-            stdout = stdout_bytes.decode('utf-8', errors='replace') if stdout_bytes else ''
-            stderr = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ''
+            # Extract output with truncation notice if needed
+            stdout = stdout_result.with_truncation_notice()
+            stderr = stderr_result.with_truncation_notice()
             exit_code: int = process.returncode if process.returncode is not None else -1
 
         except TimeoutError:
@@ -393,7 +397,10 @@ class ShellExecutor:
         except Exception as e:
             if process is not None and process.poll() is None:
                 _kill_process_group(process)
-                process.communicate()
+                try:
+                    process.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    pass
             raise ShellExecutorError(f"Command execution failed: {type(e).__name__}: {e}") from e
 
         execution_time = time.time() - start_time
