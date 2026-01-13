@@ -176,11 +176,13 @@ class PfcTaskNotificationService:
 
             while True:
                 try:
-                    # Check if we have any foreground handle for this session
-                    has_foreground = any(
-                        ctx.session_id == session_id
-                        for ctx in self._foreground_contexts.values()
-                    )
+                    # Get foreground task_ids for this session (for proactive completion check)
+                    # This handles fast-completing tasks that finish before first poll
+                    fg_task_ids = {
+                        ctx.task_id for ctx in self._foreground_contexts.values()
+                        if ctx.session_id == session_id
+                    }
+                    has_foreground = len(fg_task_ids) > 0
 
                     # Get PFC client
                     client = await get_pfc_client()
@@ -212,17 +214,28 @@ class PfcTaskNotificationService:
                         self._last_task_id[session_id] = running_task.get("task_id")
                         await self._process_running_task(session_id, running_task, client)
                     else:
-                        # No running task - check if previous task completed/failed/interrupted
-                        if last_task_id:
-                            # Find the completed task
+                        # No running task - check completions
+                        handled_task_ids = set()
+
+                        # 1. Check foreground tasks proactively (handles fast-completing tasks)
+                        # These tasks may have completed before we ever saw them as "running"
+                        for task in tasks:
+                            task_id = task.get("task_id")
+                            status = task.get("status")
+                            if task_id in fg_task_ids and status not in ("running", "pending"):
+                                await self._handle_task_completion(session_id, task, client)
+                                handled_task_ids.add(task_id)
+
+                        # 2. Check last_task_id for background tasks (original logic)
+                        if last_task_id and last_task_id not in handled_task_ids:
                             completed_task = next(
                                 (t for t in tasks if t.get("task_id") == last_task_id),
                                 None
                             )
                             if completed_task:
                                 await self._handle_task_completion(session_id, completed_task, client)
-                            self._last_task_id[session_id] = None
 
+                        self._last_task_id[session_id] = None
                         consecutive_empty += 1
 
                         # Stop only if no running task AND no foreground handle waiting
