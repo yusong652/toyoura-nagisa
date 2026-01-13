@@ -24,13 +24,14 @@ from typing import Optional, Union, List, TYPE_CHECKING
 if TYPE_CHECKING:
     from .executor import ShellExecutor
 
+from .shell_config import get_shell_config
 from backend.infrastructure.mcp.utils.path_normalization import normalize_windows_paths
 from backend.infrastructure.mcp.utils.shell import (
     ShellExecutionResult,
     process_shell_output,
     DEFAULT_MAX_OUTPUT_CHARS,
 )
-from .utils import prepare_shell_env, read_stream_to_buffer
+from .utils import prepare_shell_env, read_stream_to_buffer, bounded_communicate
 
 # Default timeout for foreground execution (30 seconds)
 DEFAULT_TIMEOUT_MS = 30000
@@ -326,7 +327,7 @@ class ShellExecutor:
 
         Performs:
         - Windows path normalization
-        - Windows UTF-8 encoding setup
+        - Windows UTF-8 encoding setup (cmd.exe only)
 
         Args:
             command: Raw command string
@@ -337,8 +338,10 @@ class ShellExecutor:
         # Normalize Windows paths in command
         prepared_command = normalize_windows_paths(command)
 
-        # On Windows, prepend chcp 65001 to force UTF-8 output from CMD
-        if sys.platform == "win32":
+        # On Windows with cmd.exe, prepend chcp 65001 to force UTF-8 output
+        # Git Bash doesn't need this - it handles UTF-8 natively
+        shell_config = get_shell_config()
+        if shell_config.is_cmd:
             prepared_command = f"chcp 65001 >nul && {prepared_command}"
 
         return prepared_command
@@ -355,6 +358,9 @@ class ShellExecutor:
         This is the single point of Popen creation, ensuring consistent
         configuration across foreground and background execution.
 
+        Uses the configured shell (Git Bash on Windows if available,
+        otherwise cmd.exe, or $SHELL on Unix).
+
         Args:
             command: The enhanced command to execute
             cwd: Working directory
@@ -366,10 +372,12 @@ class ShellExecutor:
         Returns:
             subprocess.Popen instance
         """
+        shell_config = get_shell_config()
+        full_command = shell_config.build_command(command)
+
         # On Unix, start_new_session=True creates a new process group
         # This allows us to kill all child processes with os.killpg()
         popen_kwargs: dict = {
-            "shell": True,
             "cwd": cwd,
             "stdin": subprocess.DEVNULL,
             "stdout": subprocess.PIPE,
@@ -385,7 +393,7 @@ class ShellExecutor:
         if sys.platform != "win32":
             popen_kwargs["start_new_session"] = True
 
-        return subprocess.Popen(command, **popen_kwargs)
+        return subprocess.Popen(full_command, **popen_kwargs)
 
     async def execute(
         self,
@@ -423,13 +431,19 @@ class ShellExecutor:
         process: Optional[subprocess.Popen] = None
 
         try:
+            # Use configured shell (Git Bash on Windows if available)
+            shell_config = get_shell_config()
+            full_command = shell_config.build_command(prepared_command)
+
             process = subprocess.Popen(
-                prepared_command,
-                shell=True,
+                full_command,
                 cwd=cwd,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
                 env=process_env,
             )
 
