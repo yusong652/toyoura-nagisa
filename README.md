@@ -28,40 +28,23 @@ Scripts *are* the context. Each execution compounds understanding.
 
 ### 🔬 **Documentation-Driven Workflow**
 
-Simulation software comes with extensive documentation. The agent doesn't guess—it queries and browses documentation hierarchies to discover:
+*Capability guides action, limitation guides creation.*
 
-- **What exists**: Available features and their usage patterns
-- **What's missing**: Gaps that require workarounds
-- **What's limited**: Built-in features that don't fully cover the use case
-
-**Discovery Flow**
-
-```
-├─ Query       → keyword search returns documentation paths
-├─ Browse      → navigate hierarchy, see available options
-├─ Discover    → identify gaps and limitations
-└─ Decide      → use built-in features vs implement custom solutions
-```
+Documentation tools guide script generation by providing verified syntax and usage patterns. The agent queries for relevant paths, browses for syntax, and discovers capability boundaries—revealing where to use built-ins and where to innovate.
 
 ### ⚡ **Adaptive Simulation Control**
 
-The agent maintains full control over simulation execution through deep backend integration.
-
-**Autonomous Control Loop**
+The agent maintains complete control over simulation lifecycle. It submits scripts, monitors real-time progress, analyzes intermediate results, and decides autonomously when to continue, when to interrupt, and when to restart with adjustments.
 
 ```
-├─ Submit      → pfc_execute_task(compression_script)
-├─ Monitor     → pfc_check_task_status → "Cycle 50000: stress=98kPa"
-├─ Analyze     → bash/read → parse output files, extract metrics
-├─ Diagnose    → pfc_capture_plot → verify uniform stress distribution
-├─ Complete    → Task finished, checkpoint saved
-├─ Submit      → pfc_execute_task(shear_script)  ← starts new task
-├─ Monitor     → pfc_check_task_status → "Strain: 2.1%, peak approaching"
-├─ Interrupt   → Detects instability → stops execution
-└─ Restart     → pfc_execute_task(adjusted_script) ← restarts with fixes
+Submit → Monitor → Analyze → Decide (continue | interrupt | restart)
 ```
 
-The agent decides when to continue, when to stop, and when to restart—without user intervention.
+### 🔍 **Multimodal Diagnostics**
+
+*Qualitative is radar, quantitative is microscope.*
+
+The agent captures visual output during simulation cycles—particle configurations, velocity arrows, contact force chains, cross-sections. Visual patterns reveal where to look; task output data confirms what's wrong.
 
 ### 🤖 **SubAgent Delegation**
 
@@ -76,15 +59,23 @@ Complex explorations risk context window exhaustion and hallucination. SubAgents
 
 The MainAgent stays focused on decision-making while SubAgents handle deep exploration.
 
+### 📚 **Extensible Skills**
+
+*Teach once, reuse forever.*
+
+Skills are structured guides that encode domain expertise. The agent follows them step-by-step, handling complex workflows you'd otherwise explain repeatedly. Don't know how to set up pfc-server? The `pfc-server-setup` skill walks the agent through environment verification, dependency installation, and server launch.
+
+Define your own skills to capture simulation workflows, analysis pipelines, or project-specific conventions. Your expertise becomes reusable agent knowledge.
+
 ### 🤝 **Intent Awareness**
 
-User operations automatically become agent context:
+*Your scripts are context too.*
 
-- **Terminal commands**: Bash operations visible to agent without copy-paste
-- **Console execution**: PFC IPython operations persist as tracked tasks—user scripts are context too
-- **File mentions**: `@file` syntax injects file content inline
+- **PFC Console** (`>`): Direct access to PFC's Python environment. Edit scripts, import modules, run experiments. Each execution becomes a tracked task with background support. You stay in control.
+- **Terminal** (`!`): Bash commands and outputs flow into agent context automatically.
+- **File mentions** (`@`): Reference any file inline; content is injected on the fly.
 
-Scripts *are* the context—yours included. The agent sees what you did, no explanation needed.
+The agent sees what you did, no explanation needed.
 
 ## 🎨 Additional Features
 
@@ -122,11 +113,14 @@ npm run dev:cli       # CLI (or npm run dev:web for Web UI)
 
 ### PFC Integration
 
-For ITASCA PFC simulations, install `websockets==9.1` in PFC's Python environment, then start the server in PFC GUI:
+For ITASCA PFC simulations:
 
-```python
-exec(open(r'/path/to/toyoura-nagisa/services/pfc-server/start_server.py', encoding='utf-8').read())
-```
+1. **Ask Nagisa**: Just say "help me start PFC" and the agent handles environment setup, dependency installation, and server launch.
+
+2. **Manual start**: In PFC GUI IPython console:
+   ```python
+   %run /path/to/toyoura-nagisa/services/pfc-server/start_server.py
+   ```
 
 See `services/pfc-server/README.md` for detailed setup.
 
