@@ -210,6 +210,40 @@ def _bounded_communicate_windows(
     )
 
 
+def _process_chunk(
+    chunk: str,
+    chunks: list[str],
+    bytes_read: int,
+    max_bytes: int,
+    already_truncated: bool,
+) -> tuple[int, bool]:
+    """Process a single chunk for a stream with truncation logic.
+
+    Args:
+        chunk: Data chunk to process
+        chunks: List to append chunks to
+        bytes_read: Current byte count
+        max_bytes: Maximum allowed bytes
+        already_truncated: Whether stream was already truncated
+
+    Returns:
+        Tuple of (new_bytes_read, truncated)
+    """
+    if already_truncated:
+        return bytes_read, True
+
+    chunk_bytes = len(chunk.encode('utf-8', errors='replace'))
+
+    if bytes_read + chunk_bytes > max_bytes:
+        allowed = max_bytes - bytes_read
+        if allowed > 0:
+            chunks.append(chunk[:allowed])
+        return max_bytes, True
+
+    chunks.append(chunk)
+    return bytes_read + chunk_bytes, False
+
+
 def bounded_communicate(
     process: subprocess.Popen,
     max_bytes: int = MAX_OUTPUT_BYTES,
@@ -238,7 +272,6 @@ def bounded_communicate(
             pass
         result = stdout.with_truncation_notice()
     """
-    # Windows: use simple communicate() + truncation
     if sys.platform == "win32":
         return _bounded_communicate_windows(process, max_bytes)
 
@@ -250,7 +283,7 @@ def bounded_communicate(
     stdout_truncated = False
     stderr_truncated = False
 
-    # Get file objects for select
+    # Build read set from available file descriptors
     stdout_fd = process.stdout
     stderr_fd = process.stderr
     read_set: list = []
@@ -260,47 +293,33 @@ def bounded_communicate(
         read_set.append(stderr_fd)
 
     while read_set:
-        # Use select with timeout to check for readable streams
         try:
             readable, _, _ = select.select(read_set, [], [], 0.1)
         except (ValueError, OSError):
-            # Pipe closed or invalid
             break
 
-        if not readable:
-            # Check if process has exited
-            if process.poll() is not None:
-                # Process done, do final reads
-                for fd in list(read_set):
-                    try:
-                        remaining = fd.read()
-                        if remaining:
-                            if fd == stdout_fd and not stdout_truncated:
-                                chunk_bytes = len(remaining.encode('utf-8', errors='replace'))
-                                if stdout_bytes + chunk_bytes > max_bytes:
-                                    # Truncate to fit
-                                    allowed = max_bytes - stdout_bytes
-                                    stdout_chunks.append(remaining[:allowed])
-                                    stdout_bytes = max_bytes
-                                    stdout_truncated = True
-                                else:
-                                    stdout_chunks.append(remaining)
-                                    stdout_bytes += chunk_bytes
-                            elif fd == stderr_fd and not stderr_truncated:
-                                chunk_bytes = len(remaining.encode('utf-8', errors='replace'))
-                                if stderr_bytes + chunk_bytes > max_bytes:
-                                    allowed = max_bytes - stderr_bytes
-                                    stderr_chunks.append(remaining[:allowed])
-                                    stderr_bytes = max_bytes
-                                    stderr_truncated = True
-                                else:
-                                    stderr_chunks.append(remaining)
-                                    stderr_bytes += chunk_bytes
-                    except Exception:
-                        pass
-                break
-            continue
+        # Process finished without readable data
+        if not readable and process.poll() is not None:
+            # Do final reads on all remaining streams
+            for fd in list(read_set):
+                try:
+                    remaining = fd.read()
+                    if not remaining:
+                        continue
 
+                    if fd == stdout_fd:
+                        stdout_bytes, stdout_truncated = _process_chunk(
+                            remaining, stdout_chunks, stdout_bytes, max_bytes, stdout_truncated
+                        )
+                    elif fd == stderr_fd:
+                        stderr_bytes, stderr_truncated = _process_chunk(
+                            remaining, stderr_chunks, stderr_bytes, max_bytes, stderr_truncated
+                        )
+                except Exception:
+                    pass
+            break
+
+        # Process each readable stream
         for fd in readable:
             try:
                 chunk = fd.read(chunk_size)
@@ -309,50 +328,34 @@ def bounded_communicate(
                 continue
 
             if not chunk:
-                # EOF on this stream
                 read_set.remove(fd)
                 continue
 
-            chunk_bytes = len(chunk.encode('utf-8', errors='replace'))
-
+            # Process stdout chunk
             if fd == stdout_fd:
-                if stdout_truncated:
-                    # Already truncated, discard
-                    continue
-                if stdout_bytes + chunk_bytes > max_bytes:
-                    # Would exceed limit - truncate and mark
-                    allowed = max_bytes - stdout_bytes
-                    if allowed > 0:
-                        stdout_chunks.append(chunk[:allowed])
-                    stdout_bytes = max_bytes
+                stdout_bytes, newly_truncated = _process_chunk(
+                    chunk, stdout_chunks, stdout_bytes, max_bytes, stdout_truncated
+                )
+                if newly_truncated and not stdout_truncated:
                     stdout_truncated = True
-                    # Kill process immediately to unblock pipes
                     if process.poll() is None:
                         process.kill()
-                else:
-                    stdout_chunks.append(chunk)
-                    stdout_bytes += chunk_bytes
 
+            # Process stderr chunk
             elif fd == stderr_fd:
-                if stderr_truncated:
-                    continue
-                if stderr_bytes + chunk_bytes > max_bytes:
-                    allowed = max_bytes - stderr_bytes
-                    if allowed > 0:
-                        stderr_chunks.append(chunk[:allowed])
-                    stderr_bytes = max_bytes
+                stderr_bytes, newly_truncated = _process_chunk(
+                    chunk, stderr_chunks, stderr_bytes, max_bytes, stderr_truncated
+                )
+                if newly_truncated and not stderr_truncated:
                     stderr_truncated = True
                     if process.poll() is None:
                         process.kill()
-                else:
-                    stderr_chunks.append(chunk)
-                    stderr_bytes += chunk_bytes
 
-        # If both streams truncated, stop reading
+        # Stop reading if both streams are truncated
         if stdout_truncated and stderr_truncated:
             break
 
-    # Ensure process is terminated
+    # Ensure process cleanup
     if process.poll() is None:
         process.kill()
         try:
