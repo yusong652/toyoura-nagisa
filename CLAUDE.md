@@ -4,29 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**toyoura-nagisa** is a **production-grade AI agent platform** bridging conversational AI with professional scientific computing workflows. The project demonstrates how modern LLM capabilities can be extended to control complex external systems while maintaining architectural elegance and reliability.
-
-### Core Value Propositions
-
-1. **Professional Scientific Computing Integration**
-   - First-class support for ITASCA PFC (Particle Flow Code) discrete element simulations
-   - Production-grade WebSocket architecture solving thread-safety and long-running task challenges
-   - Real-time bidirectional communication between AI and simulation engines
-
-2. **Intelligent Agent Specialization**
-   - Multi-profile system dynamically configuring agent capabilities per domain
-   - Token-optimized tool loading (coding: 10 tools, lifestyle: 14 tools, PFC: 14 tools, general: 28 tools)
-   - Stateless per-request profile selection for scalability
-
-3. **Clean Architecture at Scale**
-   - Strict separation of presentation/domain/infrastructure layers (not just theoretical)
-   - Pluggable LLM providers (Gemini, Anthropic, OpenAI, Local) with unified interface
-   - Unified tool protocol ensuring consistent behavior across 28+ tools
-
-4. **Long-term Contextual Memory**
-   - ChromaDB-powered semantic similarity search
-   - Session-based memory management with conversation history
-   - Image-aware memory for multimodal context
+**toyoura-nagisa** is an AI agent platform for professional scientific computing, focusing on ITASCA PFC (Particle Flow Code) discrete element simulations with real-time WebSocket communication.
 
 ### Technology Stack
 
@@ -59,51 +37,15 @@ Infrastructure Layer (LLM, MCP, Memory, PFC, Storage)
 - **Presentation**: API routes, WebSocket handlers, request/response formatting
 - **Application**: Business logic orchestration (ChatOrchestrator, content processing)
 - **Domain**: Core models and business rules (StreamingChunk, BaseMessage)
-- **Infrastructure**: External integrations (LLM providers, MCP tools, storage)
+- **Infrastructure**: External integrations (LLM providers, MCP tool registration, storage). Note: MCP tools currently contain business logic; planned refactor to move tool logic to Application layer
 
 **Example**: Swapping LLM providers requires zero application/domain layer changes (`backend/infrastructure/llm/base/client.py`)
 
-### LLM Multi-Provider Architecture
+### LLM Providers
 
-**Base Abstraction**: `backend/infrastructure/llm/base/client.py`
-```python
-class LLMClientBase(ABC):
-    @abstractmethod
-    async def call_api_with_context_streaming(...) -> AsyncGenerator[StreamingChunk, None]:
-        """Streaming API call returning unified StreamingChunk format"""
-
-    @abstractmethod
-    async def call_api_with_context(...) -> Any:
-        """Non-streaming API call for tool execution"""
-```
-
-**Unified Streaming Format**: All providers return standardized `StreamingChunk` objects (`backend/domain/models/streaming.py`) containing chunk type (thinking/text/function_call), content, and metadata.
-
-**Providers**: `backend/infrastructure/llm/providers/`
-- `gemini/`: Google Gemini (primary provider)
-- `anthropic/`: Anthropic Claude
-- `openai/`: OpenAI GPT models
-- `local/`: vLLM and Ollama support
+Located in `backend/infrastructure/llm/providers/`: gemini (primary), anthropic, openai, kimi, zhipu, openrouter, local (vLLM/Ollama).
 
 **Configuration**: `backend/config/llm.py`
-
-### Agent Profile System
-
-**The Killer Feature**: Token-optimized, domain-specialized agent configurations.
-
-| Profile | Tool Count | Token Usage | Use Case |
-|---------|-----------|-------------|----------|
-| **Coding** | 10 tools | 2,820 tokens | Code development, debugging |
-| **Lifestyle** | 14 tools | 3,948 tokens | Email, calendar, communication |
-| **PFC Expert** | 14 tools | 3,948 tokens | Scientific simulations (script-only workflow) |
-| **General** | 27 tools | 7,614 tokens | Multi-domain tasks |
-| **Disabled** | 0 tools | 0 tokens | Text-only conversation |
-
-**Impact**: Coding profile uses 64% fewer tokens than General, enabling longer context windows.
-
-**Implementation**: `backend/domain/models/agent_profiles.py`
-
-**API**: `/api/profiles` endpoint (`backend/presentation/api/profiles.py:41`)
 
 ### SubAgent System
 
@@ -113,12 +55,12 @@ MainAgent can delegate specialized tasks to lightweight SubAgents via the `invok
 
 | SubAgent | Tools | Max Iterations | Purpose |
 |----------|-------|----------------|---------|
-| **PFC Explorer** | 9 read-only | 20 | Documentation search, codebase exploration |
-| **PFC Diagnostic** | 11 read-only | 64 | Multimodal visual analysis, task status inspection |
+| **PFC Explorer** | 14 read-only | 20 | Documentation search, codebase exploration |
+| **PFC Diagnostic** | 9 read-only | 64 | Multimodal visual analysis, task status inspection |
 
-**PFC Explorer Tools**: `read`, `glob`, `grep`, `bash`, `bash_output`, `pfc_query_command`, `pfc_query_python_api`, `web_search`, `todo_write`
+**PFC Explorer Tools**: `read`, `glob`, `grep`, `bash`, `bash_output`, `pfc_browse_commands`, `pfc_browse_python_api`, `pfc_query_python_api`, `pfc_query_command`, `pfc_browse_reference`, `pfc_list_tasks`, `pfc_check_task_status`, `web_search`, `todo_write`
 
-**PFC Diagnostic Tools**: `pfc_capture_plot`, `read`, `pfc_check_task_status`, `pfc_list_tasks`, `pfc_query_command`, `pfc_query_python_api`, `glob`, `grep`, `bash`, `bash_output`, `todo_write`
+**PFC Diagnostic Tools**: `pfc_capture_plot`, `read`, `pfc_check_task_status`, `pfc_list_tasks`, `glob`, `grep`, `bash`, `bash_output`, `todo_write`
 
 **Architecture**:
 - **Non-Streaming**: SubAgents use synchronous API calls for efficiency
@@ -137,30 +79,13 @@ MainAgent can delegate specialized tasks to lightweight SubAgents via the `invok
 
 ### MCP Tool System
 
-**Unified Tool Response Format** (`backend/infrastructure/mcp/utils/tool_result.py:27`):
-```python
-@dataclass
-class ToolResult:
-    status: Literal["success", "error"]    # Operation outcome
-    message: str                           # User-facing summary
-    llm_content: Optional[Any]             # Structured LLM content
-    data: Optional[Dict[str, Any]]         # Tool-specific metadata
-```
-
 **Tool Categories** (`backend/infrastructure/mcp/tools/`):
-
-| Category | Tools | Description |
-|----------|-------|-------------|
-| `builtin/` | web_search | Internet search |
-| `coding/` | write, read, edit, bash, glob, grep, etc. | Development tools |
-| `lifestyle/` | email, calendar, contacts, location, time, etc. | Productivity tools |
-| `pfc/` | pfc_query_command, pfc_query_python_api, pfc_execute_task, pfc_check_task_status, pfc_list_tasks, pfc_capture_plot | PFC simulation control and diagnostics |
-
-**Benefits**:
-- Explicit schema for automatic documentation
-- Stable contract across all tools
-- LLM consistency in reasoning
-- Extensible via `data` field
+- `coding/`: write, read, edit, bash, glob, grep
+- `pfc/`: pfc_execute_task, pfc_check_task_status, pfc_list_tasks, pfc_capture_plot, pfc_query_*, pfc_browse_*
+- `planning/`: todo_write
+- `agent/`: invoke_agent
+- `builtin/`: web_search
+- `lifestyle/`: email, calendar, contacts, etc.
 
 ### PFC Integration Overview
 
@@ -179,10 +104,10 @@ Query Tools      Small-Scale Test   Full Simulation
 ```
 
 **Key Components**:
-- **Main Thread Executor**: Queue-based execution ensuring thread safety (`pfc-server/server/main_thread_executor.py`)
-- **Task Manager**: Non-blocking lifecycle tracking (`pfc-server/server/task_manager.py:19`)
-- **Script Executor**: Real-time output capture for progress monitoring (`pfc-server/server/script_executor.py:28`)
-- **Diagnostic Executor**: Callback-based execution for non-blocking diagnostics during simulation cycles (`pfc-server/server/diagnostic_executor.py`)
+- **Main Thread Executor**: Queue-based execution ensuring thread safety (`services/pfc-server/server/main_thread_executor.py`)
+- **Task Manager**: Non-blocking lifecycle tracking (`services/pfc-server/server/task_manager.py:19`)
+- **Script Executor**: Real-time output capture for progress monitoring (`services/pfc-server/server/script_executor.py:28`)
+- **Diagnostic Executor**: Callback-based execution for non-blocking diagnostics during simulation cycles (`services/pfc-server/server/diagnostic_executor.py`)
 - **Documentation System**: Command syntax + Python usage examples (`backend/infrastructure/pfc/commands/`)
 
 **PFC Tools Workflow (Script-Only)**:
@@ -200,7 +125,7 @@ Query Tools      Small-Scale Test   Full Simulation
 - This branch is automatically managed; working on it will break git snapshot creation
 - If accidentally on this branch, switch back: `git checkout master`
 
-**Detailed Documentation**: See `pfc-server/README.md` for implementation details, thread-safety architecture, and usage examples.
+**Detailed Documentation**: See `services/pfc-server/README.md` for implementation details, thread-safety architecture, and usage examples.
 
 **Backend Integration**: `backend/infrastructure/mcp/tools/pfc/` + `backend/infrastructure/pfc/websocket_client.py`
 
@@ -269,7 +194,7 @@ npm run preview
 pip install websockets==9.1
 
 # 2. Start PFC WebSocket server (in PFC GUI Python console)
-exec(open(r'C:\Dev\Han\toyoura-nagisa\pfc-server\start_server.py', encoding='utf-8').read())
+exec(open(r'C:\Dev\Han\toyoura-nagisa\services\pfc-server\start_server.py', encoding='utf-8').read())
 
 # 3. Test integration from toyoura-nagisa environment (with PFC server running)
 uv run python examples/pfc_integration/DEMo.py
@@ -298,13 +223,13 @@ toyoura-nagisa/
 │   │   └── streaming/             # Response streaming handlers
 │   ├── application/                # Business logic orchestration
 │   │   └── services/              # Business services
+│   │       ├── agent.py           # Main Agent class
 │   │       ├── chat_service.py    # Chat message processing
-│   │       ├── conversation/      # Conversation orchestration
-│   │       │   ├── chat_orchestrator.py  # Core conversation flow
-│   │       │   └── models.py      # StreamingState and models
-│   │       └── contents/          # Content processing
-│   │           ├── content_processor.py  # Content pipeline
-│   │           └── tts/           # TTS processing
+│   │       ├── streaming_models.py # StreamingState and models
+│   │       ├── contents/          # Content processing
+│   │       ├── notifications/     # Tool confirmation, notifications
+│   │       ├── pfc/               # PFC console service
+│   │       └── shell/             # Shell execution service
 │   ├── domain/                     # Core business logic
 │   │   └── models/                # Domain models
 │   │       ├── streaming.py       # StreamingChunk unified format
@@ -319,6 +244,9 @@ toyoura-nagisa/
 │   │   │   │   ├── gemini/
 │   │   │   │   ├── anthropic/
 │   │   │   │   ├── openai/
+│   │   │   │   ├── kimi/
+│   │   │   │   ├── zhipu/
+│   │   │   │   ├── openrouter/
 │   │   │   │   └── local/
 │   │   │   └── shared/
 │   │   ├── mcp/                   # Model Context Protocol system
@@ -328,6 +256,7 @@ toyoura-nagisa/
 │   │   │   │   ├── coding/
 │   │   │   │   ├── lifestyle/
 │   │   │   │   ├── pfc/           # PFC simulation tools
+│   │   │   │   ├── planning/      # Task planning (todo_write)
 │   │   │   │   └── agent/         # SubAgent invocation (invoke_agent)
 │   │   │   └── utils/
 │   │   │       └── tool_result.py # Unified tool response format
@@ -347,6 +276,11 @@ toyoura-nagisa/
 │   │   ├── websocket/             # WebSocket infrastructure
 │   │   │   ├── connection_manager.py     # Connection management
 │   │   │   └── notification_service.py   # WebSocket notifications
+│   │   ├── shell/                 # Shell execution infrastructure
+│   │   │   ├── executor.py        # ShellExecutor (foreground/background)
+│   │   │   ├── shell_config.py    # Cross-platform shell detection
+│   │   │   └── background_process_manager.py  # Background process lifecycle
+│   │   ├── messaging/             # Message queue management
 │   │   └── tts/                   # Text-to-speech engines
 │   ├── config/                     # Configuration management
 │   │   └── prompts/               # Agent system prompts
@@ -404,79 +338,10 @@ Many tools integrate with Google services via OAuth:
 - Supports Gmail, Google Calendar, and Google Contacts
 - Use `packages/backend/infrastructure/mcp/tools/google_auth/init_google_token.py` to set up authentication
 
-## Development Patterns
+## CLI Commands
 
-### Message Handling
-- Messages use factory pattern with `message_factory()` and `message_factory_no_thinking()`
-- Support for text, image, and tool result messages
-- Real-time streaming with WebSocket support
-- Unified `StreamingChunk` format across all LLM providers (thinking/text/function_call types)
-- File mention support (`@file` syntax for automatic content injection)
-
-### Tool Integration
-- Each tool category has its own registration function
-- Tools follow FastMCP protocol
-- All tools return standardized `ToolResult` format
-- Semantic search enables dynamic tool discovery
-
-### Session Management
-- UUID-based session identification
-- Persistent chat history with metadata
-- Session cleanup and tool cache management
-
-### Task Management Pattern
-
-Long-running operations (PFC simulations, large file operations) use task-based execution:
-
-1. **Submit**: Tool returns `task_id` immediately (non-blocking)
-2. **Monitor**: Query status with `task_id` to check progress
-3. **Complete**: Retrieve results when status changes to "success"
-
-This pattern prevents:
-- Client timeouts on long operations
-- Thread pool exhaustion
-- Blocking user interactions
-
-**Implementation**: `pfc-server/server/task_manager.py:19`
-
-### User Interaction Commands
-
-The CLI supports direct command execution with automatic context injection for intent awareness:
-
-**Shell Command (`!` prefix)**
-```bash
-! git status          # Execute bash command
-! ls -la              # Results become LLM context
-```
-- **API**: `POST /api/shell/execute`
-- **Context**: Command + stdout/stderr injected as `<bash-input>`, `<bash-stdout>`, `<bash-stderr>` tags
-- **State**: Working directory (`cwd`) persisted per session
-- **Implementation**: `backend/presentation/api/shell.py`
-
-**PFC Console Command (`>` prefix)**
-```python
-> print(itasca.ball.count())     # Execute in PFC Python environment
-> itasca.command("model save")   # Results become LLM context
-```
-- **API**: `POST /api/pfc/console/execute`
-- **Context**: Code + output injected as `<pfc-python>` tags with `<input>`, `<task_id>`, `<output>`, `<error>`
-- **Traceability**: Code saved to `workspace/.user_console/` as timestamped scripts
-- **Requires**: PFC server running (WebSocket port 9001)
-- **Implementation**: `backend/presentation/api/pfc_console.py`
-
-**Intent Awareness Architecture**
-
-Both commands enable the agent to "see" user operations without explicit explanation:
-1. User executes `! git diff` or `> ball.count()`
-2. Command + results captured by status monitor
-3. Context injected into next LLM prompt as system-reminder
-4. Agent understands user's current focus and can respond accordingly
-
-**Key Files**:
-- Parsing: `packages/cli/src/ui/components/InputPrompt.tsx`
-- Shell Hook: `packages/cli/src/ui/hooks/useShellCommand.ts`
-- PFC Hook: `packages/cli/src/ui/hooks/usePfcConsoleCommand.ts`
-- Monitors: `backend/infrastructure/monitoring/monitors/user_bash_monitor.py`, `user_pfc_python_monitor.py`
+- **Shell** (`!` prefix): `! git status` - Execute bash, results injected to LLM context
+- **PFC Console** (`>` prefix): `> ball.count()` - Execute in PFC Python environment
 
 ## Testing
 
@@ -521,86 +386,18 @@ uv run python examples/pfc_integration/DEMo.py
 - **Server port**: Runs on port 9001 (WebSocket)
 - **Startup**: Must be started in PFC GUI before using PFC tools
 - **Long tasks**: Return task_id immediately for non-blocking operation
-- **Troubleshooting**: Check `pfc-server/README.md`
+- **Troubleshooting**: Check `services/pfc-server/README.md`
 
-## Key Development Notes
+## Related Guides
 
-- **Clean Architecture**: Implemented, not just theoretical - see dependency flow in `packages/backend/`
-- **Python Dependency Management**: Uses UV with `pyproject.toml`
-- **Frontend Development**: Vite + TypeScript + Material-UI
-- **Real-time Communication**: WebSocket for streaming responses
-- **LLM Flexibility**: Pluggable architecture supports multiple providers
-- **Tool System**: Asynchronous MCP-based tools with dynamic loading
-- **Memory Architecture**: ChromaDB for conversation history and semantic search
-- **Character Animation**: Live2D integration using PIXI.js
-- **TTS Flexibility**: Support for local (GPT-SoVITS) and remote (Fish Audio) providers
-- **Agent Specialization**: Profile-based tool loading optimizes token usage
-- **Task-Based Execution**: Non-blocking operation management for long-running computations
-- **Unified Tool Protocol**: ToolResult schema ensures consistent tool behavior
-- **Stateless Profile Design**: Per-request profile selection eliminates session complexity
+- `.claude/guides/typescript-guide.md` - TypeScript/React patterns
+- `.claude/guides/code-standards.md` - Code quality standards
+- `services/pfc-server/README.md` - PFC integration details
 
-## 📚 Specialized Guides
+## Git Commit Format
 
-For detailed guidance on specific development topics, refer to these specialized documents:
-
-### Frontend Development
-**File**: `.claude/guides/typescript-guide.md`
-
-Comprehensive TypeScript development guide covering:
-- Type system mastery (interfaces, generics, unions, conditionals)
-- React-TypeScript integration patterns
-- Component architecture and composition
-- Custom hooks with proper typing
-- Advanced type techniques and best practices
-
-**When to use**: Frontend component development, TypeScript refactoring, React hook implementation
-
-### Code Quality Standards
-**File**: `.claude/guides/code-standards.md`
-
-Project-wide coding standards including:
-- Function documentation requirements (docstrings, type annotations)
-- Type validation principles (avoiding redundancy, trusting internal APIs)
-- Git commit message format and attribution
-- Code readability guidelines
-
-**When to use**: Writing new functions, creating commits, code reviews
-
-### PFC Integration Deep Dive
-**File**: `pfc-server/README.md`
-
-Detailed PFC integration documentation covering:
-- Thread-safety architecture and main thread execution
-- Task classification and background execution patterns
-- Type-driven command assembly examples
-- Real-time progress monitoring implementation
-- Troubleshooting and debugging guides
-
-**When to use**: Working on PFC tools, understanding scientific computing integration
-
----
-
-## Git Configuration
-
-### Commit Message Requirements
-
-When creating commits, follow these guidelines for attribution and project identification:
-
-1. **Project Attribution**: Always reference the toyoura-nagisa project repository URL `https://github.com/yusong652/toyoura-nagisa` in commit messages rather than external tools
-2. **Co-authorship**: Use "Co-authored-with: Nagisa Toyoura" to reflect collaborative development instead of external tool attribution
-3. **Project Context**: Ensure commit messages reflect the toyoura-nagisa project context and goals
-
-### Example Commit Format
 ```
-feat: improve tool extraction logic
-
-Enhance MCP tool result processing for better LLM integration
-in the toyoura-nagisa voice-enabled AI assistant.
-
-https://github.com/yusong652/toyoura-nagisa
+feat: brief description
 
 Co-authored-with: Nagisa Toyoura <nagisa.toyoura@gmail.com>
 ```
-
----
-**Note**: This guide focuses on development workflow and architecture patterns. For technical showcase and detailed implementation explanations, see project documentation (NAGISA.md) and specialized guides listed above.
