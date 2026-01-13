@@ -10,6 +10,7 @@ Business logic layer for user shell commands (CLI `!` prefix):
 
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Optional, Tuple, Union
 
@@ -22,6 +23,30 @@ from backend.infrastructure.mcp.utils.shell import (
     ShellExecutionResult,
     format_with_caveat,
 )
+
+
+def _convert_git_bash_path(path: str) -> str:
+    """Convert Git Bash style path to Windows path.
+
+    Git Bash uses Unix-style paths like /c/Users/...
+    Windows Python needs C:/Users/... format.
+
+    Args:
+        path: Path string (may be Git Bash or Windows style)
+
+    Returns:
+        Windows-compatible path string
+    """
+    if sys.platform != "win32":
+        return path
+
+    # Match Git Bash style: /c/... or /d/... etc.
+    if len(path) >= 3 and path[0] == '/' and path[2] == '/':
+        drive_letter = path[1].upper()
+        if drive_letter.isalpha():
+            return f"{drive_letter}:{path[2:]}"
+
+    return path
 
 
 class ShellService:
@@ -136,8 +161,10 @@ class ShellService:
             if lines:
                 # Last line is pwd output
                 pwd_output = lines[-1]
-                if pwd_output.startswith('/') and os.path.isdir(pwd_output):
-                    self._state_storage.update_cwd(pwd_output)
+                # Convert Git Bash path (/c/...) to Windows path (C:/...)
+                windows_path = _convert_git_bash_path(pwd_output)
+                if os.path.isdir(windows_path):
+                    self._state_storage.update_cwd(windows_path)
                     # Remove pwd output from stdout
                     stdout = '\n'.join(lines[:-1])
                     if stdout:
@@ -384,8 +411,10 @@ class ShellService:
             if lines:
                 # Last line is pwd output
                 pwd_output = lines[-1]
-                if pwd_output.startswith('/') and os.path.isdir(pwd_output):
-                    self._state_storage.update_cwd(pwd_output)
+                # Convert Git Bash path (/c/...) to Windows path (C:/...)
+                windows_path = _convert_git_bash_path(pwd_output)
+                if os.path.isdir(windows_path):
+                    self._state_storage.update_cwd(windows_path)
                     # Remove pwd output from stdout
                     stdout = '\n'.join(lines[:-1])
                     if stdout:
