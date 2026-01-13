@@ -194,9 +194,10 @@ class BackgroundProcessManager:
 
     def _start_cleanup_thread(self) -> None:
         """Start the background cleanup thread."""
-        if self._cleanup_thread is None or not self._cleanup_thread.is_alive():
-            self._cleanup_thread = Thread(target=self._cleanup_worker, daemon=True)
-            self._cleanup_thread.start()
+        if self._cleanup_thread is not None and self._cleanup_thread.is_alive():
+            return
+        self._cleanup_thread = Thread(target=self._cleanup_worker, daemon=True)
+        self._cleanup_thread.start()
 
     def _start_notification_monitoring(
         self,
@@ -291,6 +292,21 @@ class BackgroundProcessManager:
         finally:
             stream.close()
 
+    def _update_process_status(self, bg_process: BackgroundProcess) -> None:
+        """Update process status if it has completed.
+
+        Checks if a running process has finished and updates status, exit code, and completion time.
+        """
+        if bg_process.status != "running":
+            return
+
+        if bg_process.process.poll() is None:
+            return
+
+        bg_process.status = "completed"
+        bg_process.exit_code = bg_process.process.returncode
+        bg_process.completion_time = datetime.now()
+
     def _watch_process_completion(self, bg_process: BackgroundProcess) -> None:
         """Watch for process exit and set completion_time immediately.
 
@@ -299,13 +315,66 @@ class BackgroundProcessManager:
         """
         try:
             bg_process.process.wait()  # Block until process exits
-            # Set completion time immediately when process exits
-            if bg_process.status == "running":
-                bg_process.status = "completed"
-                bg_process.exit_code = bg_process.process.returncode
-                bg_process.completion_time = datetime.now()
+            self._update_process_status(bg_process)
         except Exception:
             pass
+
+    def _start_output_threads(self, bg_process: BackgroundProcess, process: subprocess.Popen) -> None:
+        """Start output reading and watcher threads for a background process.
+
+        Args:
+            bg_process: The BackgroundProcess to start threads for
+            process: The subprocess.Popen object to read from
+        """
+        bg_process._stdout_thread = Thread(
+            target=self._read_output_stream,
+            args=(bg_process, process.stdout, False),
+            daemon=True
+        )
+        bg_process._stderr_thread = Thread(
+            target=self._read_output_stream,
+            args=(bg_process, process.stderr, True),
+            daemon=True
+        )
+        bg_process._watcher_thread = Thread(
+            target=self._watch_process_completion,
+            args=(bg_process,),
+            daemon=True
+        )
+
+        bg_process._stdout_thread.start()
+        bg_process._stderr_thread.start()
+        bg_process._watcher_thread.start()
+
+    def _register_process(self, session_id: str, process_id: str, bg_process: BackgroundProcess) -> None:
+        """Register a background process in tracking dictionaries.
+
+        Args:
+            session_id: Session ID
+            process_id: Process ID
+            bg_process: BackgroundProcess object to register
+        """
+        self.processes[process_id] = bg_process
+        if session_id not in self.session_processes:
+            self.session_processes[session_id] = set()
+        self.session_processes[session_id].add(process_id)
+
+    def _count_running_processes(self, session_id: Optional[str] = None) -> int:
+        """Count running processes, optionally filtered by session.
+
+        Args:
+            session_id: If provided, count only this session's processes. Otherwise count all.
+
+        Returns:
+            Number of running processes
+        """
+        if session_id is None:
+            return sum(1 for p in self.processes.values() if p.status == "running")
+
+        return sum(
+            1 for pid in self.session_processes.get(session_id, set())
+            if pid in self.processes and self.processes[pid].status == "running"
+        )
 
     def start_process(
         self,
@@ -327,22 +396,15 @@ class BackgroundProcessManager:
             StartProcessResult with process info or error
         """
         with self._lock:
-            # Check global process limit (only count running processes)
-            global_running = sum(
-                1 for p in self.processes.values() if p.status == "running"
-            )
-            if global_running >= self.MAX_PROCESSES_GLOBAL:
+            # Check global process limit
+            if self._count_running_processes() >= self.MAX_PROCESSES_GLOBAL:
                 return StartProcessResult(
                     success=False,
                     error=f"Maximum {self.MAX_PROCESSES_GLOBAL} concurrent global background processes"
                 )
 
-            # Check session process limits (only count running processes)
-            running_count = sum(
-                1 for pid in self.session_processes.get(session_id, set())
-                if pid in self.processes and self.processes[pid].status == "running"
-            )
-            if running_count >= self.MAX_PROCESSES_PER_SESSION:
+            # Check session process limits
+            if self._count_running_processes(session_id) >= self.MAX_PROCESSES_PER_SESSION:
                 return StartProcessResult(
                     success=False,
                     error=f"Maximum {self.MAX_PROCESSES_PER_SESSION} concurrent background processes per session"
@@ -364,7 +426,7 @@ class BackgroundProcessManager:
                 bg_process = BackgroundProcess(
                     process_id=process_id,
                     session_id=session_id,
-                    command=handle.command,  # Original command
+                    command=handle.command,
                     description=description,
                     process=handle.process,
                     start_time=datetime.fromtimestamp(handle.start_time),
@@ -373,33 +435,10 @@ class BackgroundProcessManager:
                 )
 
                 # Start output reading threads
-                bg_process._stdout_thread = Thread(
-                    target=self._read_output_stream,
-                    args=(bg_process, handle.process.stdout, False),
-                    daemon=True
-                )
-                bg_process._stderr_thread = Thread(
-                    target=self._read_output_stream,
-                    args=(bg_process, handle.process.stderr, True),
-                    daemon=True
-                )
-
-                bg_process._stdout_thread.start()
-                bg_process._stderr_thread.start()
-
-                # Start watcher thread to track completion time
-                bg_process._watcher_thread = Thread(
-                    target=self._watch_process_completion,
-                    args=(bg_process,),
-                    daemon=True
-                )
-                bg_process._watcher_thread.start()
+                self._start_output_threads(bg_process, handle.process)
 
                 # Register the process
-                self.processes[process_id] = bg_process
-                if session_id not in self.session_processes:
-                    self.session_processes[session_id] = set()
-                self.session_processes[session_id].add(process_id)
+                self._register_process(session_id, process_id, bg_process)
 
                 # Start notification service monitoring
                 self._start_notification_monitoring(session_id, process_id, command, description)
@@ -412,15 +451,9 @@ class BackgroundProcessManager:
                 )
 
             except ShellExecutorError as e:
-                return StartProcessResult(
-                    success=False,
-                    error=str(e)
-                )
+                return StartProcessResult(success=False, error=str(e))
             except Exception as e:
-                return StartProcessResult(
-                    success=False,
-                    error=f"Failed to start background process: {e}"
-                )
+                return StartProcessResult(success=False, error=f"Failed to start background process: {e}")
 
     def adopt_process(
         self,
@@ -463,9 +496,8 @@ class BackgroundProcessManager:
                 working_directory=bg_handle.cwd,
             )
 
-            # Check if foreground handle has existing threads (Ctrl+B case)
+            # Reuse existing threads and buffers from foreground handle
             if bg_handle.stdout_thread is not None and bg_handle.output_lock is not None:
-                # Reuse existing threads and buffers from foreground
                 bg_process._stdout_thread = bg_handle.stdout_thread
                 bg_process._stderr_thread = bg_handle.stderr_thread
                 bg_process._output_lock = bg_handle.output_lock
@@ -478,34 +510,20 @@ class BackgroundProcessManager:
                     bg_process.stdout_buffer = bg_handle.stdout_buffer
                 if bg_handle.stderr_buffer is not None:
                     bg_process.stderr_buffer = bg_handle.stderr_buffer
+
+                # Only start watcher thread (output threads already running)
+                bg_process._watcher_thread = Thread(
+                    target=self._watch_process_completion,
+                    args=(bg_process,),
+                    daemon=True
+                )
+                bg_process._watcher_thread.start()
             else:
                 # Fallback: start new threads (shouldn't happen with new code)
-                bg_process._stdout_thread = Thread(
-                    target=self._read_output_stream,
-                    args=(bg_process, bg_handle.process.stdout, False),
-                    daemon=True
-                )
-                bg_process._stderr_thread = Thread(
-                    target=self._read_output_stream,
-                    args=(bg_process, bg_handle.process.stderr, True),
-                    daemon=True
-                )
-                bg_process._stdout_thread.start()
-                bg_process._stderr_thread.start()
-
-            # Start watcher thread to track completion time
-            bg_process._watcher_thread = Thread(
-                target=self._watch_process_completion,
-                args=(bg_process,),
-                daemon=True
-            )
-            bg_process._watcher_thread.start()
+                self._start_output_threads(bg_process, bg_handle.process)
 
             # Register the process
-            self.processes[process_id] = bg_process
-            if session_id not in self.session_processes:
-                self.session_processes[session_id] = set()
-            self.session_processes[session_id].add(process_id)
+            self._register_process(session_id, process_id, bg_process)
 
             # Start notification service monitoring
             self._start_notification_monitoring(
@@ -537,14 +555,10 @@ class BackgroundProcessManager:
             bg_process = self.processes[process_id]
             bg_process.last_accessed = datetime.now()
 
-            # Check if process has completed
-            if bg_process.status == "running" and bg_process.process.poll() is not None:
-                bg_process.status = "completed"
-                bg_process.exit_code = bg_process.process.returncode
-                bg_process.completion_time = datetime.now()
+            # Update status if completed
+            self._update_process_status(bg_process)
 
             # Mark completion as notified when LLM actively checks the status
-            # This prevents duplicate reminders via get_system_reminders()
             if bg_process.status in ["completed", "killed"]:
                 bg_process.completion_notified = True
 
@@ -558,16 +572,15 @@ class BackgroundProcessManager:
                 bg_process.last_stdout_position = len(bg_process.stdout_buffer)
                 bg_process.last_stderr_position = len(bg_process.stderr_buffer)
 
+                # Get statistics
+                total_stdout_lines = len(bg_process.stdout_buffer)
+                total_stderr_lines = len(bg_process.stderr_buffer)
+
             # Format output
             stdout_text = '\n'.join(new_stdout) if new_stdout else ''
             stderr_text = '\n'.join(new_stderr) if new_stderr else ''
 
-            # Get statistics
-            with bg_process._output_lock:
-                total_stdout_lines = len(bg_process.stdout_buffer)
-                total_stderr_lines = len(bg_process.stderr_buffer)
-
-            # Use completion_time for finished processes, now for running
+            # Calculate runtime
             end_time = bg_process.completion_time or datetime.now()
             runtime_seconds = (end_time - bg_process.start_time).total_seconds()
 
@@ -597,10 +610,7 @@ class BackgroundProcessManager:
         """
         with self._lock:
             if process_id not in self.processes:
-                return KillProcessResult(
-                    success=False,
-                    error=f"Process {process_id} not found"
-                )
+                return KillProcessResult(success=False, error=f"Process {process_id} not found")
 
             bg_process = self.processes[process_id]
 
@@ -613,7 +623,6 @@ class BackgroundProcessManager:
             try:
                 # Get any remaining output before killing
                 with bg_process._output_lock:
-                    # Get only unread output for final message
                     final_stdout_lines = bg_process.stdout_buffer[bg_process.last_stdout_position:]
                     final_stderr_lines = bg_process.stderr_buffer[bg_process.last_stderr_position:]
                     final_stdout = '\n'.join(final_stdout_lines) if final_stdout_lines else ''
@@ -634,10 +643,7 @@ class BackgroundProcessManager:
                 )
 
             except Exception as e:
-                return KillProcessResult(
-                    success=False,
-                    error=f"Failed to kill process {process_id}: {e}"
-                )
+                return KillProcessResult(success=False, error=f"Failed to kill process {process_id}: {e}")
 
     def has_active_processes(self, session_id: str) -> bool:
         """
@@ -654,16 +660,14 @@ class BackgroundProcessManager:
                 return False
 
             for process_id in self.session_processes[session_id]:
-                if process_id in self.processes:
-                    bg_process = self.processes[process_id]
-                    # Update status if process completed
-                    if bg_process.status == "running" and bg_process.process.poll() is not None:
-                        bg_process.status = "completed"
-                        bg_process.exit_code = bg_process.process.returncode
-                        bg_process.completion_time = datetime.now()
+                if process_id not in self.processes:
+                    continue
 
-                    if bg_process.status == "running":
-                        return True
+                bg_process = self.processes[process_id]
+                self._update_process_status(bg_process)
+
+                if bg_process.status == "running":
+                    return True
 
             return False
 
@@ -678,19 +682,19 @@ class BackgroundProcessManager:
             List of active process IDs
         """
         with self._lock:
-            active_ids = []
-            if session_id in self.session_processes:
-                for process_id in self.session_processes[session_id]:
-                    if process_id in self.processes:
-                        bg_process = self.processes[process_id]
-                        # Update status if needed
-                        if bg_process.status == "running" and bg_process.process.poll() is not None:
-                            bg_process.status = "completed"
-                            bg_process.exit_code = bg_process.process.returncode
-                            bg_process.completion_time = datetime.now()
+            if session_id not in self.session_processes:
+                return []
 
-                        if bg_process.status == "running":
-                            active_ids.append(process_id)
+            active_ids = []
+            for process_id in self.session_processes[session_id]:
+                if process_id not in self.processes:
+                    continue
+
+                bg_process = self.processes[process_id]
+                self._update_process_status(bg_process)
+
+                if bg_process.status == "running":
+                    active_ids.append(process_id)
 
             return active_ids
 
@@ -710,7 +714,6 @@ class BackgroundProcessManager:
             List[str]: List of formatted reminder strings
         """
         with self._lock:
-            # Get active process IDs (inline to avoid nested lock)
             if session_id not in self.session_processes:
                 return []
 
@@ -721,15 +724,12 @@ class BackgroundProcessManager:
                     continue
 
                 # Update status if needed
-                if bg_process.status == "running" and bg_process.process.poll() is not None:
-                    bg_process.status = "completed"
-                    bg_process.exit_code = bg_process.process.returncode
-                    bg_process.completion_time = datetime.now()
+                self._update_process_status(bg_process)
 
                 # Use description if available, fallback to command
                 display_info = bg_process.description or bg_process.command
 
-                # Case 1: Running processes - always remind (with or without new output)
+                # Case 1: Running processes - always remind
                 if bg_process.status == "running":
                     has_new_output = (
                         len(bg_process.stdout_buffer) > bg_process.last_stdout_position or
@@ -744,7 +744,6 @@ class BackgroundProcessManager:
                             f"Has new output available. You can check its output using the BashOutput tool."
                         )
                     else:
-                        # No new output, but still remind about running process
                         runtime = (datetime.now() - bg_process.start_time).total_seconds()
                         reminder = (
                             f"Background Bash {process_id} "
@@ -754,7 +753,7 @@ class BackgroundProcessManager:
                         )
                     reminders.append(reminder)
 
-                # Case 2: First-time completion/error - remind once about status change
+                # Case 2: First-time completion - remind once about status change
                 elif bg_process.status in ["completed", "killed"] and not bg_process.completion_notified:
                     bg_process.completion_notified = True
                     exit_info = f"exit_code={bg_process.exit_code}" if bg_process.exit_code is not None else ""
@@ -765,8 +764,6 @@ class BackgroundProcessManager:
                         f"You can check its final output using the BashOutput tool."
                     )
                     reminders.append(reminder)
-
-                # Case 3: Already notified completion - no more reminders
 
             return reminders
 
@@ -801,23 +798,20 @@ class BackgroundProcessManager:
         """Remove old completed/killed processes to prevent memory leaks."""
         with self._lock:
             cutoff_time = datetime.now() - timedelta(hours=1)
+            timeout_cutoff = datetime.now() - timedelta(hours=self.PROCESS_TIMEOUT_HOURS)
             processes_to_remove = []
 
             for process_id, bg_process in self.processes.items():
                 # Update status if needed
-                if bg_process.status == "running" and bg_process.process.poll() is not None:
-                    bg_process.status = "completed"
-                    bg_process.exit_code = bg_process.process.returncode
-                    bg_process.completion_time = datetime.now()
+                self._update_process_status(bg_process)
 
                 # Remove old completed/killed processes
-                if (bg_process.status in ["completed", "killed"] and
-                    bg_process.last_accessed < cutoff_time):
+                if bg_process.status in ["completed", "killed"] and bg_process.last_accessed < cutoff_time:
                     processes_to_remove.append(process_id)
+                    continue
 
                 # Kill processes that have been running too long
-                elif (bg_process.status == "running" and
-                      bg_process.start_time < datetime.now() - timedelta(hours=self.PROCESS_TIMEOUT_HOURS)):
+                if bg_process.status == "running" and bg_process.start_time < timeout_cutoff:
                     _terminate_process_tree(bg_process.process, timeout=5.0)
                     bg_process.status = "killed"
                     bg_process.completion_time = datetime.now()
@@ -828,7 +822,6 @@ class BackgroundProcessManager:
                 bg_process = self.processes[process_id]
                 session_id = bg_process.session_id
 
-                # Remove from processes
                 del self.processes[process_id]
 
                 # Remove from session tracking
