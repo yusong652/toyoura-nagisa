@@ -11,11 +11,14 @@ Used by both ShellExecutor (synchronous) and BackgroundProcessManager (async str
 
 import os
 import re
-import select
 import subprocess
 import sys
 from dataclasses import dataclass
 from typing import Dict, Optional
+
+# select() only works with pipes on Unix, not Windows
+if sys.platform != "win32":
+    import select
 
 
 # Background process buffer limits (memory protection)
@@ -128,6 +131,45 @@ class BoundedOutput:
         )
 
 
+def _bounded_communicate_windows(
+    process: subprocess.Popen,
+    max_bytes: int,
+) -> tuple[BoundedOutput, BoundedOutput]:
+    """Windows implementation using simple communicate() with truncation.
+
+    Windows doesn't support select() on pipes, so we use communicate()
+    and truncate the output afterward. This is less efficient for large
+    outputs but works reliably.
+    """
+    try:
+        stdout, stderr = process.communicate(timeout=300)  # 5 min timeout
+    except subprocess.TimeoutExpired:
+        process.kill()
+        stdout, stderr = process.communicate()
+
+    # Truncate if needed
+    stdout = stdout or ""
+    stderr = stderr or ""
+
+    stdout_bytes = len(stdout.encode('utf-8', errors='replace'))
+    stderr_bytes = len(stderr.encode('utf-8', errors='replace'))
+
+    stdout_truncated = stdout_bytes > max_bytes
+    stderr_truncated = stderr_bytes > max_bytes
+
+    if stdout_truncated:
+        stdout = stdout[:max_bytes]
+        stdout_bytes = max_bytes
+    if stderr_truncated:
+        stderr = stderr[:max_bytes]
+        stderr_bytes = max_bytes
+
+    return (
+        BoundedOutput(content=stdout, truncated=stdout_truncated, bytes_read=stdout_bytes),
+        BoundedOutput(content=stderr, truncated=stderr_truncated, bytes_read=stderr_bytes),
+    )
+
+
 def bounded_communicate(
     process: subprocess.Popen,
     max_bytes: int = MAX_OUTPUT_BYTES,
@@ -135,14 +177,15 @@ def bounded_communicate(
 ) -> tuple[BoundedOutput, BoundedOutput]:
     """Memory-safe replacement for process.communicate().
 
-    Reads stdout and stderr with byte limits using select() for
-    non-blocking I/O. If either stream exceeds the limit, the process
-    is terminated immediately to prevent blocking.
+    On Unix: Uses select() for non-blocking I/O with streaming truncation.
+    On Windows: Uses communicate() with post-hoc truncation.
+
+    If either stream exceeds the limit, output is truncated.
 
     Args:
         process: Subprocess with stdout/stderr pipes (text mode)
         max_bytes: Maximum bytes per stream (default 512KB)
-        chunk_size: Read chunk size
+        chunk_size: Read chunk size (Unix only)
 
     Returns:
         Tuple of (stdout_result, stderr_result) as BoundedOutput
@@ -155,6 +198,11 @@ def bounded_communicate(
             pass
         result = stdout.with_truncation_notice()
     """
+    # Windows: use simple communicate() + truncation
+    if sys.platform == "win32":
+        return _bounded_communicate_windows(process, max_bytes)
+
+    # Unix: use select() for streaming reads with early termination
     stdout_chunks: list[str] = []
     stderr_chunks: list[str] = []
     stdout_bytes = 0
