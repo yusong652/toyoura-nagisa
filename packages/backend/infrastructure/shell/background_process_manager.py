@@ -102,6 +102,7 @@ class BackgroundProcess:
     # Output reading tracking
     _stdout_thread: Optional[Thread] = None
     _stderr_thread: Optional[Thread] = None
+    _watcher_thread: Optional[Thread] = None  # Monitors process exit
     _output_lock: Lock = field(default_factory=Lock)
     _last_output_time: datetime = field(default_factory=datetime.now)
 
@@ -290,6 +291,22 @@ class BackgroundProcessManager:
         finally:
             stream.close()
 
+    def _watch_process_completion(self, bg_process: BackgroundProcess) -> None:
+        """Watch for process exit and set completion_time immediately.
+
+        This thread blocks on process.wait() and sets completion_time
+        as soon as the process exits, ensuring accurate runtime calculation.
+        """
+        try:
+            bg_process.process.wait()  # Block until process exits
+            # Set completion time immediately when process exits
+            if bg_process.status == "running":
+                bg_process.status = "completed"
+                bg_process.exit_code = bg_process.process.returncode
+                bg_process.completion_time = datetime.now()
+        except Exception:
+            pass
+
     def start_process(
         self,
         session_id: str,
@@ -369,6 +386,14 @@ class BackgroundProcessManager:
 
                 bg_process._stdout_thread.start()
                 bg_process._stderr_thread.start()
+
+                # Start watcher thread to track completion time
+                bg_process._watcher_thread = Thread(
+                    target=self._watch_process_completion,
+                    args=(bg_process,),
+                    daemon=True
+                )
+                bg_process._watcher_thread.start()
 
                 # Register the process
                 self.processes[process_id] = bg_process
@@ -460,6 +485,14 @@ class BackgroundProcessManager:
                 )
                 bg_process._stdout_thread.start()
                 bg_process._stderr_thread.start()
+
+            # Start watcher thread to track completion time
+            bg_process._watcher_thread = Thread(
+                target=self._watch_process_completion,
+                args=(bg_process,),
+                daemon=True
+            )
+            bg_process._watcher_thread.start()
 
             # Register the process
             self.processes[process_id] = bg_process
