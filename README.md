@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="./docs/assets/readme_header.png" alt="toyoura-nagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="900"/>
+  <img src="./docs/assets/readme_header.png" alt="toyoura-nagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="500"/>
 </p>
 
 <p align="center">
