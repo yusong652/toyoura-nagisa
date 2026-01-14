@@ -18,9 +18,9 @@
 
 **Toyoura Nagisa** demonstrates context engineering for LLM-driven discrete element simulations.
 
-Traditional DEM workflows involve repetitive cycles: searching documentation, comparing command syntax with Python APIs, and manually debugging scripts. We automate this: the LLM navigates documentation, understands command-API tradeoffs, generates tested code, and iterates until success.
+`pfc3d>model new`, but now, Large Language Model. Toyoura Nagisa navigates references, writes scripts, runs simulations, and iterates—until the particles actually behave.
 
-Every script execution creates a git snapshot with full workspace state. The LLM queries task history, reviews previous approaches, and builds upon past work—forming persistent cross-session context that survives restarts and spans projects.
+Every execution is remembered—script, parameters, results. The agent recalls what worked, learns from what failed, and builds upon previous attempts. Context persists across sessions and projects.
 
 Scripts *are* the context. Each execution compounds understanding.
 
@@ -38,7 +38,9 @@ Documentation tools guide script generation by providing verified syntax and usa
 
 ### ⚡ **Adaptive Simulation Control**
 
-The agent maintains complete control over simulation lifecycle. It submits scripts, monitors real-time progress, analyzes intermediate results, and decides autonomously when to continue, when to interrupt, and when to restart with adjustments.
+*Autonomy enables iteration.*
+
+The agent manages the simulation lifecycle—submitting, monitoring, analyzing, deciding. Within user-defined goals, it interrupts diverging runs and restarts with adjusted parameters without waiting for step-by-step approval. Continuous progress, faster convergence.
 
 ```
 Submit → Monitor → Analyze → Decide (continue | interrupt | restart)
@@ -48,20 +50,16 @@ Submit → Monitor → Analyze → Decide (continue | interrupt | restart)
 
 *Qualitative is radar, quantitative is microscope.*
 
-The agent captures visual output during simulation cycles—particle configurations, velocity arrows, contact force chains, cross-sections. Visual patterns reveal where to look; task output data confirms what's wrong.
+The agent captures visual output during simulation cycles—particle configurations, velocity arrows, contact force chains, cross-sections. Visuals locate anomalies; output data pinpoints the cause.
 
 ### 🤖 **SubAgent Delegation**
 
-Complex explorations risk context window exhaustion and hallucination. SubAgents solve both:
+*Delegate depth, preserve clarity.*
 
-- **Context Isolation**: SubAgent exploration doesn't consume MainAgent's context window
-- **Structured Results**: Only verified findings return to MainAgent—no intermediate noise
-- **Read-Only Safety**: SubAgents cannot execute simulations or modify files
+Deep exploration risks context exhaustion and hallucination. SubAgents isolate that complexity—exploring extensively, returning only verified findings.
 
-- **PFC Explorer**: Documentation queries, API exploration, project history search
-- **PFC Diagnostic**: Multimodal visual analysis, task output correlation, structured diagnosis
-
-The MainAgent stays focused on decision-making while SubAgents handle deep exploration.
+- **PFC Explorer**: Navigates documentation, returns verified syntax. The MainAgent decides; the Explorer validates.
+- **PFC Diagnostic**: Analyzes plots across angles and quantities, returns structured conclusions—not raw images.
 
 ### 📚 **Extensible Skills**
 
