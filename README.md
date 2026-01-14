@@ -16,9 +16,9 @@
 
 ## 💡 Script is Context
 
-**Toyoura Nagisa** demonstrates context engineering for LLM-driven discrete element simulations.
+`pfc3d>model new`, but now, Large Language Model.
 
-`pfc3d>model new`, but now, Large Language Model. Toyoura Nagisa navigates references, writes scripts, runs simulations, and iterates—until the particles actually behave.
+**Toyoura Nagisa** demonstrates context engineering for LLM-driven discrete element simulations. It navigates references, writes scripts, runs simulations, and iterates—until the particles actually behave.
 
 Every execution is remembered—script, parameters, results. The agent recalls what worked, learns from what failed, and builds upon previous attempts. Context persists across sessions and projects.
 
