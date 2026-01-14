@@ -147,8 +147,11 @@ BALL_COLOR_BY_SPECS = {
     "density":           {"type": "numeric", "attribute": "density"},
     "mass":              {"type": "numeric", "attribute": "mass"},
     # Text attributes - ball_color_by_quantity is ignored, uses named color mapping
-    "id":                {"type": "text", "attribute": "id"},
-    "group":             {"type": "text", "attribute": "group"},
+    # Different filter requirements:
+    #   - "id": color-by text-attribute "id" (no filter needed)
+    #   - "group": color-by text-attribute "group" 'Any' (requires filter)
+    "id":                {"type": "text-id", "attribute": "id"},
+    "group":             {"type": "text-group", "attribute": "group"},
 }
 
 # Wall color-by specifications (subset of ball attributes applicable to walls)
@@ -170,11 +173,13 @@ WALL_COLOR_BY_SPECS = {
 CONTACT_COLOR_BY_SPECS = {
     # Vector attributes
     "force": {"type": "vector", "attribute": "force"},
-    # Text attributes
-    "id":           {"type": "text", "attribute": "id"},
-    "group":        {"type": "text", "attribute": "group"},
-    "contact-type": {"type": "text", "attribute": "contact type"},
-    "model-name":   {"type": "text", "attribute": "model name"},
+    # Text attributes - different filter requirements:
+    #   - "id", "contact-type", "model-name": no filter needed
+    #   - "group": requires 'Any' filter
+    "id":           {"type": "text-id", "attribute": "id"},
+    "group":        {"type": "text-group", "attribute": "group"},
+    "contact-type": {"type": "text-id", "attribute": "contact type"},
+    "model-name":   {"type": "text-id", "attribute": "model name"},
     # Numeric properties (uses numeric-property, not numeric-attribute)
     "fric":       {"type": "numeric-property", "property": "fric"},
     "kn":         {"type": "numeric-property", "property": "kn"},
@@ -199,7 +204,8 @@ def _build_ball_color_by_command(
     Encapsulates PFC syntax:
     - Vector: color-by vector-attribute "name" quantity <mag|x|y|z>
     - Numeric: color-by numeric-attribute "name" (quantity ignored)
-    - Text: color-by text-attribute "name" (quantity ignored, uses named colors)
+    - Text-id: color-by text-attribute "id" (no filter, uses named colors)
+    - Text-group: color-by text-attribute "group" 'Any' (with filter, uses named colors)
 
     Args:
         color_by: Attribute name (e.g., "velocity", "position", "radius", "id", "group")
@@ -237,8 +243,12 @@ def _build_ball_color_by_command(
         elif spec["type"] == "numeric":
             color_by_part = f'color-by numeric-attribute "{spec["attribute"]}"'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
-        elif spec["type"] == "text":
-            # Text attributes need 'Any' filter to show all values
+        elif spec["type"] == "text-id":
+            # Text attributes like "id" don't need a filter
+            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+            color_options = "color-options named maximum-names 1000000 name-controls true"
+        elif spec["type"] == "text-group":
+            # Group text attribute needs 'Any' filter to show all values
             # Escape single quotes for embedding in itasca.command('...')
             color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
             color_options = "color-options named maximum-names 1000000 name-controls true"
@@ -302,7 +312,8 @@ def _build_wall_color_by_command(
 
     Encapsulates PFC syntax:
     - Vector: color-by vector-attribute "name" quantity <mag|x|y|z>
-    - Text: color-by text-attribute "name" (quantity ignored, uses named colors)
+    - Text-name: color-by text-attribute "name" (no filter, uses named colors)
+    - Text-group: color-by text-attribute "group" 'Any' piece off (with filter, uses named colors)
     - Custom: Unknown values treated as numeric-property (for wall.set_prop())
 
     Args:
@@ -366,7 +377,8 @@ def _build_contact_color_by_command(
 
     Encapsulates PFC syntax:
     - Vector: color-by vector-attribute "force" quantity <mag|x|y|z>
-    - Text: color-by text-attribute "model name" (quantity ignored, uses named colors)
+    - Text-id: color-by text-attribute "model name" (no filter, uses named colors)
+    - Text-group: color-by text-attribute "group" 'Any' (with filter, uses named colors)
     - Numeric: color-by numeric-property "fric" (known contact properties)
     - Custom: Unknown values treated as numeric-property (for contact.set_prop())
 
@@ -403,8 +415,12 @@ def _build_contact_color_by_command(
         if spec["type"] == "vector":
             color_by_part = f'color-by vector-attribute "{spec["attribute"]}" quantity {qty}'
             color_options = "color-options scaled ramp rainbow minimum automatic maximum automatic"
-        elif spec["type"] == "text":
-            # Contact text attributes need 'Any' filter to show all values
+        elif spec["type"] == "text-id":
+            # Text attributes like "id", "contact type", "model name" don't need a filter
+            color_by_part = f'color-by text-attribute "{spec["attribute"]}"'
+            color_options = "color-options named maximum-names 1000000 name-controls true"
+        elif spec["type"] == "text-group":
+            # Group text attribute needs 'Any' filter to show all values
             # Escape single quotes for embedding in itasca.command('...')
             color_by_part = f"color-by text-attribute \"{spec['attribute']}\" \\'Any\\'"
             color_options = "color-options named maximum-names 1000000 name-controls true"
