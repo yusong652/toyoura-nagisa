@@ -77,7 +77,7 @@ class AnthropicToolManager(BaseToolManager):
         anthropic_tools = []
         for _, tool_schema in tools_dict.items():
             # Convert JSONSchema object to dictionary
-            input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True)
+            input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True, by_alias=True)
 
             anthropic_tool = self._format_schema_for_anthropic({
                 "name": tool_schema.name,
@@ -122,7 +122,7 @@ class AnthropicToolManager(BaseToolManager):
                 schema_dict = {
                     "name": tool_schema.name,
                     "description": tool_schema.description,
-                    "parameters": tool_schema.inputSchema.model_dump(exclude_none=True)
+                    "parameters": tool_schema.inputSchema.model_dump(exclude_none=True, by_alias=True)
                 }
                 prompt_schemas.append(schema_dict)
             except Exception as e:

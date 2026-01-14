@@ -81,7 +81,7 @@ class GeminiToolManager(BaseToolManager):
                 schema_dict = {
                     "name": tool_schema.name,
                     "description": tool_schema.description,
-                    "parameters": tool_schema.inputSchema.model_dump(exclude_none=True)
+                    "parameters": tool_schema.inputSchema.model_dump(exclude_none=True, by_alias=True)
                 }
                 prompt_schemas.append(schema_dict)
             except Exception as e:
@@ -111,7 +111,7 @@ class GeminiToolManager(BaseToolManager):
             types.FunctionDeclaration: Gemini function declaration, or None if conversion failed
         """
         try:
-            input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True)
+            input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True, by_alias=True)
 
             # Normalize schema: convert 'definitions' -> '$defs' (SDK doesn't auto-alias this)
             sdk_schema = self._normalize_schema_for_sdk(input_schema_dict)

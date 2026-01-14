@@ -105,5 +105,5 @@ class ToolSchema(BaseModel):
         return {
             "name": self.name,
             "description": self.description,
-            "inputSchema": self.inputSchema.model_dump(exclude_none=True)
+            "inputSchema": self.inputSchema.model_dump(exclude_none=True, by_alias=True)
         }

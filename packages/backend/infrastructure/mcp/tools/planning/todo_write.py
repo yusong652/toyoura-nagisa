@@ -51,11 +51,22 @@ async def todo_write(
     context: Context,
     todos: List[TodoItem] = Field(
         ...,
-        description="The updated todo list"
+        description="Array of todo objects. Each object MUST have: content (imperative form, e.g. 'Run tests'), activeForm (present continuous, e.g. 'Running tests'), status ('pending'|'in_progress'|'completed')"
     )
 ) -> Dict[str, Any]:
     """Use this tool to create and manage a structured task list for your current coding session. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.
 It also helps the user understand the progress of the task and overall progress of their requests.
+
+## Parameter Format
+The `todos` parameter is an array of objects, NOT strings. Each object requires three fields:
+```json
+{
+  "todos": [
+    {"content": "Run tests", "activeForm": "Running tests", "status": "pending"},
+    {"content": "Fix bug", "activeForm": "Fixing bug", "status": "in_progress"}
+  ]
+}
+```
 
 ## When to Use This Tool
 Use this tool proactively in these scenarios:
@@ -89,15 +100,18 @@ NOTE that you should not use this tool if there is only one trivial task to do. 
 <example>
 User: Create a ball settling simulation with 1000 balls and linear contact model
 Assistant: I'll help create a ball settling simulation. Let me create a todo list to track this PFC workflow.
-*Creates todo list with the following items:*
-1. Querying PFC documentation for ball generation syntax
-2. Querying PFC documentation for linear contact model setup
-3. Writing test script with 10 balls for validation
-4. Executing test script to verify syntax correctness
-5. Writing production script with 1000 balls and monitoring loop
-6. Resetting PFC state before production run
-7. Executing production script in background mode
-8. Monitoring simulation progress with real-time output
+*Calls todo_write with:*
+```json
+{"todos": [
+  {"content": "Query PFC docs for ball generation", "activeForm": "Querying ball generation docs", "status": "in_progress"},
+  {"content": "Query PFC docs for contact model", "activeForm": "Querying contact model docs", "status": "pending"},
+  {"content": "Write test script (10 balls)", "activeForm": "Writing test script", "status": "pending"},
+  {"content": "Execute and validate test", "activeForm": "Executing test script", "status": "pending"},
+  {"content": "Write production script", "activeForm": "Writing production script", "status": "pending"},
+  {"content": "Execute production in background", "activeForm": "Executing production script", "status": "pending"},
+  {"content": "Monitor simulation progress", "activeForm": "Monitoring simulation", "status": "pending"}
+]}
+```
 *Begins working on the first task*
 
 <reasoning>
@@ -112,83 +126,25 @@ The assistant used the todo list because:
 
 <example>
 User: Run a triaxial compression test on a soil sample with strain-controlled loading
-Assistant: Let me first query the documentation to understand the required commands for triaxial testing.
-*Queries PFC documentation for domain creation, ball packing, wall confinement, servo control, and strain loading*
-Assistant: I've found the documentation for all required commands. This is a complex multi-stage simulation requiring careful initialization. Let me create a todo list to track these stages.
-*Creates todo list with specific items for each stage:*
-1. Querying documentation for domain extent and ball attributes
-2. Querying documentation for contact model and servo mechanism
-3. Writing test script for sample generation (100 balls)
-4. Validating test script execution
-5. Writing test script for confinement and servo control
-6. Validating servo convergence in test
-7. Writing production script for full sample (5000 balls)
-8. Executing sample generation in background
-9. Writing checkpoint save after equilibrium
-10. Writing strain loading loop with data export
-11. Executing loading phase with progress monitoring
-12. Writing CSV analysis script for stress-strain curve
+Assistant: This is a complex multi-stage simulation. Let me create a todo list.
+*Calls todo_write with todos array containing objects like:*
+```json
+{"content": "Query docs for domain/ball setup", "activeForm": "Querying documentation", "status": "in_progress"}
+```
+*Each todo object follows the same format as the first example*
 
 <reasoning>
-The assistant used the todo list because:
-1. Triaxial test involves multiple initialization stages (generation → confinement → loading)
-2. Each stage requires separate documentation queries and validation
-3. Checkpoint management is critical (save after equilibrium before loading)
-4. Long-running task requires background execution and progress tracking
-5. Post-processing analysis requires separate script writing
-6. The workflow spans multiple scripts and data files requiring systematic organization
+Complex simulations require systematic tracking of: query → test → production → monitor stages.
 </reasoning>
 </example>
 
 <example>
-User: I need to implement these analysis tasks: extract particle positions, calculate fabric tensor, visualize contact networks, and export results to CSV
-Assistant: I'll help implement these analysis tasks. First, let's add all the tasks to the todo list.
-*Creates a todo list breaking down each analysis task:*
-1. Querying Python API documentation for Ball.pos() syntax
-2. Writing script to extract particle positions from PFC
-3. Querying documentation for contact iteration methods
-4. Writing fabric tensor calculation function
-5. Exporting contact network data to CSV
-6. Writing Python analysis script for fabric tensor computation
-7. Writing Python visualization script using matplotlib
-8. Executing analysis pipeline and generating plots
+User: Help me debug the contact model setup - my simulation shows unexpected results
+Assistant: I'll systematically debug this. Let me create a todo list.
+*Calls todo_write with todos array - each item as an object with content/activeForm/status fields*
 
 <reasoning>
-The assistant used the todo list because:
-1. The user provided multiple analysis tasks in a comma-separated list
-2. Each task requires both PFC data extraction and local Python analysis
-3. Documentation queries needed for both PFC Python API and command syntax
-4. Analysis involves two separate environments (PFC Python vs workspace venv)
-5. Visualization requires separate script writing and package installation
-6. The todo list helps track both PFC operations and post-processing tasks
-</reasoning>
-</example>
-
-<example>
-User: My simulation is showing unexpected results. Help me debug the contact model setup
-Assistant: Let me first check the current simulation state and scripts to identify potential issues.
-*Uses read tool to examine existing scripts and grep to search for contact model commands*
-Assistant: I've found several potential issues in your contact model configuration. Let me create a todo list to systematically debug these issues.
-*Creates todo list with diagnostic and fix tasks:*
-1. Reading current production script to understand configuration
-2. Querying documentation for correct contact property syntax
-3. Identifying incorrect parameter usage (found: using 'friction' instead of 'fric')
-4. Writing corrected test script with proper contact property syntax
-5. Executing test script to verify contact model behavior
-6. Querying documentation for contact model validation methods
-7. Writing diagnostic script to print contact properties
-8. Comparing diagnostic output with expected values
-9. Updating production script with corrected parameters
-10. Re-executing production simulation with monitoring
-
-<reasoning>
-The assistant used the todo list because:
-1. Debugging requires systematic investigation of multiple potential issues
-2. Each fix must be validated with test scripts before updating production
-3. Documentation queries needed to verify correct syntax
-4. Diagnostic scripts must be written and executed to confirm issues
-5. The error escalation strategy (docs → API → web → user) requires tracking
-6. Multiple script modifications and validations need organized tracking
+Debugging requires systematic investigation with documentation queries, test scripts, and validation steps.
 </reasoning>
 </example>
 

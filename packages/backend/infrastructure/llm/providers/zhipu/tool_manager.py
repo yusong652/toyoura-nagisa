@@ -89,7 +89,7 @@ class ZhipuToolManager(BaseToolManager):
         """
         try:
             # Get the input schema and convert to dict
-            input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True)
+            input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True, by_alias=True)
 
             # Handle required fields properly for Zhipu function calling
             if "properties" in input_schema_dict:
@@ -150,7 +150,7 @@ class ZhipuToolManager(BaseToolManager):
                 schema_dict = {
                     "name": tool_schema.name,
                     "description": tool_schema.description,
-                    "parameters": tool_schema.inputSchema.model_dump(exclude_none=True)
+                    "parameters": tool_schema.inputSchema.model_dump(exclude_none=True, by_alias=True)
                 }
                 prompt_schemas.append(schema_dict)
             except Exception as e:
