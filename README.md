@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="./packages/web/public/readme_header.png" alt="toyoura-nagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="900"/>
+  <img src="./docs/assets/readme_header.png" alt="toyoura-nagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="900"/>
 </p>
 
 <p align="center">
@@ -23,6 +23,10 @@ Traditional DEM workflows involve repetitive cycles: searching documentation, co
 Every script execution creates a git snapshot with full workspace state. The LLM queries task history, reviews previous approaches, and builds upon past work—forming persistent cross-session context that survives restarts and spans projects.
 
 Scripts *are* the context. Each execution compounds understanding.
+
+<p align="center">
+  <img src="./docs/assets/HelloNagisa.gif" alt="Demo: Drop 50 balls into a box" width="640"/>
+</p>
 
 ## 🎯 Core Features
 
