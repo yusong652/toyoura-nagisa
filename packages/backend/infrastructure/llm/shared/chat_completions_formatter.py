@@ -11,7 +11,7 @@ The Chat Completions API format differs from OpenAI's Responses API:
 
 Supports multimodal content, tool calls, and message history processing.
 
-Note: Kimi uses a separate formatter (kimi/message_formatter.py) that supports reasoning_content.
+Note: Moonshot uses a separate formatter (moonshot/message_formatter.py) that supports reasoning_content.
 """
 
 import json
@@ -33,7 +33,7 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
     - Other standard OpenAI-compatible APIs
 
     Note: This formatter does NOT support reasoning_content field.
-    Kimi uses KimiMessageFormatter which supports reasoning_content for k2-thinking models.
+    Moonshot uses MoonshotMessageFormatter which supports reasoning_content for k2-thinking models.
     """
 
     @staticmethod

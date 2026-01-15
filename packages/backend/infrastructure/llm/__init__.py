@@ -14,7 +14,7 @@ from backend.domain.models.response_models import LLMResponse
 from backend.infrastructure.llm.providers.gemini import GeminiClient
 from backend.infrastructure.llm.providers.anthropic import AnthropicClient
 from backend.infrastructure.llm.providers.openai import OpenAIClient
-from backend.infrastructure.llm.providers.kimi import KimiClient
+from backend.infrastructure.llm.providers.moonshot import MoonshotClient
 from backend.infrastructure.llm.providers.zhipu import ZhipuClient
 
 try:
@@ -41,7 +41,7 @@ __all__ = [
     "GeminiClient",
     "AnthropicClient",
     "OpenAIClient",
-    "KimiClient",
+    "MoonshotClient",
     "ZhipuClient",
     "LocalLLMClient",
 ] 

@@ -22,7 +22,7 @@ class LLMFactory:
         from backend.infrastructure.llm.providers.gemini import GeminiClient
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         from backend.infrastructure.llm.providers.openai import OpenAIClient
-        from backend.infrastructure.llm.providers.kimi import KimiClient
+        from backend.infrastructure.llm.providers.moonshot import MoonshotClient
         from backend.infrastructure.llm.providers.zhipu import ZhipuClient
         from backend.infrastructure.llm.providers.openrouter import OpenRouterClient
         from backend.infrastructure.llm.providers.local.local_llm_client import LocalLLMClient
@@ -32,7 +32,7 @@ class LLMFactory:
             "anthropic": AnthropicClient,
             "gpt": OpenAIClient,
             "openai": OpenAIClient,
-            "kimi": KimiClient,
+            "moonshot": MoonshotClient,
             "zhipu": ZhipuClient,
             "openrouter": OpenRouterClient,
             "local_llm": LocalLLMClient,
@@ -94,8 +94,8 @@ class LLMFactory:
                 "extra_config": {**extra, "model": cfg.model, "temperature": cfg.temperature,
                                  "top_p": cfg.top_p, "top_k": cfg.top_k, "max_tokens": cfg.max_tokens}
             }
-        elif name == "kimi":
-            cfg = llm_settings.get_kimi_config()
+        elif name == "moonshot":
+            cfg = llm_settings.get_moonshot_config()
             if not cfg.moonshot_api_key:
                 raise ValueError("Moonshot API key not configured")
             return {
@@ -163,8 +163,8 @@ class LLMFactory:
                 "extra_config": {**extra, "model": cfg.secondary_model, "temperature": cfg.temperature,
                                  "top_p": cfg.top_p, "top_k": cfg.top_k, "max_tokens": cfg.max_tokens}
             }
-        elif name == "kimi":
-            cfg = llm_settings.get_kimi_config()
+        elif name == "moonshot":
+            cfg = llm_settings.get_moonshot_config()
             logger.info(f"Secondary model: {cfg.secondary_model}")
             return {
                 "api_key": cfg.moonshot_api_key,

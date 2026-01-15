@@ -1,9 +1,9 @@
 """
-Kimi (Moonshot) Response Processor
+Moonshot (Moonshot) Response Processor
 
-Handles processing of Kimi API responses using OpenAI Chat Completions API format.
+Handles processing of Moonshot API responses using OpenAI Chat Completions API format.
 
-Unlike OpenAI's Responses API, Kimi uses the traditional Chat Completions API
+Unlike OpenAI's Responses API, Moonshot uses the traditional Chat Completions API
 which returns ChatCompletion objects instead of Response objects.
 """
 
@@ -13,14 +13,14 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatComplet
 from backend.domain.models.messages import AssistantMessage
 from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor, BaseStreamingProcessor
-from .debug import KimiDebugger
+from .debug import MoonshotDebugger
 
 
-class KimiStreamingProcessor(BaseStreamingProcessor):
+class MoonshotStreamingProcessor(BaseStreamingProcessor):
     """
-    Stateful streaming processor for Kimi API.
+    Stateful streaming processor for Moonshot API.
 
-    Processes Kimi ChatCompletionChunk events and converts them into
+    Processes Moonshot ChatCompletionChunk events and converts them into
     standardized StreamingChunk objects. Maintains state to track tool calls
     and reasoning content across chunks.
     """
@@ -34,10 +34,10 @@ class KimiStreamingProcessor(BaseStreamingProcessor):
 
     def process_event(self, event: Any) -> List[StreamingChunk]:
         """
-        Process Kimi streaming chunk into standardized StreamingChunk objects.
+        Process Moonshot streaming chunk into standardized StreamingChunk objects.
 
         Args:
-            event: Kimi ChatCompletionChunk
+            event: Moonshot ChatCompletionChunk
 
         Returns:
             List[StreamingChunk]: List of standardized chunks to yield
@@ -79,7 +79,7 @@ class KimiStreamingProcessor(BaseStreamingProcessor):
         delta = choice.delta
 
         # Also check for usage in choice.usage (appears in finish_reason chunk)
-        # Note: Kimi may include usage in choice, though not in OpenAI's type definition
+        # Note: Moonshot may include usage in choice, though not in OpenAI's type definition
         usage_metadata = {}
         usage = getattr(choice, 'usage', None)
         if usage:
@@ -94,7 +94,7 @@ class KimiStreamingProcessor(BaseStreamingProcessor):
                 'candidates_token_count': get_usage_field('completion_tokens'),
                 'total_token_count': get_usage_field('total_tokens'),
             }
-            # Extract cached tokens (Kimi-specific field)
+            # Extract cached tokens (Moonshot-specific field)
             cached = get_usage_field('cached_tokens')
             if cached:
                 usage_metadata['cached_tokens'] = cached
@@ -176,21 +176,21 @@ class KimiStreamingProcessor(BaseStreamingProcessor):
         return result
 
 
-class KimiResponseProcessor(BaseResponseProcessor):
+class MoonshotResponseProcessor(BaseResponseProcessor):
     """
-    Process Kimi API responses using Chat Completions format.
+    Process Moonshot API responses using Chat Completions format.
 
-    Kimi uses OpenAI-compatible Chat Completions API (not Responses API),
+    Moonshot uses OpenAI-compatible Chat Completions API (not Responses API),
     so the response structure is ChatCompletion, not Response.
     """
 
     @staticmethod
     def extract_text_content(response) -> str:
         """
-        Extract text content from Kimi ChatCompletion response.
+        Extract text content from Moonshot ChatCompletion response.
 
         Args:
-            response: ChatCompletion object from Kimi API
+            response: ChatCompletion object from Moonshot API
 
         Returns:
             Extracted text content as a single string.
@@ -207,13 +207,13 @@ class KimiResponseProcessor(BaseResponseProcessor):
     @staticmethod
     def extract_reasoning_content(response) -> Optional[str]:
         """
-        Extract reasoning content from Kimi K2 Thinking ChatCompletion response.
+        Extract reasoning content from Moonshot K2 Thinking ChatCompletion response.
 
         K2 Thinking models expose an auxiliary field `reasoning_content` that contains
         the model's intermediate reasoning/thinking process before the final answer.
 
         Args:
-            response: ChatCompletion object from Kimi API
+            response: ChatCompletion object from Moonshot API
 
         Returns:
             Extracted reasoning content as a string, or None if not available.
@@ -248,10 +248,10 @@ class KimiResponseProcessor(BaseResponseProcessor):
     @staticmethod
     def extract_tool_calls(response) -> List[Dict[str, Any]]:
         """
-        Extract tool calls from Kimi ChatCompletion response.
+        Extract tool calls from Moonshot ChatCompletion response.
 
         Args:
-            response: ChatCompletion object from Kimi API
+            response: ChatCompletion object from Moonshot API
 
         Returns:
             List of tool call dictionaries with name, arguments, and id.
@@ -326,7 +326,7 @@ class KimiResponseProcessor(BaseResponseProcessor):
         tool_calls: Optional[List[Dict[str, Any]]] = None
     ) -> AssistantMessage:
         """
-        Format Kimi ChatCompletion response for storage in message history.
+        Format Moonshot ChatCompletion response for storage in message history.
 
         This method creates standardized message objects optimized for:
         - Database storage efficiency
@@ -335,7 +335,7 @@ class KimiResponseProcessor(BaseResponseProcessor):
         - K2 Thinking model reasoning content support
 
         Args:
-            response: ChatCompletion object from Kimi API
+            response: ChatCompletion object from Moonshot API
             tool_calls: Pre-extracted tool calls (optional). If provided, reuses these
                        instead of re-extracting to ensure consistent IDs.
 
@@ -348,18 +348,18 @@ class KimiResponseProcessor(BaseResponseProcessor):
         content_blocks: List[Dict[str, Any]] = []
 
         # Extract reasoning content first (K2 Thinking models)
-        reasoning_content = KimiResponseProcessor.extract_reasoning_content(response)
+        reasoning_content = MoonshotResponseProcessor.extract_reasoning_content(response)
         if reasoning_content:
             content_blocks.append({"type": "thinking", "thinking": reasoning_content})
 
         # Extract text content
-        text_content = KimiResponseProcessor.extract_text_content(response)
+        text_content = MoonshotResponseProcessor.extract_text_content(response)
         if text_content:
             content_blocks.append({"type": "text", "text": text_content})
 
         # Reuse pre-extracted tool calls if provided, otherwise extract now
         if tool_calls is None:
-            tool_calls = KimiResponseProcessor.extract_tool_calls(response)
+            tool_calls = MoonshotResponseProcessor.extract_tool_calls(response)
 
         # Add tool_use blocks to content array (following Gemini/Anthropic pattern)
         # This ensures frontend can render tool calls correctly
@@ -382,7 +382,7 @@ class KimiResponseProcessor(BaseResponseProcessor):
     @staticmethod
     def format_response_for_context(response) -> Optional[Dict[str, Any]]:
         """
-        Format Kimi ChatCompletion response for working context.
+        Format Moonshot ChatCompletion response for working context.
 
         Extracts data from API response and builds message dict in Chat Completions
         format for use in subsequent API calls.
@@ -391,7 +391,7 @@ class KimiResponseProcessor(BaseResponseProcessor):
         now centralized in the response processor for better separation of concerns.
 
         Args:
-            response: ChatCompletion object from Kimi API
+            response: ChatCompletion object from Moonshot API
 
         Returns:
             Message dict ready to append to working_contents, or None if invalid.
@@ -424,7 +424,7 @@ class KimiResponseProcessor(BaseResponseProcessor):
             "role": message.role
         }
 
-        # Add reasoning_content as separate field if present (Kimi k2-thinking format)
+        # Add reasoning_content as separate field if present (Moonshot k2-thinking format)
         if reasoning_content and reasoning_content.strip():
             message_dict["reasoning_content"] = reasoning_content
 
@@ -455,9 +455,9 @@ class KimiResponseProcessor(BaseResponseProcessor):
     @staticmethod
     def extract_web_search_sources(response, debug: bool = False) -> List[Dict[str, Any]]:
         """
-        Extract web search sources from Kimi response.
+        Extract web search sources from Moonshot response.
 
-        Kimi supports web search through the $web_search builtin_tool.
+        Moonshot supports web search through the $web_search builtin_tool.
         Search results are integrated directly into the response text.
         """
         sources = []
@@ -475,16 +475,16 @@ class KimiResponseProcessor(BaseResponseProcessor):
                 function = getattr(tool_call, 'function', None)
                 if function and getattr(function, 'name', '') == '$web_search':
                     # Web search was performed
-                    # Kimi integrates results into text, so we mark it
+                    # Moonshot integrates results into text, so we mark it
                     sources.append({
-                        "title": "Kimi Web Search",
+                        "title": "Moonshot Web Search",
                         "url": "",
                         "snippet": "Search results integrated into response",
                         "type": "web_search"
                     })
 
         if debug and sources:
-            print(f"[DEBUG] Extracted {len(sources)} web search sources from Kimi response")
+            print(f"[DEBUG] Extracted {len(sources)} web search sources from Moonshot response")
 
         return sources
 
@@ -516,7 +516,7 @@ class KimiResponseProcessor(BaseResponseProcessor):
         # Check if we have a final response stored in metadata
         for chunk in reversed(chunks):
             metadata = chunk.metadata or {}
-            final_response = metadata.get("__kimi_final_response")
+            final_response = metadata.get("__moonshot_final_response")
             if final_response:
                 return final_response
 
@@ -569,7 +569,7 @@ class KimiResponseProcessor(BaseResponseProcessor):
 
         # Get model name from config
         from backend.config.llm import get_llm_settings
-        model_name = get_llm_settings().get_kimi_config().model
+        model_name = get_llm_settings().get_moonshot_config().model
 
         return ChatCompletion(
             id="constructed_from_chunks",
@@ -587,12 +587,12 @@ class KimiResponseProcessor(BaseResponseProcessor):
     @staticmethod
     def create_streaming_processor() -> BaseStreamingProcessor:
         """
-        Create Kimi streaming processor instance.
+        Create Moonshot streaming processor instance.
 
         Returns:
-            KimiStreamingProcessor: Stateful processor for Kimi streaming
+            MoonshotStreamingProcessor: Stateful processor for Moonshot streaming
         """
-        return KimiStreamingProcessor()
+        return MoonshotStreamingProcessor()
 
 
-__all__ = ['KimiResponseProcessor']
+__all__ = ['MoonshotResponseProcessor']

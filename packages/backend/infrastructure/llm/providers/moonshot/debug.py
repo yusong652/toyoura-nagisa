@@ -1,16 +1,16 @@
 """
-Kimi (Moonshot) Debugger
+Moonshot (Moonshot) Debugger
 
-Debugging utilities for Kimi Chat Completions API calls.
+Debugging utilities for Moonshot Chat Completions API calls.
 """
 
 import json
 from typing import Dict, Any, List
 
 
-class KimiDebugger:
+class MoonshotDebugger:
     """
-    Debugging utilities for Kimi API calls.
+    Debugging utilities for Moonshot API calls.
 
     Provides detailed logging of request payloads, tool schemas, and responses.
     """
@@ -26,7 +26,7 @@ class KimiDebugger:
             tools: Tool schemas
         """
         print(f"\n{'='*80}")
-        print(f"[KIMI DEBUG] API Request")
+        print(f"[MOONSHOT DEBUG] API Request")
         print(f"{'='*80}")
 
         # Basic parameters
@@ -73,7 +73,7 @@ class KimiDebugger:
                 tool_copy['type'] = tool_type
 
                 if tool_type == 'builtin_function':
-                    # Kimi's builtin functions (like $web_search)
+                    # Moonshot's builtin functions (like $web_search)
                     tool_copy['function'] = tool.get('function', {})
                 elif 'function' in tool:
                     func = tool['function']
@@ -115,21 +115,21 @@ class KimiDebugger:
         Args:
             tool_calls: List of tool calls from ChatCompletion
         """
-        print(f"\n[KIMI DEBUG] Tool Calls Received:")
+        print(f"\n[MOONSHOT DEBUG] Tool Calls Received:")
         for i, tc in enumerate(tool_calls):
-            print(f"[KIMI]   Call {i+1}:")
-            print(f"[KIMI]     ID: {tc.get('id', 'N/A')}")
-            print(f"[KIMI]     Function: {tc.get('function', {}).get('name', 'unknown')}")
+            print(f"[MOONSHOT]   Call {i+1}:")
+            print(f"[MOONSHOT]     ID: {tc.get('id', 'N/A')}")
+            print(f"[MOONSHOT]     Function: {tc.get('function', {}).get('name', 'unknown')}")
 
             args = tc.get('function', {}).get('arguments', '')
             if isinstance(args, str):
                 try:
                     parsed = json.loads(args) if args else {}
-                    print(f"[KIMI]     Arguments: {json.dumps(parsed, indent=8)}")
+                    print(f"[MOONSHOT]     Arguments: {json.dumps(parsed, indent=8)}")
                 except json.JSONDecodeError:
-                    print(f"[KIMI]     Arguments (raw): {args}")
+                    print(f"[MOONSHOT]     Arguments (raw): {args}")
             else:
-                print(f"[KIMI]     Arguments: {args}")
+                print(f"[MOONSHOT]     Arguments: {args}")
         print()
 
     @staticmethod
@@ -140,14 +140,14 @@ class KimiDebugger:
         Args:
             tool_calls: Processed tool calls with name, arguments, id
         """
-        print(f"\n[KIMI DEBUG] Extracted Tool Calls:")
+        print(f"\n[MOONSHOT DEBUG] Extracted Tool Calls:")
         for i, tc in enumerate(tool_calls):
-            print(f"[KIMI]   Call {i+1}:")
-            print(f"[KIMI]     Name: {tc.get('name', 'N/A')}")
-            print(f"[KIMI]     ID: {tc.get('id', 'N/A')}")
-            print(f"[KIMI]     Arguments type: {type(tc.get('arguments')).__name__}")
-            print(f"[KIMI]     Arguments: {json.dumps(tc.get('arguments', {}), indent=8)}")
+            print(f"[MOONSHOT]   Call {i+1}:")
+            print(f"[MOONSHOT]     Name: {tc.get('name', 'N/A')}")
+            print(f"[MOONSHOT]     ID: {tc.get('id', 'N/A')}")
+            print(f"[MOONSHOT]     Arguments type: {type(tc.get('arguments')).__name__}")
+            print(f"[MOONSHOT]     Arguments: {json.dumps(tc.get('arguments', {}), indent=8)}")
         print()
 
 
-__all__ = ['KimiDebugger']
+__all__ = ['MoonshotDebugger']

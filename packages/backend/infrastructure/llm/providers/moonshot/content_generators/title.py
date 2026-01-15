@@ -1,7 +1,7 @@
 """
-Kimi-specific title generator.
+Moonshot-specific title generator.
 
-Generates concise conversation titles using the Kimi (Moonshot) API.
+Generates concise conversation titles using the Moonshot (Moonshot) API.
 """
 
 from typing import Optional, List, Any, cast
@@ -19,9 +19,9 @@ from backend.infrastructure.llm.shared.constants import (
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
 
 
-class KimiTitleGenerator(BaseTitleGenerator):
+class MoonshotTitleGenerator(BaseTitleGenerator):
     """
-    Kimi-specific title generation using Chat Completions API.
+    Moonshot-specific title generation using Chat Completions API.
     """
 
     async def generate_title_from_messages(
@@ -42,9 +42,9 @@ class KimiTitleGenerator(BaseTitleGenerator):
             if not BaseTitleGenerator.validate_messages_for_title(latest_messages):
                 return None
 
-            # Get Kimi configuration
+            # Get Moonshot configuration
             llm_settings = get_llm_settings()
-            kimi_config = llm_settings.get_kimi_config()
+            moonshot_config = llm_settings.get_moonshot_config()
 
             # Use non-thinking model for title generation (fast and concise)
             title_model = "kimi-k2-0905-preview"
@@ -81,7 +81,7 @@ class KimiTitleGenerator(BaseTitleGenerator):
                 {"role": "user", "content": f"Please generate a title based on the following conversation:\n\n{conversation_context}"}
             ]
 
-            # Call Kimi API using Chat Completions format (direct async call)
+            # Call Moonshot API using Chat Completions format (direct async call)
             response: ChatCompletion = await self.client.chat.completions.create(
                 model=title_model,  # Use non-thinking model for fast title generation
                 messages=cast(Any, chat_messages),

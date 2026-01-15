@@ -13,7 +13,7 @@ class LLMSettings(BaseSettings):
     """LLM Master Configuration"""
 
     # Current LLM provider
-    provider: Literal["openai", "gemini", "anthropic", "local_llm", "kimi", "openrouter", "zhipu"] = Field(
+    provider: Literal["openai", "gemini", "anthropic", "local_llm", "moonshot", "openrouter", "zhipu"] = Field(
         default="gemini",
         description="Current LLM provider"
     )
@@ -39,9 +39,9 @@ class LLMSettings(BaseSettings):
         """Get Anthropic configuration"""
         return AnthropicConfig()  # type: ignore
 
-    def get_kimi_config(self) -> KimiConfig:
-        """Get Kimi configuration"""
-        return KimiConfig()  # type: ignore
+    def get_moonshot_config(self) -> MoonshotConfig:
+        """Get Moonshot configuration"""
+        return MoonshotConfig()  # type: ignore
 
     def get_openrouter_config(self) -> OpenRouterConfig:
         """Get OpenRouter configuration"""
@@ -66,7 +66,7 @@ class LLMSettings(BaseSettings):
             "openai": self.get_openai_config,
             "gemini": self.get_gemini_config,
             "anthropic": self.get_anthropic_config,
-            "kimi": self.get_kimi_config,
+            "moonshot": self.get_moonshot_config,
             "openrouter": self.get_openrouter_config,
             "zhipu": self.get_zhipu_config,
             "local_llm": self.get_local_llm_config
@@ -197,8 +197,8 @@ class AnthropicConfig(BaseSettings):
     )
 
 
-class KimiConfig(BaseSettings):
-    """Kimi (Moonshot) Configuration"""
+class MoonshotConfig(BaseSettings):
+    """Moonshot Configuration"""
 
     # API Key - set via environment variable MOONSHOT_API_KEY
     moonshot_api_key: Optional[str] = Field(default=None, description="Moonshot API Key")

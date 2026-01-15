@@ -14,12 +14,12 @@ Supported Models (examples):
 
 Architecture:
 OpenRouter uses OpenAI-compatible Chat Completions API (not Responses API).
-This provider is based on Kimi implementation with these differences:
+This provider is based on Moonshot implementation with these differences:
 - OpenRouterToolManager: Uses nested tool schema format (OpenAI compatible)
 - OpenRouterResponseProcessor: Handles ChatCompletion objects
 - OpenRouterContextManager: Manages ChatCompletion responses
 - OpenRouterMessageFormatter: Alias to OpenAI formatter (Chat Completions compatible)
-- No provider-specific features (like Kimi's $web_search)
+- No provider-specific features (like Moonshot's $web_search)
 
 Use Cases:
 - Quick access to multiple LLM providers without separate integrations

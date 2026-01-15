@@ -343,7 +343,7 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         if tool_calls is None:
             tool_calls = OpenAIResponseProcessor.extract_tool_calls(response)
 
-        # Add tool_use blocks to content array (following Gemini/Anthropic/Kimi pattern)
+        # Add tool_use blocks to content array (following Gemini/Anthropic/Moonshot pattern)
         # This ensures frontend can render tool calls correctly
         if tool_calls:
             for tool_call in tool_calls:

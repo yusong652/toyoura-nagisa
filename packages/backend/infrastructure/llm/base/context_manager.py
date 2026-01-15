@@ -263,7 +263,7 @@ class BaseContextManager(ABC):
             # Merge into last message
             last_msg = self.working_contents[-1]
             if isinstance(last_msg, dict):
-                # Dict format (Kimi/OpenAI)
+                # Dict format (Moonshot/OpenAI)
                 if isinstance(last_msg.get('content'), str):
                     last_msg['content'] += merge_text
                 elif isinstance(last_msg.get('content'), list):

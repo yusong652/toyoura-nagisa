@@ -1,8 +1,8 @@
 """
-Kimi (Moonshot) client implementation using OpenAI-compatible API.
+Moonshot (Moonshot) client implementation using OpenAI-compatible API.
 
 This implementation uses the standard OpenAI Chat Completions API format
-since Kimi/Moonshot provides full OpenAI compatibility.
+since Moonshot/Moonshot provides full OpenAI compatibility.
 
 Base URL: https://api.moonshot.ai/v1
 """
@@ -18,17 +18,17 @@ from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 
-# Import Kimi-specific implementations (aliases for OpenAI components)
-from .config import get_kimi_client_config
-from .message_formatter import KimiMessageFormatter
-from .tool_manager import KimiToolManager
-from .context_manager import KimiContextManager
-from .debug import KimiDebugger
+# Import Moonshot-specific implementations (aliases for OpenAI components)
+from .config import get_moonshot_client_config
+from .message_formatter import MoonshotMessageFormatter
+from .tool_manager import MoonshotToolManager
+from .context_manager import MoonshotContextManager
+from .debug import MoonshotDebugger
 
 
-class KimiClient(LLMClientBase):
+class MoonshotClient(LLMClientBase):
     """
-    Kimi (Moonshot) client implementation using OpenAI-compatible API.
+    Moonshot (Moonshot) client implementation using OpenAI-compatible API.
 
     Key Features:
     - OpenAI-compatible Chat Completions API
@@ -36,7 +36,7 @@ class KimiClient(LLMClientBase):
     - Full streaming support with tool calling
     - Real-time tool execution notifications
 
-    Kimi specializes in:
+    Moonshot specializes in:
     - Long document understanding and analysis
     - Multi-turn conversations with extensive context
     - Chinese language processing
@@ -44,7 +44,7 @@ class KimiClient(LLMClientBase):
 
     def __init__(self, api_key: str, **kwargs):
         """
-        Initialize Kimi client with OpenAI-compatible setup.
+        Initialize Moonshot client with OpenAI-compatible setup.
 
         Args:
             api_key: Moonshot API key (MOONSHOT_API_KEY)
@@ -57,7 +57,7 @@ class KimiClient(LLMClientBase):
         super().__init__(**kwargs)
         self.api_key = api_key
 
-        # Initialize Kimi-specific configuration
+        # Initialize Moonshot-specific configuration
         config_overrides = {}
 
         # Extract relevant configuration from extra_config for overrides
@@ -74,12 +74,12 @@ class KimiClient(LLMClientBase):
         if 'debug' in self.extra_config:
             config_overrides['debug'] = self.extra_config['debug']
 
-        self.kimi_config = get_kimi_client_config(**config_overrides)
+        self.moonshot_config = get_moonshot_client_config(**config_overrides)
 
-        # Initialize both sync and async OpenAI clients with Kimi base URL
+        # Initialize both sync and async OpenAI clients with Moonshot base URL
         client_kwargs: Dict[str, Any] = {
             "api_key": self.api_key,
-            "base_url": self.kimi_config.base_url
+            "base_url": self.moonshot_config.base_url
         }
 
         # Allow custom base URL override
@@ -94,7 +94,7 @@ class KimiClient(LLMClientBase):
         self.async_client = AsyncOpenAI(**client_kwargs)
 
         # Initialize unified tool manager (uses OpenAI-compatible format)
-        self.tool_manager = KimiToolManager()
+        self.tool_manager = MoonshotToolManager()
 
     # ========== CORE API METHODS ==========
 
@@ -105,7 +105,7 @@ class KimiClient(LLMClientBase):
         **kwargs
     ) -> ChatCompletion:
         """
-        Execute a stateless Kimi API call with prepared context.
+        Execute a stateless Moonshot API call with prepared context.
 
         Uses standard OpenAI Chat Completions API format.
 
@@ -117,11 +117,11 @@ class KimiClient(LLMClientBase):
         Returns:
             ChatCompletion object from OpenAI-compatible API.
         """
-        debug = self.kimi_config.debug
+        debug = self.moonshot_config.debug
 
         tools = api_config.get("tools", []) or []
 
-        # Build messages (Kimi uses standard OpenAI format)
+        # Build messages (Moonshot uses standard OpenAI format)
         messages = context_contents.copy()
 
         # Add system message if provided
@@ -134,14 +134,14 @@ class KimiClient(LLMClientBase):
 
         # Build API call parameters
         api_kwargs: Dict[str, Any] = {
-            "model": self.kimi_config.model_settings.model,
+            "model": self.moonshot_config.model_settings.model,
             "messages": messages,
-            "temperature": self.kimi_config.model_settings.temperature,
-            "top_p": self.kimi_config.model_settings.top_p,
+            "temperature": self.moonshot_config.model_settings.temperature,
+            "top_p": self.moonshot_config.model_settings.top_p,
         }
 
-        if self.kimi_config.model_settings.max_tokens:
-            api_kwargs["max_tokens"] = self.kimi_config.model_settings.max_tokens
+        if self.moonshot_config.model_settings.max_tokens:
+            api_kwargs["max_tokens"] = self.moonshot_config.model_settings.max_tokens
 
         # Add tools if provided
         if tools:
@@ -157,14 +157,14 @@ class KimiClient(LLMClientBase):
             api_kwargs['top_p'] = kwargs['top_p']
 
         if debug:
-            KimiDebugger.print_api_request(api_kwargs, messages, tools)
+            MoonshotDebugger.print_api_request(api_kwargs, messages, tools)
 
         try:
             response = await self.async_client.chat.completions.create(**api_kwargs)
             return response
         except Exception as exc:
             if debug:
-                print(f"[DEBUG] Kimi API call failed: {exc}")
+                print(f"[DEBUG] Moonshot API call failed: {exc}")
             raise
 
     async def call_api_with_context_streaming(
@@ -174,7 +174,7 @@ class KimiClient(LLMClientBase):
         **kwargs
     ) -> AsyncGenerator[StreamingChunk, None]:
         """
-        Execute streaming Kimi API call with real-time chunk delivery.
+        Execute streaming Moonshot API call with real-time chunk delivery.
 
         Args:
             context_contents: Conversation messages in OpenAI format.
@@ -184,7 +184,7 @@ class KimiClient(LLMClientBase):
         Yields:
             StreamingChunk: Standardized streaming data chunks.
         """
-        debug = self.kimi_config.debug
+        debug = self.moonshot_config.debug
 
         tools = api_config.get("tools", []) or []
 
@@ -201,16 +201,16 @@ class KimiClient(LLMClientBase):
 
         # Build API call parameters
         api_kwargs: Dict[str, Any] = {
-            "model": self.kimi_config.model_settings.model,
+            "model": self.moonshot_config.model_settings.model,
             "messages": messages,
-            "temperature": self.kimi_config.model_settings.temperature,
-            "top_p": self.kimi_config.model_settings.top_p,
+            "temperature": self.moonshot_config.model_settings.temperature,
+            "top_p": self.moonshot_config.model_settings.top_p,
             "stream": True,  # Enable streaming
             "stream_options": {"include_usage": True},  # Request usage metadata in stream
         }
 
-        if self.kimi_config.model_settings.max_tokens:
-            api_kwargs["max_tokens"] = self.kimi_config.model_settings.max_tokens
+        if self.moonshot_config.model_settings.max_tokens:
+            api_kwargs["max_tokens"] = self.moonshot_config.model_settings.max_tokens
 
         # Add tools if provided
         if tools:
@@ -226,7 +226,7 @@ class KimiClient(LLMClientBase):
             api_kwargs['top_p'] = kwargs['top_p']
 
         if debug:
-            KimiDebugger.print_api_request(api_kwargs, messages, tools)
+            MoonshotDebugger.print_api_request(api_kwargs, messages, tools)
 
         try:
             stream = await self.async_client.chat.completions.create(**api_kwargs)
@@ -251,26 +251,26 @@ class KimiClient(LLMClientBase):
             session_id: Unique session identifier
 
         Returns:
-            KimiContextManager instance for this session
+            MoonshotContextManager instance for this session
         """
         if session_id not in self._session_context_managers:
-            self._session_context_managers[session_id] = KimiContextManager(session_id=session_id)
+            self._session_context_managers[session_id] = MoonshotContextManager(session_id=session_id)
         return self._session_context_managers[session_id]
 
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     def _get_response_processor(self):
-        """Get Kimi-specific response processor instance."""
-        from .response_processor import KimiResponseProcessor
-        return KimiResponseProcessor()
+        """Get Moonshot-specific response processor instance."""
+        from .response_processor import MoonshotResponseProcessor
+        return MoonshotResponseProcessor()
 
     def _get_context_manager_class(self):
-        """Get Kimi-specific context manager class."""
-        return KimiContextManager
+        """Get Moonshot-specific context manager class."""
+        return MoonshotContextManager
 
     def _get_provider_config(self):
-        """Get Kimi-specific configuration object."""
-        return self.kimi_config
+        """Get Moonshot-specific configuration object."""
+        return self.moonshot_config
 
     def _build_api_config(
         self,
@@ -278,11 +278,11 @@ class KimiClient(LLMClientBase):
         tool_schemas: Optional[List[Any]]
     ) -> Dict[str, Any]:
         """
-        Build Kimi-specific API configuration.
+        Build Moonshot-specific API configuration.
 
         Args:
             system_prompt: Pre-built system prompt
-            tool_schemas: Tool schemas in Kimi format
+            tool_schemas: Tool schemas in Moonshot format
 
         Returns:
             Dict with 'tools' and 'system_prompt' keys

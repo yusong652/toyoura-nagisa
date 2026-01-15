@@ -34,9 +34,9 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
     elif provider_name == "openai":
         from backend.infrastructure.llm.providers.openai.message_formatter import OpenAIMessageFormatter
         return OpenAIMessageFormatter
-    elif provider_name == "kimi":
-        from backend.infrastructure.llm.providers.kimi.message_formatter import KimiMessageFormatter
-        return KimiMessageFormatter
+    elif provider_name == "moonshot":
+        from backend.infrastructure.llm.providers.moonshot.message_formatter import MoonshotMessageFormatter
+        return MoonshotMessageFormatter
     elif provider_name == "zhipu":
         from backend.infrastructure.llm.providers.zhipu.message_formatter import ZhipuMessageFormatter
         return ZhipuMessageFormatter
@@ -69,9 +69,9 @@ def get_context_manager_class(provider_name: str) -> Type[Any]:
     elif provider_name == "openai":
         from backend.infrastructure.llm.providers.openai.context_manager import OpenAIContextManager
         return OpenAIContextManager
-    elif provider_name == "kimi":
-        from backend.infrastructure.llm.providers.kimi.context_manager import KimiContextManager
-        return KimiContextManager
+    elif provider_name == "moonshot":
+        from backend.infrastructure.llm.providers.moonshot.context_manager import MoonshotContextManager
+        return MoonshotContextManager
     elif provider_name == "zhipu":
         from backend.infrastructure.llm.providers.zhipu.context_manager import ZhipuContextManager
         return ZhipuContextManager
@@ -104,9 +104,9 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
     elif provider_name == "openai":
         from backend.infrastructure.llm.providers.openai.tool_manager import OpenAIToolManager
         return OpenAIToolManager
-    elif provider_name == "kimi":
-        from backend.infrastructure.llm.providers.kimi.tool_manager import KimiToolManager
-        return KimiToolManager
+    elif provider_name == "moonshot":
+        from backend.infrastructure.llm.providers.moonshot.tool_manager import MoonshotToolManager
+        return MoonshotToolManager
     elif provider_name == "zhipu":
         from backend.infrastructure.llm.providers.zhipu.tool_manager import ZhipuToolManager
         return ZhipuToolManager
@@ -118,7 +118,7 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
 
 
 # Provider registry for future extensibility
-SUPPORTED_PROVIDERS = ["gemini", "anthropic", "openai", "kimi", "zhipu", "openrouter", "local"]
+SUPPORTED_PROVIDERS = ["gemini", "anthropic", "openai", "moonshot", "zhipu", "openrouter", "local"]
 
 
 def is_provider_supported(provider_name: str) -> bool:

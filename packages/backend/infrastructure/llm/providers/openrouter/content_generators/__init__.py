@@ -4,7 +4,7 @@ OpenRouter content generators module.
 Provides specialized content generation utilities for the OpenRouter API,
 including title generation, image prompts, and video prompts.
 
-Note: OpenRouter does not support provider-specific features like Kimi's $web_search.
+Note: OpenRouter does not support provider-specific features like Moonshot's $web_search.
 For web search capabilities, use native provider implementations.
 
 This module maintains backward compatibility - all generators can be imported

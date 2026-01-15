@@ -1,38 +1,38 @@
 """
-Kimi (Moonshot) Context Manager
+Moonshot (Moonshot) Context Manager
 
-Manages conversation context and message history for Kimi API calls.
+Manages conversation context and message history for Moonshot API calls.
 Handles ChatCompletion responses (unlike OpenAI's Responses API).
 """
 
 from typing import Any, Dict
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
-from .message_formatter import KimiMessageFormatter
+from .message_formatter import MoonshotMessageFormatter
 
 
-class KimiContextManager(BaseContextManager):
+class MoonshotContextManager(BaseContextManager):
     """
-    Kimi-specific context manager for handling conversation state.
+    Moonshot-specific context manager for handling conversation state.
 
-    Unlike OpenAI's Responses API, Kimi uses Chat Completions API which
+    Unlike OpenAI's Responses API, Moonshot uses Chat Completions API which
     returns ChatCompletion objects instead of Response objects.
     """
 
-    def __init__(self, session_id: str, provider_name: str = "kimi"):
-        """Initialize Kimi context manager"""
+    def __init__(self, session_id: str, provider_name: str = "moonshot"):
+        """Initialize Moonshot context manager"""
         super().__init__(provider_name=provider_name, session_id=session_id)
 
     def add_response(self, response) -> None:
         """
-        Add Kimi ChatCompletion API response to context.
+        Add Moonshot ChatCompletion API response to context.
 
         Args:
-            response: ChatCompletion object from Kimi API
+            response: ChatCompletion object from Moonshot API
         """
-        from .response_processor import KimiResponseProcessor
+        from .response_processor import MoonshotResponseProcessor
 
         # Delegate formatting to response processor for separation of concerns
-        message_dict = KimiResponseProcessor.format_response_for_context(response)
+        message_dict = MoonshotResponseProcessor.format_response_for_context(response)
         if message_dict:
             self.working_contents.append(message_dict)
 
@@ -57,7 +57,7 @@ class KimiContextManager(BaseContextManager):
             await self._inject_reminders_to_result(result)
 
         # Format tool result content using message formatter
-        content = KimiMessageFormatter._format_tool_result(result)
+        content = MoonshotMessageFormatter._format_tool_result(result)
 
         # Add tool result in Chat Completions format (role: "tool")
         tool_result_message = {
@@ -72,7 +72,7 @@ class KimiContextManager(BaseContextManager):
         """
         Check if message contains tool calls (Chat Completions format).
 
-        Kimi tool calls are included as tool_calls field in assistant messages,
+        Moonshot tool calls are included as tool_calls field in assistant messages,
         same as OpenAI Chat Completions API.
 
         Args:
@@ -94,7 +94,7 @@ class KimiContextManager(BaseContextManager):
         """
         Check if message is a tool result (Chat Completions format).
 
-        Kimi tool results have role 'tool' and contain tool_call_id,
+        Moonshot tool results have role 'tool' and contain tool_call_id,
         same as OpenAI Chat Completions API.
 
         Args:
@@ -112,4 +112,4 @@ class KimiContextManager(BaseContextManager):
                    msg.get('tool_call_id'))
 
 
-__all__ = ['KimiContextManager']
+__all__ = ['MoonshotContextManager']

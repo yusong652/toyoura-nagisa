@@ -36,7 +36,7 @@ class BaseStreamingProcessor(ABC):
                 - Gemini: GenerateContentResponse chunk
                 - Anthropic: MessageStreamEvent
                 - OpenAI: Response event
-                - Kimi/Zhipu/OpenRouter: ChatCompletionChunk
+                - Moonshot/Zhipu/OpenRouter: ChatCompletionChunk
 
         Returns:
             List[StreamingChunk]: List of standardized chunks to yield.
@@ -178,7 +178,7 @@ class BaseResponseProcessor(ABC):
                 - Gemini: types.GenerateContentResponse
                 - Anthropic: anthropic.types.Message
                 - OpenAI: openai.types.responses.Response
-                - Kimi: openai.types.chat.ChatCompletion
+                - Moonshot: openai.types.chat.ChatCompletion
                 - Zhipu: ChatCompletion-like object
                 - OpenRouter: openai.types.chat.ChatCompletion
                 - Must contain all necessary data for tool call detection

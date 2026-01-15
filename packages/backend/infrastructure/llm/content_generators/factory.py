@@ -1,7 +1,7 @@
 """Content Generator Factory for Multi-LLM Support.
 
 This factory provides unified interfaces for content generation tasks across
-different LLM providers (Gemini, Anthropic, OpenAI, Kimi, OpenRouter, Zhipu),
+different LLM providers (Gemini, Anthropic, OpenAI, Moonshot, OpenRouter, Zhipu),
 following the same architecture pattern as WebSearchToolFactory.
 """
 
@@ -22,7 +22,7 @@ class ContentGeneratorFactory:
             llm_client: The LLM client instance
 
         Returns:
-            LLM type string ('gemini', 'anthropic', 'openai', 'kimi', 'openrouter', or 'zhipu')
+            LLM type string ('gemini', 'anthropic', 'openai', 'moonshot', 'openrouter', or 'zhipu')
 
         Raises:
             ValueError: If LLM type cannot be detected
@@ -30,10 +30,10 @@ class ContentGeneratorFactory:
         client_type = type(llm_client).__name__.lower()
         client_module = type(llm_client).__module__.lower()
 
-        # Check specific providers FIRST (Kimi, OpenRouter, Zhipu) before OpenAI
+        # Check specific providers FIRST (Moonshot, OpenRouter, Zhipu) before OpenAI
         # (since they use OpenAI-compatible API)
-        if 'kimi' in client_type or 'kimi' in client_module:
-            return 'kimi'
+        if 'moonshot' in client_type or 'moonshot' in client_module:
+            return 'moonshot'
         elif 'openrouter' in client_type or 'openrouter' in client_module:
             return 'openrouter'
         elif 'zhipu' in client_type or 'zhipu' in client_module:
@@ -64,7 +64,7 @@ class ContentGeneratorFactory:
         Get the appropriate title generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'kimi', 'openrouter', or 'zhipu')
+            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'moonshot', 'openrouter', or 'zhipu')
 
         Returns:
             TitleGenerator class for the specified LLM type
@@ -81,12 +81,12 @@ class ContentGeneratorFactory:
         elif llm_type.lower() == 'openai':
             from backend.infrastructure.llm.providers.openai.content_generators import OpenAITitleGenerator
             return OpenAITitleGenerator
-        elif llm_type.lower() == 'kimi':
-            # Kimi has its own TitleGenerator using Chat Completions API
-            from backend.infrastructure.llm.providers.kimi.content_generators import KimiTitleGenerator
-            return KimiTitleGenerator
+        elif llm_type.lower() == 'moonshot':
+            # Moonshot has its own TitleGenerator using Chat Completions API
+            from backend.infrastructure.llm.providers.moonshot.content_generators import MoonshotTitleGenerator
+            return MoonshotTitleGenerator
         elif llm_type.lower() == 'openrouter':
-            # OpenRouter uses Chat Completions API (similar to Kimi)
+            # OpenRouter uses Chat Completions API (similar to Moonshot)
             from backend.infrastructure.llm.providers.openrouter.content_generators import OpenRouterTitleGenerator
             return OpenRouterTitleGenerator
         elif llm_type.lower() == 'zhipu':
@@ -102,7 +102,7 @@ class ContentGeneratorFactory:
         Get the appropriate image prompt generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'kimi', 'openrouter', or 'zhipu')
+            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'moonshot', 'openrouter', or 'zhipu')
 
         Returns:
             ImagePromptGenerator class for the specified LLM type
@@ -119,12 +119,12 @@ class ContentGeneratorFactory:
         elif llm_type.lower() == 'openai':
             from backend.infrastructure.llm.providers.openai.content_generators import OpenAIImagePromptGenerator
             return OpenAIImagePromptGenerator
-        elif llm_type.lower() == 'kimi':
-            # Kimi has its own ImagePromptGenerator using Chat Completions API
-            from backend.infrastructure.llm.providers.kimi.content_generators import KimiImagePromptGenerator
-            return KimiImagePromptGenerator
+        elif llm_type.lower() == 'moonshot':
+            # Moonshot has its own ImagePromptGenerator using Chat Completions API
+            from backend.infrastructure.llm.providers.moonshot.content_generators import MoonshotImagePromptGenerator
+            return MoonshotImagePromptGenerator
         elif llm_type.lower() == 'openrouter':
-            # OpenRouter uses Chat Completions API (similar to Kimi)
+            # OpenRouter uses Chat Completions API (similar to Moonshot)
             from backend.infrastructure.llm.providers.openrouter.content_generators import OpenRouterImagePromptGenerator
             return OpenRouterImagePromptGenerator
         elif llm_type.lower() == 'zhipu':

@@ -1,8 +1,8 @@
 """
-Kimi (Moonshot) Message Formatter
+Moonshot (Moonshot) Message Formatter
 
-Handles conversion of internal message formats to Kimi API format.
-Kimi uses OpenAI Chat Completions API format with additional reasoning_content support
+Handles conversion of internal message formats to Moonshot API format.
+Moonshot uses OpenAI Chat Completions API format with additional reasoning_content support
 for k2-thinking models.
 
 Supports multimodal content, tool calls, reasoning content, and message history processing.
@@ -14,14 +14,14 @@ from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
 
 
-class KimiMessageFormatter(BaseMessageFormatter):
+class MoonshotMessageFormatter(BaseMessageFormatter):
     """
-    Format messages for Kimi (Moonshot) API consumption
+    Format messages for Moonshot (Moonshot) API consumption
 
-    Converts internal message objects to Kimi API format while preserving
+    Converts internal message objects to Moonshot API format while preserving
     all content types including text, images, tool calls, reasoning content, and tool results.
 
-    This formatter is specifically designed for Kimi API which supports:
+    This formatter is specifically designed for Moonshot API which supports:
     - Standard Chat Completions format
     - reasoning_content field for k2-thinking models
     - Tool calling and multimodal content
@@ -46,7 +46,7 @@ class KimiMessageFormatter(BaseMessageFormatter):
 
         for msg in messages:
             # format_single_message may return a dict or a list (for tool_result blocks)
-            formatted = KimiMessageFormatter.format_single_message(msg)
+            formatted = MoonshotMessageFormatter.format_single_message(msg)
 
             if isinstance(formatted, list):
                 # Multiple messages (tool_result blocks converted to separate messages)
@@ -120,7 +120,7 @@ class KimiMessageFormatter(BaseMessageFormatter):
             elif block_type == "image" or "inline_data" in block:
                 # Format image block
                 inline_data = block.get("inline_data", block)
-                image_block = KimiMessageFormatter._format_image_block(inline_data)
+                image_block = MoonshotMessageFormatter._format_image_block(inline_data)
                 if image_block:
                     image_blocks.append(image_block)
 
@@ -137,7 +137,7 @@ class KimiMessageFormatter(BaseMessageFormatter):
 
                 # Format tool result content
                 if isinstance(nested_content, dict) and "parts" in nested_content:
-                    formatted_content = KimiMessageFormatter._format_tool_result({
+                    formatted_content = MoonshotMessageFormatter._format_tool_result({
                         "llm_content": nested_content
                     })
                 else:
@@ -153,7 +153,7 @@ class KimiMessageFormatter(BaseMessageFormatter):
         # Build message result
         result: Dict[str, Any] = {"role": message.role}  # type: ignore
 
-        # Add reasoning_content if present (separate field for thinking models like Kimi k2-thinking)
+        # Add reasoning_content if present (separate field for thinking models like Moonshot k2-thinking)
         # thinking_blocks now contains strings instead of dicts
         if thinking_blocks:
             # Combine all thinking blocks into single reasoning_content

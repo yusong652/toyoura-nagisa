@@ -55,7 +55,7 @@ class GeminiTitleGenerator(BaseTitleGenerator):
             system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
 
             # Extract text content from messages and assemble into conversation context
-            # This unified approach is consistent with other providers (Anthropic, OpenAI, Kimi, OpenRouter)
+            # This unified approach is consistent with other providers (Anthropic, OpenAI, Moonshot, OpenRouter)
             conversation_parts = []
             for msg in latest_messages:
                 role = getattr(msg, 'role', 'user')

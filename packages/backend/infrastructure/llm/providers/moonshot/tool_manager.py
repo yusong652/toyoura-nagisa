@@ -1,24 +1,24 @@
 """
-Kimi (Moonshot) Tool Manager
+Moonshot (Moonshot) Tool Manager
 
-Manages MCP tool integration for Kimi client including schema formatting,
+Manages MCP tool integration for Moonshot client including schema formatting,
 tool execution, and result processing.
 
-Kimi uses a nested tool schema format that differs from OpenAI's flat format.
+Moonshot uses a nested tool schema format that differs from OpenAI's flat format.
 """
 
 from typing import List, Dict, Any
 from backend.infrastructure.llm.base.tool_manager import BaseToolManager
 
 
-class KimiToolManager(BaseToolManager):
+class MoonshotToolManager(BaseToolManager):
     """
-    Kimi-specific tool manager
+    Moonshot-specific tool manager
 
-    Formats MCP tools for Kimi/Moonshot function calling API with nested structure.
-    Unlike OpenAI's flat format, Kimi requires function details nested under a 'function' key.
+    Formats MCP tools for Moonshot/Moonshot function calling API with nested structure.
+    Unlike OpenAI's flat format, Moonshot requires function details nested under a 'function' key.
 
-    Example Kimi format:
+    Example Moonshot format:
     {
         "type": "function",
         "function": {
@@ -34,14 +34,14 @@ class KimiToolManager(BaseToolManager):
     """
 
     def __init__(self):
-        """Initialize Kimi tool manager"""
+        """Initialize Moonshot tool manager"""
         super().__init__()
 
     async def get_function_call_schemas(self, session_id: str, agent_profile: str = 'general') -> List[Dict[str, Any]] | None:
         """
-        Get MCP tools formatted for Kimi function calling with nested structure.
+        Get MCP tools formatted for Moonshot function calling with nested structure.
 
-        Uses get_standardized_tools() from base class, then converts to Kimi's nested format.
+        Uses get_standardized_tools() from base class, then converts to Moonshot's nested format.
         Supports agent profile filtering.
 
         Args:
@@ -49,7 +49,7 @@ class KimiToolManager(BaseToolManager):
             agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
 
         Returns:
-            List of Kimi-formatted tool schemas (nested) or None if tools disabled
+            List of Moonshot-formatted tool schemas (nested) or None if tools disabled
         """
 
         # Get standardized tools from base class
@@ -58,33 +58,33 @@ class KimiToolManager(BaseToolManager):
         if not tools_dict:
             return None
 
-        # Convert ToolSchema objects to Kimi nested format
-        kimi_tools = []
+        # Convert ToolSchema objects to Moonshot nested format
+        moonshot_tools = []
         for _, tool_schema in tools_dict.items():
-            kimi_tool = self._convert_tool_schema_to_kimi_format(tool_schema)
-            if kimi_tool:
-                kimi_tools.append(kimi_tool)
+            moonshot_tool = self._convert_tool_schema_to_moonshot_format(tool_schema)
+            if moonshot_tool:
+                moonshot_tools.append(moonshot_tool)
 
-        return kimi_tools if kimi_tools else None
+        return moonshot_tools if moonshot_tools else None
 
-    def _convert_tool_schema_to_kimi_format(self, tool_schema) -> Dict[str, Any] | None:
+    def _convert_tool_schema_to_moonshot_format(self, tool_schema) -> Dict[str, Any] | None:
         """
-        Convert ToolSchema to Kimi nested function format.
+        Convert ToolSchema to Moonshot nested function format.
 
-        Kimi requires a nested structure where function details are under a 'function' key,
+        Moonshot requires a nested structure where function details are under a 'function' key,
         unlike OpenAI's flat format.
 
         Args:
             tool_schema: ToolSchema object
 
         Returns:
-            Dict: Kimi-formatted tool schema (nested), or None if conversion failed
+            Dict: Moonshot-formatted tool schema (nested), or None if conversion failed
         """
         try:
             # Get the input schema and convert to dict
             input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True, by_alias=True)
 
-            # Handle required fields properly for Kimi function calling
+            # Handle required fields properly for Moonshot function calling
             if "properties" in input_schema_dict:
                 # Respect the original schema's required field if it exists
                 if "required" not in input_schema_dict:
@@ -97,9 +97,9 @@ class KimiToolManager(BaseToolManager):
             if "type" not in input_schema_dict:
                 input_schema_dict["type"] = "object"
 
-            # Create Kimi tool schema with NESTED structure
+            # Create Moonshot tool schema with NESTED structure
             # Key difference: function details are nested under 'function' key
-            kimi_tool = {
+            moonshot_tool = {
                 "type": "function",
                 "function": {
                     "name": tool_schema.name,
@@ -108,10 +108,10 @@ class KimiToolManager(BaseToolManager):
                 }
             }
 
-            return kimi_tool
+            return moonshot_tool
 
         except Exception as e:
-            print(f"[WARNING] Failed to convert tool {tool_schema.name} to Kimi format: {e}")
+            print(f"[WARNING] Failed to convert tool {tool_schema.name} to Moonshot format: {e}")
             print(f"[DEBUG] Tool schema content: {tool_schema}")
             return None
 
@@ -158,4 +158,4 @@ class KimiToolManager(BaseToolManager):
         return prompt_schemas
 
 
-__all__ = ['KimiToolManager']
+__all__ = ['MoonshotToolManager']

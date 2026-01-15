@@ -15,7 +15,7 @@ class WebSearchToolFactory:
         Get the appropriate web search generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'kimi', or 'zhipu')
+            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'moonshot', or 'zhipu')
 
         Returns:
             WebSearchGenerator class for the specified LLM type
@@ -29,8 +29,8 @@ class WebSearchToolFactory:
         elif llm_type.lower() == 'openai':
             from backend.infrastructure.llm.providers.openai.content_generators import OpenAIWebSearchGenerator
             return OpenAIWebSearchGenerator
-        elif llm_type.lower() == 'kimi':
-            from backend.infrastructure.llm.providers.kimi.content_generators import KimiWebSearchGenerator as WebSearchGenerator
+        elif llm_type.lower() == 'moonshot':
+            from backend.infrastructure.llm.providers.moonshot.content_generators import MoonshotWebSearchGenerator as WebSearchGenerator
             return WebSearchGenerator
         elif llm_type.lower() == 'zhipu':
             from backend.infrastructure.llm.providers.zhipu.content_generators import ZhipuWebSearchGenerator
@@ -77,8 +77,8 @@ class WebSearchToolFactory:
                 elif llm_type.lower() == 'openai':
                     # OpenAI doesn't use max_uses but we keep it for compatibility
                     max_uses = 5
-                elif llm_type.lower() == 'kimi':
-                    # Kimi uses built-in $web_search tool, max_uses not applicable
+                elif llm_type.lower() == 'moonshot':
+                    # Moonshot uses built-in $web_search tool, max_uses not applicable
                     max_uses = 1
                 elif llm_type.lower() == 'zhipu':
                     # Zhipu uses built-in web_search tool, max_uses not applicable
@@ -91,14 +91,14 @@ class WebSearchToolFactory:
                 debug = llm_settings.debug
             
             # Perform the search with appropriate parameters
-            # Extract the async client for providers that support it (Kimi, OpenAI)
+            # Extract the async client for providers that support it (Moonshot, OpenAI)
             # Fallback to 'client' for providers that don't have separate async/sync clients
             client = getattr(llm_client, 'async_client', None) or getattr(llm_client, 'client', llm_client)
 
             # Instantiate the generator with the client
             generator = WebSearchGenerator(client=client)
 
-            if llm_type.lower() in ('gemini', 'anthropic', 'openai', 'kimi', 'zhipu'):
+            if llm_type.lower() in ('gemini', 'anthropic', 'openai', 'moonshot', 'zhipu'):
                 # All providers now use instance method (async)
                 return await generator.perform_web_search(
                     query=query,
@@ -127,15 +127,15 @@ class WebSearchToolFactory:
             llm_client: The LLM client instance
 
         Returns:
-            LLM type string ('gemini', 'anthropic', 'openai', 'kimi', or 'zhipu')
+            LLM type string ('gemini', 'anthropic', 'openai', 'moonshot', or 'zhipu')
         """
         client_type = type(llm_client).__name__.lower()
         client_module = type(llm_client).__module__.lower()
 
-        # Check specific providers FIRST (Kimi, OpenRouter, Zhipu) before OpenAI
+        # Check specific providers FIRST (Moonshot, OpenRouter, Zhipu) before OpenAI
         # (since they use OpenAI-compatible API)
-        if 'kimi' in client_type or 'kimi' in client_module:
-            return 'kimi'
+        if 'moonshot' in client_type or 'moonshot' in client_module:
+            return 'moonshot'
         elif 'openrouter' in client_type or 'openrouter' in client_module:
             return 'openrouter'
         elif 'zhipu' in client_type or 'zhipu' in client_module:

@@ -1,7 +1,7 @@
 """
-Kimi-specific image prompt generator.
+Moonshot-specific image prompt generator.
 
-Generates high-quality text-to-image prompts using the Kimi (Moonshot) API.
+Generates high-quality text-to-image prompts using the Moonshot (Moonshot) API.
 """
 
 from typing import Optional, Dict, Any, cast
@@ -12,9 +12,9 @@ from backend.config import get_llm_settings
 from backend.infrastructure.llm.base.content_generators.image_prompt import BaseImagePromptGenerator
 
 
-class KimiImagePromptGenerator(BaseImagePromptGenerator):
+class MoonshotImagePromptGenerator(BaseImagePromptGenerator):
     """
-    Kimi-specific image prompt generation using Chat Completions API.
+    Moonshot-specific image prompt generation using Chat Completions API.
     """
 
     async def generate_text_to_image_prompt(
@@ -33,19 +33,19 @@ class KimiImagePromptGenerator(BaseImagePromptGenerator):
             Dictionary with 'text_prompt' and 'negative_prompt' keys, or None if failed
         """
         try:
-            # Get Kimi configuration
+            # Get Moonshot configuration
             llm_settings = get_llm_settings()
-            kimi_config = llm_settings.get_kimi_config()
+            moonshot_config = llm_settings.get_moonshot_config()
 
             # Prepare generation context using inherited method
-            context = KimiImagePromptGenerator.prepare_generation_context(
+            context = MoonshotImagePromptGenerator.prepare_generation_context(
                 session_id=session_id,
-                llm_provider="kimi",
-                llm_model=kimi_config.model
+                llm_provider="moonshot",
+                llm_model=moonshot_config.model
             )
 
             # Build messages using inherited method
-            messages = KimiImagePromptGenerator.build_messages_for_generation(context)
+            messages = MoonshotImagePromptGenerator.build_messages_for_generation(context)
 
             # Build chat messages for Chat Completions API
             chat_messages = [
@@ -77,11 +77,11 @@ class KimiImagePromptGenerator(BaseImagePromptGenerator):
                 })
 
             if debug:
-                print(f"[Kimi ImagePrompt] Calling API with {len(chat_messages)} messages")
+                print(f"[Moonshot ImagePrompt] Calling API with {len(chat_messages)} messages")
 
-            # Call Kimi API (direct async call)
+            # Call Moonshot API (direct async call)
             response: ChatCompletion = await self.client.chat.completions.create(
-                model=kimi_config.model,
+                model=moonshot_config.model,
                 messages=cast(Any, chat_messages),
                 temperature=context.get('temperature', 1.0),
                 max_tokens=1024
@@ -96,14 +96,14 @@ class KimiImagePromptGenerator(BaseImagePromptGenerator):
                 return None
 
             if debug:
-                print(f"[Kimi ImagePrompt] Raw response: {prompt_text[:200]}...")
+                print(f"[Moonshot ImagePrompt] Raw response: {prompt_text[:200]}...")
 
             # Process response using inherited method
-            return KimiImagePromptGenerator.process_generation_response(
+            return MoonshotImagePromptGenerator.process_generation_response(
                 prompt_text, context, session_id, debug
             )
 
         except Exception as e:
             if debug:
-                print(f"[Kimi ImagePrompt] Error during prompt generation: {str(e)}")
+                print(f"[Moonshot ImagePrompt] Error during prompt generation: {str(e)}")
             return None
