@@ -96,12 +96,12 @@ async def handle_diagnostic_execute(ctx, data):
     Handle diagnostic_execute message - execute diagnostic script with smart path selection.
 
     Execution strategy:
-    1. Try queue execution first (8s timeout) - works when PFC is idle
+    1. Try queue execution first (1s timeout) - works when PFC is idle
     2. If queue blocked, use callback execution - works during cycle
 
     Timeout budget:
     - Total timeout: timeout_ms (default 30000ms)
-    - Queue wait: 8s
+    - Queue wait: 1s (plot commands execute quickly)
     - Script execution: variable
     - File wait: remaining time after script execution
 
@@ -151,10 +151,10 @@ async def handle_diagnostic_execute(ctx, data):
         # Get event loop for non-blocking waits
         loop = asyncio.get_event_loop()
 
-        # Strategy 1: Try queue execution with 8 second timeout
-        # This covers most diagnostic tasks (plot creation + export + file wait)
+        # Strategy 1: Try queue execution with 1 second timeout
+        # Plot commands execute quickly (~1s), so short timeout is sufficient
         # If timeout, likely blocked by long-running cycle
-        queue_timeout = min(8.0, remaining_time())
+        queue_timeout = min(1.0, remaining_time())
         queue_future = ctx.main_executor.submit(
             ctx.script_runner._execute,
             script_path,

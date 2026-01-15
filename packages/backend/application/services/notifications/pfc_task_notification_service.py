@@ -338,6 +338,7 @@ class PfcTaskNotificationService:
         This is the unified completion handler for both foreground and background tasks:
         - For foreground: signals the handle to unblock pfc_execute_task.wait()
         - For all tasks: sends final status notification to frontend
+        - Updates backend PfcTaskManager to sync terminal state (fixes concurrent task count)
 
         Args:
             session_id: Session ID
@@ -372,6 +373,20 @@ class PfcTaskNotificationService:
                 "interrupted": "interrupted",
             }
             mapped_status = status_map.get(server_status, server_status)
+
+            # Update backend PfcTaskManager to sync terminal state
+            # This is critical for correct concurrent task counting
+            from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
+            task_manager = get_pfc_task_manager()
+            task_manager.update_status(
+                task_id,
+                mapped_status,
+                result=result,
+                error=error,
+            )
+            if current_output:
+                task_manager.set_output(task_id, current_output)
+            logger.debug(f"Updated PfcTaskManager status for task {task_id}: {mapped_status}")
 
             # Get recent lines
             recent_lines = self._get_recent_lines(current_output)

@@ -161,8 +161,8 @@ def format_task_status_for_llm(
 
     # Build status-specific text
     if data.status == "submitted":
-        # Just submitted, no end time yet
-        time_section = f"submitted: {start_str}"
+        # Just submitted, task not yet started - no time info available
+        time_section = None
     elif data.status == "pending":
         # Queued but not yet started
         import time
@@ -182,20 +182,30 @@ def format_task_status_for_llm(
     error_section = f"\nError:\n{data.error}" if data.error else ""
 
     # Compose full text
-    text = (
-        f"task_id: {data.task_id}\n"
-        f"status: {data.status}\n"
-        f"{time_section}\n"
-        f"elapsed: {elapsed_str}\n"
-        f"git: {git_str}\n"
-        f"entry_script: {data.entry_script or 'n/a'}\n"
-        f"description: {data.description or 'n/a'}\n"
-        f"{result_line}\n"
-        f"Output ({pagination['total_lines']} lines{filter_info}, showing {pagination['line_range']}):\n"
-        f"{output_text}"
-        f"{error_section}\n\n"
-        f"Next: {nav_hint}"
-    )
+    lines = [
+        f"task_id: {data.task_id}",
+        f"status: {data.status}",
+    ]
+    if time_section:
+        lines.append(time_section)
+        lines.append(f"elapsed: {elapsed_str}")
+    lines.extend([
+        f"git: {git_str}",
+        f"entry_script: {data.entry_script or 'n/a'}",
+        f"description: {data.description or 'n/a'}",
+    ])
+    if result_line:
+        lines.append(result_line.rstrip())
+    lines.extend([
+        "",
+        f"Output ({pagination['total_lines']} lines{filter_info}, showing {pagination['line_range']}):",
+        output_text,
+    ])
+    if error_section:
+        lines.append(error_section)
+    lines.extend(["", f"Next: {nav_hint}"])
+
+    text = "\n".join(lines)
 
     return FormattedTaskStatus(text=text, pagination=pagination)
 
