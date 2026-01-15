@@ -24,13 +24,13 @@
 
 ---
 
-## 💡 Script is Context
+## 🎯 Core Features
+
+### 💡 **Persistent Context**
+
+*Script is context. Each execution compounds understanding.*
 
 Every execution is remembered—script, parameters, results. The agent recalls what worked, learns from what failed, and builds upon previous attempts. Context persists across sessions and projects.
-
-Scripts *are* the context. Each execution compounds understanding.
-
-## 🎯 Core Features
 
 ### 🔬 **Documentation-Driven Workflow**
 
@@ -78,6 +78,8 @@ Define your own skills to capture simulation workflows, analysis pipelines, or p
 - **PFC Console** (`>`): Direct access to PFC's Python environment. Edit scripts, import modules, run experiments. Each execution becomes a tracked task with background support. You stay in control.
 - **Terminal** (`!`): Bash commands and outputs flow into agent context automatically.
 - **File mentions** (`@`): Reference any file inline; content is injected on the fly.
+- **Task status** (`/pfc-list-tasks`): Check running simulations; status details flow into agent context.
+- **Mid-execution interaction** (`ESC`, messages): Interrupt the agent or send messages while tools run—context preserved, conversation continues.
 
 The agent sees what you did, no explanation needed.
 
@@ -85,7 +87,7 @@ The agent sees what you did, no explanation needed.
 
 Beyond the core PFC integration, toyoura-nagisa includes:
 
-- **Multi-Provider LLM Support** - Gemini, Claude, OpenAI, Zhipu, Moonshot, OpenRouter, vLLM, Ollama
+- **Multi-Provider LLM Support** - Gemini, Claude, GPT, GLM, Kimi, OpenRouter, vLLM, Ollama
 - **Long-Term Memory** (ChromaDB) - Learns user preferences across sessions
 - **Live2D Character** - Interactive visual companion that responds to conversations
 - **Text-to-Speech** - Local (GPT-SoVITS) or cloud (Fish Audio) voice output
