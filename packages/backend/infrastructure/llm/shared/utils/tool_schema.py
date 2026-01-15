@@ -9,6 +9,110 @@ from typing import Dict, Any, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+def transform_schema_for_openai_compat(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Transform JSON Schema to OpenAI-compatible format.
+
+    OpenAI function calling (and compatible APIs like OpenRouter, Zhipu, Moonshot)
+    have limited support for:
+    - $ref references (need to be inlined)
+    - anyOf with null (should use "type": ["<type>", "null"] instead)
+
+    This function:
+    1. Dereferences all $ref by inlining definitions from $defs
+    2. Converts anyOf: [{...}, {type: null}] to type: [<type>, "null"]
+
+    Args:
+        schema: Original JSON Schema (may contain $ref and anyOf)
+
+    Returns:
+        Transformed schema compatible with OpenAI function calling
+    """
+    if not isinstance(schema, dict):
+        return schema
+
+    # Extract $defs for reference resolution
+    defs = schema.get("$defs", schema.get("definitions", {}))
+
+    def resolve_ref(ref_path: str) -> Dict[str, Any] | None:
+        """Resolve a $ref path to its definition."""
+        if ref_path.startswith("#/$defs/") or ref_path.startswith("#/definitions/"):
+            def_name = ref_path.split("/")[-1]
+            if def_name in defs:
+                return defs[def_name].copy()
+        return None
+
+    def transform_value(value: Any) -> Any:
+        """Recursively transform a schema value."""
+        if not isinstance(value, dict):
+            return value
+
+        # Handle $ref - inline the referenced definition
+        if "$ref" in value:
+            resolved = resolve_ref(value["$ref"])
+            if resolved:
+                # Preserve description from original if not in resolved
+                if "description" in value and "description" not in resolved:
+                    resolved["description"] = value["description"]
+                return transform_value(resolved)
+            return value
+
+        # Handle anyOf with null - convert to type array format
+        if "anyOf" in value:
+            any_of = value["anyOf"]
+            # Check if this is Optional pattern: anyOf: [{...}, {type: null}]
+            if len(any_of) == 2:
+                null_item = None
+                other_item = None
+                for item in any_of:
+                    if isinstance(item, dict):
+                        if item.get("type") == "null":
+                            null_item = item
+                        else:
+                            other_item = item
+
+                if null_item is not None and other_item is not None:
+                    # Transform the non-null item first (may contain $ref)
+                    transformed_other = transform_value(other_item)
+
+                    # Build result with nullable flag (more compatible than type array)
+                    # Gemini uses nullable:true, OpenAI accepts both formats
+                    result = transformed_other.copy()
+
+                    # Mark as nullable
+                    result["nullable"] = True
+
+                    # Copy description from original anyOf wrapper if not in transformed
+                    if "description" in value and "description" not in result:
+                        result["description"] = value["description"]
+                    if "default" in value:
+                        result["default"] = value["default"]
+
+                    return result
+
+            # For other anyOf patterns, transform each item
+            result = value.copy()
+            result["anyOf"] = [transform_value(item) for item in any_of]
+            return result
+
+        # Handle properties recursively
+        result = {}
+        for key, val in value.items():
+            if key == "properties" and isinstance(val, dict):
+                result[key] = {k: transform_value(v) for k, v in val.items()}
+            elif key == "items":
+                result[key] = transform_value(val) if isinstance(val, dict) else val
+            elif key in ("$defs", "definitions"):
+                # Remove $defs from output - we've inlined everything
+                continue
+            else:
+                result[key] = val
+
+        return result
+
+    return transform_value(schema)
+
+
 class JSONSchema(BaseModel):
     """JSON Schema representation for tool parameters."""
     

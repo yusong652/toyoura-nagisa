@@ -9,6 +9,7 @@ OpenRouter uses the same nested tool schema format as OpenAI Chat Completions AP
 
 from typing import List, Dict, Any
 from backend.infrastructure.llm.base.tool_manager import BaseToolManager
+from backend.infrastructure.llm.shared.utils.tool_schema import transform_schema_for_openai_compat
 
 
 class OpenRouterToolManager(BaseToolManager):
@@ -88,6 +89,11 @@ class OpenRouterToolManager(BaseToolManager):
         try:
             # Get the input schema and convert to dict
             input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True, by_alias=True)
+
+            # Transform schema for OpenAI compatibility:
+            # - Dereference $ref (inline definitions)
+            # - Convert anyOf with null to type array format
+            input_schema_dict = transform_schema_for_openai_compat(input_schema_dict)
 
             # Handle required fields properly for OpenRouter function calling
             if "properties" in input_schema_dict:
