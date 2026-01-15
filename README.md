@@ -58,6 +58,10 @@ The agent captures visual output during simulation cycles—particle configurati
 
 *Delegate depth, preserve clarity.*
 
+<p align="center">
+  <img src="./docs/assets/Diagnostic.gif" alt="Demo: Multi-view diagnostic analysis of drum washer simulation" width="720"/>
+</p>
+
 Deep exploration risks context exhaustion and hallucination. SubAgents isolate that complexity—exploring extensively, returning only verified findings.
 
 - **PFC Explorer**: Navigates documentation, returns verified syntax. The MainAgent decides; the Explorer validates.
@@ -87,10 +91,8 @@ The agent sees what you did, no explanation needed.
 
 Beyond the core PFC integration, toyoura-nagisa includes:
 
-- **Multi-Provider LLM Support** - Gemini, Claude, GPT, GLM, Kimi, OpenRouter, vLLM, Ollama
+- **Multi-Provider LLM Support** - Gemini, Claude, GPT, GLM, Moonshot, OpenRouter, vLLM, Ollama
 - **Long-Term Memory** (ChromaDB) - Learns user preferences across sessions
-- **Live2D Character** - Interactive visual companion that responds to conversations
-- **Text-to-Speech** - Local (GPT-SoVITS) or cloud (Fish Audio) voice output
 
 ## 🚀 Quick Start
 
