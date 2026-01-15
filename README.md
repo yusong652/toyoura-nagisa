@@ -12,21 +12,23 @@
   </a>
 </p>
 
----
+`pfc3d>model new ;but now, Large Language Model.`
 
-## 💡 Script is Context
+**Toyoura Nagisa** demonstrates context engineering for LLM-driven discrete element simulations. It navigates references, writes scripts, runs simulations, and iterates.
 
-`pfc3d>model new`, but now, Large Language Model.
-
-**Toyoura Nagisa** demonstrates context engineering for LLM-driven discrete element simulations. It navigates references, writes scripts, runs simulations, and iterates—until the particles actually behave.
-
-Every execution is remembered—script, parameters, results. The agent recalls what worked, learns from what failed, and builds upon previous attempts. Context persists across sessions and projects.
-
-Scripts *are* the context. Each execution compounds understanding.
+`pfc3d>model solve ;llm solves.`
 
 <p align="center">
   <img src="./docs/assets/HelloNagisa.gif" alt="Demo: Drop 50 balls into a box" width="640"/>
 </p>
+
+---
+
+## 💡 Script is Context
+
+Every execution is remembered—script, parameters, results. The agent recalls what worked, learns from what failed, and builds upon previous attempts. Context persists across sessions and projects.
+
+Scripts *are* the context. Each execution compounds understanding.
 
 ## 🎯 Core Features
 
