@@ -34,19 +34,19 @@ async def web_fetch(
         from backend.config import get_llm_settings
 
         try:
-            gemini_config = get_llm_settings().get_gemini_config()
-            gemini_client = genai.Client(api_key=gemini_config.google_api_key)
+            google_config = get_llm_settings().get_google_config()
+            google_client = genai.Client(api_key=google_config.google_api_key)
         except Exception as e:
             return error_response(
                 f"Gemini API not configured. web_fetch requires GOOGLE_API_KEY: {e}"
             )
 
         # Import and create generator
-        from backend.infrastructure.llm.providers.gemini.content_generators import (
-            GeminiWebFetchGenerator
+        from backend.infrastructure.llm.providers.google.content_generators import (
+            GoogleWebFetchGenerator
         )
 
-        generator = GeminiWebFetchGenerator(client=gemini_client)
+        generator = GoogleWebFetchGenerator(client=google_client)
         result = await generator.fetch_url_content(url=url, prompt=prompt)
 
         # Check result status

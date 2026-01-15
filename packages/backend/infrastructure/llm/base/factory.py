@@ -19,7 +19,7 @@ class LLMFactory:
 
     def _register_default_clients(self):
         """Register default LLM client implementations."""
-        from backend.infrastructure.llm.providers.gemini import GeminiClient
+        from backend.infrastructure.llm.providers.google import GoogleClient
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         from backend.infrastructure.llm.providers.openai import OpenAIClient
         from backend.infrastructure.llm.providers.moonshot import MoonshotClient
@@ -28,7 +28,7 @@ class LLMFactory:
         from backend.infrastructure.llm.providers.local.local_llm_client import LocalLLMClient
 
         self._clients = {
-            "gemini": GeminiClient,
+            "google": GoogleClient,
             "anthropic": AnthropicClient,
             "gpt": OpenAIClient,
             "openai": OpenAIClient,
@@ -68,8 +68,8 @@ class LLMFactory:
         extra = {"app": app} if app else {}
         extra["debug"] = llm_settings.debug
 
-        if name == "gemini":
-            cfg = llm_settings.get_gemini_config()
+        if name == "google":
+            cfg = llm_settings.get_google_config()
             return {
                 "api_key": cfg.google_api_key,
                 "extra_config": {**extra, "model": cfg.model, "temperature": cfg.temperature,
@@ -136,8 +136,8 @@ class LLMFactory:
         extra = {"app": app} if app else {}
         extra["debug"] = llm_settings.debug
 
-        if name == "gemini":
-            cfg = llm_settings.get_gemini_config()
+        if name == "google":
+            cfg = llm_settings.get_google_config()
             logger.info(f"Secondary model: {cfg.secondary_model}")
             return {
                 "api_key": cfg.google_api_key,

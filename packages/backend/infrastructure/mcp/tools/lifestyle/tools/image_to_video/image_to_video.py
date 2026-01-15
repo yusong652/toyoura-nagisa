@@ -162,12 +162,12 @@ async def optimize_prompt_for_video(
         client_class_name = llm_client.__class__.__name__
         print(f"[DEBUG] LLM client type: {client_class_name}")
         
-        if "Gemini" in client_class_name:
-            print(f"[DEBUG] Using Gemini video prompt generator")
-            from backend.infrastructure.llm.providers.gemini.content_generators import GeminiVideoPromptGenerator
+        if "Google" in client_class_name:
+            print(f"[DEBUG] Using Google video prompt generator")
+            from backend.infrastructure.llm.providers.google.content_generators import GoogleVideoPromptGenerator
 
             # Instantiate generator with client
-            generator = GeminiVideoPromptGenerator(client=llm_client.client)
+            generator = GoogleVideoPromptGenerator(client=llm_client.client)
 
             # Use video prompt generator (instance method)
             result = await generator.generate_video_prompt(

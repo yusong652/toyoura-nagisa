@@ -16,7 +16,7 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
     based on the provider name, avoiding circular dependencies.
     
     Args:
-        provider_name: Name of the LLM provider ('gemini', 'anthropic', 'openai')
+        provider_name: Name of the LLM provider ('google', 'anthropic', 'openai')
     
     Returns:
         Type[Any]: Provider-specific message formatter class
@@ -25,9 +25,9 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
         ValueError: If provider name is unsupported
         ImportError: If provider module cannot be imported
     """
-    if provider_name == "gemini":
-        from backend.infrastructure.llm.providers.gemini.message_formatter import GeminiMessageFormatter
-        return GeminiMessageFormatter
+    if provider_name == "google":
+        from backend.infrastructure.llm.providers.google.message_formatter import GoogleMessageFormatter
+        return GoogleMessageFormatter
     elif provider_name == "anthropic":
         from backend.infrastructure.llm.providers.anthropic.message_formatter import MessageFormatter
         return MessageFormatter
@@ -60,9 +60,9 @@ def get_context_manager_class(provider_name: str) -> Type[Any]:
     Raises:
         ValueError: If provider name is unsupported
     """
-    if provider_name == "gemini":
-        from backend.infrastructure.llm.providers.gemini.context_manager import GeminiContextManager
-        return GeminiContextManager
+    if provider_name == "google":
+        from backend.infrastructure.llm.providers.google.context_manager import GoogleContextManager
+        return GoogleContextManager
     elif provider_name == "anthropic":
         from backend.infrastructure.llm.providers.anthropic.context_manager import AnthropicContextManager
         return AnthropicContextManager
@@ -95,9 +95,9 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
     Raises:
         ValueError: If provider name is unsupported
     """
-    if provider_name == "gemini":
-        from backend.infrastructure.llm.providers.gemini.tool_manager import GeminiToolManager
-        return GeminiToolManager
+    if provider_name == "google":
+        from backend.infrastructure.llm.providers.google.tool_manager import GoogleToolManager
+        return GoogleToolManager
     elif provider_name == "anthropic":
         from backend.infrastructure.llm.providers.anthropic.tool_manager import AnthropicToolManager
         return AnthropicToolManager
@@ -118,7 +118,7 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
 
 
 # Provider registry for future extensibility
-SUPPORTED_PROVIDERS = ["gemini", "anthropic", "openai", "moonshot", "zhipu", "openrouter", "local"]
+SUPPORTED_PROVIDERS = ["google", "anthropic", "openai", "moonshot", "zhipu", "openrouter", "local"]
 
 
 def is_provider_supported(provider_name: str) -> bool:

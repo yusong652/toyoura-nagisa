@@ -7,7 +7,7 @@ import copy
 from typing import Dict, Any, List, Optional
 
 
-class GeminiDebugger:
+class GoogleDebugger:
     """Debug utilities for Gemini API interactions."""
 
     @staticmethod
@@ -18,13 +18,13 @@ class GeminiDebugger:
         print(f"📝 Context items: {len(contents)}")
 
         config_dict = config.model_dump()
-        debug_config = GeminiDebugger._truncate_config(config_dict)
+        debug_config = GoogleDebugger._truncate_config(config_dict)
 
         payload = {"model": model, "contents": contents, "config": debug_config}
-        payload = GeminiDebugger._censor_payload(payload)
+        payload = GoogleDebugger._censor_payload(payload)
 
         print("\nPayload (truncated):")
-        GeminiDebugger._print_json(payload)
+        GoogleDebugger._print_json(payload)
         print("========== END ==========")
 
     @staticmethod
@@ -161,9 +161,9 @@ class GeminiDebugger:
         result = {}
         for key, value in config_dict.items():
             if key == "system_instruction" and isinstance(value, str):
-                result[key] = GeminiDebugger._truncate(value, 200, "system_instruction")
+                result[key] = GoogleDebugger._truncate(value, 200, "system_instruction")
             elif key == "tools" and isinstance(value, list):
-                result[key] = GeminiDebugger._truncate_tools(value)
+                result[key] = GoogleDebugger._truncate_tools(value)
             else:
                 result[key] = value
         return result
@@ -192,7 +192,7 @@ class GeminiDebugger:
                     if isinstance(func, dict):
                         func_copy = func.copy()
                         if 'description' in func_copy:
-                            func_copy['description'] = GeminiDebugger._truncate(
+                            func_copy['description'] = GoogleDebugger._truncate(
                                 func_copy['description'], 80, func.get('name', 'func')
                             )
                         if 'parameters' in func_copy:
@@ -239,7 +239,7 @@ class GeminiDebugger:
             elif isinstance(o, list):
                 return [convert(i) for i in o]
             elif hasattr(o, '__dict__'):
-                return GeminiDebugger._convert_sdk_object(o)
+                return GoogleDebugger._convert_sdk_object(o)
             else:
                 return o
 
@@ -270,10 +270,10 @@ class GeminiDebugger:
                     sig_b64 = base64.b64encode(sig).decode('utf-8')
                 else:
                     sig_b64 = str(sig)
-                result['thought_signature'] = GeminiDebugger._truncate(sig_b64, 50, "sig")
+                result['thought_signature'] = GoogleDebugger._truncate(sig_b64, 50, "sig")
 
             if hasattr(obj, 'text') and obj.text:
-                result['text'] = GeminiDebugger._truncate(obj.text, 150, "text")
+                result['text'] = GoogleDebugger._truncate(obj.text, 150, "text")
                 return result
             elif hasattr(obj, 'function_call') and obj.function_call:
                 fc = obj.function_call
@@ -281,7 +281,7 @@ class GeminiDebugger:
                 args = getattr(fc, 'args', {})
                 args_str = str(args) if args else "{}"
                 result['function_call'] = name
-                result['args'] = GeminiDebugger._truncate(args_str, 150, "args")
+                result['args'] = GoogleDebugger._truncate(args_str, 150, "args")
                 return result
             elif hasattr(obj, 'function_response') and obj.function_response:
                 fr = obj.function_response
@@ -289,7 +289,7 @@ class GeminiDebugger:
                 response = getattr(fr, 'response', {})
                 response_str = str(response) if response else "{}"
                 result['function_response'] = name
-                result['response'] = GeminiDebugger._truncate(response_str, 150, "response")
+                result['response'] = GoogleDebugger._truncate(response_str, 150, "response")
                 return result
             elif hasattr(obj, 'inline_data') and obj.inline_data:
                 result['inline_data'] = "[binary data]"
@@ -303,7 +303,7 @@ class GeminiDebugger:
             if hasattr(obj, 'role'):
                 result['role'] = obj.role
             if hasattr(obj, 'parts') and obj.parts:
-                result['parts'] = [GeminiDebugger._convert_sdk_object(p) for p in obj.parts]
+                result['parts'] = [GoogleDebugger._convert_sdk_object(p) for p in obj.parts]
             return result if result else f"<Content: empty>"
 
         # Fallback: try model_dump() for pydantic objects

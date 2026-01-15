@@ -44,7 +44,7 @@ class BaseContextManager(ABC):
         immediately after construction.
 
         Args:
-            provider_name: LLM provider name (e.g., 'gemini', 'anthropic', 'openai')
+            provider_name: LLM provider name (e.g., 'google', 'anthropic', 'openai')
             session_id: Session ID for loading history and runtime state
         """
         self._provider_name = provider_name

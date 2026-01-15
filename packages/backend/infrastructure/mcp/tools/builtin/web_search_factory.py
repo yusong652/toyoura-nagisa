@@ -15,13 +15,13 @@ class WebSearchToolFactory:
         Get the appropriate web search generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'moonshot', or 'zhipu')
+            llm_type: Type of LLM client ('google', 'anthropic', 'openai', 'moonshot', or 'zhipu')
 
         Returns:
             WebSearchGenerator class for the specified LLM type
         """
-        if llm_type.lower() == 'gemini':
-            from backend.infrastructure.llm.providers.gemini.content_generators import GeminiWebSearchGenerator as WebSearchGenerator
+        if llm_type.lower() == 'google':
+            from backend.infrastructure.llm.providers.google.content_generators import GoogleWebSearchGenerator as WebSearchGenerator
             return WebSearchGenerator
         elif llm_type.lower() == 'anthropic':
             from backend.infrastructure.llm.providers.anthropic.content_generators import AnthropicWebSearchGenerator as WebSearchGenerator
@@ -51,7 +51,7 @@ class WebSearchToolFactory:
         
         Args:
             llm_client: The LLM client instance
-            llm_type: Type of LLM ('gemini' or 'anthropic')
+            llm_type: Type of LLM ('google' or 'anthropic')
             query: Search query
             debug: Enable debug output
             max_uses: Maximum number of search uses (ignored for Gemini)
@@ -68,9 +68,9 @@ class WebSearchToolFactory:
 
             # Use configured max_uses if not provided
             if max_uses is None:
-                if llm_type.lower() == 'gemini':
-                    gemini_config = llm_settings.get_gemini_config()
-                    max_uses = gemini_config.web_search_max_uses
+                if llm_type.lower() == 'google':
+                    google_config = llm_settings.get_google_config()
+                    max_uses = google_config.web_search_max_uses
                 elif llm_type.lower() == 'anthropic':
                     anthropic_config = llm_settings.get_anthropic_config()
                     max_uses = anthropic_config.web_search_max_uses
@@ -98,7 +98,7 @@ class WebSearchToolFactory:
             # Instantiate the generator with the client
             generator = WebSearchGenerator(client=client)
 
-            if llm_type.lower() in ('gemini', 'anthropic', 'openai', 'moonshot', 'zhipu'):
+            if llm_type.lower() in ('google', 'anthropic', 'openai', 'moonshot', 'zhipu'):
                 # All providers now use instance method (async)
                 return await generator.perform_web_search(
                     query=query,
@@ -127,7 +127,7 @@ class WebSearchToolFactory:
             llm_client: The LLM client instance
 
         Returns:
-            LLM type string ('gemini', 'anthropic', 'openai', 'moonshot', or 'zhipu')
+            LLM type string ('google', 'anthropic', 'openai', 'moonshot', or 'zhipu')
         """
         client_type = type(llm_client).__name__.lower()
         client_module = type(llm_client).__module__.lower()
@@ -140,8 +140,8 @@ class WebSearchToolFactory:
             return 'openrouter'
         elif 'zhipu' in client_type or 'zhipu' in client_module:
             return 'zhipu'
-        elif 'gemini' in client_type or 'gemini' in client_module:
-            return 'gemini'
+        elif 'google' in client_type or 'google' in client_module:
+            return 'google'
         elif 'anthropic' in client_type or 'anthropic' in client_module:
             return 'anthropic'
         elif 'openai' in client_type or 'openai' in client_module:
@@ -152,7 +152,7 @@ class WebSearchToolFactory:
         else:
             # Fallback: check for specific attributes
             if hasattr(llm_client, 'models') and hasattr(llm_client, 'generate_content'):
-                return 'gemini'
+                return 'google'
             elif hasattr(llm_client, 'messages') and hasattr(llm_client, 'create'):
                 return 'anthropic'
             elif hasattr(llm_client, 'chat') and hasattr(llm_client.chat, 'completions'):

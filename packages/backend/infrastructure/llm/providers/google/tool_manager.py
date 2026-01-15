@@ -10,7 +10,7 @@ from backend.infrastructure.llm.base.tool_manager import BaseToolManager
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
 
 
-class GeminiToolManager(BaseToolManager):
+class GoogleToolManager(BaseToolManager):
     """
     Gemini-specific tool manager.
     

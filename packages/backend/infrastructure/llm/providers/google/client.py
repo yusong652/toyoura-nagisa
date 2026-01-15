@@ -14,14 +14,14 @@ from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
 
 # Import Gemini-specific implementations
-from .config import get_gemini_client_config
-from .context_manager import GeminiContextManager
-from .debug import GeminiDebugger
-from .response_processor import GeminiResponseProcessor
-from .tool_manager import GeminiToolManager
+from .config import get_google_client_config
+from .context_manager import GoogleContextManager
+from .debug import GoogleDebugger
+from .response_processor import GoogleResponseProcessor
+from .tool_manager import GoogleToolManager
 
 
-class GeminiClient(LLMClientBase):
+class GoogleClient(LLMClientBase):
     """
     Enhanced Google Gemini client with unified architecture.
     
@@ -36,10 +36,10 @@ class GeminiClient(LLMClientBase):
     - Modular component architecture
     
     Components:
-    - GeminiContextManager: Manages context and state for Gemini API calls
-    - GeminiDebugger: Provides detailed request/response logging in debug mode
-    - GeminiResponseProcessor: Enhanced response processing with tool call extraction
-    - GeminiToolManager: Advanced MCP tool integration
+    - GoogleContextManager: Manages context and state for Gemini API calls
+    - GoogleDebugger: Provides detailed request/response logging in debug mode
+    - GoogleResponseProcessor: Enhanced response processing with tool call extraction
+    - GoogleToolManager: Advanced MCP tool integration
     - Content Generators: Specialized content generation utilities
     """
     
@@ -71,12 +71,12 @@ class GeminiClient(LLMClientBase):
         if 'debug' in self.extra_config:
             config_overrides['debug'] = self.extra_config['debug']
         
-        self.gemini_config = get_gemini_client_config(**config_overrides)
+        self.google_config = get_google_client_config(**config_overrides)
         
-        print(f"Gemini Client initialized with model: {self.gemini_config.model_settings.model}")
+        print(f"Gemini Client initialized with model: {self.google_config.model_settings.model}")
 
         # Initialize component managers with unified architecture
-        self.tool_manager = GeminiToolManager()
+        self.tool_manager = GoogleToolManager()
 
     # get_response is now implemented in base class using provider-specific components
 
@@ -116,13 +116,13 @@ class GeminiClient(LLMClientBase):
         Note:
             This method is completely stateless. All configuration is passed via parameters.
         """
-        debug = self.gemini_config.debug
+        debug = self.google_config.debug
 
         # Extract Gemini config from api_config
         config = api_config.get('config')
         if not config:
             # Fallback to basic config if not provided
-            config_kwargs = self.gemini_config.get_generation_config_kwargs(
+            config_kwargs = self.google_config.get_generation_config_kwargs(
                 system_prompt="",
                 tool_schemas=[]
             )
@@ -135,10 +135,10 @@ class GeminiClient(LLMClientBase):
                 config_dict.update(kwargs)
                 config = types.GenerateContentConfig(**config_dict)
 
-        model = self.gemini_config.model_settings.model
+        model = self.google_config.model_settings.model
 
         if debug:
-            GeminiDebugger.print_request(context_contents, config, model)
+            GoogleDebugger.print_request(context_contents, config, model)
 
         try:
             response = await self.client.aio.models.generate_content(
@@ -150,18 +150,18 @@ class GeminiClient(LLMClientBase):
             # Validate response structure
             if not hasattr(response, 'candidates') or not response.candidates:
                 if debug:
-                    GeminiDebugger.print_error("No candidates", model, response=response)
+                    GoogleDebugger.print_error("No candidates", model, response=response)
                 raise Exception(f"Empty response (no candidates). Model: {model}")
 
             candidate = response.candidates[0]
             if not hasattr(candidate, 'content') or not candidate.content:
                 if debug:
-                    GeminiDebugger.print_error("Empty content", model, candidate=candidate)
+                    GoogleDebugger.print_error("Empty content", model, candidate=candidate)
                 raise Exception(f"Empty content. Model: {model}, finish_reason: {getattr(candidate, 'finish_reason', None)}")
 
             if not hasattr(candidate.content, 'parts') or not candidate.content.parts:
                 if debug:
-                    GeminiDebugger.print_error("Empty parts", model, candidate=candidate)
+                    GoogleDebugger.print_error("Empty parts", model, candidate=candidate)
                 raise Exception(
                     f"Empty parts. Model: {model}, "
                     f"finish_reason: {getattr(candidate, 'finish_reason', None)}, "
@@ -169,7 +169,7 @@ class GeminiClient(LLMClientBase):
                 )
 
             if debug:
-                GeminiDebugger.print_response(response)
+                GoogleDebugger.print_response(response)
 
             return response
 
@@ -183,11 +183,11 @@ class GeminiClient(LLMClientBase):
 
     def _get_response_processor(self):
         """Get Gemini-specific response processor instance."""
-        return GeminiResponseProcessor()
+        return GoogleResponseProcessor()
 
     def _get_context_manager_class(self):
         """Get Gemini-specific context manager class."""
-        return GeminiContextManager
+        return GoogleContextManager
 
     def _build_api_config(
         self,
@@ -204,7 +204,7 @@ class GeminiClient(LLMClientBase):
         Returns:
             Dict with 'config' key containing GenerateContentConfig
         """
-        config_kwargs = self.gemini_config.get_generation_config_kwargs(
+        config_kwargs = self.google_config.get_generation_config_kwargs(
             system_prompt=system_prompt,
             tool_schemas=tool_schemas or []
         )
@@ -213,7 +213,7 @@ class GeminiClient(LLMClientBase):
 
     def _get_provider_config(self):
         """Get Gemini-specific configuration object."""
-        return self.gemini_config
+        return self.google_config
 
     async def call_api_with_context_streaming(
         self,
@@ -239,13 +239,13 @@ class GeminiClient(LLMClientBase):
         Raises:
             Exception: If streaming API call fails
         """
-        debug = self.gemini_config.debug
+        debug = self.google_config.debug
 
         # Extract Gemini config from api_config
         config = api_config.get('config')
         if not config:
             # Fallback to basic config if not provided
-            config_kwargs = self.gemini_config.get_generation_config_kwargs(
+            config_kwargs = self.google_config.get_generation_config_kwargs(
                 system_prompt="",
                 tool_schemas=[]
             )
@@ -258,10 +258,10 @@ class GeminiClient(LLMClientBase):
                 config_dict.update(kwargs)
                 config = types.GenerateContentConfig(**config_dict)
 
-        model = self.gemini_config.model_settings.model
+        model = self.google_config.model_settings.model
 
         if debug:
-            GeminiDebugger.print_request(context_contents, config, model)
+            GoogleDebugger.print_request(context_contents, config, model)
 
         try:
             # Use streaming API
@@ -281,7 +281,7 @@ class GeminiClient(LLMClientBase):
             async for chunk in await stream_generator:
                 # Debug: print raw chunk before processing
                 if debug:
-                    GeminiDebugger.print_streaming_chunk(chunk, chunk_index)
+                    GoogleDebugger.print_streaming_chunk(chunk, chunk_index)
 
                 # Delegate chunk processing to streaming processor
                 processed_chunks = streaming_processor.process_event(chunk)
@@ -297,7 +297,7 @@ class GeminiClient(LLMClientBase):
 
             # Debug: print summary after streaming completes
             if debug:
-                GeminiDebugger.print_streaming_summary(chunk_index, empty_chunk_count)
+                GoogleDebugger.print_streaming_summary(chunk_index, empty_chunk_count)
 
         except Exception as e:
             error_message = f"Gemini streaming API call failed: {str(e)}"

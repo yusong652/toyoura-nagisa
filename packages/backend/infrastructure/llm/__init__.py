@@ -11,7 +11,7 @@ from backend.infrastructure.llm.base.factory import LLMFactory, get_default_fact
 from backend.domain.models.response_models import LLMResponse
 
 # Import specific client implementations for direct use if needed
-from backend.infrastructure.llm.providers.gemini import GeminiClient
+from backend.infrastructure.llm.providers.google import GoogleClient
 from backend.infrastructure.llm.providers.anthropic import AnthropicClient
 from backend.infrastructure.llm.providers.openai import OpenAIClient
 from backend.infrastructure.llm.providers.moonshot import MoonshotClient
@@ -38,7 +38,7 @@ __all__ = [
     "ErrorResponse",
 
     # Specific client implementations
-    "GeminiClient",
+    "GoogleClient",
     "AnthropicClient",
     "OpenAIClient",
     "MoonshotClient",

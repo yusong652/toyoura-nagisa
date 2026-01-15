@@ -13,8 +13,8 @@ class LLMSettings(BaseSettings):
     """LLM Master Configuration"""
 
     # Current LLM provider
-    provider: Literal["openai", "gemini", "anthropic", "local_llm", "moonshot", "openrouter", "zhipu"] = Field(
-        default="gemini",
+    provider: Literal["openai", "google", "anthropic", "local_llm", "moonshot", "openrouter", "zhipu"] = Field(
+        default="google",
         description="Current LLM provider"
     )
     debug: bool = Field(default=False, description="Debug mode")
@@ -31,9 +31,9 @@ class LLMSettings(BaseSettings):
         """Get OpenAI configuration"""
         return OpenAIConfig()  # type: ignore
 
-    def get_gemini_config(self) -> GeminiConfig:
-        """Get Gemini configuration"""
-        return GeminiConfig()  # type: ignore
+    def get_google_config(self) -> GoogleConfig:
+        """Get Google configuration"""
+        return GoogleConfig()  # type: ignore
 
     def get_anthropic_config(self) -> AnthropicConfig:
         """Get Anthropic configuration"""
@@ -64,7 +64,7 @@ class LLMSettings(BaseSettings):
         """
         config_map = {
             "openai": self.get_openai_config,
-            "gemini": self.get_gemini_config,
+            "google": self.get_google_config,
             "anthropic": self.get_anthropic_config,
             "moonshot": self.get_moonshot_config,
             "openrouter": self.get_openrouter_config,
@@ -135,8 +135,8 @@ class OpenAIConfig(BaseSettings):
     )
 
 
-class GeminiConfig(BaseSettings):
-    """Gemini Configuration"""
+class GoogleConfig(BaseSettings):
+    """Google (Gemini) Configuration"""
 
     # API Key - set via environment variable GOOGLE_API_KEY
     google_api_key: str = Field(default="", description="Google API Key")

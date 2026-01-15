@@ -9,7 +9,7 @@ from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
 
 
-class GeminiMessageFormatter(BaseMessageFormatter):
+class GoogleMessageFormatter(BaseMessageFormatter):
     """
     Gemini-specific message formatter.
 
@@ -136,7 +136,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
 
                         elif item.get("type") == "image" and "inline_data" in item:
                             # Handle image content using unified processing
-                            blob = GeminiMessageFormatter._process_inline_data(item['inline_data'])
+                            blob = GoogleMessageFormatter._process_inline_data(item['inline_data'])
                             if blob:
                                 parts.append(types.Part(inline_data=blob))
                         elif "text" in item and item["text"]:
@@ -144,7 +144,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
                             parts.append(types.Part(text=item["text"]))
                         elif "inline_data" in item:
                             # Generic inline data (images, etc.)
-                            blob = GeminiMessageFormatter._process_inline_data(item['inline_data'])
+                            blob = GoogleMessageFormatter._process_inline_data(item['inline_data'])
                             if blob:
                                 parts.append(types.Part(inline_data=blob))
             else:
@@ -153,7 +153,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
             
             # Map role and add to contents if we have parts
             if parts:
-                mapped_role = GeminiMessageFormatter._map_role(msg.role) # type: ignore
+                mapped_role = GoogleMessageFormatter._map_role(msg.role) # type: ignore
                 contents.append({"role": mapped_role, "parts": parts})
         
         return contents
@@ -272,7 +272,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
 
                     elif item.get("type") == "image" and "inline_data" in item:
                         # Handle image content using unified processing
-                        blob = GeminiMessageFormatter._process_inline_data(item['inline_data'])
+                        blob = GoogleMessageFormatter._process_inline_data(item['inline_data'])
                         if blob:
                             parts.append(types.Part(inline_data=blob))
                     elif "text" in item and item["text"]:
@@ -280,7 +280,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
                         parts.append(types.Part(text=item["text"]))
                     elif "inline_data" in item:
                         # Generic inline data (images, etc.)
-                        blob = GeminiMessageFormatter._process_inline_data(item['inline_data'])
+                        blob = GoogleMessageFormatter._process_inline_data(item['inline_data'])
                         if blob:
                             parts.append(types.Part(inline_data=blob))
         else:
@@ -289,7 +289,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         
         # Map role and return formatted message
         if parts:
-            mapped_role = GeminiMessageFormatter._map_role(message.role) # type: ignore
+            mapped_role = GoogleMessageFormatter._map_role(message.role) # type: ignore
             return {"role": mapped_role, "parts": parts}
         
         return {}
@@ -323,7 +323,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
 
             if part_type == "inline_data":
                 # Process inline_data part for multimodal content
-                blob = GeminiMessageFormatter._process_inline_data(part)
+                blob = GoogleMessageFormatter._process_inline_data(part)
                 if blob:
                     parts.append(types.Part(inline_data=blob))
             elif part_type == "text":

@@ -43,7 +43,7 @@ Infrastructure Layer (LLM, MCP, Memory, PFC, Storage)
 
 ### LLM Providers
 
-Located in `backend/infrastructure/llm/providers/`: gemini (primary), anthropic, openai, moonshot, zhipu, openrouter, local (vLLM/Ollama).
+Located in `backend/infrastructure/llm/providers/`: google (primary), anthropic, openai, moonshot, zhipu, openrouter, local (vLLM/Ollama).
 
 **Configuration**: `backend/config/llm.py`
 
@@ -241,7 +241,7 @@ toyoura-nagisa/
 │   │   │   │   ├── client.py      # LLMClientBase ABC
 │   │   │   │   └── response_processor.py  # BaseStreamingProcessor
 │   │   │   ├── providers/         # Provider implementations
-│   │   │   │   ├── gemini/
+│   │   │   │   ├── google/
 │   │   │   │   ├── anthropic/
 │   │   │   │   ├── openai/
 │   │   │   │   ├── moonshot/

@@ -18,11 +18,11 @@ from backend.infrastructure.llm.shared.constants.defaults import (
 from backend.infrastructure.llm.shared.constants.prompts import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
 )
-from backend.infrastructure.llm.providers.gemini.config import get_gemini_client_config
-from backend.infrastructure.llm.providers.gemini.response_processor import GeminiResponseProcessor
+from backend.infrastructure.llm.providers.google.config import get_google_client_config
+from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
 
 
-class GeminiTitleGenerator(BaseTitleGenerator):
+class GoogleTitleGenerator(BaseTitleGenerator):
     """
     Gemini-specific title generation using shared logic where possible.
     """
@@ -50,7 +50,7 @@ class GeminiTitleGenerator(BaseTitleGenerator):
                 return None
 
             # Read Gemini configuration
-            gemini_config = get_gemini_client_config()
+            google_config = get_google_client_config()
 
             system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
 
@@ -107,7 +107,7 @@ class GeminiTitleGenerator(BaseTitleGenerator):
 
             # Get model from configuration
             llm_settings = get_llm_settings()
-            gemini_config = llm_settings.get_gemini_config()
+            google_config = llm_settings.get_google_config()
 
             # Use a reliable non-thinking model for title generation
             # Thinking models (gemini-2.5-pro, gemini-exp-*) may refuse or return
@@ -122,7 +122,7 @@ class GeminiTitleGenerator(BaseTitleGenerator):
             )
 
             # Extract response text using ResponseProcessor
-            title_response_text = GeminiResponseProcessor.extract_text_content(response)
+            title_response_text = GoogleResponseProcessor.extract_text_content(response)
 
             # Parse title using shared utility function
             return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)

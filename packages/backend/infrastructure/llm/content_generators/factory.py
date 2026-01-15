@@ -22,7 +22,7 @@ class ContentGeneratorFactory:
             llm_client: The LLM client instance
 
         Returns:
-            LLM type string ('gemini', 'anthropic', 'openai', 'moonshot', 'openrouter', or 'zhipu')
+            LLM type string ('google', 'anthropic', 'openai', 'moonshot', 'openrouter', or 'zhipu')
 
         Raises:
             ValueError: If LLM type cannot be detected
@@ -38,8 +38,8 @@ class ContentGeneratorFactory:
             return 'openrouter'
         elif 'zhipu' in client_type or 'zhipu' in client_module:
             return 'zhipu'
-        elif 'gemini' in client_type or 'gemini' in client_module:
-            return 'gemini'
+        elif 'google' in client_type or 'google' in client_module:
+            return 'google'
         elif 'anthropic' in client_type or 'anthropic' in client_module:
             return 'anthropic'
         elif 'openai' in client_type or 'openai' in client_module:
@@ -50,7 +50,7 @@ class ContentGeneratorFactory:
         else:
             # Fallback: check for specific attributes
             if hasattr(llm_client, 'models') and hasattr(llm_client, 'generate_content'):
-                return 'gemini'
+                return 'google'
             elif hasattr(llm_client, 'messages') and hasattr(llm_client, 'create'):
                 return 'anthropic'
             elif hasattr(llm_client, 'chat') and hasattr(llm_client.chat, 'completions'):
@@ -64,7 +64,7 @@ class ContentGeneratorFactory:
         Get the appropriate title generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'moonshot', 'openrouter', or 'zhipu')
+            llm_type: Type of LLM client ('google', 'anthropic', 'openai', 'moonshot', 'openrouter', or 'zhipu')
 
         Returns:
             TitleGenerator class for the specified LLM type
@@ -72,9 +72,9 @@ class ContentGeneratorFactory:
         Raises:
             ValueError: If LLM type is not supported
         """
-        if llm_type.lower() == 'gemini':
-            from backend.infrastructure.llm.providers.gemini.content_generators import GeminiTitleGenerator
-            return GeminiTitleGenerator
+        if llm_type.lower() == 'google':
+            from backend.infrastructure.llm.providers.google.content_generators import GoogleTitleGenerator
+            return GoogleTitleGenerator
         elif llm_type.lower() == 'anthropic':
             from backend.infrastructure.llm.providers.anthropic.content_generators import AnthropicTitleGenerator
             return AnthropicTitleGenerator
@@ -102,7 +102,7 @@ class ContentGeneratorFactory:
         Get the appropriate image prompt generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'moonshot', 'openrouter', or 'zhipu')
+            llm_type: Type of LLM client ('google', 'anthropic', 'openai', 'moonshot', 'openrouter', or 'zhipu')
 
         Returns:
             ImagePromptGenerator class for the specified LLM type
@@ -110,9 +110,9 @@ class ContentGeneratorFactory:
         Raises:
             ValueError: If LLM type is not supported
         """
-        if llm_type.lower() == 'gemini':
-            from backend.infrastructure.llm.providers.gemini.content_generators import GeminiImagePromptGenerator
-            return GeminiImagePromptGenerator
+        if llm_type.lower() == 'google':
+            from backend.infrastructure.llm.providers.google.content_generators import GoogleImagePromptGenerator
+            return GoogleImagePromptGenerator
         elif llm_type.lower() == 'anthropic':
             from backend.infrastructure.llm.providers.anthropic.content_generators import AnthropicImagePromptGenerator
             return AnthropicImagePromptGenerator

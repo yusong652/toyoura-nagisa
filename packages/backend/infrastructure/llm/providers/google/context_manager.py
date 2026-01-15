@@ -12,10 +12,10 @@ Core design principles:
 
 from typing import Any, Optional, Dict
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
-from .message_formatter import GeminiMessageFormatter
+from .message_formatter import GoogleMessageFormatter
 
 
-class GeminiContextManager(BaseContextManager):
+class GoogleContextManager(BaseContextManager):
     """
     Manages context during Gemini API tool calls
     
@@ -30,7 +30,7 @@ class GeminiContextManager(BaseContextManager):
     3. Finalization: Create standardized messages for storage
     """
     
-    def __init__(self, session_id: str, provider_name: str = "gemini"):
+    def __init__(self, session_id: str, provider_name: str = "google"):
         """Initialize context manager"""
         super().__init__(provider_name=provider_name, session_id=session_id)
         # working_contents already initialized in base class
@@ -42,10 +42,10 @@ class GeminiContextManager(BaseContextManager):
         Args:
             response: Original Gemini API response object
         """
-        from .response_processor import GeminiResponseProcessor
+        from .response_processor import GoogleResponseProcessor
 
         # Delegate formatting to response processor for separation of concerns
-        raw_content = GeminiResponseProcessor.format_response_for_context(response)
+        raw_content = GoogleResponseProcessor.format_response_for_context(response)
         if raw_content is None:
             raise ValueError("Invalid Gemini API response format")
 
@@ -69,7 +69,7 @@ class GeminiContextManager(BaseContextManager):
             await self._inject_reminders_to_result(result)
 
         # Use message formatter to handle tool result format
-        working_content = GeminiMessageFormatter.format_tool_result_for_context(tool_name, result)
+        working_content = GoogleMessageFormatter.format_tool_result_for_context(tool_name, result)
         # Add to working context
         self.working_contents.append(working_content)
     

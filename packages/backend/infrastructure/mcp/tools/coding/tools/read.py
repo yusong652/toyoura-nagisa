@@ -39,7 +39,7 @@ __all__ = ["read", "register_read_tool"]
 # -----------------------------------------------------------------------------
 
 # LLM providers that support multimodal content (images, binary files)
-MULTIMODAL_PROVIDERS = {"gemini", "anthropic", "openai", "openrouter", "zhipu"}
+MULTIMODAL_PROVIDERS = {"google", "anthropic", "openai", "openrouter", "zhipu"}
 
 
 def _check_multimodal_support() -> bool:

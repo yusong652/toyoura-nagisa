@@ -11,7 +11,7 @@ from backend.infrastructure.llm.base.response_processor import BaseResponseProce
 from google.genai import types
 
 
-class GeminiStreamingProcessor(BaseStreamingProcessor):
+class GoogleStreamingProcessor(BaseStreamingProcessor):
     """
     Stateful streaming processor for Gemini API.
 
@@ -120,7 +120,7 @@ class GeminiStreamingProcessor(BaseStreamingProcessor):
         return result
 
 
-class GeminiResponseProcessor(BaseResponseProcessor):
+class GoogleResponseProcessor(BaseResponseProcessor):
     """
     Gemini-specific response processor.
     
@@ -263,7 +263,7 @@ class GeminiResponseProcessor(BaseResponseProcessor):
 
         # Reuse pre-extracted tool calls if provided, otherwise extract now
         if tool_calls is None:
-            tool_calls = GeminiResponseProcessor.extract_tool_calls(response)
+            tool_calls = GoogleResponseProcessor.extract_tool_calls(response)
 
         # Extract thinking content and text parts
         thinking_parts = []
@@ -480,7 +480,7 @@ class GeminiResponseProcessor(BaseResponseProcessor):
             ...     {"type": "tool_use", "name": "read"},
             ...     {"type": "text", "text": "Part 2"}
             ... ]
-            >>> GeminiResponseProcessor.extract_combined_text_from_content(content)
+            >>> GoogleResponseProcessor.extract_combined_text_from_content(content)
             'Part 1Part 2'
         """
         text_parts = []
@@ -500,7 +500,7 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         Returns:
             bool: True if response contains tool calls
         """
-        return len(GeminiResponseProcessor.extract_tool_calls(response)) > 0
+        return len(GoogleResponseProcessor.extract_tool_calls(response)) > 0
 
     @staticmethod
     def format_response_for_context(response) -> Optional[Any]:
@@ -652,6 +652,6 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         Create Gemini streaming processor instance.
 
         Returns:
-            GeminiStreamingProcessor: Stateful processor for Gemini streaming
+            GoogleStreamingProcessor: Stateful processor for Gemini streaming
         """
-        return GeminiStreamingProcessor()
+        return GoogleStreamingProcessor()

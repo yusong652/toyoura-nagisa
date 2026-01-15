@@ -12,11 +12,11 @@ from backend.infrastructure.llm.base.content_generators.web_fetch import (
     BaseWebFetchGenerator,
     WebFetchResult,
 )
-from backend.infrastructure.llm.providers.gemini.config import get_gemini_client_config
-from backend.infrastructure.llm.providers.gemini.response_processor import GeminiResponseProcessor
+from backend.infrastructure.llm.providers.google.config import get_google_client_config
+from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
 
 
-class GeminiWebFetchGenerator(BaseWebFetchGenerator):
+class GoogleWebFetchGenerator(BaseWebFetchGenerator):
     """
     Gemini-specific web fetch using urlContext tool.
 
@@ -48,12 +48,12 @@ class GeminiWebFetchGenerator(BaseWebFetchGenerator):
             self.log_fetch_start(url)
 
             # Get configuration
-            gemini_client_config = get_gemini_client_config()
+            google_client_config = get_google_client_config()
             llm_settings = get_llm_settings()
-            gemini_llm_config = llm_settings.get_gemini_config()
+            google_llm_config = llm_settings.get_google_config()
 
             # Use secondary model for URL fetching (reduces primary model RPM usage)
-            model = gemini_llm_config.secondary_model
+            model = google_llm_config.secondary_model
 
             # Build the user prompt with URL
             user_prompt = f"{prompt}\n\nURL: {url}"
@@ -62,7 +62,7 @@ class GeminiWebFetchGenerator(BaseWebFetchGenerator):
             # Note: urlContext is incompatible with function calling
             fetch_config = types.GenerateContentConfig(
                 tools=[types.Tool(url_context=types.UrlContext())],
-                safety_settings=gemini_client_config.safety_settings.to_gemini_format(),
+                safety_settings=google_client_config.safety_settings.to_gemini_format(),
             )
 
             # Call Gemini API with urlContext
@@ -100,7 +100,7 @@ class GeminiWebFetchGenerator(BaseWebFetchGenerator):
                     )
 
         # Extract response text
-        response_text = GeminiResponseProcessor.extract_text_content(response)
+        response_text = GoogleResponseProcessor.extract_text_content(response)
         if not response_text:
             return self.format_fetch_error(url, "No content extracted from URL")
 

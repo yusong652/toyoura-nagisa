@@ -1,16 +1,16 @@
 """
-Gemini Client Configuration Module
+Google Client Configuration Module
 
-This module contains all Gemini-specific configuration settings,
-including safety settings, model parameters, and other Gemini-specific options.
+This module contains all Google-specific configuration settings,
+including safety settings, model parameters, and other Google-specific options.
 """
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from google.genai import types
 
 
-class GeminiSafetySettings(BaseModel):
-    """Gemini safety settings"""
+class GoogleSafetySettings(BaseModel):
+    """Google safety settings"""
     
     # 每个安全类别的阈值设置
     sexually_explicit_threshold: types.HarmBlockThreshold = Field(
@@ -31,7 +31,7 @@ class GeminiSafetySettings(BaseModel):
     )
     
     def to_gemini_format(self) -> List[types.SafetySetting]:
-        """Convert to Gemini API format safety settings"""
+        """Convert to Google API format safety settings"""
         return [
             types.SafetySetting(
                 category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
@@ -52,8 +52,8 @@ class GeminiSafetySettings(BaseModel):
         ]
 
 
-class GeminiModelConfig(BaseModel):
-    """Gemini model parameters configuration"""
+class GoogleModelConfig(BaseModel):
+    """Google model parameters configuration"""
     
     # 基础模型配置
     model: str = Field(
@@ -86,7 +86,7 @@ class GeminiModelConfig(BaseModel):
     # Thinking configuration
     enable_thinking: bool = Field(
         default=True,
-        description="Whether to enable thinking mode for supported models (Gemini 2.5+, Gemini 3+)"
+        description="Whether to enable thinking mode for supported models (Google 2.5+, Google 3+)"
     )
     include_thoughts_in_response: bool = Field(
         default=True,
@@ -102,19 +102,19 @@ class GeminiModelConfig(BaseModel):
         return self.enable_thinking
 
 
-class GeminiClientConfig(BaseModel):
-    """Gemini Client full configuration"""
+class GoogleClientConfig(BaseModel):
+    """Google Client full configuration"""
     
     # 安全设置
-    safety_settings: GeminiSafetySettings = Field(
-        default_factory=GeminiSafetySettings,
-        description="Gemini safety settings"
+    safety_settings: GoogleSafetySettings = Field(
+        default_factory=GoogleSafetySettings,
+        description="Google safety settings"
     )
     
     # 模型配置
-    model_settings: GeminiModelConfig = Field(
-        default_factory=GeminiModelConfig,
-        description="Gemini model configuration"
+    model_settings: GoogleModelConfig = Field(
+        default_factory=GoogleModelConfig,
+        description="Google model configuration"
     )
     
     # 调试配置
@@ -131,7 +131,7 @@ class GeminiClientConfig(BaseModel):
     
     def get_generation_config_kwargs(self, system_prompt: str, tool_schemas: Optional[List[types.Tool]]) -> Dict[str, Any]:
         """
-        Get GenerateContentConfig parameters for Gemini API
+        Get GenerateContentConfig parameters for Google API
         
         Args:
             system_prompt: system prompt
@@ -163,13 +163,13 @@ class GeminiClientConfig(BaseModel):
         # Add thinking configuration based on model version
         model = self.model_settings.model
         if self.model_settings.enable_thinking:
-            # Gemini 3 models use thinking_level parameter (enum)
+            # Google 3 models use thinking_level parameter (enum)
             if model.startswith("gemini-3"):
                 config_kwargs["thinking_config"] = types.ThinkingConfig(
-                    thinking_level=types.ThinkingLevel.HIGH,  # LOW or HIGH, cannot be disabled for Gemini 3
+                    thinking_level=types.ThinkingLevel.HIGH,  # LOW or HIGH, cannot be disabled for Google 3
                     include_thoughts=self.model_settings.include_thoughts_in_response
                 )
-            # Gemini 2.5 models use thinking_budget parameter
+            # Google 2.5 models use thinking_budget parameter
             elif model.startswith("gemini-2.5"):
                 config_kwargs["thinking_config"] = types.ThinkingConfig(
                     thinking_budget=-1,  # -1 = dynamic (auto), model adjusts based on complexity
@@ -180,18 +180,18 @@ class GeminiClientConfig(BaseModel):
 
 
 # Default configuration instance
-DEFAULT_GEMINI_CONFIG = GeminiClientConfig()
+DEFAULT_GEMINI_CONFIG = GoogleClientConfig()
 
 
-def get_gemini_client_config(**overrides) -> GeminiClientConfig:
+def get_google_client_config(**overrides) -> GoogleClientConfig:
     """
-    Get Gemini Client configuration, support runtime overrides
+    Get Google Client configuration, support runtime overrides
     
     Args:
         **overrides: Configuration items to override
         
     Returns:
-        GeminiClientConfig: Configuration instance
+        GoogleClientConfig: Configuration instance
     """
     if not overrides:
         return DEFAULT_GEMINI_CONFIG
@@ -211,4 +211,4 @@ def get_gemini_client_config(**overrides) -> GeminiClientConfig:
         else:
             config_dict[key] = value
     
-    return GeminiClientConfig(**config_dict) 
+    return GoogleClientConfig(**config_dict) 

@@ -8,13 +8,13 @@ from typing import Optional, Dict, List, Any
 from google.genai import types
 
 from backend.infrastructure.llm.base.content_generators.video_prompt import BaseVideoPromptGenerator
-from backend.infrastructure.llm.providers.gemini.config import get_gemini_client_config
-from backend.infrastructure.llm.providers.gemini.debug import GeminiDebugger
-from backend.infrastructure.llm.providers.gemini.message_formatter import GeminiMessageFormatter
-from backend.infrastructure.llm.providers.gemini.response_processor import GeminiResponseProcessor
+from backend.infrastructure.llm.providers.google.config import get_google_client_config
+from backend.infrastructure.llm.providers.google.debug import GoogleDebugger
+from backend.infrastructure.llm.providers.google.message_formatter import GoogleMessageFormatter
+from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
 
 
-class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
+class GoogleVideoPromptGenerator(BaseVideoPromptGenerator):
     """
     Gemini-specific video prompt generation using direct implementation.
     """
@@ -44,9 +44,9 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
             # Get configuration
             from backend.config import get_llm_settings, get_image_to_video_settings
             llm_settings = get_llm_settings()
-            llm_gemini_config = llm_settings.get_gemini_config()
+            llm_google_config = llm_settings.get_google_config()
             image_to_video_settings = get_image_to_video_settings()
-            gemini_client_config = get_gemini_client_config()
+            google_client_config = get_google_client_config()
             debug = llm_settings.debug
 
             # Convert motion_type to motion_style description
@@ -59,48 +59,48 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
             motion_style = motion_descriptions.get(motion_type, motion_descriptions["cinematic"])
 
             # Prepare context using inherited method
-            context = GeminiVideoPromptGenerator.prepare_video_context(
+            context = GoogleVideoPromptGenerator.prepare_video_context(
                 session_id=session_id,
                 motion_style=motion_style,
-                llm_provider="gemini",
-                llm_model=llm_gemini_config.model
+                llm_provider="google",
+                llm_model=llm_google_config.model
             )
 
             # Build messages using inherited method
-            messages = GeminiVideoPromptGenerator.build_video_messages(context)
+            messages = GoogleVideoPromptGenerator.build_video_messages(context)
 
             # Format messages using Gemini formatter
-            contents = GeminiMessageFormatter.format_messages(messages)
+            contents = GoogleMessageFormatter.format_messages(messages)
 
             # Create API call configuration
             config_kwargs = {
                 "system_instruction": context['system_prompt'],
-                "safety_settings": gemini_client_config.safety_settings.to_gemini_format(),
+                "safety_settings": google_client_config.safety_settings.to_gemini_format(),
                 "temperature": context['temperature'],
-                "max_output_tokens": gemini_client_config.model_settings.max_output_tokens
+                "max_output_tokens": google_client_config.model_settings.max_output_tokens
             }
 
             # Use model from context
-            model = context.get('model', llm_gemini_config.model)
+            model = context.get('model', llm_google_config.model)
 
             # Add thinking configuration based on model version
-            if gemini_client_config.model_settings.enable_thinking:
+            if google_client_config.model_settings.enable_thinking:
                 if model.startswith("gemini-3"):
                     config_kwargs["thinking_config"] = types.ThinkingConfig(
                         thinking_level=types.ThinkingLevel.HIGH,
-                        include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
+                        include_thoughts=google_client_config.model_settings.include_thoughts_in_response
                     )
                 elif model.startswith("gemini-2.5"):
                     config_kwargs["thinking_config"] = types.ThinkingConfig(
                         thinking_budget=-1,
-                        include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
+                        include_thoughts=google_client_config.model_settings.include_thoughts_in_response
                     )
 
             prompt_config = types.GenerateContentConfig(**config_kwargs)
 
             if debug:
                 print("[image_to_video] Gemini API call configuration:")
-                GeminiDebugger.print_request(contents, prompt_config, model)
+                GoogleDebugger.print_request(contents, prompt_config, model)
 
             # Use async non-streaming for better performance
             response = await self.client.aio.models.generate_content(
@@ -111,14 +111,14 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
 
             if debug:
                 print("[image_to_video] Gemini API response:")
-                GeminiDebugger.print_response(response)
+                GoogleDebugger.print_response(response)
 
             # Extract response text
-            prompt_text = GeminiResponseProcessor.extract_text_content(response)
+            prompt_text = GoogleResponseProcessor.extract_text_content(response)
 
             if prompt_text:
                 # Process response using inherited method
-                return GeminiVideoPromptGenerator.process_video_response(
+                return GoogleVideoPromptGenerator.process_video_response(
                     prompt_text, context, session_id, debug
                 )
 

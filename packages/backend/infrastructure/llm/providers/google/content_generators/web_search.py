@@ -10,13 +10,13 @@ from google.genai import types
 from backend.config import get_llm_settings
 from backend.infrastructure.llm.base.content_generators.web_search import BaseWebSearchGenerator
 from backend.infrastructure.llm.shared.constants.prompts import DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
-from backend.infrastructure.llm.providers.gemini.config import get_gemini_client_config
-from backend.infrastructure.llm.providers.gemini.debug import GeminiDebugger
-from backend.infrastructure.llm.providers.gemini.message_formatter import GeminiMessageFormatter
-from backend.infrastructure.llm.providers.gemini.response_processor import GeminiResponseProcessor
+from backend.infrastructure.llm.providers.google.config import get_google_client_config
+from backend.infrastructure.llm.providers.google.debug import GoogleDebugger
+from backend.infrastructure.llm.providers.google.message_formatter import GoogleMessageFormatter
+from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
 
 
-class GeminiWebSearchGenerator(BaseWebSearchGenerator):
+class GoogleWebSearchGenerator(BaseWebSearchGenerator):
     """
     Gemini-specific web search using shared logic and Gemini's google_search tool.
     """
@@ -43,10 +43,10 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
             user_message = BaseWebSearchGenerator.create_search_user_message(query)
 
             # Get unified configuration
-            gemini_client_config = get_gemini_client_config()
+            google_client_config = get_google_client_config()
             llm_settings = get_llm_settings()
-            gemini_llm_config = llm_settings.get_gemini_config()
-            model = gemini_llm_config.model
+            google_llm_config = llm_settings.get_google_config()
+            model = google_llm_config.model
 
             # Web search uses a simpler config:
             # - No thinking config (google_search tool is a simple retrieval, not reasoning)
@@ -55,14 +55,14 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
             search_config = types.GenerateContentConfig(
                 system_instruction=DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
                 tools=[types.Tool(google_search=types.GoogleSearch())],
-                safety_settings=gemini_client_config.safety_settings.to_gemini_format(),
+                safety_settings=google_client_config.safety_settings.to_gemini_format(),
             )
 
             # Format message using MessageFormatter
-            contents = GeminiMessageFormatter.format_messages([user_message])
+            contents = GoogleMessageFormatter.format_messages([user_message])
 
             if debug:
-                GeminiDebugger.print_request(contents, search_config, model)
+                GoogleDebugger.print_request(contents, search_config, model)
                 print(f"[WebSearch] Note: max_uses={max_uses} parameter ignored for Gemini (API limitation)")
 
             # Call the model with the query (async version)
@@ -75,15 +75,15 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
             # Use base class debug method
             BaseWebSearchGenerator.debug_search_complete(debug)
             if debug:
-                GeminiDebugger.print_response(response)
+                GoogleDebugger.print_response(response)
 
             # Check for candidates
             if response.candidates:
                 # Extract sources using ResponseProcessor
-                sources = GeminiResponseProcessor.extract_web_search_sources(response, debug=debug)
+                sources = GoogleResponseProcessor.extract_web_search_sources(response, debug=debug)
 
                 # Extract response text using ResponseProcessor
-                response_text = GeminiResponseProcessor.extract_text_content(response)
+                response_text = GoogleResponseProcessor.extract_text_content(response)
 
                 # Build structured result using base class method
                 result = BaseWebSearchGenerator.format_search_result(
