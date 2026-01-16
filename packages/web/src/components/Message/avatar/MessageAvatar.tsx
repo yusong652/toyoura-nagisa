@@ -20,7 +20,7 @@ const MessageAvatar: React.FC<MessageAvatarProps> = ({
   onMouseEnter,
   onMouseLeave
 }) => {
-  const avatarSrc = role === 'user' ? '/user-avatar.jpg' : '/Nagisa_avatar.png'
+  const avatarSrc = role === 'user' ? '/Nagisa_avatar.png' : '/Nagisa_avatar.png'
   const altText = role === 'user' ? 'User' : 'Nagisa'
   
   return (

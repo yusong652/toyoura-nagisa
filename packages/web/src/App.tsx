@@ -2,7 +2,6 @@ import React, { useEffect } from 'react'
 import './App.css'
 import { ChatBox } from './components/ChatBox'
 import InputArea from './components/InputArea'
-import Live2DCanvas from './components/Live2DCanvas'
 import ChatHistorySidebar from './components/ChatHistorySidebar/ChatHistorySidebar'
 import BackgroundTaskMonitor from './components/BackgroundTaskMonitor'
 import { ThemeToggle } from './components/Toggle/variants/ThemeToggle'
@@ -10,7 +9,6 @@ import ConnectionError from './components/ConnectionError'
 import { ConnectionProvider } from './contexts/connection/ConnectionContext'
 import { SessionProvider } from './contexts/session/SessionContext'
 import { ChatProvider } from './contexts/chat/ChatContext'
-import { Live2DProvider } from './contexts/live2d/Live2DContext'
 import { MemoryProvider } from './contexts/MemoryContext'
 import { useConnection } from './contexts/connection/ConnectionContext'
 import { ConnectionStatus } from './types/connection'
@@ -75,10 +73,7 @@ function App(): React.ReactElement {
         <SessionProvider>
           <MemoryProvider>
             <ChatProvider>
-              <Live2DProvider>
-                <AppContent />
-                <Live2DCanvas />
-              </Live2DProvider>
+              <AppContent />
             </ChatProvider>
           </MemoryProvider>
         </SessionProvider>

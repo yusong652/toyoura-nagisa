@@ -201,10 +201,6 @@ button:focus-visible {
     max-width: 90%;
   }
   
-  .live2d-container {
-    transform: scale(0.7);
-    transform-origin: bottom right;
-  }
 }
 
 /* 亮色主题 */

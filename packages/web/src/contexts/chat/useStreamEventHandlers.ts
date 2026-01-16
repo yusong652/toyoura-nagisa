@@ -1,11 +1,9 @@
 import { useCallback, useEffect } from 'react'
-import { playMotion } from '../../utils/live2d'
 
 interface UseStreamEventHandlersProps {
   currentSessionId: string | null
   sessionRefreshSessions: () => Promise<any>
   sessionSwitchSession: (sessionId: string) => Promise<void>
-  updateMessageId: (oldId: string, newId: string) => void
   addImageMessage: (imageData: any) => void
 }
 
@@ -26,19 +24,11 @@ export const useStreamEventHandlers = ({
   currentSessionId,
   sessionRefreshSessions,
   sessionSwitchSession,
-  updateMessageId,
   addImageMessage
 }: UseStreamEventHandlersProps): StreamEventHandlers => {
 
-  /**
-   * Handle keyword for Live2D motion.
-   *
-   * Triggers Live2D animation based on keyword.
-   */
-  const handleKeyword = useCallback((data: any) => {
-    if (data.keyword) {
-      playMotion(data.keyword)
-    }
+  const handleKeyword = useCallback((_data: any) => {
+    // Keyword handling reserved for future UI features.
   }, [])
 
   // Listen to WebSocket emotion keyword events
@@ -132,7 +122,7 @@ export const useStreamEventHandlers = ({
    *
    * All content updates now handled via WebSocket MESSAGE_CREATE.
    */
-  const handleContentUpdate = useCallback(async (data: any, messageId: string) => {
+  const handleContentUpdate = useCallback(async (_data: any, _messageId: string) => {
     // No longer process content via SSE - everything goes through WebSocket
   }, [])
 

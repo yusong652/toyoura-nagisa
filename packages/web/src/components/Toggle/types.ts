@@ -5,8 +5,6 @@
  * Provides base interfaces and specific toggle variant types.
  */
 
-import { ReactNode } from 'react'
-
 /**
  * Base Toggle component props
  */
@@ -39,20 +37,6 @@ export interface BaseToggleProps {
 export interface ThemeToggleProps {
   /** Optional callback when theme changes */
   onThemeChange?: (theme: 'light' | 'dark') => void
-  
-  /** Additional CSS classes */
-  className?: string
-}
-
-/**
- * Live2D Toggle specific props
- */
-export interface Live2DToggleProps {
-  /** Initial Live2D display state */
-  initialDisplay?: boolean
-  
-  /** Callback when Live2D display changes */
-  onDisplayChange?: (display: boolean) => void
   
   /** Additional CSS classes */
   className?: string

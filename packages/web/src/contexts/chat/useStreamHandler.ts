@@ -38,7 +38,6 @@ export const useStreamHandler = ({
   
   // Initialize message state manager
   const {
-    updateMessageId,
     addImageMessage
   } = useMessageStateManager({
     setMessages
@@ -54,7 +53,6 @@ export const useStreamHandler = ({
     currentSessionId,
     sessionRefreshSessions,
     sessionSwitchSession,
-    updateMessageId,
     addImageMessage
   })
   
