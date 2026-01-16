@@ -12,14 +12,7 @@ sys.path.insert(0, str(_PROJECT_ROOT))
 import asyncio
 from fastmcp import FastMCP
 from backend.infrastructure.mcp.tools.builtin import register_builtin_tools
-from backend.infrastructure.mcp.tools.lifestyle.tools.email import register_email_tools
-from backend.infrastructure.mcp.tools.lifestyle.tools.calendar import register_calendar_tools
 from backend.infrastructure.mcp.tools.coding import register_coding_tools
-from backend.infrastructure.mcp.tools.lifestyle.tools.text_to_image import register_text_to_image_tools
-from backend.infrastructure.mcp.tools.lifestyle.tools.contacts import register_contact_tools
-from backend.infrastructure.mcp.tools.lifestyle.tools.places import register_places_tools
-from backend.infrastructure.mcp.tools.lifestyle.tools.location import register_location_tools
-from backend.infrastructure.mcp.tools.lifestyle.tools.time import register_time_tools
 from backend.infrastructure.mcp.tools.pfc import (
     register_pfc_task_tool,
     register_pfc_task_status_tool,
@@ -48,14 +41,7 @@ print(f"[DEBUG] Smart MCP Server initialized")
 
 # 注册所有工具
 register_builtin_tools(mcp)
-register_email_tools(mcp)
-register_calendar_tools(mcp)
 register_coding_tools(mcp)
-register_text_to_image_tools(mcp)
-register_contact_tools(mcp)
-register_places_tools(mcp)
-register_location_tools(mcp)
-register_time_tools(mcp)
 # PFC tools - task execution with version tracking (Script is Context)
 register_pfc_task_tool(mcp)
 register_pfc_task_status_tool(mcp)

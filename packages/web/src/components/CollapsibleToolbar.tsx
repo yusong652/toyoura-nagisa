@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import AgentProfileSelector from './AgentProfileSelector';
 import { TTSToggle } from './Toggle/variants/TTSToggle';
 import { Live2DToggle } from './Toggle/variants/Live2DToggle';
 import { MemoryToggle } from './Toggle/variants/MemoryToggle';
@@ -51,25 +50,6 @@ export const CollapsibleToolbar: React.FC = () => {
       
       {isExpanded && (
         <div className="toolbar-content">
-          <div className="toolbar-section">
-            <div className="toolbar-item">
-              <div className="toolbar-icon-label">
-                <svg className="toolbar-section-icon" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-                <span className="toolbar-label">Agent Profile</span>
-              </div>
-              <AgentProfileSelector 
-                useContext={true}
-                variant="compact"
-                iconType="svg"
-                showDescription={false}
-                showToolCount={false}
-              />
-            </div>
-          </div>
-          
           <div className="toolbar-section">
             <div className="toolbar-item">
               <div className="toolbar-icon-label">

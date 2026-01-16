@@ -2,17 +2,14 @@ import React, { useEffect } from 'react'
 import './App.css'
 import { ChatBox } from './components/ChatBox'
 import InputArea from './components/InputArea'
-import { SlashCommandStatusPanel } from './components/SlashCommandStatusPanel'
 import Live2DCanvas from './components/Live2DCanvas'
 import ChatHistorySidebar from './components/ChatHistorySidebar/ChatHistorySidebar'
 import BackgroundTaskMonitor from './components/BackgroundTaskMonitor'
 import { ThemeToggle } from './components/Toggle/variants/ThemeToggle'
 import ConnectionError from './components/ConnectionError'
-import { useSlashCommandExecution } from './components/InputArea/hooks'
 import { AudioProvider } from './contexts/audio/AudioContext'
 import { TtsEnableProvider } from './contexts/audio/TtsEnableContext'
 import { ConnectionProvider } from './contexts/connection/ConnectionContext'
-import { AgentProvider } from './contexts/agent/AgentContext'
 import { SessionProvider } from './contexts/session/SessionContext'
 import { ChatProvider } from './contexts/chat/ChatContext'
 import { Live2DProvider } from './contexts/live2d/Live2DContext'
@@ -22,8 +19,6 @@ import { ConnectionStatus } from './types/connection'
 
 function AppContent(): React.ReactElement {
   const { connectionStatus, connectionError, checkConnection, sendWebSocketMessage, sessionId } = useConnection()
-
-  const { executeSlashCommand, executionQueue } = useSlashCommandExecution()
 
   // Global ESC key listener for interrupt
   useEffect(() => {
@@ -54,15 +49,8 @@ function AppContent(): React.ReactElement {
       <ThemeToggle />
       <div className="chat-container">
         <div className="chat-left-panel">
-          <ChatBox
-            statusPanel={
-              <SlashCommandStatusPanel
-                executionQueue={executionQueue}
-                position="chatbox-right"
-              />
-            }
-          />
-          <InputArea executeSlashCommand={executeSlashCommand} />
+          <ChatBox />
+          <InputArea />
         </div>
       </div>
       <ChatHistorySidebar />
@@ -88,18 +76,16 @@ function App(): React.ReactElement {
       <AudioProvider>
         <TtsEnableProvider>
           <ConnectionProvider>
-            <AgentProvider>
-              <SessionProvider>
-                <MemoryProvider>
-                  <ChatProvider>
-                    <Live2DProvider>
-                      <AppContent />
-                      <Live2DCanvas />
-                    </Live2DProvider>
-                  </ChatProvider>
-                </MemoryProvider>
-              </SessionProvider>
-            </AgentProvider>
+            <SessionProvider>
+              <MemoryProvider>
+                <ChatProvider>
+                  <Live2DProvider>
+                    <AppContent />
+                    <Live2DCanvas />
+                  </Live2DProvider>
+                </ChatProvider>
+              </MemoryProvider>
+            </SessionProvider>
           </ConnectionProvider>
         </TtsEnableProvider>
       </AudioProvider>

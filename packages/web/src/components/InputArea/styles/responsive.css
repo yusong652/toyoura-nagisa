@@ -81,19 +81,8 @@
     padding: 1px 3px;
   }
 
-  /* Mobile slash command adjustments */
-  .slash-command-suggestions {
-    margin-bottom: 4px;
-    border-radius: 6px;
-  }
-
   .suggestion-item {
     padding: 10px;
-  }
-
-  .suggestion-description {
-    font-size: 11px;
-    margin-left: 20px;
   }
 }
 
@@ -172,11 +161,6 @@
     padding: 0px 2px;
   }
 
-  /* Smaller slash command suggestions on mobile */
-  .slash-command-suggestions {
-    border-radius: 4px;
-  }
-
   .suggestions-header {
     padding: 6px 10px;
   }
@@ -185,19 +169,6 @@
     padding: 8px 10px;
   }
 
-  .category-icon {
-    font-size: 12px;
-    width: 14px;
-  }
-
-  .trigger-text {
-    font-size: 12px;
-  }
-
-  .suggestion-description {
-    font-size: 10px;
-    margin-left: 18px;
-  }
 
   .suggestions-footer {
     padding: 6px 10px;
@@ -244,9 +215,6 @@
     height: 60px;
   }
   
-  .slash-command-suggestions {
-    font-size: 14px;
-  }
 }
 
 /* Large screens */

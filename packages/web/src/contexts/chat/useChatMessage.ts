@@ -54,7 +54,7 @@ export const useChatMessage = ({
   sessionRefreshSessions,
   sessionSwitchSession,
   ttsEnabled = false,
-  currentProfile = "general",
+  currentProfile = "pfc",
   memoryEnabled = true,
   setIsLLMThinking
 }: UseChatMessageOptions): UseChatMessageReturn => {

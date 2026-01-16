@@ -4,13 +4,11 @@ import {
   useFileHandling,
   useMessageSending,
   useInputAutoResize,
-  useSlashCommandDetection,
   useFileMentionDetection
 } from './hooks'
 import {
   FilePreviewArea,
   MessageInput,
-  SlashCommandSuggestions,
   FileMentionSuggestions
 } from './components'
 import { CollapsibleToolbar } from '../CollapsibleToolbar'
@@ -20,7 +18,6 @@ import {
   LoadingSpinnerIcon,
   SendIcon
 } from './styles/icons'
-import { useAgent } from '../../contexts/agent/AgentContext'
 import { useSession } from '../../contexts/session/SessionContext'
 import './styles/index.css'
 
@@ -39,10 +36,8 @@ import './styles/index.css'
  * - File preview with thumbnails and removal
  * - Send functionality with validation and status feedback
  * - Keyboard shortcuts (Enter to send, Shift+Enter for newline)
- * - Integration with CollapsibleToolbar for agent settings
+ * - Integration with CollapsibleToolbar for session settings
  * - Loading states and disabled state management
- * - Slash command system with intelligent suggestions (/text_to_image, /help)
- * - Real-time command detection and execution
  * - Comprehensive accessibility features
  * 
  * Architecture Benefits:
@@ -51,7 +46,6 @@ import './styles/index.css'
  * - Easy to test individual hooks and components in isolation
  * - Consistent with toyoura-nagisa component patterns (VideoPlayer, ImageViewer)
  * - Better performance with optimized hook composition
- * - Extensible design ready for slash command implementation
  * 
  * Args:
  *     className?: string - Additional CSS classes for styling customization
@@ -76,10 +70,9 @@ const InputArea: React.FC<InputAreaProps> = ({
   disabled = false,
   maxFiles = DEFAULT_INPUT_CONFIG.maxFiles,
   acceptedFileTypes = DEFAULT_INPUT_CONFIG.allowedFileTypes,
-  executeSlashCommand
 }) => {
-  // Get current agent profile and session ID from context
-  const { currentProfile } = useAgent()
+  // Use fixed agent profile and session ID from context
+  const currentProfile = 'pfc'
   const { currentSessionId } = useSession()
 
   // Core state management hook
@@ -109,9 +102,8 @@ const InputArea: React.FC<InputAreaProps> = ({
     canAddMoreFiles
   } = useFileHandling(files, setFiles, maxFiles)
   
-  // Cursor position tracking for slash commands and file mentions
+  // Cursor position tracking for file mentions
   const [cursorPosition, setCursorPosition] = useState<number>(0)
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(0)
   const [selectedFileMentionIndex, setSelectedFileMentionIndex] = useState<number>(0)
 
   // Mentioned files tracking - collect file paths from @ mentions for backend processing
@@ -135,16 +127,7 @@ const InputArea: React.FC<InputAreaProps> = ({
   }, [message, mentionedFiles])
 
 
-  // Slash command functionality
-  const {
-    suggestions,
-    isCommandActive,
-    selectSuggestion,
-    clearCommand
-  } = useSlashCommandDetection(message, cursorPosition)
-
   // File mention functionality (@ mention)
-  // Use actual agent profile and session ID from context
   const {
     suggestions: fileSuggestions,
     isMentionActive,
@@ -154,11 +137,11 @@ const InputArea: React.FC<InputAreaProps> = ({
   } = useFileMentionDetection(
     message,
     cursorPosition,
-    currentProfile,  // Use actual agent profile (pfc, general, coding, etc.)
+    currentProfile,
     currentSessionId || undefined  // Use actual session ID
   )
   
-  // Message sending logic - no interception, allow slash text as normal messages
+  // Message sending logic - no interception, allow raw text as normal messages
   const {
     handleSendMessage,
     handleKeyPress,
@@ -171,22 +154,6 @@ const InputArea: React.FC<InputAreaProps> = ({
     // Clear mentioned files after sending
     setMentionedFiles([])
   }, textareaRef, mentionedFiles)
-  
-  // Handle suggestion selection - execute command immediately
-  const handleSelectSuggestion = useCallback(async (suggestion: any) => {
-    // Clear input immediately to provide instant visual feedback
-    clearInput()
-    resetTextareaHeight()
-
-    // Reset suggestion state
-    selectSuggestion(suggestion)
-    setSelectedSuggestionIndex(0)
-
-    // Execute the selected command through the passed-in execution function
-    if (executeSlashCommand) {
-      await executeSlashCommand(suggestion.command, [])
-    }
-  }, [selectSuggestion, executeSlashCommand, clearInput, resetTextareaHeight])
 
   // Handle file mention selection - insert file path into message
   const handleSelectFileMention = useCallback((suggestion: any) => {
@@ -241,7 +208,7 @@ const InputArea: React.FC<InputAreaProps> = ({
   }, [message, cursorPosition, selectFileSuggestion, setMessage, textareaRef])
 
 
-  // Handle keyboard navigation for slash commands and file mentions
+  // Handle keyboard navigation for file mentions
   const handleKeyDown = useCallback(async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Priority 1: File mention navigation (if active)
     if (isMentionActive && fileSuggestions.length > 0) {
@@ -278,62 +245,19 @@ const InputArea: React.FC<InputAreaProps> = ({
           setSelectedFileMentionIndex(0)
           break
       }
-      return // File mention handled, don't process slash commands
-    }
-
-    // Priority 2: Slash command navigation (if active and file mention is not)
-    if (isCommandActive && suggestions.length > 0) {
-      // Limit navigation to displayed suggestions (max 5 items for slash commands)
-      const maxDisplaySuggestions = 5
-      const displayCount = Math.min(suggestions.length, maxDisplaySuggestions)
-
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault()
-          setSelectedSuggestionIndex(prev =>
-            prev < displayCount - 1 ? prev + 1 : 0
-          )
-          break
-
-        case 'ArrowUp':
-          e.preventDefault()
-          setSelectedSuggestionIndex(prev =>
-            prev > 0 ? prev - 1 : displayCount - 1
-          )
-          break
-
-        case 'Enter':
-          e.preventDefault()
-          if (suggestions[selectedSuggestionIndex]) {
-            const suggestion = suggestions[selectedSuggestionIndex]
-            await handleSelectSuggestion(suggestion)
-          }
-          break
-
-        case 'Escape':
-          e.preventDefault()
-          clearCommand()
-          setSelectedSuggestionIndex(0)
-          break
-      }
+      return
     }
   }, [
     isMentionActive,
     fileSuggestions,
     selectedFileMentionIndex,
     handleSelectFileMention,
-    clearMention,
-    isCommandActive,
-    suggestions,
-    selectedSuggestionIndex,
-    handleSelectSuggestion,
-    clearCommand
+    clearMention
   ])
 
   // Message change handler with auto-resize and cursor tracking
   const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value)
-    // Update cursor position for slash command detection
     const position = e.target.selectionStart || 0
     setCursorPosition(position)
     // Auto-resize will be handled by useInputAutoResize hook
@@ -352,15 +276,6 @@ const InputArea: React.FC<InputAreaProps> = ({
             onSelectSuggestion={handleSelectFileMention}
             selectedIndex={selectedFileMentionIndex}
             isLoading={isSearching}
-          />
-        )}
-
-        {/* Slash command suggestions - shown when typing commands */}
-        {isCommandActive && suggestions.length > 0 && (
-          <SlashCommandSuggestions
-            suggestions={suggestions}
-            onSelectSuggestion={handleSelectSuggestion}
-            selectedIndex={selectedSuggestionIndex}
           />
         )}
         

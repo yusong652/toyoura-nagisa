@@ -274,57 +274,6 @@
   75% { transform: translateX(2px); }
 }
 
-/* =============================================================================
-   Slash Command Execution Status (Separate Floating Area)
-   ============================================================================= */
-
-.slash-command-status {
-  position: absolute;
-  top: -10px;
-  right: 60px; /* Space for send button */
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-items: flex-end;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.command-status-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--primary-color);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
-  animation: slideInFromRight 0.3s ease-out;
-}
-
-.command-status-label {
-  white-space: nowrap;
-}
-
-.queue-position {
-  font-size: 9px;
-  opacity: 0.8;
-  margin-left: 4px;
-}
-
-@keyframes slideInFromRight {
-  from {
-    opacity: 0;
-    transform: translateX(20px) translateY(-5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) translateY(0);
-  }
-}
-
 @keyframes readyTextPulse {
   0%, 100% { 
     opacity: 1;

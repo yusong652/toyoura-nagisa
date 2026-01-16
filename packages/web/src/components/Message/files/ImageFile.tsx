@@ -14,8 +14,7 @@ interface ImageFileProps {
 /**
  * Image file display component.
  *
- * Renders image files with click handling for viewer. Video generation
- * is now available via the /video slash command for better user experience.
+ * Renders image files with click handling for viewer.
  *
  * Args:
  *     file: Image file object with data URL
@@ -39,7 +38,6 @@ const ImageFile: React.FC<ImageFileProps> = ({ file, onClick }) => {
         className="file-image" 
         onClick={handleImageClick}
       />
-      {/* Video generation is now available via /video slash command */}
     </div>
   )
 }

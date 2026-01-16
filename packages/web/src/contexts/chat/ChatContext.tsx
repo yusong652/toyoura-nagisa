@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useCallback, ReactNode, use
 import { FileData, ChatContextType} from '@toyoura-nagisa/core'
 import { useAudio } from '../audio/AudioContext'
 import { useTtsEnable } from '../audio/TtsEnableContext'
-import { useAgent } from '../agent/AgentContext'
 import { useSession } from '../session/SessionContext'
 import { useMemory } from '../MemoryContext'
 import { useChatMessage } from './useChatMessage'
@@ -10,8 +9,6 @@ import { useStreamHandler } from './useStreamHandler'
 import { useWebSocketTTS } from './useWebSocketTTS'
 import { useStreamingUpdateHandler } from './useStreamingUpdateHandler'
 import { useMessageStateManager } from './useMessageStateManager'
-import { useImageGenerator } from './useImageGenerator'
-import { useVideoGenerator } from './useVideoGenerator'
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
@@ -33,7 +30,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const { queueAndPlayAudio, resetAudioState } = useAudio()
   const { ttsEnabled } = useTtsEnable()
   const { memoryEnabled } = useMemory()
-  const { currentProfile } = useAgent()
+  const currentProfile = 'pfc'
   
   // 从SessionContext获取会话相关状态和方法
   const {
@@ -100,18 +97,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     setMessages
   })
 
-  // Use image generation hook
-  const { generateImage } = useImageGenerator({
-    currentSessionId,
-    setMessages
-  })
-
-  // Use video generation hook
-  const { generateVideo } = useVideoGenerator({
-    currentSessionId,
-    setMessages
-  })
-
   // Main message sending function - now coordinates message sending and both SSE/WebSocket processing
   const sendMessage = useCallback(async (text: string, files: FileData[] = [], mentionedFiles: string[] = []) => {
     if (text.trim() === '' && files.length === 0) return
@@ -149,8 +134,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       sendMessage,
       clearChat,
       deleteMessage,
-      generateImage,
-      generateVideo,
       addVideoMessage
     }}>
       {children}

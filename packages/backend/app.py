@@ -5,9 +5,6 @@ from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.tts.tts_factory import get_tts_engine
 from backend.infrastructure.mcp.mcp_server import mcp
 from fastmcp import Client
-from backend.presentation.api import images
-from backend.presentation.api import videos
-
 from backend.presentation.api import sessions
 from backend.presentation.api import messages
 from backend.presentation.api import content
@@ -111,8 +108,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(images.router, prefix="/api")
-app.include_router(videos.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(content.router, prefix="/api")

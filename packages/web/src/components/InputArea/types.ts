@@ -8,7 +8,6 @@
  * Architecture Benefits:
  * - Type-safe prop threading between hooks and components
  * - Clear contracts for each responsibility area
- * - Extensible design for future slash command features
  * - Consistent with other toyoura-nagisa component patterns
  */
 
@@ -24,11 +23,6 @@ export interface InputAreaProps {
   disabled?: boolean
   maxFiles?: number
   acceptedFileTypes?: string[]
-  executeSlashCommand?: (
-    command: SlashCommand,
-    args: string[],
-    onComplete?: () => void
-  ) => Promise<{ success: boolean; error?: string }>
 }
 
 export interface MessageInputInfo {
@@ -76,17 +70,6 @@ export interface InputAutoResizeHookReturn {
   handleTextareaResize: () => void
   resetTextareaHeight: () => void
   maxHeight: number
-}
-
-export interface SlashCommandHookReturn {
-  context: SlashCommandContext
-  activeCommand: SlashCommandMatch | null
-  suggestions: SlashCommandSuggestion[]
-  isCommandActive: boolean
-  executeCommand: (command: SlashCommand, args: string[]) => Promise<void>
-  selectSuggestion: (suggestion: SlashCommandSuggestion) => void
-  clearCommand: () => void
-  availableCommands: SlashCommand[]
 }
 
 // =============================================================================
@@ -167,14 +150,6 @@ export interface DragDropState {
   validDrop: boolean
 }
 
-export interface SlashCommand {
-  trigger: string
-  description: string
-  handler: (args: string[]) => any | Promise<any>
-  isVisible: boolean
-  category?: string
-}
-
 // =============================================================================
 // Event Handler Types
 // =============================================================================
@@ -206,11 +181,6 @@ export interface InputAreaConfig {
     newlineOnShiftEnter: boolean
   }
   fileHandling: FileProcessingOptions
-  slashCommands: {
-    enabled: boolean
-    triggerChar: string
-    availableCommands: SlashCommand[]
-  }
   dragDrop: {
     enabled: boolean
     acceptMultiple: boolean
@@ -241,11 +211,6 @@ export const DEFAULT_INPUT_CONFIG: InputAreaConfig = {
     allowedTypes: ['*'],
     imageCompression: false,
     generateThumbnails: true
-  },
-  slashCommands: {
-    enabled: true, // Enabled for slash command functionality
-    triggerChar: '/',
-    availableCommands: []
   },
   dragDrop: {
     enabled: true,
@@ -330,34 +295,6 @@ export const calculateMessageInfo = (message: string, files: FileData[]): Messag
   }
 }
 
-// =============================================================================
-// Future Slash Command Types (for upcoming implementation)
-// =============================================================================
-
-export interface SlashCommandMatch {
-  command: SlashCommand
-  args: string[]
-  fullMatch: string
-  position: {
-    start: number
-    end: number
-  }
-}
-
-export interface SlashCommandSuggestion {
-  command: SlashCommand
-  relevanceScore: number
-  matchedText: string
-}
-
-export interface SlashCommandContext {
-  currentText: string
-  cursorPosition: number
-  availableCommands: SlashCommand[]
-  isTriggered: boolean
-  suggestions: SlashCommandSuggestion[]
-}
-
 /**
  * TypeScript Learning Points Demonstrated:
  * 
@@ -378,64 +315,18 @@ export interface SlashCommandContext {
  * 
  * 6. **Event Handler Types**:
  *    Specific typing for all React event handlers used
- * 
- * 7. **Future-Ready Design**:
- *    Types prepared for slash command implementation
- * 
- * 8. **Const Assertions**:
+ *
+ * 7. **Const Assertions**:
  *    Using 'as const' for literal type preservation
  * 
  * Architecture Benefits:
  * - **Type Safety**: Complete coverage prevents runtime errors
- * - **Extensibility**: Easy to add new features like slash commands
+ * - **Extensibility**: Easy to add new features as the input evolves
  * - **Documentation**: Types serve as comprehensive documentation
  * - **IDE Support**: Full autocomplete and error checking
  * - **Refactoring Safety**: Changes caught at compile time
  * - **Team Collaboration**: Clear contracts between developers
  */
-
-/**
- * Hook return type for useSlashCommandDetection
- * Handles command detection, parsing, and suggestion generation
- */
-export interface SlashCommandDetectionHookReturn {
-  context: SlashCommandContext
-  activeCommand: SlashCommandMatch | null
-  suggestions: SlashCommandSuggestion[]
-  isCommandActive: boolean
-  executeCommand: (command: SlashCommand, args: string[]) => Promise<void>
-  selectSuggestion: (suggestion: SlashCommandSuggestion) => void
-  clearCommand: () => void
-  availableCommands: SlashCommand[]
-}
-
-/**
- * Represents a command execution task in the queue
- */
-export interface CommandExecutionTask {
-  id: string
-  command: SlashCommand
-  args: string[]
-  startTime: number
-  status: 'executing' | 'completed' | 'error'
-  error?: string
-}
-
-/**
- * Hook return type for useSlashCommandExecution
- * Handles command execution and loading state management with queue support
- */
-export interface SlashCommandExecutionHookReturn {
-  isGeneratingImage: boolean
-  isGeneratingVideo: boolean
-  executeSlashCommand: (
-    command: SlashCommand,
-    args: string[],
-    onComplete?: () => void
-  ) => Promise<{ success: boolean; error?: string }>
-  isExecuting: boolean
-  executionQueue: CommandExecutionTask[]
-}
 
 // =============================================================================
 // File Mention Types (@ mention functionality)

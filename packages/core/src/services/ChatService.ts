@@ -154,46 +154,6 @@ export class ChatService {
 
     return await apiClient.post<MessageDeleteData>('/api/messages/delete', request)
   }
-
-  /**
-   * Generate an AI-created image for the current session.
-   *
-   * Note: HttpClient automatically unwraps ApiResponse format,
-   * so this returns the data payload directly (ImageGenerateData).
-   * Errors are thrown as ApiBusinessError.
-   *
-   * @param sessionId - Session to generate image for
-   * @returns Promise resolving to image generation result
-   */
-  async generateImage(sessionId: string): Promise<{
-    image_path?: string
-  }> {
-    return await apiClient.post<{
-      image_path?: string
-    }>('/api/generate-image', { session_id: sessionId })
-  }
-
-  /**
-   * Generate a video from the most recent image in the session.
-   *
-   * Note: HttpClient automatically unwraps ApiResponse format,
-   * so this returns the data payload directly (VideoGenerateData).
-   * Errors are thrown as ApiBusinessError.
-   *
-   * @param sessionId - Session containing the image to convert to video
-   * @param motionStyle - Optional motion style for the video generation
-   * @returns Promise resolving to video generation result
-   */
-  async generateVideo(sessionId: string, motionStyle?: string): Promise<{
-    video_path?: string
-  }> {
-    return await apiClient.post<{
-      video_path?: string
-    }>('/api/generate-video', {
-      session_id: sessionId,
-      motion_style: motionStyle
-    })
-  }
 }
 
 // Create a singleton instance

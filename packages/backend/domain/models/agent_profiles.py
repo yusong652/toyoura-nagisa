@@ -18,9 +18,7 @@ from typing import Dict, List
 class AgentProfile(Enum):
     """Agent profile types."""
     CODING = "coding"
-    LIFESTYLE = "lifestyle"
     PFC = "pfc"
-    GENERAL = "general"
     DISABLED = "disabled"
 
 
@@ -41,23 +39,6 @@ CODING_TOOLS: List[str] = [
     "todo_write",
 ]
 
-LIFESTYLE_TOOLS: List[str] = [
-    "send_email",
-    "check_emails",
-    "read_email",
-    "list_calendar_events",
-    "create_calendar_event",
-    "update_calendar_event",
-    "delete_calendar_event",
-    "list_contacts",
-    "search_contacts",
-    "generate_image",
-    "search_places",
-    "get_location",
-    "web_search",
-    "get_current_time",
-    "todo_write",
-]
 
 PFC_TOOLS: List[str] = [
     # File operations
@@ -143,23 +124,6 @@ SUBAGENT_PFC_DIAGNOSTIC_TOOLS: List[str] = [
     # NOTE: No invoke_agent - prevents recursive SubAgent spawning
 ]
 
-GENERAL_TOOLS: List[str] = [
-    # Coding
-    "write", "read", "edit", "bash", "bash_output", "kill_shell", "glob", "grep",
-    # Lifestyle
-    "send_email", "check_emails", "read_email",
-    "list_calendar_events", "create_calendar_event",
-    "update_calendar_event", "delete_calendar_event",
-    "list_contacts", "search_contacts",
-    "generate_image", "search_places", "get_location", "get_current_time",
-    # Shared
-    "web_search", "todo_write",
-    # PFC
-    "pfc_query_python_api", "pfc_query_command",
-    "pfc_execute_task", "pfc_check_task_status", "pfc_list_tasks", "pfc_interrupt_task",
-    # SubAgent delegation
-    "invoke_agent",
-]
 
 # =============================================================================
 # Skills Configuration (on-demand workflow instructions)
@@ -240,18 +204,6 @@ PROFILE_CONFIGS: Dict[AgentProfile, ProfileConfig] = {
         icon="💻",
     ),
 
-    AgentProfile.LIFESTYLE: ProfileConfig(
-        name="lifestyle",
-        display_name="Lifestyle Agent",
-        description="Email, calendar, and daily life assistance",
-        max_iterations=64,
-        streaming_enabled=True,
-        enable_memory=True,
-        tools=tuple(LIFESTYLE_TOOLS),
-        color="#FF9800",
-        icon="🌟",
-    ),
-
     AgentProfile.PFC: ProfileConfig(
         name="pfc",
         display_name="PFC Agent",
@@ -263,18 +215,6 @@ PROFILE_CONFIGS: Dict[AgentProfile, ProfileConfig] = {
         color="#9C27B0",
         icon="⚛️",
         skills=tuple(PFC_SKILLS),
-    ),
-
-    AgentProfile.GENERAL: ProfileConfig(
-        name="general",
-        display_name="General Agent",
-        description="Full capabilities for complex multi-domain tasks",
-        max_iterations=64,
-        streaming_enabled=True,
-        enable_memory=True,
-        tools=tuple(GENERAL_TOOLS),
-        color="#607D8B",
-        icon="🤖",
     ),
 
     AgentProfile.DISABLED: ProfileConfig(

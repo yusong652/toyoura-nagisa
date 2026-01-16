@@ -3,9 +3,6 @@
  * 
  * This component can house control elements and be extended 
  * with additional controls in the future.
- * 
- * Note: Image generation has been moved to slash commands (/image)
- * for better user experience and extensibility.
  */
 
 import React from 'react'
@@ -14,7 +11,7 @@ import { ChatBoxControlsProps } from '../types'
 /**
  * Renders control buttons for the ChatBox.
  * 
- * Currently empty as primary functions have moved to slash commands.
+ * Currently empty as primary functions live in the input toolbar.
  * 
  * Future additions could include:
  * - Export chat button
@@ -30,7 +27,6 @@ const ChatBoxControls: React.FC<ChatBoxControlsProps> = () => {
   return (
     <div className="chatbox-controls">
       {/* Controls can be added here as needed */}
-      {/* Image generation is now available via /image slash command */}
     </div>
   )
 }

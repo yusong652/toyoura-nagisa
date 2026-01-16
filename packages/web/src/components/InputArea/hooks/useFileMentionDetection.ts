@@ -50,7 +50,7 @@ import {
 const useFileMentionDetection = (
   message: string,
   cursorPosition: number,
-  agentProfile: string = 'general',
+  agentProfile: string = 'pfc',
   sessionId?: string
 ): FileMentionDetectionHookReturn => {
 

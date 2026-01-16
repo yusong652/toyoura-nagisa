@@ -24,8 +24,6 @@ export { default as useInputState } from './useInputState'
 export { default as useFileHandling } from './useFileHandling'
 export { default as useMessageSending } from './useMessageSending'
 export { default as useInputAutoResize } from './useInputAutoResize'
-export { default as useSlashCommandDetection, BUILTIN_COMMANDS } from './useSlashCommandDetection'
-export { useSlashCommandExecution } from './useSlashCommandExecution'
 export { default as useFileSearch } from './useFileSearch'
 export { default as useFileMentionDetection } from './useFileMentionDetection'
 
@@ -35,8 +33,6 @@ export type {
   FileHandlingHookReturn,
   MessageSendingHookReturn,
   InputAutoResizeHookReturn,
-  SlashCommandDetectionHookReturn,
-  SlashCommandExecutionHookReturn,
   FileSearchHookReturn,
   FileMentionDetectionHookReturn
 } from '../types'

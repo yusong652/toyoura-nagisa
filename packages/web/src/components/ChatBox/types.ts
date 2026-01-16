@@ -47,12 +47,10 @@ export interface MessageListProps {
 /**
  * ChatBox controls component props.
  * 
- * Placeholder for future control elements. Image generation has been
- * moved to slash commands for better user experience.
+ * Placeholder for future control elements.
  */
 export interface ChatBoxControlsProps {
   // Empty for now - future controls can be added here
-  // Image generation is available via /image slash command
 }
 
 /**

@@ -136,7 +136,7 @@ class BaseToolManager(ABC):
 
         Args:
             session_id: Session ID (required for future session-specific tool filtering)
-            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+            agent_profile: Agent profile name ("coding", "pfc", "disabled")
 
         Returns:
             Dict[str, ToolSchema]: Tool name -> ToolSchema mapping
@@ -181,7 +181,7 @@ class BaseToolManager(ABC):
 
         Args:
             session_id: Session ID (required)
-            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+            agent_profile: Agent profile name ("coding", "pfc", "disabled")
 
         Returns:
             Tool schema list adapted for target LLM format (format varies by client)

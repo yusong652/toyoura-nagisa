@@ -16,7 +16,7 @@ import {
  */
 
 const useFileSearch = (
-  agentProfile: string = 'general',
+  agentProfile: string = 'pfc',
   sessionId?: string
 ): FileSearchHookReturn => {
 

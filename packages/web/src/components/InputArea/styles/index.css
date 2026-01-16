@@ -13,7 +13,6 @@
  * - buttons.css: File upload and send button styles
  * - file-preview.css: File thumbnail display and management
  * - status.css: Status indicators, feedback messages, and loading states
- * - slash-commands.css: Command suggestions and execution feedback
  * - responsive.css: Mobile-first responsive design breakpoints
  * - accessibility.css: ARIA support, focus states, and inclusion features
  * 
@@ -40,9 +39,6 @@
 
 /* Status indicators and feedback */
 @import './status.css';
-
-/* Slash command suggestions */
-@import './slash-commands.css';
 
 /* Responsive design breakpoints */
 @import './responsive.css';
@@ -86,7 +82,6 @@
  * Integration with React Components:
  * - InputArea.tsx: Main orchestrating component
  * - MessageInput.tsx: Uses input.css styles
- * - SlashCommandSuggestions.tsx: Uses slash-commands.css
  * - FilePreviewArea.tsx: Uses file-preview.css
  * - Status components: Use status.css
  * 
