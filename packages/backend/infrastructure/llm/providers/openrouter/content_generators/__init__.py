@@ -8,8 +8,4 @@ Note: OpenRouter does not support provider-specific features like web search.
 For web search capabilities, use native provider implementations.
 """
 
-from .title import OpenRouterTitleGenerator
-
-__all__ = [
-    'OpenRouterTitleGenerator',
-]
+__all__ = []

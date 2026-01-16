@@ -7,7 +7,7 @@ Handles URL content fetching with proper error handling and debugging support.
 from abc import abstractmethod
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
-from .base import BaseContentGenerator
+from abc import ABC
 
 
 @dataclass
@@ -21,7 +21,7 @@ class WebFetchResult:
     metadata: Optional[Dict[str, Any]] = None  # Token usage, retrieval status, etc.
 
 
-class BaseWebFetchGenerator(BaseContentGenerator):
+class BaseWebFetchGenerator(ABC):
     """
     Abstract base class for web fetch content generation.
 
@@ -29,6 +29,10 @@ class BaseWebFetchGenerator(BaseContentGenerator):
     Fetches web content and returns structured results with proper error
     handling and debugging support.
     """
+
+    def __init__(self, client, config=None):
+        self.client = client
+        self.config = config
 
     @abstractmethod
     async def fetch_url_content(
@@ -47,7 +51,7 @@ class BaseWebFetchGenerator(BaseContentGenerator):
             WebFetchResult containing processed content or error information
 
         Note:
-            Uses self.client for API calls (inherited from BaseContentGenerator).
+            Uses self.client for API calls.
             Debug mode is read from llm_settings.debug.
         """
         pass

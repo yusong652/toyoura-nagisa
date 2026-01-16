@@ -9,38 +9,217 @@ from typing import Dict, Any, Optional, List
 from backend.infrastructure.storage.session_manager import (
     get_all_sessions,
     update_session_title,
-    load_history,
-    load_all_message_history
+    load_all_message_history,
+    get_latest_n_messages,
 )
 from backend.domain.models.messages import BaseMessage
-from backend.domain.models.message_factory import message_factory
-from backend.infrastructure.llm.providers.anthropic.content_generators import AnthropicTitleGenerator
-from backend.infrastructure.llm.providers.google.content_generators import GoogleTitleGenerator
-from backend.infrastructure.llm.providers.moonshot.content_generators import MoonshotTitleGenerator
-from backend.infrastructure.llm.providers.openai.content_generators import OpenAITitleGenerator
-from backend.infrastructure.llm.providers.openrouter.content_generators import OpenRouterTitleGenerator
-from backend.infrastructure.llm.providers.zhipu.content_generators import ZhipuTitleGenerator
+from backend.domain.models.message_factory import message_factory, extract_text_from_message
+from backend.infrastructure.llm.providers.anthropic.config import get_anthropic_client_config
+from backend.infrastructure.llm.providers.anthropic.response_processor import AnthropicResponseProcessor
+from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
+from backend.infrastructure.llm.providers.moonshot.response_processor import MoonshotResponseProcessor
+from backend.infrastructure.llm.providers.openai.constants import (
+    DEFAULT_TITLE_MODEL,
+    TITLE_GENERATION_TEMPERATURE,
+    TITLE_MAX_LENGTH,
+)
+from backend.infrastructure.llm.providers.openai.response_processor import OpenAIResponseProcessor
+from backend.infrastructure.llm.providers.openrouter.response_processor import OpenRouterResponseProcessor
+from backend.infrastructure.llm.providers.zhipu.response_processor import ZhipuResponseProcessor
+from backend.infrastructure.llm.shared.constants import (
+    DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
+    DEFAULT_TITLE_GENERATION_TEMPERATURE,
+    DEFAULT_TITLE_MAX_LENGTH,
+)
+from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
+
+
+def _format_conversation_context(messages: List[BaseMessage]) -> str:
+    conversation_parts = []
+    for msg in messages:
+        text = extract_text_from_message(msg)
+        if not text or not text.strip():
+            continue
+        role_label = "User" if msg.role == "user" else "Assistant"
+        conversation_parts.append(f"{role_label}: {text.strip()}")
+    return "\n".join(conversation_parts)
+
+
+def _build_title_prompt(conversation_context: str) -> List[Dict[str, str]]:
+    return [
+        {"role": "system", "content": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                "Please generate a concise title based on the following conversation:\n\n"
+                f"{conversation_context}"
+            ),
+        },
+    ]
+
+
+async def _generate_title_google(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
+    conversation_context = _format_conversation_context(latest_messages)
+    if not conversation_context:
+        return None
+
+    from google.genai import types
+
+    contents = [
+        types.Content(
+            role="user",
+            parts=[
+                types.Part(
+                    text=_build_title_prompt(conversation_context)[1]["content"]
+                )
+            ],
+        )
+    ]
+    title_config = types.GenerateContentConfig(
+        system_instruction=DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
+        temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
+        max_output_tokens=2048,
+    )
+
+    response = await llm_client.client.aio.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=contents,
+        config=title_config,
+    )
+
+    title_response_text = GoogleResponseProcessor.extract_text_content(response)
+    return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
+
+
+async def _generate_title_anthropic(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
+    conversation_context = _format_conversation_context(latest_messages)
+    if not conversation_context:
+        return None
+
+    anthropic_config = get_anthropic_client_config()
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                "Please generate a concise title based on the following conversation:\n\n"
+                f"{conversation_context}"
+            ),
+        }
+    ]
+    api_kwargs = anthropic_config.get_api_call_kwargs(
+        system_prompt=DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
+        messages=messages,
+    )
+    api_kwargs.update({"max_tokens": 100, "temperature": 1.0})
+    api_kwargs.pop("thinking", None)
+
+    response = await llm_client.client.messages.create(**api_kwargs)
+    title_response_text = AnthropicResponseProcessor.extract_text_content(response)
+    return parse_title_response(title_response_text, max_length=30)
+
+
+async def _generate_title_openai(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
+    conversation_context = _format_conversation_context(latest_messages)
+    if not conversation_context:
+        return None
+
+    input_items = [
+        {
+            "role": "user",
+            "content": (
+                "Please generate a concise title based on the following conversation:\n\n"
+                f"{conversation_context}"
+            ),
+        }
+    ]
+    api_kwargs = {
+        "model": DEFAULT_TITLE_MODEL,
+        "instructions": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
+        "input": input_items,
+        "temperature": TITLE_GENERATION_TEMPERATURE,
+        "max_output_tokens": 100,
+    }
+
+    response = await llm_client.async_client.responses.create(**api_kwargs)
+    title_response_text = OpenAIResponseProcessor.extract_text_content(response)
+    return parse_title_response(title_response_text, max_length=TITLE_MAX_LENGTH)
+
+
+async def _generate_title_moonshot(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
+    conversation_context = _format_conversation_context(latest_messages)
+    if not conversation_context:
+        return None
+
+    chat_messages = _build_title_prompt(conversation_context)
+    response = await llm_client.async_client.chat.completions.create(
+        model="kimi-k2-0905-preview",
+        messages=chat_messages,
+        temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
+        max_tokens=100,
+    )
+
+    title_response_text = MoonshotResponseProcessor.extract_text_content(response)
+    return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
+
+
+async def _generate_title_openrouter(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
+    conversation_context = _format_conversation_context(latest_messages)
+    if not conversation_context:
+        return None
+
+    from backend.config import get_llm_settings
+
+    openrouter_config = get_llm_settings().get_openrouter_config()
+    chat_messages = _build_title_prompt(conversation_context)
+    response = await llm_client.async_client.chat.completions.create(
+        model=openrouter_config.model,
+        messages=chat_messages,
+        temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
+        max_tokens=1000,
+    )
+
+    title_response_text = OpenRouterResponseProcessor.extract_text_content(response)
+    return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
+
+
+async def _generate_title_zhipu(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
+    conversation_context = _format_conversation_context(latest_messages)
+    if not conversation_context:
+        return None
+
+    chat_messages = _build_title_prompt(conversation_context)
+    response = await llm_client.client.chat.completions.create(
+        model="glm-4.5-air",
+        messages=chat_messages,
+        temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
+        max_tokens=2048,
+        stream=False,
+    )
+
+    title_response_text = ZhipuResponseProcessor.extract_text_content(response)
+    return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
+
 
 TITLE_GENERATORS = {
-    "google": GoogleTitleGenerator,
-    "anthropic": AnthropicTitleGenerator,
-    "openai": OpenAITitleGenerator,
-    "moonshot": MoonshotTitleGenerator,
-    "openrouter": OpenRouterTitleGenerator,
-    "zhipu": ZhipuTitleGenerator,
+    "google": _generate_title_google,
+    "anthropic": _generate_title_anthropic,
+    "openai": _generate_title_openai,
+    "moonshot": _generate_title_moonshot,
+    "openrouter": _generate_title_openrouter,
+    "zhipu": _generate_title_zhipu,
 }
 
 
-def _get_title_generator_class(llm_client: Any):
+def _get_title_generator(llm_client: Any):
     provider_name = getattr(llm_client, "provider_name", None)
     if not provider_name:
         raise ValueError("LLM client is missing provider_name")
 
-    generator_class = TITLE_GENERATORS.get(provider_name.lower())
-    if not generator_class:
+    generator = TITLE_GENERATORS.get(provider_name.lower())
+    if not generator:
         raise ValueError(f"Unsupported LLM provider for title generation: {provider_name}")
 
-    return generator_class
+    return generator
 
 
 async def generate_title_from_messages(
@@ -48,10 +227,8 @@ async def generate_title_from_messages(
     latest_messages: List[BaseMessage]
 ) -> Optional[str]:
     try:
-        generator_class = _get_title_generator_class(llm_client)
-        client = getattr(llm_client, "async_client", None) or getattr(llm_client, "client", llm_client)
-        generator = generator_class(client=client)
-        return await generator.generate_title_from_messages(latest_messages=latest_messages)
+        generator = _get_title_generator(llm_client)
+        return await generator(llm_client, latest_messages)
     except Exception as exc:
         print(f"[ERROR] Title generation failed: {exc}")
         import traceback
@@ -191,36 +368,9 @@ class TitleService:
         Returns:
             Optional[str]: Generated title, or None if no suitable message pair found
         """
-        history = load_history(session_id)
-        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
-
-        # Traverse backward to find most recent pair of pure conversation messages
-        latest_user_msg = None
-        latest_assistant_msg = None
-
-        for msg in reversed(history_msgs):
-            role = getattr(msg, 'role', None)
-
-            # Find latest pure text user message (not tool result)
-            if not latest_user_msg and role == 'user':
-                if self._is_pure_text_user(msg):
-                    latest_user_msg = msg
-
-            # Find latest assistant message with text content (can have tool calls)
-            # Changed from elif to if - both checks should be independent
-            if not latest_assistant_msg and role == 'assistant':
-                if self._is_assistant_with_text_content(msg):
-                    latest_assistant_msg = msg
-
-            # Stop searching if found most recent pair of messages
-            if latest_user_msg and latest_assistant_msg:
-                break
-
-        if not latest_user_msg or not latest_assistant_msg:
+        latest_messages = list(get_latest_n_messages(session_id, 2))
+        if len(latest_messages) < 2:
             return None
-
-        # Create a list of latest messages for title generation
-        latest_messages = [latest_user_msg, latest_assistant_msg]
 
         title = await generate_title_from_messages(llm_client, latest_messages)
         return title

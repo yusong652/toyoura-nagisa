@@ -6,11 +6,11 @@ Handles web search with proper error handling and debugging support.
 
 from abc import abstractmethod
 from typing import Optional, Dict, Any, List
+from abc import ABC
 from backend.domain.models.messages import UserMessage
-from .base import BaseContentGenerator
 
 
-class BaseWebSearchGenerator(BaseContentGenerator):
+class BaseWebSearchGenerator(ABC):
     """
     Abstract base class for web search generation.
 
@@ -18,6 +18,10 @@ class BaseWebSearchGenerator(BaseContentGenerator):
     Performs web searches and returns structured results with proper error
     handling and debugging support.
     """
+
+    def __init__(self, client, config=None):
+        self.client = client
+        self.config = config
 
     @abstractmethod
     async def perform_web_search(
@@ -38,7 +42,7 @@ class BaseWebSearchGenerator(BaseContentGenerator):
             Dictionary containing search results or error information
 
         Note:
-            Uses self.client for API calls (inherited from BaseContentGenerator).
+            Uses self.client for API calls.
         """
         pass
     
