@@ -85,7 +85,6 @@ MainAgent can delegate specialized tasks to lightweight SubAgents via the `invok
 - `planning/`: todo_write
 - `agent/`: invoke_agent
 - `builtin/`: web_search
-- `lifestyle/`: email, calendar, contacts, etc.
 
 ### PFC Integration Overview
 
@@ -219,7 +218,6 @@ toyoura-nagisa/
 │   │   ├── websocket/             # WebSocket connection management
 │   │   ├── handlers/              # Request handlers
 │   │   │   ├── chat_request_handler.py  # Chat request processing
-│   │   │   └── tts_handler.py     # TTS processing
 │   │   └── streaming/             # Response streaming handlers
 │   ├── application/                # Business logic orchestration
 │   │   └── services/              # Business services
@@ -281,7 +279,6 @@ toyoura-nagisa/
 │   │   │   ├── shell_config.py    # Cross-platform shell detection
 │   │   │   └── background_process_manager.py  # Background process lifecycle
 │   │   ├── messaging/             # Message queue management
-│   │   └── tts/                   # Text-to-speech engines
 │   ├── config/                     # Configuration management
 │   │   └── prompts/               # Agent system prompts
 │   │       ├── pfc_explorer.md    # PFC Explorer SubAgent prompt
@@ -327,7 +324,7 @@ toyoura-nagisa/
 
 ### Environment Setup
 - Copy configuration examples from `packages/backend/config_example/` to `packages/backend/config/`
-- Main config files: `base.py`, `llm.py`, `tts.py`, `email.py`, `text_to_image.py`
+- Main config files: `base.py`, `llm.py`
 - Database locations:
   - Memory DB: `memory_db/` (root level)
   - Session data: `data/` (root level)

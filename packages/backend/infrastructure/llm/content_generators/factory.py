@@ -5,7 +5,7 @@ different LLM providers (Gemini, Anthropic, OpenAI, Moonshot, OpenRouter, Zhipu)
 following the same architecture pattern as WebSearchToolFactory.
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Optional, List
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 
@@ -97,43 +97,6 @@ class ContentGeneratorFactory:
             raise ValueError(f"Unsupported LLM type for title generation: {llm_type}")
 
     @staticmethod
-    def get_image_prompt_generator(llm_type: str):
-        """
-        Get the appropriate image prompt generator based on LLM type.
-
-        Args:
-            llm_type: Type of LLM client ('google', 'anthropic', 'openai', 'moonshot', 'openrouter', or 'zhipu')
-
-        Returns:
-            ImagePromptGenerator class for the specified LLM type
-
-        Raises:
-            ValueError: If LLM type is not supported
-        """
-        if llm_type.lower() == 'google':
-            from backend.infrastructure.llm.providers.google.content_generators import GoogleImagePromptGenerator
-            return GoogleImagePromptGenerator
-        elif llm_type.lower() == 'anthropic':
-            from backend.infrastructure.llm.providers.anthropic.content_generators import AnthropicImagePromptGenerator
-            return AnthropicImagePromptGenerator
-        elif llm_type.lower() == 'openai':
-            from backend.infrastructure.llm.providers.openai.content_generators import OpenAIImagePromptGenerator
-            return OpenAIImagePromptGenerator
-        elif llm_type.lower() == 'moonshot':
-            # Moonshot has its own ImagePromptGenerator using Chat Completions API
-            from backend.infrastructure.llm.providers.moonshot.content_generators import MoonshotImagePromptGenerator
-            return MoonshotImagePromptGenerator
-        elif llm_type.lower() == 'openrouter':
-            # OpenRouter uses Chat Completions API (similar to Moonshot)
-            from backend.infrastructure.llm.providers.openrouter.content_generators import OpenRouterImagePromptGenerator
-            return OpenRouterImagePromptGenerator
-        elif llm_type.lower() == 'zhipu':
-            # Zhipu uses Chat Completions API via zai SDK
-            from backend.infrastructure.llm.providers.zhipu.content_generators import ZhipuImagePromptGenerator
-            return ZhipuImagePromptGenerator
-        else:
-            raise ValueError(f"Unsupported LLM type for image prompt generation: {llm_type}")
-
     @staticmethod
     async def generate_title_from_messages(
         llm_client: LLMClientBase,
@@ -178,48 +141,4 @@ class ContentGeneratorFactory:
             print(f"[ERROR] Title generation failed: {e}")
             import traceback
             traceback.print_exc()
-            raise
-
-    @staticmethod
-    async def generate_text_to_image_prompt(
-        llm_client: LLMClientBase,
-        session_id: Optional[str] = None
-    ) -> Optional[Dict[str, str]]:
-        """
-        Generate text-to-image prompt using appropriate LLM client.
-
-        Args:
-            llm_client: The LLM client instance
-            session_id: Session ID for getting conversation context
-
-        Returns:
-            Dictionary containing text prompt and negative prompt, or None if failed
-
-        Raises:
-            ValueError: If LLM type cannot be detected
-            Exception: If prompt generation fails
-        """
-        try:
-            # Auto-detect LLM type
-            llm_type = ContentGeneratorFactory.detect_llm_type(llm_client)
-
-            # Get the appropriate image prompt generator class
-            ImagePromptGeneratorClass = ContentGeneratorFactory.get_image_prompt_generator(llm_type)
-
-            # Extract the async client for generator (use async_client for OpenAI-compatible APIs)
-            # Fallback to 'client' for providers that don't have separate async/sync clients
-            client = getattr(llm_client, 'async_client', None) or getattr(llm_client, 'client', llm_client)
-
-            # Instantiate the generator with the client
-            generator = ImagePromptGeneratorClass(client=client)
-
-            # Call provider-specific generator (now an instance method)
-            prompt_result = await generator.generate_text_to_image_prompt(
-                session_id=session_id
-            )
-
-            return prompt_result
-
-        except Exception as e:
-            print(f"[ERROR] Image prompt generation failed: {e}")
             raise

@@ -4,7 +4,6 @@ Provides unified configuration interface and backward compatibility
 """
 from __future__ import annotations
 import os
-from typing import Dict, Any
 from pathlib import Path
 
 from pydantic import Field
@@ -12,9 +11,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # BaseConfig removed - not used in actual configuration
 from .llm import LLMSettings, get_llm_settings
-from .tts import TTSSettings, get_tts_settings
-from .email import EmailConfig, AuthConfig, SearchConfig, get_email_config, get_auth_config, get_search_config
-from .text_to_image import TextToImageSettings, get_text_to_image_settings
 from .dev import DevelopmentConfig
 
 
@@ -38,26 +34,6 @@ class AppSettings(BaseSettings):
         """Get LLM configuration"""
         return LLMSettings()
     
-    def get_tts_settings(self) -> TTSSettings:
-        """Get TTS configuration"""
-        return TTSSettings()
-    
-    def get_email_config(self) -> EmailConfig:
-        """Get email configuration"""
-        return EmailConfig()
-    
-    def get_auth_config(self) -> AuthConfig:
-        """Get authentication configuration"""
-        return AuthConfig()
-    
-    def get_search_config(self) -> SearchConfig:
-        """Get search configuration"""
-        return SearchConfig()
-    
-    def get_text_to_image_settings(self) -> TextToImageSettings:
-        """Get text-to-image configuration"""
-        return TextToImageSettings()
-
 
 # Global configuration instance - recreate each time to ensure latest config
 def get_app_settings() -> AppSettings:
@@ -152,39 +128,6 @@ def get_system_prompt(agent_profile: str = "general") -> str:
 
 
 
-def get_text_to_image_config() -> Dict[str, Any]:
-    """Get text-to-image configuration (backward compatibility)"""
-    settings = get_app_settings().get_text_to_image_settings()
-    
-    # Since we now use ComfyUI, get its config directly
-    comfyui_config = settings.get_current_config()
-    
-    config = {
-        "provider": "comfyui",  # Now using ComfyUI
-        "text_to_image_system_prompt": settings.text_to_image_system_prompt,
-        "context_message_count": settings.context_message_count,
-        "text_to_image_default_positive_prompt": settings.text_to_image_default_positive_prompt,
-        "text_to_image_default_negative_prompt": settings.text_to_image_default_negative_prompt,
-        "debug": settings.enable_debug,
-        "comfyui": {
-            "server_url": comfyui_config.comfyui_server_url,
-            "available_samplers": comfyui_config.available_samplers,
-            "available_schedulers": comfyui_config.available_schedulers,
-            "available_checkpoints": comfyui_config.available_checkpoints,
-            "model_type": comfyui_config.model_type,
-            "default_seed": comfyui_config.default_seed,
-            "client_id": comfyui_config.client_id,
-            "return_base64": comfyui_config.return_base64,
-            "debug": comfyui_config.debug,
-            "model_presets": comfyui_config.model_presets,
-        }
-    }
-    
-    return config
-
-
-
-
 # Export configuration getter functions
 __all__ = [
     # New configuration system
@@ -200,9 +143,6 @@ __all__ = [
     "get_expression_prompt",
     "get_tool_prompt",
     "get_system_prompt",
-
-    # Backward compatibility function
-    "get_text_to_image_config",
 
     # Path constants
     "BASE_DIR",

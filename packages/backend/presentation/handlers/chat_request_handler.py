@@ -31,7 +31,7 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
     Handles the entire chat request lifecycle:
     1. Status notifications (sent/read/error)
     2. Agent execution with explicit instruction passing
-    3. Content processing pipeline (TTS, etc.)
+    3. Content processing pipeline
     4. Memory persistence after successful completion
     5. Comprehensive error handling
 
@@ -79,8 +79,7 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
             # ========== PHASE 3: Content processing pipeline ==========
             if result.status == "success" and result.message:
                 await process_content_pipeline(
-                    result.message, session_id, message_id=result.message_id,
-                    tts_enabled=prepared_message.tts_enabled
+                    result.message, session_id, message_id=result.message_id
                 )
 
             # ========== PHASE 4: Memory persistence ==========

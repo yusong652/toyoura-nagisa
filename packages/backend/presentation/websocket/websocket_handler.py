@@ -52,7 +52,7 @@ class WebSocketHandler:
         - ConnectionManager: Low-level WebSocket connection handling
         - MessageProcessor: High-level message parsing and routing
         - StatusService: WebSocket notification services
-        - Global instances: For external service access (TTS, notifications, etc.)
+        - Global instances: For external service access (notifications, etc.)
         """
         self.connection_manager = ConnectionManager()  # Infrastructure layer
         self.message_processor = WebSocketMessageProcessor(self.connection_manager)  # Presentation layer
@@ -70,7 +70,7 @@ class WebSocketHandler:
         self.pfc_task_notification_service = PfcTaskNotificationService(self.connection_manager)
 
         # Set global instances for external services to access
-        set_connection_manager(self.connection_manager)  # For TTS streaming, notifications
+        set_connection_manager(self.connection_manager)  # For notifications
     
     async def handle_connection(self, websocket: WebSocket, session_id: str):
         """
@@ -153,4 +153,3 @@ def create_websocket_handler() -> WebSocketHandler:
     logger.info("WebSocket handler created with bash confirmation service")
 
     return handler
-

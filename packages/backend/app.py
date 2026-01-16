@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from backend.infrastructure.llm.base.factory import initialize_factory
-from backend.infrastructure.tts.tts_factory import get_tts_engine
 from backend.infrastructure.mcp.mcp_server import mcp
 from fastmcp import Client
 from backend.presentation.api import sessions
@@ -30,12 +29,6 @@ async def lifespan(app: FastAPI):
         # Create and store WebSocket handler in app state
         app.state.websocket_handler = create_websocket_handler()
         print("[INIT] WebSocket handler created with unified architecture")
-
-        # Initialize TTS Engine
-        tts_engine = get_tts_engine()
-        await tts_engine.initialize()
-        app.state.tts_engine = tts_engine
-        print("[INIT] TTS Engine initialized successfully")
 
         # Initialize LLM Factory
         llm_factory = initialize_factory()
@@ -79,10 +72,6 @@ async def lifespan(app: FastAPI):
         try:
             print("[SHUTDOWN] Starting graceful shutdown...")
 
-            # Shutdown TTS Engine
-            await app.state.tts_engine.shutdown()
-            print("[SHUTDOWN] TTS Engine shutdown complete")
-
             # Cleanup background processes
             try:
                 from backend.infrastructure.shell.background_process_manager import shutdown_all_processes
@@ -123,4 +112,3 @@ register_websocket_routes(app)
 
 # Register global exception handlers
 register_exception_handlers(app)
-

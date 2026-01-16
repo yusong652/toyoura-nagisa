@@ -45,20 +45,6 @@ export interface ThemeToggleProps {
 }
 
 /**
- * TTS Toggle specific props
- */
-export interface TTSToggleProps {
-  /** Initial TTS enabled state */
-  initialEnabled?: boolean
-  
-  /** Callback when TTS state changes */
-  onTTSChange?: (enabled: boolean) => void
-  
-  /** Additional CSS classes */
-  className?: string
-}
-
-/**
  * Live2D Toggle specific props
  */
 export interface Live2DToggleProps {

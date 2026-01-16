@@ -34,26 +34,6 @@ def set_app(app: FastAPI) -> None:
     _app_instance = app
 
 
-def get_tts_engine():
-    """
-    Get TTS engine from app state.
-
-    Returns:
-        BaseTTS: TTS engine instance from app state
-
-    Raises:
-        RuntimeError: If app is not initialized or TTS engine not found
-    """
-    app = get_app()
-    if not app:
-        raise RuntimeError("FastAPI app not initialized")
-
-    if not hasattr(app.state, 'tts_engine'):
-        raise RuntimeError("TTS engine not found in app state")
-
-    return app.state.tts_engine
-
-
 def get_llm_client():
     """
     Get LLM client from app state.

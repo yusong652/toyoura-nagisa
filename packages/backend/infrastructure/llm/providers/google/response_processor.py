@@ -465,7 +465,7 @@ class GoogleResponseProcessor(BaseResponseProcessor):
         """
         Extract and combine all text parts from content array.
 
-        Used by frontend rendering and TTS processing to get complete text.
+        Used by frontend rendering to get complete text.
         Skips thinking, tool_use, and tool_result blocks.
 
         Args:

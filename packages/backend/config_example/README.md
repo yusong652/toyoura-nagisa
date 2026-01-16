@@ -20,11 +20,6 @@ GOOGLE_API_KEY=your_actual_google_api_key_here
 # OPENAI_API_KEY=your_actual_openai_api_key_here  
 # ANTHROPIC_API_KEY=your_actual_anthropic_api_key_here
 
-# Optional - TTS Configuration
-TTS__TYPE=gpt_sovits
-# FISH_AUDIO_API_KEY=your_fish_audio_api_key_here
-# FISH_AUDIO_REFERENCE_ID=your_reference_id_here
-
 # Optional - Other Services
 # GOOGLE_CUSTOM_SEARCH_API_KEY=your_search_api_key_here
 # GOOGLE_CUSTOM_SEARCH_ENGINE_ID=your_search_engine_id_here
@@ -46,9 +41,6 @@ python -c "from config import get_llm_config; print('✅ Configuration validatio
 
 - `__init__.py` - Main configuration entry point, provides backward compatible interface
 - `llm.py` - GPT, Gemini, Anthropic configurations
-- `tts.py` - Fish Audio, GPT-SoVITS configurations  
-- `email.py` - Email, authentication, search configurations
-- `text_to_image.py` - Stable Diffusion configurations
 - `base.py` - Base paths and common configurations
 
 ## 🔄 Updating Configurations

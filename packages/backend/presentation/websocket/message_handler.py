@@ -12,7 +12,7 @@ to appropriate processors. The main purpose is to:
 Key Flow:
 - User sends CHAT_MESSAGE → ChatHandler processes → Streaming LLM response
 - Backend needs to show assistant message → MESSAGE_CREATE sent to frontend
-- TTS/content chunks sent via WebSocket for real-time display
+- Content updates sent via WebSocket for real-time display
 """
 import asyncio
 import logging
@@ -213,8 +213,7 @@ class ChatHandler(MessageHandler):
     - Sequential processing ensures messages are never lost
 
     Note: The actual assistant message creation (MESSAGE_CREATE) and content
-    streaming (TTS_CHUNK) happens in the content processing pipeline,
-    not directly in this handler.
+    streaming happens in the content processing pipeline, not directly here.
     """
 
     def __init__(self, connection_manager: ConnectionManager):
@@ -900,4 +899,3 @@ class UserPfcConsoleHandler(MessageHandler):
             connected=False,
         )
         await self.connection_manager.send_json(session_id, result_msg.model_dump())
-

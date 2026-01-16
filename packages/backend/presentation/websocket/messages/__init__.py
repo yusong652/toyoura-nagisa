@@ -28,9 +28,6 @@ from backend.presentation.websocket.messages.location import (
 # Emotion and animation
 from backend.presentation.websocket.messages.emotion import EmotionKeywordMessage
 
-# Text-to-Speech
-from backend.presentation.websocket.messages.tts import TTSChunk
-
 # System messages
 from backend.presentation.websocket.messages.system import (
     ErrorMessage,
@@ -97,8 +94,6 @@ __all__ = [
     "LocationResponseMessage",
     # Emotion and animation
     "EmotionKeywordMessage",
-    # Text-to-Speech
-    "TTSChunk",
     # System messages
     "ErrorMessage",
     "StatusUpdate",

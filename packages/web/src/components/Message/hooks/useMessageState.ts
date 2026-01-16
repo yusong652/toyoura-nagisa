@@ -40,7 +40,7 @@ export const useMessageState = (
         setDisplayText(prev => prev + newText)
         onRenderComplete?.()
       } else if (text) {
-        // No newText but has text (TTS disabled case)
+        // No incremental text, fall back to full message text
         setDisplayText(prev => {
           if (prev !== text) {
             // Set virtual chunk to avoid showing loading

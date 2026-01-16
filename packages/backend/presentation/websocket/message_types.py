@@ -27,8 +27,6 @@ from backend.presentation.websocket.messages import (
     LocationResponseMessage,
     # Emotion and animation
     EmotionKeywordMessage,
-    # Text-to-Speech
-    TTSChunk,
     # System messages
     ErrorMessage,
     StatusUpdate,
@@ -68,8 +66,6 @@ __all__ = [
     "LocationResponseMessage",
     # Emotion and animation
     "EmotionKeywordMessage",
-    # Text-to-Speech
-    "TTSChunk",
     # System messages
     "ErrorMessage",
     "StatusUpdate",

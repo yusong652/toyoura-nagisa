@@ -1,14 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { FileData, ChatContextType} from '@toyoura-nagisa/core'
-import { useAudio } from '../audio/AudioContext'
-import { useTtsEnable } from '../audio/TtsEnableContext'
 import { useSession } from '../session/SessionContext'
 import { useMemory } from '../MemoryContext'
 import { useChatMessage } from './useChatMessage'
 import { useStreamHandler } from './useStreamHandler'
-import { useWebSocketTTS } from './useWebSocketTTS'
 import { useStreamingUpdateHandler } from './useStreamingUpdateHandler'
-import { useMessageStateManager } from './useMessageStateManager'
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
@@ -27,8 +23,6 @@ interface ChatProviderProps {
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false)
   const [isLLMThinking, setIsLLMThinking] = useState(false)  // Global LLM thinking status
-  const { queueAndPlayAudio, resetAudioState } = useAudio()
-  const { ttsEnabled } = useTtsEnable()
   const { memoryEnabled } = useMemory()
   const currentProfile = 'pfc'
   
@@ -52,38 +46,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     currentSessionId,
     sessionRefreshSessions,
     sessionSwitchSession,
-    ttsEnabled,
     currentProfile,
     memoryEnabled,
     setIsLLMThinking  // Pass LLM thinking status setter
-  })
-
-  // Process audio data - ensure Promise resolves after audio playback completes
-  const processAudioData = useCallback(async (audioData: string, count: number): Promise<boolean> => {
-    if (typeof audioData !== 'string' || audioData.length === 0) {
-      console.warn('Received empty audio data or incorrect format')
-      return false
-    }
-
-    try {
-      // Wait for audio playback to complete before returning
-      await queueAndPlayAudio(audioData);
-      return true;
-    } catch (error) {
-      console.error(`Audio #${count} processing failed:`, error);
-      return false;
-    }
-  }, [queueAndPlayAudio])
-
-  // Use message state manager for WebSocket TTS processing
-  const { updateMessageText, finalizeMessage } = useMessageStateManager({ setMessages })
-
-  // Use WebSocket TTS handler
-  const { setupTTSHandler, cleanupTTSHandler } = useWebSocketTTS({
-    ttsEnabled,
-    processAudioData,
-    updateMessageText,
-    finalizeMessage
   })
 
   // Use streaming update handler for real-time thinking/text content
@@ -101,12 +66,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const sendMessage = useCallback(async (text: string, files: FileData[] = [], mentionedFiles: string[] = []) => {
     if (text.trim() === '' && files.length === 0) return
 
-    // Reset audio state - ensure cleanup of residual state from previous requests
-    await resetAudioState()
-
-    // Setup WebSocket TTS handler to process incoming TTS chunks
-    setupTTSHandler()
-
     try {
       // Use basic message creation and sending functionality from useChatMessage
       const { userMessageId, botMessageId, response } = await createAndSendMessage(text, files, mentionedFiles)
@@ -114,16 +73,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       // Handle streaming response (SSE metadata events)
       await handleStreamResponse(response, { userMessageId, botMessageId })
 
-      // Note: TTS processing will happen asynchronously via WebSocket
-
     } catch (error) {
       console.error('Error sending message:', error)
-      // Cleanup TTS handler on error
-      cleanupTTSHandler()
     } finally {
       setIsLoading(false)
     }
-  }, [createAndSendMessage, handleStreamResponse, resetAudioState, setupTTSHandler, cleanupTTSHandler])
+  }, [createAndSendMessage, handleStreamResponse])
 
 
   return (

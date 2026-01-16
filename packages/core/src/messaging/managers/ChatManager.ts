@@ -74,7 +74,6 @@ export interface ErrorPayload {
 export interface SendMessageOptions {
   sessionId: string
   profile?: string
-  ttsEnabled?: boolean
   memoryEnabled?: boolean
   mentionedFiles?: string[]
 }
@@ -163,7 +162,6 @@ export class ChatManager extends EventEmitter {
         options.sessionId,
         userMessageId,
         options.profile || 'general',
-        options.ttsEnabled || false,
         options.memoryEnabled !== false,
         options.mentionedFiles || []
       )

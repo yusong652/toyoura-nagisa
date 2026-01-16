@@ -56,7 +56,6 @@ type SessionAction = 'create' | 'restore' | 'delete';
 // Profile options for SelectDialog
 const PROFILE_OPTIONS: SelectOption<AgentProfileType>[] = [
   { key: 'coding', value: 'coding', label: 'Coding', description: 'Code development and programming tasks' },
-  { key: 'lifestyle', value: 'lifestyle', label: 'Lifestyle', description: 'Daily life, email, calendar, and communication' },
   { key: 'pfc', value: 'pfc', label: 'PFC', description: 'ITASCA PFC simulation specialist' },
   { key: 'general', value: 'general', label: 'General', description: 'Full tool capabilities for complex tasks' },
   { key: 'disabled', value: 'disabled', label: 'Disabled', description: 'Pure text conversation mode (no tools)' },

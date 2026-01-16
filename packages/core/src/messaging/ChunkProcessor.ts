@@ -1,13 +1,13 @@
 /**
  * ChunkProcessor - Platform-agnostic chunk processing and ordering
  *
- * Handles text and audio chunks from stream with proper ordering and buffering.
+ * Handles text chunks from stream with proper ordering and buffering.
  * Core chunk processing logic extracted from web's useChunkProcessor hook.
  *
  * Features:
  * - Chunk ordering and sequential processing
  * - Out-of-order chunk buffering
- * - Text accumulation and audio coordination
+ * - Text accumulation coordination
  * - Event-based architecture for loose coupling
  */
 
@@ -16,7 +16,6 @@
  */
 export interface ChunkData {
   text?: string | string[]
-  audio?: string
   index?: number
   next?: ChunkData
   keyword?: string
@@ -36,7 +35,6 @@ export interface MessageUpdateOptions {
  */
 export interface ChunkEventHandlers {
   onTextUpdate: (messageId: string, text: string, options?: MessageUpdateOptions) => void
-  onAudioChunk?: (audioData: string, count: number) => Promise<boolean>
   onMessageFinalize: (messageId: string) => void
 }
 
@@ -48,29 +46,25 @@ export interface ChunkEventHandlers {
  */
 export class ChunkProcessor {
   private handlers: ChunkEventHandlers
-  private ttsEnabled: boolean
 
   // Processing state
   private isProcessing: boolean = false
   private chunkQueue: ChunkData[] = []
   private chunkBuffer: Map<number, ChunkData> = new Map()
   private expectedIndex: number = 0
-  private audioCount: number = 0
   private currentMessage: string = ''
 
   /**
    * Create a new ChunkProcessor
    *
    * @param handlers - Event handler callbacks
-   * @param ttsEnabled - Whether TTS is enabled
    */
-  constructor(handlers: ChunkEventHandlers, ttsEnabled: boolean = false) {
+  constructor(handlers: ChunkEventHandlers) {
     this.handlers = handlers
-    this.ttsEnabled = ttsEnabled
   }
 
   /**
-   * Process a single chunk of text and/or audio
+   * Process a single chunk of text
    *
    * Handles text accumulation and audio playback sequentially.
    *
@@ -94,37 +88,14 @@ export class ChunkProcessor {
         this.currentMessage += newText
 
         // Update message text immediately
-        // When TTS is disabled, we pass the full text without newText to avoid duplication
-        if (!this.ttsEnabled) {
-          this.handlers.onTextUpdate(messageId, this.currentMessage, {
-            streaming: true,
-            isLoading: false
-          })
-        } else {
-          this.handlers.onTextUpdate(messageId, this.currentMessage, {
-            newText,
-            streaming: true,
-            isLoading: false
-          })
-        }
+        this.handlers.onTextUpdate(messageId, this.currentMessage, {
+          newText,
+          streaming: true,
+          isLoading: false
+        })
 
         // Small delay for smooth rendering
         await new Promise(resolve => setTimeout(resolve, 10))
-      }
-    }
-
-    // Process audio if TTS is enabled
-    if (
-      this.ttsEnabled &&
-      this.handlers.onAudioChunk &&
-      chunk.audio &&
-      typeof chunk.audio === 'string' &&
-      chunk.audio.length > 0
-    ) {
-      try {
-        await this.handlers.onAudioChunk(chunk.audio, this.audioCount++)
-      } catch (error) {
-        console.error('[ChunkProcessor] Audio processing error:', error)
       }
     }
   }
@@ -189,7 +160,7 @@ export class ChunkProcessor {
   /**
    * Main chunk processing entry point
    *
-   * All text/audio chunks should have an index for ordered processing.
+   * All text chunks should have an index for ordered processing.
    * Chunks without index and without content are ignored.
    *
    * @param chunk - Chunk data to process
@@ -201,7 +172,7 @@ export class ChunkProcessor {
     // All content chunks should be ordered (have index)
     if (chunk.index !== undefined && typeof chunk.index === 'number') {
       await this.handleOrderedChunk(chunk, messageId)
-    } else if (chunk.text !== undefined || chunk.audio !== undefined) {
+    } else if (chunk.text !== undefined) {
       // Log warning if we receive content without index (shouldn't happen)
       console.warn('[ChunkProcessor] Received content chunk without index, assigning index 0')
       chunk.index = 0
@@ -226,7 +197,6 @@ export class ChunkProcessor {
     this.chunkQueue = []
     this.chunkBuffer.clear()
     this.expectedIndex = 0
-    this.audioCount = 0
     this.currentMessage = ''
   }
 
@@ -239,12 +209,4 @@ export class ChunkProcessor {
     return this.currentMessage
   }
 
-  /**
-   * Update TTS enabled state
-   *
-   * @param enabled - Whether TTS should be enabled
-   */
-  setTTSEnabled(enabled: boolean): void {
-    this.ttsEnabled = enabled
-  }
 }

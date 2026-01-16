@@ -111,7 +111,7 @@ class SessionQueueManager:
         - Subsequent iterations: Process immediately (messages already waited during LLM processing)
 
         This prevents unnecessary delays when users send messages during LLM processing
-        or TTS rendering - those messages should be processed immediately.
+        or other long-running tasks - those messages should be processed immediately.
 
         Args:
             session_id: Session identifier

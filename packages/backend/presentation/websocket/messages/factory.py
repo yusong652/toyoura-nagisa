@@ -17,7 +17,6 @@ from backend.presentation.websocket.messages.location import (
     LocationResponseMessage
 )
 from backend.presentation.websocket.messages.emotion import EmotionKeywordMessage
-from backend.presentation.websocket.messages.tts import TTSChunk
 from backend.presentation.websocket.messages.system import (
     ErrorMessage,
     StatusUpdate,
@@ -72,7 +71,6 @@ OUTGOING_MESSAGE_SCHEMAS = {
     MessageType.MESSAGE_CREATE: MessageCreateMessage,
     MessageType.STATUS_UPDATE: StatusUpdate,
     MessageType.TITLE_UPDATE: TitleUpdateMessage,
-    MessageType.TTS_CHUNK: TTSChunk,
     MessageType.STREAMING_UPDATE: StreamingUpdateMessage,  # Real-time content update (accumulated)
     # Used via specialized creation functions
     MessageType.TOOL_CONFIRMATION_REQUEST: ToolConfirmationRequestMessage,

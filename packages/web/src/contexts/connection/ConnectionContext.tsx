@@ -174,10 +174,6 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     })
 
     // Setup message handlers - dispatch CustomEvents for React components
-    manager.on('tts_chunk', (data) => {
-      window.dispatchEvent(new CustomEvent('websocket-tts-chunk', { detail: data }))
-    })
-
     manager.on('status_update', (data) => {
       window.dispatchEvent(new CustomEvent('messageStatusUpdate', { detail: data }))
     })

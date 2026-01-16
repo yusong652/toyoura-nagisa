@@ -130,7 +130,7 @@ export const useStreamEventHandlers = ({
   /**
    * Handle content update - deprecated in WebSocket architecture.
    *
-   * All content updates now handled via WebSocket MESSAGE_CREATE and TTS_CHUNK.
+   * All content updates now handled via WebSocket MESSAGE_CREATE.
    */
   const handleContentUpdate = useCallback(async (data: any, messageId: string) => {
     // No longer process content via SSE - everything goes through WebSocket

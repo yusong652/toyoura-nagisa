@@ -7,8 +7,6 @@ import ChatHistorySidebar from './components/ChatHistorySidebar/ChatHistorySideb
 import BackgroundTaskMonitor from './components/BackgroundTaskMonitor'
 import { ThemeToggle } from './components/Toggle/variants/ThemeToggle'
 import ConnectionError from './components/ConnectionError'
-import { AudioProvider } from './contexts/audio/AudioContext'
-import { TtsEnableProvider } from './contexts/audio/TtsEnableContext'
 import { ConnectionProvider } from './contexts/connection/ConnectionContext'
 import { SessionProvider } from './contexts/session/SessionContext'
 import { ChatProvider } from './contexts/chat/ChatContext'
@@ -73,22 +71,18 @@ function App(): React.ReactElement {
 
   return (
     <>
-      <AudioProvider>
-        <TtsEnableProvider>
-          <ConnectionProvider>
-            <SessionProvider>
-              <MemoryProvider>
-                <ChatProvider>
-                  <Live2DProvider>
-                    <AppContent />
-                    <Live2DCanvas />
-                  </Live2DProvider>
-                </ChatProvider>
-              </MemoryProvider>
-            </SessionProvider>
-          </ConnectionProvider>
-        </TtsEnableProvider>
-      </AudioProvider>
+      <ConnectionProvider>
+        <SessionProvider>
+          <MemoryProvider>
+            <ChatProvider>
+              <Live2DProvider>
+                <AppContent />
+                <Live2DCanvas />
+              </Live2DProvider>
+            </ChatProvider>
+          </MemoryProvider>
+        </SessionProvider>
+      </ConnectionProvider>
     </>
   )
 }

@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { TTSToggle } from './Toggle/variants/TTSToggle';
 import { Live2DToggle } from './Toggle/variants/Live2DToggle';
 import { MemoryToggle } from './Toggle/variants/MemoryToggle';
 import { SettingsToggle } from './Toggle/variants/SettingsToggle';
@@ -50,19 +49,6 @@ export const CollapsibleToolbar: React.FC = () => {
       
       {isExpanded && (
         <div className="toolbar-content">
-          <div className="toolbar-section">
-            <div className="toolbar-item">
-              <div className="toolbar-icon-label">
-                <svg className="toolbar-section-icon" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path d="M11 5L6 9H2v6h4l5 4V5z"/>
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                </svg>
-                <span className="toolbar-label">Text-to-Speech</span>
-              </div>
-              <TTSToggle />
-            </div>
-          </div>
-          
           <div className="toolbar-section">
             <div className="toolbar-item">
               <div className="toolbar-icon-label">

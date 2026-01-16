@@ -5,26 +5,23 @@ This service orchestrates the complete content processing pipeline for LLM respo
 - Content extraction from structured messages
 - Message persistence to conversation history
 - Keyword extraction for emotional expressions
-- TTS processing coordination
 
 As an application service, it coordinates multiple infrastructure components
-(MessageService, NotificationService, TTS) to implement the content processing
+(MessageService, NotificationService) to implement the content processing
 use case. WebSocket communication is delegated to presentation layer for proper
 separation of concerns.
 """
 
-import json
 from typing import Dict, Any, Optional, List
 from backend.domain.models.messages import BaseMessage
 from backend.application.services.message_service import MessageService
-from backend.presentation.websocket.message_sender import send_message_create, send_tts_chunk
+from backend.presentation.websocket.message_sender import send_message_create
 
 
 async def process_content_pipeline(
     final_message: BaseMessage,  # AssistantMessage with List content
     session_id: str,
-    message_id: Optional[str] = None,  # Optional: use existing message ID from streaming
-    tts_enabled: bool = True  # TTS processing flag from client
+    message_id: Optional[str] = None  # Optional: use existing message ID from streaming
 ) -> None:
     """
     Content processing pipeline for final LLM responses.
@@ -33,7 +30,6 @@ async def process_content_pipeline(
     1. Content extraction from structured messages
     2. Message persistence to conversation history
     3. Keyword extraction for emotional expressions
-    4. TTS processing coordination via WebSocket
 
     Args:
         final_message: Final LLM response message
@@ -53,7 +49,7 @@ async def process_content_pipeline(
 
     content_list: List[Dict[str, Any]] = content  # Type-safe assignment
 
-    # Extract text content for keyword parsing and TTS (excluding thinking blocks)
+    # Extract text content for keyword parsing (excluding thinking blocks)
     text_content = ""
     for item in content_list:
         if isinstance(item, dict) and item.get('type') == 'text':
@@ -83,39 +79,6 @@ async def process_content_pipeline(
         if emotion_service:
             await emotion_service.notify_emotion_keyword(session_id, extracted_keyword, ai_msg_id)
     
-    # Process TTS pipeline if clean text content is available AND TTS is enabled
-    if parsed_result['text'].strip():
-        # Send MESSAGE_CREATE only if message was not created during streaming
-        if not message_id:
-            await send_message_create(session_id, ai_msg_id)
-
-        if tts_enabled:
-            # Get TTS engine from app state
-            from backend.shared.utils.app_context import get_tts_engine
-            tts_engine = get_tts_engine()
-
-            # Dynamic import to avoid circular dependency
-            from backend.presentation.handlers.tts_handler import process_tts_pipeline
-            # Use cleaned text without keyword markers for TTS
-            async for chunk in process_tts_pipeline(parsed_result['text'], tts_engine):
-                # Send TTS chunks via WebSocket
-                # For streaming messages: audio-only (text already displayed)
-                # For non-streaming messages: text+audio (for incremental text display)
-                is_streaming = bool(message_id)
-                await send_tts_chunk(session_id, chunk, ai_msg_id, is_streaming)
-        else:
-            # Send final TTS chunk without audio to signal completion
-            final_chunk_data = {'text': '', 'audio': None, 'index': 0, 'is_final': True}
-            final_sse_chunk = f"data: {json.dumps(final_chunk_data)}\n\n"
-            is_streaming = bool(message_id)
-            await send_tts_chunk(session_id, final_sse_chunk, ai_msg_id, is_streaming)
-    else:
-        # Send MESSAGE_CREATE only if message was not created during streaming
-        if not message_id:
-            await send_message_create(session_id, ai_msg_id)
-
-        # Send empty text chunk for consistency when only keywords are present
-        empty_chunk_data = {'text': '', 'audio': None, 'index': 0, 'is_final': True}
-        empty_sse_chunk = f"data: {json.dumps(empty_chunk_data)}\n\n"
-        is_streaming = bool(message_id)
-        await send_tts_chunk(session_id, empty_sse_chunk, ai_msg_id, is_streaming)
+    # Send MESSAGE_CREATE only if message was not created during streaming
+    if not message_id:
+        await send_message_create(session_id, ai_msg_id)

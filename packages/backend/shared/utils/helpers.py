@@ -13,7 +13,6 @@ class _MessageParseResultRequired(TypedDict):
     message: str
     request_id: str
     enable_memory: bool
-    tts_enabled: bool
 
 class MessageParseResult(_MessageParseResultRequired, total=False):
     """Type definition for message parsing result with optional fields"""
@@ -29,7 +28,6 @@ def parse_message_data(data: dict) -> MessageParseResult:
     files = data.get('files', [])
     msg_id = data.get('message_id')
     enable_memory = data.get('enable_memory', True)  # Default to True, simplified
-    tts_enabled = data.get('tts_enabled', False)  # TTS processing flag
     mentioned_files = data.get('mentioned_files', [])  # File mentions from frontend
 
     # Convert ISO timestamp to milliseconds if present
@@ -66,8 +64,7 @@ def parse_message_data(data: dict) -> MessageParseResult:
         'agent_profile': agent_profile,
         'message': text,  # Add text message for streaming handler
         'request_id': str(uuid.uuid4()),  # Generate unique request ID
-        'enable_memory': enable_memory,  # Add memory setting
-        'tts_enabled': tts_enabled  # Add TTS setting
+        'enable_memory': enable_memory  # Add memory setting
     }
 
     # Add mentioned_files only if non-empty (optional field)

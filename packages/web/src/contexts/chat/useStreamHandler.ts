@@ -1,6 +1,5 @@
 import { useCallback } from 'react'
 import { useMessageStateManager } from './useMessageStateManager'
-import { useChunkProcessor } from './useChunkProcessor'
 import { useStreamEventHandlers } from './useStreamEventHandlers'
 import { useStreamProcessor } from './useStreamProcessor'
 
@@ -27,7 +26,6 @@ import { Message } from '@toyoura-nagisa/core'
  * 
  * Architecture:
  * - useMessageStateManager: Manages message state updates
- * - useChunkProcessor: Processes text/audio chunks
  * - useStreamEventHandlers: Handles various stream events
  * - useStreamProcessor: Core stream reading and parsing
  */

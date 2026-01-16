@@ -16,7 +16,6 @@ Separate toyoura-nagisa into two focused repositories:
 ```
 tools/lifestyle/
 ├── tools/
-│   ├── email/           # Gmail send/read/check
 │   ├── calendar/        # Google Calendar CRUD
 │   ├── contacts/        # Google Contacts
 │   ├── places/          # Google Places search
@@ -38,7 +37,6 @@ infrastructure/auth/
 #### 3. Lifestyle-specific Configs (`packages/backend/config/`)
 ```
 config/
-├── email.py             # EmailConfig, AuthConfig (Google OAuth)
 └── text_to_image.py     # ComfyUI configuration (if exists)
 ```
 
@@ -146,7 +144,6 @@ Update tool loading to skip non-existent lifestyle tools.
 ### 3. Configuration
 
 Remove or make optional:
-- `packages/backend/config/email.py` (or keep SearchConfig only)
 - Google Maps API key dependency
 - ComfyUI configuration
 
@@ -180,7 +177,6 @@ cp -r toyoura-nagisa/packages/backend/infrastructure/mcp/tools/lifestyle nagisa-
 cp -r toyoura-nagisa/packages/backend/infrastructure/auth nagisa-assistant/packages/backend/infrastructure/
 
 # 3. Copy relevant configs
-cp toyoura-nagisa/packages/backend/config/email.py nagisa-assistant/packages/backend/config/
 ```
 
 ### Phase 3: Clean toyoura-nagisa

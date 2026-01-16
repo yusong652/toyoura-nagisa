@@ -98,13 +98,13 @@ export class StreamProcessor {
         if (data.keyword && this.handlers.onKeyword) {
           this.handlers.onKeyword(data)
           // Skip content update if this is only a keyword
-          if (!data.text && !data.audio) {
+          if (!data.text) {
             return
           }
         }
 
         // All content updates now handled via WebSocket
-        // SSE no longer carries text or TTS content in the new architecture
+        // SSE no longer carries text content in the new architecture
       } catch (e) {
         console.error('[StreamProcessor] Error parsing response:', e)
       }

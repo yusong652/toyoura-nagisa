@@ -151,8 +151,6 @@ toyoura-nagisa follows **Clean Architecture** principles with clear separation o
 2. Edit configuration files in `packages/backend/config/`:
    - `llm.py`: LLM provider API keys (Gemini, OpenAI, Anthropic, Local)
    - `memory.py`: Memory system settings
-   - `tts.py`: Text-to-speech provider configuration
-   - `email.py`, `text_to_image.py`: Additional service configurations
 
 ### Google Services Integration
 For tools that use Google services (Calendar, Gmail, Contacts):
@@ -168,7 +166,6 @@ Tools are organized into categories and loaded based on agent profiles:
 
 - **builtin**: Web search and core system tools
 - **coding**: File operations (read, write, edit, glob, grep), shell commands (bash)
-- **lifestyle**: Calendar, contacts, email, location, places, text-to-image, time utilities
 - **pfc**: PFC simulation tools (query, execute_task, check_status, list_tasks)
 - **agent**: SubAgent invocation (invoke_agent)
 
@@ -218,7 +215,6 @@ Tools are organized into categories and loaded based on agent profiles:
 - Multi-provider LLM support: `google-genai`, `openai`, `anthropic`, `vllm`, `ollama`
 - Tool integrations: `google-api-python-client`, `googlemaps`
 - Memory: `chromadb`
-- TTS: `fish-audio-sdk`, `torch`, `torchaudio`
 
 ## Development Guidelines
 

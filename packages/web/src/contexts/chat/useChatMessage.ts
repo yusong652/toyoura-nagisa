@@ -27,7 +27,6 @@ export interface UseChatMessageOptions {
   currentSessionId: string | null
   sessionRefreshSessions: () => Promise<any>
   sessionSwitchSession: (sessionId: string) => Promise<void>
-  ttsEnabled?: boolean
   currentProfile?: string
   memoryEnabled?: boolean
   setIsLLMThinking?: (thinking: boolean) => void  // Callback to update global LLM thinking status
@@ -53,7 +52,6 @@ export const useChatMessage = ({
   currentSessionId,
   sessionRefreshSessions,
   sessionSwitchSession,
-  ttsEnabled = false,
   currentProfile = "pfc",
   memoryEnabled = true,
   setIsLLMThinking
@@ -333,7 +331,7 @@ export const useChatMessage = ({
 
 
   // Send message via ChatManager
-  // Returns response stream for further processing (SSE metadata, TTS, etc.)
+  // Returns response stream for further processing (SSE metadata, etc.)
   const sendMessage = useCallback(async (
     text: string,
     files: FileData[] = [],
@@ -350,7 +348,6 @@ export const useChatMessage = ({
       const result = await chatManager.sendMessage(text, files, {
         sessionId,
         profile: currentProfile,
-        ttsEnabled,
         memoryEnabled,
         mentionedFiles
       })
@@ -360,7 +357,7 @@ export const useChatMessage = ({
       console.error('Failed to send message:', error)
       throw error
     }
-  }, [currentSessionId, currentProfile, ttsEnabled, memoryEnabled, chatManager])
+  }, [currentSessionId, currentProfile, memoryEnabled, chatManager])
 
   return {
     messages,

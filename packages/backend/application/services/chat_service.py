@@ -26,7 +26,6 @@ class PreparedUserMessage:
     instruction: UserMessage
     agent_profile: str
     enable_memory: bool
-    tts_enabled: bool = False
 
 
 def get_chat_service() -> "ChatService":
@@ -133,7 +132,6 @@ class ChatService:
                 - session_id: str - Session identifier
                 - agent_profile: str - Agent profile type
                 - enable_memory: bool - Memory injection setting
-                - tts_enabled: bool - TTS processing setting
                 - files: List - Attached files (if any)
 
         Returns:
@@ -191,15 +189,12 @@ class ChatService:
             timestamp=dt_timestamp
         )
 
-        tts_enabled = parsed_data.get('tts_enabled', False)
-
         return PreparedUserMessage(
             session_id=session_id,
             message_id=message_id,
             instruction=instruction,
             agent_profile=parsed_data.get('agent_profile', 'general'),
-            enable_memory=parsed_data.get('enable_memory', True),
-            tts_enabled=tts_enabled
+            enable_memory=parsed_data.get('enable_memory', True)
         )
 
     async def _inject_status_reminders(self, session_id: str, parsed_data: MessageParseResult) -> None:
@@ -228,4 +223,3 @@ class ChatService:
             print(f"[WARNING] Failed to inject status reminders: {e}")
             import traceback
             traceback.print_exc()
-

@@ -168,7 +168,6 @@ export function useChatStream({
         stream_response: true,
         agent_profile: currentProfile,
         enable_memory: memoryEnabled,
-        tts_enabled: false,
         files: [],
         mentioned_files: mentionedFiles || [],
       });

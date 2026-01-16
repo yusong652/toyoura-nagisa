@@ -18,7 +18,7 @@ class UserRejectionInterruption(Exception):
     This represents a deliberate user interruption, not a system error.
     When raised, the request should:
     1. Save context with rejection responses (already done)
-    2. NOT trigger content processing (TTS, post-processing, etc.)
+    2. NOT trigger content processing (post-processing, etc.)
     3. Wait for user's next input to continue naturally
 
     This follows Claude Code's standard pattern where tool rejections

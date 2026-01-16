@@ -100,7 +100,6 @@ Beyond the core PFC integration, **toyoura-nagisa** includes:
 - **Multi-Provider LLM Support**: Gemini, Claude, OpenAI, and local models (Ollama, vLLM).
 - **Long-Term Memory**: Uses ChromaDB to learn and recall user preferences across sessions.
 - **Live2D Character**: An interactive visual companion that responds to conversations, adding a layer of engagement.
-- **Text-to-Speech**: Integrated TTS (local GPT-SoVITS or cloud Fish Audio) for voice output.
 
 ## 7. Deep Dive: Model Context Protocol (MCP) Architecture
 

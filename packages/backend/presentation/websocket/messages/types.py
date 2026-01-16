@@ -33,9 +33,6 @@ class MessageType(str, Enum):
     ERROR = "ERROR"
     STATUS_UPDATE = "STATUS_UPDATE"
 
-    # TTS streaming
-    TTS_CHUNK = "TTS_CHUNK"
-
     # Message management
     MESSAGE_CREATE = "MESSAGE_CREATE"
 

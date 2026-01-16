@@ -124,19 +124,6 @@ export class ConnectionManager extends WebSocketManager {
         await this.handleLocationRequest(message);
         break;
 
-      case 'TTS_CHUNK':
-        this.emit('tts_chunk', {
-          text: message.text,
-          audio: message.audio,
-          index: message.index,
-          is_final: message.is_final,
-          message_id: message.message_id,
-          engine_status: message.engine_status,
-          error: message.error,
-          processing_time: message.processing_time
-        });
-        break;
-
       case 'STATUS_UPDATE':
         this.emit('status_update', {
           messageId: message.message_id,
