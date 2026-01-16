@@ -44,6 +44,7 @@ class ZhipuClient(LLMClientBase):
             **kwargs: Additional configuration parameters
         """
         super().__init__(**kwargs)
+        self.provider_name = "zhipu"
         self.api_key = api_key
 
         # Initialize Zhipu-specific configuration

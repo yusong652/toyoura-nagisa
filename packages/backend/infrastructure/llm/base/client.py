@@ -44,6 +44,7 @@ class LLMClientBase(ABC):
 
         # Common client attributes that all implementations should have
         self.client = None  # Will be set by concrete implementations
+        self.provider_name: Optional[str] = None
 
         # Tool manager will be set by concrete implementations
         # Each provider has its own tool manager (GeminiToolManager, OpenAIToolManager, etc.)

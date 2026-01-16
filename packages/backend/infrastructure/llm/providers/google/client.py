@@ -52,6 +52,7 @@ class GoogleClient(LLMClientBase):
             **kwargs: Additional configuration parameters
         """
         super().__init__(**kwargs)
+        self.provider_name = "google"
         self.client = genai.Client(api_key=api_key)
         
         # Initialize Gemini-specific configuration

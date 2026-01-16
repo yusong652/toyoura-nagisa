@@ -21,6 +21,7 @@ class AnthropicClient(LLMClientBase):
             **kwargs: Additional configuration parameters
         """
         super().__init__(**kwargs)
+        self.provider_name = "anthropic"
         self.api_key = api_key
         
         # Initialize Anthropic-specific configuration

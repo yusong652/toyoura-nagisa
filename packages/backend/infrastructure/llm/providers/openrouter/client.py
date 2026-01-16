@@ -53,6 +53,7 @@ class OpenRouterClient(LLMClientBase):
                 - max_tokens: Maximum output tokens
         """
         super().__init__(**kwargs)
+        self.provider_name = "openrouter"
         self.api_key = api_key
 
         # Initialize OpenRouter-specific configuration

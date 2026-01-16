@@ -59,6 +59,7 @@ class OpenAIClient(LLMClientBase):
             **kwargs: Additional configuration parameters
         """
         super().__init__(**kwargs)
+        self.provider_name = "openai"
         self.api_key = api_key
         
         # Initialize OpenAI-specific configuration

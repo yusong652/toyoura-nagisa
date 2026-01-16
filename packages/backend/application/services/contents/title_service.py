@@ -12,8 +12,51 @@ from backend.infrastructure.storage.session_manager import (
     load_history,
     load_all_message_history
 )
+from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
-from backend.infrastructure.llm.content_generators.factory import ContentGeneratorFactory
+from backend.infrastructure.llm.providers.anthropic.content_generators import AnthropicTitleGenerator
+from backend.infrastructure.llm.providers.google.content_generators import GoogleTitleGenerator
+from backend.infrastructure.llm.providers.moonshot.content_generators import MoonshotTitleGenerator
+from backend.infrastructure.llm.providers.openai.content_generators import OpenAITitleGenerator
+from backend.infrastructure.llm.providers.openrouter.content_generators import OpenRouterTitleGenerator
+from backend.infrastructure.llm.providers.zhipu.content_generators import ZhipuTitleGenerator
+
+TITLE_GENERATORS = {
+    "google": GoogleTitleGenerator,
+    "anthropic": AnthropicTitleGenerator,
+    "openai": OpenAITitleGenerator,
+    "moonshot": MoonshotTitleGenerator,
+    "openrouter": OpenRouterTitleGenerator,
+    "zhipu": ZhipuTitleGenerator,
+}
+
+
+def _get_title_generator_class(llm_client: Any):
+    provider_name = getattr(llm_client, "provider_name", None)
+    if not provider_name:
+        raise ValueError("LLM client is missing provider_name")
+
+    generator_class = TITLE_GENERATORS.get(provider_name.lower())
+    if not generator_class:
+        raise ValueError(f"Unsupported LLM provider for title generation: {provider_name}")
+
+    return generator_class
+
+
+async def generate_title_from_messages(
+    llm_client: Any,
+    latest_messages: List[BaseMessage]
+) -> Optional[str]:
+    try:
+        generator_class = _get_title_generator_class(llm_client)
+        client = getattr(llm_client, "async_client", None) or getattr(llm_client, "client", llm_client)
+        generator = generator_class(client=client)
+        return await generator.generate_title_from_messages(latest_messages=latest_messages)
+    except Exception as exc:
+        print(f"[ERROR] Title generation failed: {exc}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 def trigger_title_generation(session_id: str, llm_client: Any) -> None:
@@ -179,11 +222,7 @@ class TitleService:
         # Create a list of latest messages for title generation
         latest_messages = [latest_user_msg, latest_assistant_msg]
 
-        # Use ContentGeneratorFactory for title generation
-        title = await ContentGeneratorFactory.generate_title_from_messages(
-            llm_client,
-            latest_messages
-        )
+        title = await generate_title_from_messages(llm_client, latest_messages)
         return title
 
     async def try_generate_title_if_needed_async(

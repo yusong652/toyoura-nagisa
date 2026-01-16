@@ -55,6 +55,7 @@ class MoonshotClient(LLMClientBase):
                 - max_tokens: Maximum output tokens
         """
         super().__init__(**kwargs)
+        self.provider_name = "moonshot"
         self.api_key = api_key
 
         # Initialize Moonshot-specific configuration
