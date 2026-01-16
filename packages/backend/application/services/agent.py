@@ -9,6 +9,7 @@ Execution modes (controlled by is_main_agent):
 - SubAgent: non-streaming calls, context-only storage
 """
 
+import asyncio
 import time
 import uuid
 from typing import Any, Dict, List, Optional, Union, cast
@@ -21,7 +22,7 @@ from backend.application.services.tool_executor import ToolExecutor
 from backend.application.services.streaming_models import StreamingState
 from backend.application.services.streaming_processor import StreamingProcessor
 from backend.application.services.message_service import MessageService
-from backend.application.services.contents.title_service import trigger_title_generation
+from backend.application.services.contents.title_service import TitleService
 from backend.infrastructure.storage.session_manager import save_token_usage
 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
@@ -568,9 +569,10 @@ class Agent:
         )
 
         # Trigger title generation
-        trigger_title_generation(self.session_id, self.llm_client)
-
-        return partial_response
+        asyncio.create_task(
+            TitleService().try_generate_title_if_needed_async(self.session_id, self.llm_client)
+        )
+        return None
 
     async def _finalize_stream_response(self, response: Any) -> Any:
         """Finalize streaming response without tool calls."""
@@ -598,7 +600,9 @@ class Agent:
             save_token_usage(self.session_id, usage)
 
         # Trigger title generation
-        trigger_title_generation(self.session_id, self.llm_client)
+        asyncio.create_task(
+            TitleService().try_generate_title_if_needed_async(self.session_id, self.llm_client)
+        )
 
         return response
 
@@ -624,7 +628,9 @@ class Agent:
                 save_token_usage(self.session_id, usage)
 
             # Trigger title generation
-            trigger_title_generation(self.session_id, self.llm_client)
+            asyncio.create_task(
+                TitleService().try_generate_title_if_needed_async(self.session_id, self.llm_client)
+            )
 
         except Exception as e:
             print(f"[Agent.stream] Failed to update streaming message: {e}")
