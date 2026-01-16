@@ -13,6 +13,42 @@ from backend.infrastructure.llm.providers.google.response_processor import Googl
 from backend.infrastructure.llm.providers.anthropic.message_formatter import MessageFormatter
 
 
+async def perform_web_search(
+    llm_client,
+    query: str,
+    max_uses: Optional[int] = None,
+) -> Dict[str, Any]:
+    llm_settings = get_llm_settings()
+    provider_name = _get_provider_name(llm_client)
+
+    if max_uses is None:
+        if provider_name == "google":
+            max_uses = llm_settings.get_google_config().web_search_max_uses
+        elif provider_name == "anthropic":
+            max_uses = llm_settings.get_anthropic_config().web_search_max_uses
+        elif provider_name == "openai":
+            max_uses = 5
+        elif provider_name in ("moonshot", "zhipu"):
+            max_uses = 1
+        else:
+            max_uses = 5
+
+    if provider_name == "google":
+        return await _perform_google_search(llm_client, query, max_uses)
+    if provider_name == "anthropic":
+        return await _perform_anthropic_search(llm_client, query, max_uses)
+    if provider_name == "openai":
+        return await _perform_openai_search(llm_client, query)
+    if provider_name == "moonshot":
+        return await _perform_moonshot_search(llm_client, query)
+    if provider_name == "zhipu":
+        return await _perform_zhipu_search(llm_client, query)
+
+    return {
+        "error": f"Unsupported LLM type: {provider_name}",
+        "query": query,
+    }
+
 def _format_search_result(
     query: str,
     response_text: str,
@@ -286,38 +322,3 @@ async def _perform_zhipu_search(llm_client, query: str) -> Dict[str, Any]:
     return result
 
 
-async def perform_web_search(
-    llm_client,
-    query: str,
-    max_uses: Optional[int] = None,
-) -> Dict[str, Any]:
-    llm_settings = get_llm_settings()
-    provider_name = _get_provider_name(llm_client)
-
-    if max_uses is None:
-        if provider_name == "google":
-            max_uses = llm_settings.get_google_config().web_search_max_uses
-        elif provider_name == "anthropic":
-            max_uses = llm_settings.get_anthropic_config().web_search_max_uses
-        elif provider_name == "openai":
-            max_uses = 5
-        elif provider_name in ("moonshot", "zhipu"):
-            max_uses = 1
-        else:
-            max_uses = 5
-
-    if provider_name == "google":
-        return await _perform_google_search(llm_client, query, max_uses)
-    if provider_name == "anthropic":
-        return await _perform_anthropic_search(llm_client, query, max_uses)
-    if provider_name == "openai":
-        return await _perform_openai_search(llm_client, query)
-    if provider_name == "moonshot":
-        return await _perform_moonshot_search(llm_client, query)
-    if provider_name == "zhipu":
-        return await _perform_zhipu_search(llm_client, query)
-
-    return {
-        "error": f"Unsupported LLM type: {provider_name}",
-        "query": query,
-    }
