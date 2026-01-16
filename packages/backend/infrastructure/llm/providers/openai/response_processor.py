@@ -592,6 +592,50 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         )
 
     @staticmethod
+    def extract_web_search_sources(response) -> List[Dict[str, Any]]:
+        """
+        Extract web search sources from OpenAI Responses API response.
+
+        OpenAI provides URL citations via annotations in ResponseOutputText blocks.
+        Each annotation includes start_index and end_index to indicate the cited
+        text location.
+
+        Args:
+            response: OpenAI Responses API response object
+
+        Returns:
+            List of source dictionaries with url, title, and snippet
+        """
+        from openai.types.responses.response_output_text import AnnotationURLCitation
+
+        sources: List[Dict[str, Any]] = []
+
+        if not isinstance(response, Response) or not response.output:
+            return sources
+
+        for item in response.output:
+            if not isinstance(item, ResponseOutputMessage):
+                continue
+
+            for part in item.content:
+                if not isinstance(part, ResponseOutputText):
+                    continue
+
+                text_segment = part.text or ""
+
+                for annotation in part.annotations or []:
+                    if isinstance(annotation, AnnotationURLCitation):
+                        # Extract cited text using start_index and end_index
+                        snippet = text_segment[annotation.start_index:annotation.end_index]
+                        sources.append({
+                            "url": getattr(annotation, "url", ""),
+                            "title": getattr(annotation, "title", ""),
+                            "snippet": snippet,
+                        })
+
+        return sources
+
+    @staticmethod
     def create_streaming_processor() -> BaseStreamingProcessor:
         """
         Create OpenAI streaming processor instance.

@@ -575,6 +575,33 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
         return MockResponse(choices=[choice])
 
     @staticmethod
+    def extract_web_search_sources(response: Any) -> List[Dict[str, Any]]:
+        """
+        Extract web search sources from Zhipu response.
+
+        Zhipu's web_search returns a search_result array in the response
+        with structured search results including title, content, link, etc.
+
+        Args:
+            response: Completion response from Zhipu API
+
+        Returns:
+            List of source dictionaries with url, title, and snippet
+        """
+        sources = []
+
+        # Check if response has search_result field
+        if hasattr(response, "search_result") and response.search_result:
+            for result in response.search_result:
+                sources.append({
+                    "url": getattr(result, "link", ""),
+                    "title": getattr(result, "title", ""),
+                    "snippet": getattr(result, "content", ""),
+                })
+
+        return sources
+
+    @staticmethod
     def create_streaming_processor() -> BaseStreamingProcessor:
         """
         Create Zhipu streaming processor instance.

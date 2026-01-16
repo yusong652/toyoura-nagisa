@@ -41,13 +41,9 @@ async def web_fetch(
                 f"Gemini API not configured. web_fetch requires GOOGLE_API_KEY: {e}"
             )
 
-        # Import and create generator
-        from backend.infrastructure.llm.providers.google.content_generators import (
-            GoogleWebFetchGenerator
-        )
+        from backend.application.services.contents.web_fetch_service import fetch_url_content
 
-        generator = GoogleWebFetchGenerator(client=google_client)
-        result = await generator.fetch_url_content(url=url, prompt=prompt)
+        result = await fetch_url_content(google_client, url=url, prompt=prompt)
 
         # Check result status
         if result.status == "error":

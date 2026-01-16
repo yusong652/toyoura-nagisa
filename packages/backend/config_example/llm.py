@@ -125,7 +125,8 @@ class OpenAIConfig(BaseSettings):
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
     max_tokens: Optional[int] = Field(default=None, ge=1, description="Max output tokens")
-
+    reasoning_effort: Optional[str] = Field(default=None, description="Reasoning effort level: minimal, medium, high")
+    
     model_config = SettingsConfigDict(
         env_file='.env',
         env_nested_delimiter='__',

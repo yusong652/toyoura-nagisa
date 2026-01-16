@@ -558,6 +558,41 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
         )
 
     @staticmethod
+    def extract_web_search_sources(response: Any) -> List[Dict[str, Any]]:
+        """
+        Extract web search sources from Claude API response with web_search tool.
+
+        Anthropic web_search provides citations in the text content blocks.
+        Each citation includes url, title, and the cited text snippet.
+
+        Args:
+            response: Raw response from Anthropic Claude API
+
+        Returns:
+            List of source dictionaries with url, title, and snippet
+        """
+        sources = []
+
+        if not hasattr(response, "content") or not response.content:
+            return sources
+
+        # Extract citations from text blocks
+        for block in response.content:
+            block_type = getattr(block, "type", None)
+
+            if block_type == "text" and hasattr(block, "citations"):
+                for citation in block.citations or []:
+                    citation_type = getattr(citation, "type", None)
+                    if citation_type == "web_search_result_location":
+                        sources.append({
+                            "url": getattr(citation, "url", ""),
+                            "title": getattr(citation, "title", ""),
+                            "snippet": getattr(citation, "cited_text", ""),
+                        })
+
+        return sources
+
+    @staticmethod
     def create_streaming_processor() -> BaseStreamingProcessor:
         """
         Create Anthropic streaming processor instance.

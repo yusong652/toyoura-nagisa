@@ -585,6 +585,24 @@ class MoonshotResponseProcessor(BaseResponseProcessor):
         )
 
     @staticmethod
+    def extract_web_search_sources(response: Any) -> List[Dict[str, Any]]:
+        """
+        Extract web search sources from Moonshot response.
+
+        Note: Moonshot's $web_search builtin function synthesizes results directly
+        into the response text and does not provide separate source citations.
+
+        Args:
+            response: ChatCompletion response from Moonshot API
+
+        Returns:
+            Empty list (Moonshot doesn't provide separate sources)
+        """
+        # Moonshot web_search synthesizes results into response text
+        # No separate source citations are provided
+        return []
+
+    @staticmethod
     def create_streaming_processor() -> BaseStreamingProcessor:
         """
         Create Moonshot streaming processor instance.
