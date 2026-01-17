@@ -64,10 +64,13 @@ class ShellConfig:
 
         if sys.platform == "win32":
             # 2. Try PATH detection (Git Bash in PATH)
+            # Skip WSL bash (WindowsApps\bash.exe) - it requires WSL to be installed
             bash = shutil.which("bash")
-            if bash:
+            if bash and "WindowsApps" not in bash:
                 logger.info(f"[ShellConfig] Using Git Bash from PATH: {bash}")
                 return cls(path=bash, args=["-l", "-c"], is_cmd=False)
+            elif bash:
+                logger.debug(f"[ShellConfig] Skipping WSL bash: {bash}")
 
             # 3. Try common Git Bash location (PATH may not include it)
             if os.path.isfile(_GIT_BASH_COMMON_PATH):
