@@ -4,10 +4,6 @@ Default configuration values shared across LLM providers.
 Common default values and settings that can be used by all provider implementations.
 """
 
-DEFAULT_FEW_SHOT_MAX_LENGTH = 5
-DEFAULT_CONTEXT_MESSAGE_COUNT = 6
-DEFAULT_MAX_HISTORY_LENGTH = 10
-
 # Title generation defaults
 DEFAULT_TITLE_MAX_LENGTH = 50
 DEFAULT_TITLE_GENERATION_TEMPERATURE = 0.3

@@ -10,10 +10,7 @@ from .prompts import *
 
 __all__ = [
     # Default values
-    "DEFAULT_FEW_SHOT_MAX_LENGTH",
-    "DEFAULT_CONTEXT_MESSAGE_COUNT", 
     "DEFAULT_TITLE_MAX_LENGTH",
-    "DEFAULT_MAX_HISTORY_LENGTH",
     
     # System prompts
     "DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT",
