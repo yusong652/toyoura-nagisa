@@ -31,7 +31,7 @@ class ReminderInjector:
         await injector.inject_to_tool_result(result)
     """
 
-    def __init__(self, session_id: str, agent_profile: str = "general", user_id: Optional[str] = None):
+    def __init__(self, session_id: str, agent_profile = "pfc_expert", user_id: Optional[str] = None):
         """
         Initialize ReminderInjector with session context.
 

@@ -40,7 +40,7 @@ class TodoService:
         This is used for frontend display to show what the agent is currently working on.
 
         Args:
-            agent_profile: Agent profile type (e.g., "pfc", "coding", "general").
+            agent_profile: Agent profile type (e.g., "pfc_expert", "disabled").
                           Determines which workspace to use.
             session_id: Optional session identifier (for PFC profile workspace sync).
 
@@ -85,7 +85,7 @@ class TodoService:
         Get all todos for a workspace.
 
         Args:
-            agent_profile: Agent profile type (e.g., "pfc", "coding", "general").
+            agent_profile: Agent profile type (e.g., "pfc_expert", "disabled").
             session_id: Optional session identifier (for PFC profile workspace sync).
 
         Returns:
@@ -109,7 +109,7 @@ class TodoService:
         Get pending and in_progress todos for a workspace.
 
         Args:
-            agent_profile: Agent profile type (e.g., "pfc", "coding", "general").
+            agent_profile: Agent profile type (e.g., "pfc_expert", "disabled").
             session_id: Optional session identifier (for PFC profile workspace sync).
             limit: Maximum number of todos to return
 

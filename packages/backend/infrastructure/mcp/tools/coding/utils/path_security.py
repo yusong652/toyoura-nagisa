@@ -42,11 +42,7 @@ async def get_workspace_root_async(context=None) -> Path:
             # (set by chat_service before tool execution)
             from backend.shared.utils.app_context import get_llm_client
             from backend.shared.utils.workspace import get_workspace_for_profile
-
-            llm_client = get_llm_client()
-            context_manager = llm_client.get_or_create_context_manager(session_id)
-            agent_profile = getattr(context_manager, 'agent_profile', 'general')
-
+            agent_profile = 'pfc_expert'
             # Use unified workspace resolution for all profiles
             workspace_path = await get_workspace_for_profile(agent_profile, session_id)
             return Path(workspace_path)

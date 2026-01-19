@@ -193,7 +193,7 @@ class ChatService:
             session_id=session_id,
             message_id=message_id,
             instruction=instruction,
-            agent_profile=parsed_data.get('agent_profile', 'general'),
+            agent_profile = 'pfc_expert',
             enable_memory=parsed_data.get('enable_memory', True)
         )
 
@@ -210,7 +210,7 @@ class ChatService:
         try:
             from backend.application.services.reminder import ReminderInjector
 
-            agent_profile = parsed_data.get('agent_profile', 'general')
+            agent_profile = 'pfc_expert'
             mentioned_files = parsed_data.get('mentioned_files', [])
             content = parsed_data.get('content', [])
             enable_memory = parsed_data.get('enable_memory', False)

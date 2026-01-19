@@ -43,7 +43,7 @@ class ZhipuToolManager(BaseToolManager):
         """Initialize Zhipu tool manager"""
         super().__init__()
 
-    async def get_function_call_schemas(self, session_id: str, agent_profile: str = 'general') -> List[Dict[str, Any]] | None:
+    async def get_function_call_schemas(self, session_id: str, agent_profile = 'pfc_expert') -> List[Dict[str, Any]] | None:
         """
         Get MCP tools formatted for Zhipu function calling with nested structure.
 
@@ -52,7 +52,7 @@ class ZhipuToolManager(BaseToolManager):
 
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+            agent_profile: Agent profile name ("pfc_expert", "disabled")
 
         Returns:
             List of Zhipu-formatted tool schemas (nested) or None if tools disabled
@@ -127,13 +127,13 @@ class ZhipuToolManager(BaseToolManager):
             print(f"[DEBUG] Tool schema content: {tool_schema}")
             return None
 
-    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: str = 'general') -> List[Dict[str, Any]]:
+    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile = 'pfc_expert') -> List[Dict[str, Any]]:
         """
         Get tool schemas in standardized dictionary format for system prompt embedding.
 
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+            agent_profile: Agent profile name ("pfc_expert", "disabled")
 
         Returns:
             List[Dict[str, Any]]: Tool schemas in standardized dictionary format for system prompt

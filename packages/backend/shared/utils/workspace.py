@@ -29,11 +29,11 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
         - PFC profile without PFC server: Fallback priority:
           1. Configured PFC workspace (PFC_WORKSPACE in config/pfc.py)
           2. Local pfc_workspace (toyoura-nagisa/pfc_workspace)
-        - Other profiles (coding, general, lifestyle, etc.): Unified workspace
+        - Other profiles (disabled): Unified workspace
           → toyoura-nagisa/workspace
 
     Args:
-        agent_profile: Agent profile type ("pfc", "coding", "general", etc.)
+        agent_profile: Agent profile type ("pfc_expert", "disabled", etc.)
         session_id: Optional session ID (reserved for future use, currently unused)
 
     Returns:

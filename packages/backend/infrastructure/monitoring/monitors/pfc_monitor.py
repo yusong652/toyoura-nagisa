@@ -26,7 +26,7 @@ class PfcMonitor(BaseMonitor):
     Task state is persisted in pfc-server.
     """
 
-    async def get_reminders(self, agent_profile: str = "general") -> List[str]:
+    async def get_reminders(self, agent_profile = "pfc_expert") -> List[str]:
         """
         Get reminders for PFC simulation tasks.
 

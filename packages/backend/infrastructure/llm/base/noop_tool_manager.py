@@ -12,15 +12,15 @@ from backend.infrastructure.llm.base.tool_manager import BaseToolManager
 class NoOpToolManager(BaseToolManager):
     """Tool manager that returns empty results for providers without tool support."""
 
-    async def get_standardized_tools(self, session_id: str, agent_profile: Optional[str] = 'general') -> Dict[str, Any]:
+    async def get_standardized_tools(self, session_id: str, agent_profile = 'pfc_expert') -> Dict[str, Any]:
         """Return empty tool dictionary."""
         return {}
 
-    async def get_function_call_schemas(self, session_id: str, agent_profile: str = "general") -> List[Any]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile = "pfc_expert") -> List[Any]:
         """Return empty schemas list."""
         return []
 
-    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: str = "general") -> Optional[List[Dict[str, Any]]]:
+    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile = "pfc_expert") -> Optional[List[Dict[str, Any]]]:
         """Return None for system prompt schemas."""
         return None
 

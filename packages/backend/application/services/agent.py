@@ -42,7 +42,7 @@ class Agent:
     Usage:
         # MainAgent (streaming, WebSocket, persistence)
         from backend.domain.models.agent_profiles import get_profile_config
-        config = get_profile_config("coding")
+        config = get_profile_config("pfc_expert")
         agent = Agent(config, llm_client, session_id="abc123")
         result = await agent.execute(instruction=user_message)
 

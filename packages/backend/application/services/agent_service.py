@@ -36,7 +36,7 @@ class AgentService:
         result = await service.process_chat(
             session_id=session_id,
             instruction=user_message,
-            agent_profile="coding"
+            agent_profile="pfc_expert"
         )
 
         # For SubAgent execution
@@ -60,7 +60,7 @@ class AgentService:
         self,
         session_id: str,
         instruction: UserMessage,
-        agent_profile: str = "general",
+        agent_profile: str = "pfc_expert",
         enable_memory: bool = True,
     ) -> AgentResult:
         """
@@ -72,7 +72,7 @@ class AgentService:
         Args:
             session_id: Session ID for the conversation
             instruction: UserMessage object containing user input
-            agent_profile: Agent profile for tool selection (default: "general")
+            agent_profile: Agent profile for tool selection (default: "pfc_expert")
             enable_memory: Whether to enable memory persistence (default: True)
 
         Returns:

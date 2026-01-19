@@ -55,13 +55,13 @@ class AnthropicToolManager(BaseToolManager):
             "input_schema": input_schema
         }
     
-    async def get_function_call_schemas(self, session_id: str, agent_profile: str = 'general') -> List[Dict[str, Any]]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile = 'pfc_expert') -> List[Dict[str, Any]]:
         """
         Get MCP tool schemas in Anthropic format with agent profile filtering
 
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+            agent_profile: Agent profile name ("pfc_expert", "disabled")
 
         Returns:
             List[Dict[str, Any]]: Tool schemas in Anthropic format
@@ -92,7 +92,7 @@ class AnthropicToolManager(BaseToolManager):
         
         return anthropic_tools
 
-    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: str = 'general') -> List[Dict[str, Any]]:
+    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile = 'pfc_expert') -> List[Dict[str, Any]]:
         """
         Get tool schemas in standardized dictionary format for system prompt embedding.
 
@@ -101,7 +101,7 @@ class AnthropicToolManager(BaseToolManager):
 
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+            agent_profile: Agent profile name ("pfc_expert", "disabled")
 
         Returns:
             List[Dict[str, Any]]: Tool schemas in standardized dictionary format for system prompt

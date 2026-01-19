@@ -85,13 +85,13 @@ class FileMentionProcessor:
     - Error handling (skip failed files)
     """
 
-    def __init__(self, session_id: str, agent_profile: str = "general"):
+    def __init__(self, session_id: str, agent_profile = "pfc_expert"):
         """
         Initialize processor for a session.
 
         Args:
             session_id: Session ID for workspace resolution
-            agent_profile: Agent profile for workspace determination (general, pfc, coding, etc.)
+            agent_profile: Agent profile for workspace determination (pfc_expert, disabled)
         """
         self.session_id = session_id
         self.agent_profile = agent_profile

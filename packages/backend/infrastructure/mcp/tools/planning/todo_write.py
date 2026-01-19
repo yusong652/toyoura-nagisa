@@ -255,7 +255,7 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
         from backend.shared.utils.app_context import get_llm_client
         llm_client = get_llm_client()
         context_manager = llm_client.get_or_create_context_manager(session_id)
-        agent_profile = getattr(context_manager, 'agent_profile', 'general')
+        agent_profile = 'pfc_expert'
 
         # Determine persistent flag based on agent_profile
         # SubAgents (pfc_explorer) use in-memory storage, MainAgents use local file storage

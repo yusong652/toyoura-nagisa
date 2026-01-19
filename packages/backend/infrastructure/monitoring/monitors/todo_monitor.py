@@ -100,7 +100,7 @@ class TodoMonitor(BaseMonitor):
 
         return False
 
-    async def get_reminders(self, agent_profile: str = "general") -> List[str]:
+    async def get_reminders(self, agent_profile = "pfc_expert") -> List[str]:
         """
         Get reminders for the full todo list.
 

@@ -17,28 +17,13 @@ from typing import Dict, List
 
 class AgentProfile(Enum):
     """Agent profile types."""
-    CODING = "coding"
-    PFC = "pfc"
+    PFC_EXPERT = "pfc_expert"
     DISABLED = "disabled"
 
 
 # =============================================================================
 # Tool Lists (flat definitions for easy maintenance)
 # =============================================================================
-
-CODING_TOOLS: List[str] = [
-    "write",
-    "read",
-    "edit",
-    "bash",
-    "bash_output",
-    "kill_shell",
-    "glob",
-    "grep",
-    "web_search",
-    "todo_write",
-]
-
 
 PFC_TOOLS: List[str] = [
     # File operations
@@ -192,21 +177,9 @@ class ProfileConfig:
 # =============================================================================
 
 PROFILE_CONFIGS: Dict[AgentProfile, ProfileConfig] = {
-    AgentProfile.CODING: ProfileConfig(
-        name="coding",
-        display_name="Coding Agent",
-        description="Code development, debugging, and file operations",
-        max_iterations=64,
-        streaming_enabled=True,
-        enable_memory=True,
-        tools=tuple(CODING_TOOLS),
-        color="#4CAF50",
-        icon="💻",
-    ),
-
-    AgentProfile.PFC: ProfileConfig(
-        name="pfc",
-        display_name="PFC Agent",
+    AgentProfile.PFC_EXPERT: ProfileConfig(
+        name="pfc_expert",
+        display_name="PFC Expert",
         description="ITASCA PFC simulation with script-based workflow",
         max_iterations=64,
         streaming_enabled=True,

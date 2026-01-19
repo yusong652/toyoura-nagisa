@@ -27,7 +27,7 @@ async def _get_workspace_root(agent_profile: str, session_id: Optional[str] = No
     New code should use backend.shared.utils.workspace.get_workspace_for_profile directly.
 
     Args:
-        agent_profile: Agent profile type ("pfc", "coding", "general", etc.)
+        agent_profile: Agent profile type ("pfc_expert", "disabled", etc.)
         session_id: Optional session ID (reserved for future use)
 
     Returns:
@@ -122,7 +122,7 @@ def _get_available_skills_xml(allowed_skills: List[str]) -> str:
 
 
 async def build_system_prompt(
-    agent_profile: str = "general",
+    agent_profile = "pfc_expert",
     session_id: Optional[str] = None,
     include_expression: bool = True,
 ) -> str:
@@ -141,7 +141,7 @@ async def build_system_prompt(
     in the system prompt. This follows 2025 Anthropic best practices.
 
     Args:
-        agent_profile: Agent profile type ("general", "pfc", "coding", "lifestyle", "disabled")
+        agent_profile: Agent profile type ("pfc_expert", "disabled")
                       For SubAgents, use the SubAgent name (e.g., "pfc_explorer")
         session_id: Session ID for workspace resolution
         include_expression: Whether to include expression/Live2D instructions (default True).

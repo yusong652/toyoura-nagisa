@@ -101,7 +101,7 @@ class ToolExecutor:
         self,
         tool_calls: List[Dict],
         message_id: str,
-        agent_profile: str = "general"
+        agent_profile = "pfc_expert"
     ) -> ToolExecutionResult:
         """
         Execute all tool calls with proper ordering and cascade blocking.

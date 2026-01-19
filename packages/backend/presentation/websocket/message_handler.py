@@ -503,7 +503,7 @@ class UserShellHandler(MessageHandler):
             return
 
         command = getattr(message, 'command', '')
-        agent_profile = getattr(message, 'agent_profile', 'general')
+        agent_profile = getattr(message, 'agent_profile', 'pfc_expert')
         timeout_ms = getattr(message, 'timeout_ms', None)
 
         logger.info(f"[UserShellHandler] Executing command for session {session_id}: {command[:50]}...")

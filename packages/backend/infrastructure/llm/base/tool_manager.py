@@ -130,7 +130,7 @@ class BaseToolManager(ABC):
             if llm_settings.debug:
                 print(f"[BaseToolManager] Cleared read file tracking for session {session_id}")
 
-    async def get_standardized_tools(self, session_id: str, agent_profile: str = 'general') -> Dict[str, ToolSchema]:
+    async def get_standardized_tools(self, session_id: str, agent_profile = 'pfc_expert') -> Dict[str, ToolSchema]:
         """
         Get standardized ToolSchema objects based on agent profile.
 
@@ -174,7 +174,7 @@ class BaseToolManager(ABC):
             return {}
 
     @abstractmethod
-    async def get_function_call_schemas(self, session_id: str, agent_profile: str = 'general') -> Any:
+    async def get_function_call_schemas(self, session_id: str, agent_profile = 'pfc_expert') -> Any:
         """
         Get tool schemas formatted for the specific LLM provider.
         Uses get_standardized_tools() internally, then converts to provider format.

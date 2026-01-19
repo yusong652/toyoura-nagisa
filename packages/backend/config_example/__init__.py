@@ -98,7 +98,7 @@ def get_tool_prompt() -> str:
     return prompt
 
 
-def get_system_prompt(agent_profile: str = "general") -> str:
+def get_system_prompt(agent_profile = "pfc_expert") -> str:
     """
     Get complete system prompt.
     
@@ -106,7 +106,7 @@ def get_system_prompt(agent_profile: str = "general") -> str:
     Use backend.shared.utils.prompt.get_system_prompt() for the actual implementation.
 
     Args:
-        agent_profile: Agent profile type ("general", "coding", "lifestyle", "disabled", etc.)
+        agent_profile: Agent profile type ("pfc_expert", "disabled")
     """
     base = get_base_prompt()
     expression = get_expression_prompt()

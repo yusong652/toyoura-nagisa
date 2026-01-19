@@ -248,7 +248,7 @@ class StatusMonitor:
 
     async def get_all_reminders(
         self,
-        agent_profile: str = "general",
+        agent_profile = "pfc_expert",
         check_queue: bool = False
     ) -> List[str]:
         """

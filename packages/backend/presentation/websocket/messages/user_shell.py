@@ -24,7 +24,7 @@ class UserShellExecuteMessage(BaseWebSocketMessage):
     """
     type: MessageType = MessageType.USER_SHELL_EXECUTE
     command: str
-    agent_profile: str = "general"
+    agent_profile: str = "pfc_expert"
     timeout_ms: Optional[int] = None
 
 

@@ -18,14 +18,14 @@ class GoogleToolManager(BaseToolManager):
     Gemini-specific schema formatting and tool execution.
     """
     
-    async def get_function_call_schemas(self, session_id: str, agent_profile: str = 'general') -> List[types.Tool]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile = 'pfc_expert') -> List[types.Tool]:
         """
         Get MCP tool schemas in Gemini format based on agent profile.
         Uses get_standardized_tools() from base class, then converts to Gemini format.
 
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+            agent_profile: Agent profile name ("pfc_expert", "disabled")
 
         Returns:
             List[types.Tool]: Tool schemas formatted for Gemini API
@@ -50,7 +50,7 @@ class GoogleToolManager(BaseToolManager):
         else:
             return []
 
-    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: str = 'general') -> List[dict]:
+    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile = 'pfc_expert') -> List[dict]:
         """
         Get tool schemas in standardized dictionary format for system prompt embedding.
 
@@ -59,7 +59,7 @@ class GoogleToolManager(BaseToolManager):
 
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+            agent_profile: Agent profile name ("pfc_expert", "disabled")
 
         Returns:
             List[dict]: Tool schemas in standardized dictionary format for system prompt

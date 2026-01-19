@@ -45,7 +45,7 @@ class CwdData(BaseModel):
 class SetCwdRequest(BaseModel):
     """Request body for setting current working directory."""
     session_id: str = Field(..., description="Session ID")
-    agent_profile: str = Field(default="general", description="Agent profile")
+    agent_profile: str = Field(default="pfc_expert", description="Agent profile")
     path: str = Field(..., description="New working directory path")
 
 
@@ -55,7 +55,7 @@ class SetCwdRequest(BaseModel):
 @router.get("/cwd", response_model=ApiResponse[CwdData])
 async def get_current_directory(
     session_id: str = Query(..., description="Session ID"),
-    agent_profile: str = Query(default="general", description="Agent profile")
+    agent_profile = "pfc_expert", description="Agent profile"
 ) -> ApiResponse[CwdData]:
     """Get the current working directory for a session."""
     try:
@@ -108,7 +108,7 @@ async def set_current_directory(request: SetCwdRequest) -> ApiResponse[CwdData]:
 @router.get("/cwd/{session_id}", response_model=ApiResponse[CwdData], deprecated=True)
 async def get_current_directory_legacy(
     session_id: str,
-    agent_profile: str = "general"
+    agent_profile = "pfc_expert"
 ) -> ApiResponse[CwdData]:
     """[DEPRECATED] Use GET /api/shell/cwd with query params instead."""
     return await get_current_directory(session_id, agent_profile)
@@ -118,7 +118,7 @@ async def get_current_directory_legacy(
 async def set_current_directory_legacy(
     session_id: str,
     path: str,
-    agent_profile: str = "general"
+    agent_profile = "pfc_expert"
 ) -> ApiResponse[CwdData]:
     """[DEPRECATED] Use PUT /api/shell/cwd instead."""
     request = SetCwdRequest(session_id=session_id, agent_profile=agent_profile, path=path)

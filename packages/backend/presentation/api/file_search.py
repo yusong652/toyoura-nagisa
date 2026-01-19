@@ -133,7 +133,7 @@ async def _search_files_in_workspace(
 async def search_files(
     query: str = Query(..., description="Search query for file names/paths"),
     session_id: Optional[str] = Query(default=None, description="Session ID"),
-    agent_profile: str = Query(default="general", description="Agent profile"),
+    agent_profile = "pfc_expert",
     limit: int = Query(default=50, ge=1, le=200, description="Maximum results")
 ) -> ApiResponse[FileSearchData]:
     """Search files in workspace with fuzzy matching.

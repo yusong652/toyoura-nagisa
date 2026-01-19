@@ -23,7 +23,7 @@ class MessageParseResult(_MessageParseResultRequired, total=False):
 def parse_message_data(data: dict) -> MessageParseResult:
     """Parse WebSocket message data in unified format"""
     session_id = data.get('session_id', "default_session")
-    agent_profile = data.get('agent_profile', "general")
+    agent_profile = data.get('agent_profile', 'pfc_expert')
     text = data.get('message', '')
     files = data.get('files', [])
     msg_id = data.get('message_id')

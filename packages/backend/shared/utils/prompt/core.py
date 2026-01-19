@@ -16,19 +16,19 @@ def _load_prompt_file(filename: str) -> str:
         return ""
 
 
-def get_base_prompt(profile: str = "general") -> str:
+def get_base_prompt(profile: str = "pfc_expert") -> str:
     """
     Load base system prompt based on agent profile.
 
     Args:
-        profile: Agent profile type (e.g., "general", "pfc", "coding", "lifestyle")
+        profile: Agent profile type (e.g., "pfc_expert", "disabled")
 
     Returns:
         Base system prompt string
 
     Priority:
         1. Environment variable NAGISA_BASE_PROMPT (overrides all)
-        2. Profile-specific prompt file (e.g., pfc -> pfc_expert_prompt.md)
+        2. Profile-specific prompt file (e.g., pfc_expert -> pfc_expert_prompt.md)
         3. Default base_prompt.md
     """
     base_prompt_from_env = os.getenv("NAGISA_BASE_PROMPT")
@@ -37,10 +37,10 @@ def get_base_prompt(profile: str = "general") -> str:
 
     # Profile-specific prompt mapping
     profile_prompts = {
-        "pfc": "pfc_expert_prompt.md",  # Maps to AgentProfile.PFC = "pfc"
+        "pfc_expert": "pfc_expert_prompt.md",  # Maps to AgentProfile.PFC_EXPERT
         "pfc_explorer": "pfc_explorer.md",  # PFC documentation SubAgent
         "pfc_diagnostic": "pfc_diagnostic.md",  # PFC multimodal diagnostic SubAgent
-        "general": "base_prompt.md",
+        "disabled": "base_prompt.md",  # Chat-only mode
     }
 
     # Get profile-specific prompt file, fallback to base_prompt.md
@@ -48,7 +48,7 @@ def get_base_prompt(profile: str = "general") -> str:
     prompt = _load_prompt_file(prompt_file)
 
     # If profile-specific file doesn't exist, fallback to base
-    if not prompt and profile != "general":
+    if not prompt and profile != "disabled":
         prompt = _load_prompt_file("base_prompt.md")
 
     return prompt

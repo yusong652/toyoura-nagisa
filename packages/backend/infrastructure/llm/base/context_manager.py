@@ -51,7 +51,7 @@ class BaseContextManager(ABC):
         self.session_id = session_id
 
         # Request configuration storage
-        self.agent_profile = "general"
+        self.agent_profile = "pfc_expert"
         self.enable_memory = True
 
         # Tool call tracking
