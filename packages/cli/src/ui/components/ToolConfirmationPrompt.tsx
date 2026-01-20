@@ -25,9 +25,10 @@ import type {
   ExecToolConfirmationData,
   InfoToolConfirmationData,
 } from '../types.js';
-import { theme } from '../colors.js';
+import { theme, colors } from '../colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { DiffRenderer, getDiffStats } from './DiffRenderer.js';
+import { PanelSection } from './shared/PanelSection.js';
 
 // Confirmation outcome types matching backend
 export type ConfirmationOutcome = 'approve' | 'reject' | 'reject_and_tell';
@@ -270,15 +271,11 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
       const execData = data as ExecToolConfirmationData;
       question = `Allow execution of: '${execData.rootCommand}'?`;
       bodyContent = (
-        <Box
-          borderStyle="round"
-          borderColor={theme.border.default}
-          paddingX={1}
-        >
+        <PanelSection paddingX={1} backgroundColor={colors.bg}>
           <Text color={theme.text.link} wrap="wrap">
             {execData.command}
           </Text>
-        </Box>
+        </PanelSection>
       );
     } else if (confirmationType === 'info') {
       const infoData = data as InfoToolConfirmationData;
@@ -337,24 +334,23 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
   // Calculate maximum height for the entire component
   // This ensures the component never exceeds terminal height
   const maxComponentHeight = Math.max(UI_CHROME_HEIGHT, terminalHeight - 2);
+  const activeBackground = colors.primary;
+  const activeTextColor = colors.bg;
+  const resolveTextColor = (isActive: boolean, fallback: string) =>
+    isActive ? activeTextColor : fallback;
+  const resolveBackgroundColor = (isActive: boolean) =>
+    isActive ? activeBackground : undefined;
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={theme.border.focused}
+    <PanelSection
+      title="Tool Confirmation Required"
+      titlePrefix="?"
+      tone="accent"
       paddingX={1}
       maxHeight={maxComponentHeight}
       overflow="hidden"
+      contentGap={1}
     >
-      {/* Header - fixed height, never shrinks */}
-      <Box marginBottom={1} flexShrink={0}>
-        <Text color={theme.text.accent}>? </Text>
-        <Text bold color={theme.text.primary}>
-          Tool Confirmation Required
-        </Text>
-      </Box>
-
       {/* Body Content (Diff or Command) - can shrink if needed */}
       <Box flexGrow={1} flexShrink={1} marginBottom={1} overflow="hidden">
         {bodyContent}
@@ -368,52 +364,58 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
       {/* Custom options with inline input for option 3 */}
       <Box flexShrink={0} flexDirection="column">
         {/* Option 1: Yes, allow */}
-        <Box>
-          <Text color={activeIndex === 0 ? theme.status.success : theme.text.primary}>
+        <Box backgroundColor={resolveBackgroundColor(activeIndex === 0)}>
+          <Text color={resolveTextColor(activeIndex === 0, theme.text.primary)}>
             {activeIndex === 0 ? '● ' : '  '}
           </Text>
-          <Text color={activeIndex === 0 ? theme.status.success : theme.text.muted}>
+          <Text color={resolveTextColor(activeIndex === 0, theme.text.muted)}>
             1.{' '}
           </Text>
-          <Text color={activeIndex === 0 ? theme.status.success : theme.text.primary}>
+          <Text color={resolveTextColor(activeIndex === 0, theme.text.primary)}>
             Yes, allow
           </Text>
         </Box>
 
         {/* Option 2: No, reject */}
-        <Box>
-          <Text color={activeIndex === 1 ? theme.status.success : theme.text.primary}>
+        <Box backgroundColor={resolveBackgroundColor(activeIndex === 1)}>
+          <Text color={resolveTextColor(activeIndex === 1, theme.text.primary)}>
             {activeIndex === 1 ? '● ' : '  '}
           </Text>
-          <Text color={activeIndex === 1 ? theme.status.success : theme.text.muted}>
+          <Text color={resolveTextColor(activeIndex === 1, theme.text.muted)}>
             2.{' '}
           </Text>
-          <Text color={activeIndex === 1 ? theme.status.success : theme.text.primary}>
+          <Text color={resolveTextColor(activeIndex === 1, theme.text.primary)}>
             No, reject (Esc)
           </Text>
         </Box>
 
         {/* Option 3: Reject and tell (with inline input) */}
-        <Box>
-          <Text color={activeIndex === 2 ? theme.status.success : theme.text.primary}>
+        <Box backgroundColor={resolveBackgroundColor(activeIndex === 2)}>
+          <Text color={resolveTextColor(activeIndex === 2, theme.text.primary)}>
             {activeIndex === 2 ? '● ' : '  '}
           </Text>
-          <Text color={activeIndex === 2 ? theme.status.success : theme.text.muted}>
+          <Text color={resolveTextColor(activeIndex === 2, theme.text.muted)}>
             3.{' '}
           </Text>
-          <Text color={activeIndex === 2 ? theme.status.success : theme.text.primary}>
+          <Text color={resolveTextColor(activeIndex === 2, theme.text.primary)}>
             Reject:{' '}
           </Text>
           {/* Inline input area */}
           {activeIndex === 2 ? (
             <Text>
-              <Text color={theme.text.primary}>{inputValue.slice(0, cursorPosition)}</Text>
+              <Text color={resolveTextColor(true, theme.text.primary)}>
+                {inputValue.slice(0, cursorPosition)}
+              </Text>
               <Text inverse={cursorVisible}>{cursorPosition < inputValue.length ? inputValue[cursorPosition] : ' '}</Text>
-              <Text color={theme.text.primary}>{inputValue.slice(cursorPosition + 1)}</Text>
-              {!inputValue && <Text color={theme.text.muted}>type instruction...</Text>}
+              <Text color={resolveTextColor(true, theme.text.primary)}>
+                {inputValue.slice(cursorPosition + 1)}
+              </Text>
+              {!inputValue && (
+                <Text color={resolveTextColor(true, theme.text.muted)}>type instruction...</Text>
+              )}
             </Text>
           ) : (
-            <Text color={theme.text.muted}>
+            <Text color={resolveTextColor(false, theme.text.muted)}>
               {inputValue || 'type instruction...'}
             </Text>
           )}
@@ -428,6 +430,6 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
             : '(↑↓ select, Enter confirm, Esc reject)'}
         </Text>
       </Box>
-    </Box>
+    </PanelSection>
   );
 };

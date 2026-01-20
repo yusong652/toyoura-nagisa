@@ -8,7 +8,8 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { theme } from '../colors.js';
+import { theme, colors } from '../colors.js';
+import { PanelSection } from './shared/PanelSection.js';
 
 // Maximum suggestions to show at once
 export const MAX_SUGGESTIONS_TO_SHOW = 8;
@@ -37,9 +38,11 @@ export const SlashCommandSuggestions: React.FC<SuggestionsDisplayProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <Box paddingX={1}>
+      <PanelSection
+        paddingX={1}
+      >
         <Text color={theme.text.muted}>Loading suggestions...</Text>
-      </Box>
+      </PanelSection>
     );
   }
 
@@ -62,7 +65,10 @@ export const SlashCommandSuggestions: React.FC<SuggestionsDisplayProps> = ({
   );
 
   return (
-    <Box flexDirection="column" paddingX={1}>
+    <PanelSection
+      paddingX={1}
+      contentGap={0}
+    >
       {/* Up scroll indicator */}
       {scrollOffset > 0 && <Text color={theme.text.primary}>▲</Text>}
 
@@ -70,13 +76,20 @@ export const SlashCommandSuggestions: React.FC<SuggestionsDisplayProps> = ({
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
-        const textColor = isActive ? theme.text.accent : theme.text.secondary;
+        const showCount = index === 0;
+        const rowBackgroundColor = isActive ? colors.primary : undefined;
+        const rowTextColor = isActive ? colors.bg : theme.text.secondary;
+        const countColor = isActive ? rowTextColor : theme.text.muted;
 
         return (
-          <Box key={`${suggestion.value}-${originalIndex}`} flexDirection="row">
+          <Box
+            key={`${suggestion.value}-${originalIndex}`}
+            flexDirection="row"
+            backgroundColor={rowBackgroundColor}
+          >
             {/* Command name with slash */}
             <Box width={maxLabelWidth + 2} flexShrink={0}>
-              <Text color={textColor} bold={isActive}>
+              <Text color={rowTextColor} bold={isActive}>
                 /{suggestion.label}
               </Text>
             </Box>
@@ -84,8 +97,16 @@ export const SlashCommandSuggestions: React.FC<SuggestionsDisplayProps> = ({
             {/* Description */}
             {suggestion.description && (
               <Box flexGrow={1} paddingLeft={2}>
-                <Text color={textColor} wrap="truncate">
+                <Text color={rowTextColor} wrap="truncate">
                   {suggestion.description}
+                </Text>
+              </Box>
+            )}
+            {!suggestion.description && <Box flexGrow={1} />}
+            {showCount && (
+              <Box flexShrink={0}>
+                <Text color={countColor}>
+                  ({activeIndex + 1}/{suggestions.length})
                 </Text>
               </Box>
             )}
@@ -95,11 +116,6 @@ export const SlashCommandSuggestions: React.FC<SuggestionsDisplayProps> = ({
 
       {/* Down scroll indicator */}
       {endIndex < suggestions.length && <Text color={theme.text.muted}>▼</Text>}
-
-      {/* Page indicator - always show total count */}
-      <Text color={theme.text.muted}>
-        ({activeIndex + 1}/{suggestions.length})
-      </Text>
-    </Box>
+    </PanelSection>
   );
 };

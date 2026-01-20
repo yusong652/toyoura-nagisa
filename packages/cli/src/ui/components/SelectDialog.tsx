@@ -11,6 +11,7 @@ import { Box, Text } from 'ink';
 import { RadioButtonSelect, type RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { theme } from '../colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { PanelSection } from './shared/PanelSection.js';
 
 export interface SelectOption<T> extends RadioSelectItem<T> {
   description?: string;
@@ -83,46 +84,38 @@ export function SelectDialog<T>({
     { isActive: true }
   );
 
-  const effectiveBorderColor = borderColor || theme.border.focused;
+  const effectiveTitleColor = borderColor || theme.text.primary;
+  const titleTone = borderColor === theme.status.error ? 'error' : 'accent';
 
   // Loading state
   if (isLoading) {
     return (
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor={effectiveBorderColor}
+      <PanelSection
+        title={title}
+        titlePrefix="?"
+        tone={titleTone}
         paddingX={1}
-        paddingY={0}
+        titleColor={effectiveTitleColor}
       >
-        <Box marginBottom={1}>
-          <Text color={theme.text.accent}>? </Text>
-          <Text bold color={theme.text.primary}>{title}</Text>
-        </Box>
         <Text color={theme.text.muted}>{loadingMessage}</Text>
-      </Box>
+      </PanelSection>
     );
   }
 
   // Empty state
   if (options.length === 0) {
     return (
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor={effectiveBorderColor}
+      <PanelSection
+        title={title}
+        titlePrefix="?"
+        tone={titleTone}
         paddingX={1}
-        paddingY={0}
+        titleColor={effectiveTitleColor}
+        contentGap={1}
       >
-        <Box marginBottom={1}>
-          <Text color={theme.text.accent}>? </Text>
-          <Text bold color={theme.text.primary}>{title}</Text>
-        </Box>
         <Text color={theme.text.muted}>{emptyMessage}</Text>
-        <Box marginTop={1}>
-          <Text color={theme.text.muted}>(Press Esc to go back)</Text>
-        </Box>
-      </Box>
+        <Text color={theme.text.muted}>(Press Esc to go back)</Text>
+      </PanelSection>
     );
   }
 
@@ -130,26 +123,16 @@ export function SelectDialog<T>({
   const hasDescriptions = showDescriptions && options.some((o) => o.description);
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={effectiveBorderColor}
+    <PanelSection
+      title={title}
+      titlePrefix="?"
+      tone={titleTone}
       paddingX={1}
-      paddingY={0}
+      titleColor={effectiveTitleColor}
+      description={description}
+      descriptionColor={theme.text.secondary}
+      contentGap={1}
     >
-      {/* Title */}
-      <Box marginBottom={1}>
-        <Text color={theme.text.accent}>? </Text>
-        <Text bold color={theme.text.primary}>
-          {title}
-        </Text>
-      </Box>
-
-      {/* Description */}
-      <Box marginBottom={1}>
-        <Text color={theme.text.secondary}>{description}</Text>
-      </Box>
-
       {/* Options list */}
       <RadioButtonSelect
         items={options as SelectOption<T>[]}
@@ -180,6 +163,6 @@ export function SelectDialog<T>({
           (Use arrows to navigate, Enter to select, Esc to cancel)
         </Text>
       </Box>
-    </Box>
+    </PanelSection>
   );
 }

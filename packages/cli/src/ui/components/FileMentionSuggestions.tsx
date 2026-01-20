@@ -7,8 +7,9 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { theme } from '../colors.js';
+import { theme, colors } from '../colors.js';
 import type { FileMentionSuggestion } from '../hooks/useFileMentionDetection.js';
+import { PanelSection } from './shared/PanelSection.js';
 
 // Maximum suggestions to show at once (must match hook constant)
 const MAX_SUGGESTIONS_TO_SHOW = 8;
@@ -33,21 +34,20 @@ export const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
   const showNoResults = suggestions.length === 0 && !isLoading;
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={theme.border.default}
+    <PanelSection
+      title="files"
+      titlePrefix="$"
+      tone="muted"
+      titleColor={theme.text.secondary}
+      headerRight={
+        !isLoading && suggestions.length > 0
+          ? `(${selectedIndex + 1}/${suggestions.length})`
+          : undefined
+      }
       paddingX={1}
+      contentGap={1}
     >
-      {/* Header */}
-      <Box>
-        <Text color={theme.text.muted}>$ </Text>
-        <Text color={theme.text.secondary}>files</Text>
-        {!isLoading && suggestions.length > 0 && (
-          <Text color={theme.text.muted}> ({selectedIndex + 1}/{suggestions.length})</Text>
-        )}
-      </Box>
-
+      
       {/* Up scroll indicator */}
       {scrollOffset > 0 && <Text color={theme.text.primary}>▲</Text>}
 
@@ -64,16 +64,19 @@ export const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
         visibleSuggestions.map((suggestion, index) => {
           const originalIndex = startIndex + index;
           const isSelected = originalIndex === selectedIndex;
+          const rowBackgroundColor = isSelected ? colors.primary : undefined;
+          const rowTextColor = isSelected ? colors.bg : theme.text.secondary;
+          const prefixColor = isSelected ? colors.bg : theme.text.accent;
 
           return (
-            <Box key={suggestion.file.path}>
+            <Box key={suggestion.file.path} backgroundColor={rowBackgroundColor}>
               <Text
-                color={isSelected ? theme.text.accent : theme.text.muted}
+                color={isSelected ? prefixColor : theme.text.muted}
                 bold={isSelected}
               >
                 {isSelected ? '> ' : '  '}
               </Text>
-              <Text color={isSelected ? theme.text.primary : theme.text.secondary}>
+              <Text color={rowTextColor}>
                 {suggestion.file.path}
               </Text>
             </Box>
@@ -90,6 +93,6 @@ export const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
           {'\u2191\u2193'} navigate | {'\u23CE'} select | esc cancel
         </Text>
       </Box>
-    </Box>
+    </PanelSection>
   );
 };

@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text, type TextProps } from 'ink';
 import { useSelectionList, type SelectionListItem } from '../../hooks/useSelectionList.js';
-import { theme } from '../../colors.js';
+import { theme, colors } from '../../colors.js';
 
 // Color type for Text component
 type TextColor = TextProps['color'];
@@ -80,6 +80,8 @@ export function RadioButtonSelect<T>({
 
   const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
   const numberColumnWidth = String(items.length).length;
+  const selectedBackground = colors.primary;
+  const selectedTextColor: TextColor = colors.bg;
 
   return (
     <Box flexDirection="column">
@@ -93,20 +95,21 @@ export function RadioButtonSelect<T>({
       {visibleItems.map((item, index) => {
         const itemIndex = scrollOffset + index;
         const isSelected = activeIndex === itemIndex;
+        const rowBackgroundColor = isSelected ? selectedBackground : undefined;
 
         // Determine colors based on selection and disabled state
         let titleColor: TextColor = theme.text.primary;
         let numberColor: TextColor = theme.text.primary;
 
         if (isSelected) {
-          titleColor = theme.status.success;
-          numberColor = theme.status.success;
+          titleColor = selectedTextColor;
+          numberColor = selectedTextColor;
         } else if (item.disabled) {
           titleColor = theme.text.muted;
           numberColor = theme.text.muted;
         }
 
-        if (!isFocused && !item.disabled) {
+        if (!isFocused && !item.disabled && !isSelected) {
           numberColor = theme.text.muted;
         }
 
@@ -117,10 +120,10 @@ export function RadioButtonSelect<T>({
         const itemNumberText = `${String(itemIndex + 1).padStart(numberColumnWidth)}.`;
 
         return (
-          <Box key={item.key} alignItems="flex-start">
+          <Box key={item.key} alignItems="flex-start" backgroundColor={rowBackgroundColor}>
             {/* Radio button indicator */}
             <Box minWidth={2} flexShrink={0}>
-              <Text color={isSelected ? theme.status.success : theme.text.primary}>
+              <Text color={isSelected ? selectedTextColor : theme.text.primary}>
                 {isSelected ? '●' : ' '}
               </Text>
             </Box>

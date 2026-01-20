@@ -33,6 +33,7 @@ import { useSlashCompletion } from '../hooks/useSlashCompletion.js';
 import { useFileMentionDetection } from '../hooks/useFileMentionDetection.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { theme } from '../colors.js';
+import { PanelSection } from './shared/PanelSection.js';
 import { SlashCommandSuggestions } from './SlashCommandSuggestions.js';
 import { FileMentionSuggestions } from './FileMentionSuggestions.js';
 import type { SlashCommand, CommandContext } from '../commands/types.js';
@@ -502,24 +503,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     );
   };
 
-  // Determine border color based on state
-  const borderColor = disabled
-    ? theme.border.default
-    : isInShellMode
-      ? theme.status.warning
-      : isInPfcConsoleMode
-        ? theme.status.info
-        : theme.border.focused;
-
   return (
     <Box flexDirection="column">
       {/* Input box */}
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor={borderColor}
-        paddingX={1}
-      >
+      <PanelSection paddingX={1}>
         {disabled ? (
           <Box flexDirection="row">
             <Box width={prefixWidth} flexShrink={0}>
@@ -532,7 +519,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             renderVisualLine(visualLine, index, index === visualCursorRow)
           )
         )}
-      </Box>
+      </PanelSection>
 
       {/* File mention suggestions popup (below input) */}
       {fileMention.isMentionActive && (
