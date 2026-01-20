@@ -496,13 +496,16 @@ class ThemeManager {
 
   setTheme(name: ThemeName, persist = true): void {
     if (themes[name]) {
+      const isSameTheme = name === this.currentThemeName;
       this.currentThemeName = name;
 
-      // Clear terminal screen and scrollback buffer (Static renders to main buffer with old colors)
-      // \x1B[2J = clear visible screen, \x1B[3J = clear scrollback buffer, \x1B[H = move cursor home
-      process.stdout.write('\x1B[2J\x1B[3J\x1B[H');
+      if (!isSameTheme) {
+        // Clear terminal screen and scrollback buffer (Static renders to main buffer with old colors)
+        // \x1B[2J = clear visible screen, \x1B[3J = clear scrollback buffer, \x1B[H = move cursor home
+        process.stdout.write('\x1B[2J\x1B[3J\x1B[H');
 
-      this.notifyListeners();
+        this.notifyListeners();
+      }
 
       // Persist to config file
       if (persist) {

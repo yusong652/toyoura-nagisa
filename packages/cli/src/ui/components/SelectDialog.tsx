@@ -28,6 +28,8 @@ interface SelectDialogProps<T> {
   currentValue?: T;
   /** Callback when an option is selected */
   onSelect: (value: T) => void;
+  /** Callback when an option is highlighted */
+  onHighlight?: (value: T) => void;
   /** Callback when dialog is cancelled */
   onCancel: () => void;
   /** Whether to show option numbers */
@@ -52,6 +54,7 @@ export function SelectDialog<T>({
   options,
   currentValue,
   onSelect,
+  onHighlight,
   onCancel,
   showNumbers = false,
   isLoading = false,
@@ -138,6 +141,7 @@ export function SelectDialog<T>({
         items={options as SelectOption<T>[]}
         initialIndex={initialIndex >= 0 ? initialIndex : 0}
         onSelect={handleSelect}
+        onHighlight={onHighlight}
         showNumbers={showNumbers}
         maxItemsToShow={maxItemsToShow ?? options.length}
       />

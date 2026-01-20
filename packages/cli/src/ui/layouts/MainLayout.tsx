@@ -37,6 +37,7 @@ import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
 import { useShellCommand } from '../hooks/useShellCommand.js';
 import { usePfcConsoleCommand } from '../hooks/usePfcConsoleCommand.js';
+import { useTheme } from '../hooks/useTheme.js';
 import { useTextBuffer } from '../utils/text-buffer.js';
 import { MessageType, type AgentProfileType } from '../types.js';
 import { colors, theme, themeManager } from '../colors.js';
@@ -100,6 +101,7 @@ export const MainLayout: React.FC = () => {
   const appState = useAppState();
   const appActions = useAppActions();
   const { columns: terminalWidth } = useTerminalSize();
+  const { themeName } = useTheme();
 
   // Track previous width to detect actual changes
   const previousWidthRef = useRef(terminalWidth);
@@ -110,6 +112,7 @@ export const MainLayout: React.FC = () => {
 
   // Active dialog state
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
+  const [themePreviewBase, setThemePreviewBase] = useState<ThemeName | null>(null);
 
   // Calculate input width (terminal width minus border and padding)
   // Border: 2 (left + right), Padding: 2 (left + right), Prefix: 2 ("> ")
@@ -149,6 +152,14 @@ export const MainLayout: React.FC = () => {
 
   // PFC console mode state (for UI indicator)
   const [isPfcConsoleMode, setIsPfcConsoleMode] = useState(false);
+
+  useEffect(() => {
+    if (activeDialog === 'theme') {
+      setThemePreviewBase(themeManager.getCurrentThemeName());
+      return;
+    }
+    setThemePreviewBase(null);
+  }, [activeDialog]);
 
   // PFC tasks state
   const [pfcTasks, setPfcTasks] = useState<Array<{
@@ -233,6 +244,11 @@ export const MainLayout: React.FC = () => {
     };
   }, [terminalWidth]);
 
+  // Refresh Static output when theme changes
+  useEffect(() => {
+    setRenderKey((prev) => prev + 1);
+  }, [themeName]);
+
   // Update text buffer viewport width when terminal size changes
   useEffect(() => {
     buffer.setViewportWidth(inputWidth);
@@ -257,24 +273,28 @@ export const MainLayout: React.FC = () => {
       message: `Memory ${enabled ? 'enabled' : 'disabled'}`,
     });
     setActiveDialog(null);
-  }, [appActions]);
+  }, []);
 
   // Handle theme selection from dialog
   const handleThemeSelect = useCallback((themeName: ThemeName) => {
     themeManager.setTheme(themeName);
-    const selectedTheme = themes[themeName];
-    appActions.addHistoryItem({
-      type: MessageType.INFO,
-      message: `Switched to ${selectedTheme.displayName} theme`,
-    });
+    setThemePreviewBase(null);
     setActiveDialog(null);
     // In alternate buffer mode, Ink handles re-rendering automatically
   }, [appActions]);
 
+  const handleThemeHighlight = useCallback((themeName: ThemeName) => {
+    themeManager.setTheme(themeName, false);
+  }, []);
+
   // Handle dialog cancel
   const handleDialogCancel = useCallback(() => {
+    if (activeDialog === 'theme' && themePreviewBase) {
+      themeManager.setTheme(themePreviewBase);
+    }
+    setThemePreviewBase(null);
     setActiveDialog(null);
-  }, []);
+  }, [activeDialog, themePreviewBase]);
 
   // Handle session action selection (create/restore/delete)
   const handleSessionActionSelect = useCallback(async (action: SessionAction) => {
@@ -317,11 +337,6 @@ export const MainLayout: React.FC = () => {
 
     try {
       await appActions.switchSession(sessionId);
-      const session = sessionManager.sessions.find(s => s.id === sessionId);
-      appActions.addHistoryItem({
-        type: MessageType.INFO,
-        message: `Restored session: ${session?.name || sessionId}`,
-      });
     } catch (e) {
       appActions.addHistoryItem({
         type: MessageType.ERROR,
@@ -782,6 +797,7 @@ export const MainLayout: React.FC = () => {
             options={THEME_OPTIONS}
             currentValue={themeManager.getCurrentThemeName()}
             onSelect={handleThemeSelect}
+            onHighlight={handleThemeHighlight}
             onCancel={handleDialogCancel}
             showNumbers={true}
           />

@@ -20,18 +20,13 @@ export const themeCommand: SlashCommand = {
   description: 'Switch color theme',
   kind: CommandKind.BUILT_IN,
 
-  action: (_context, args): SlashCommandActionReturn => {
+  action: (_context, args): SlashCommandActionReturn | void => {
     const themeName = args.trim().toLowerCase();
 
     // If a theme name is provided, switch directly
     if (themeName && themeNames.includes(themeName as ThemeName)) {
       themeManager.setTheme(themeName as ThemeName);
-      const theme = themes[themeName as ThemeName];
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `Switched to ${theme.displayName} theme`,
-      };
+      return;
     }
 
     // If invalid theme name provided, show error

@@ -17,14 +17,10 @@ import { GradientText } from './components/GradientText.js';
 import { selectLogo, normalizeLineWidths, minimalLogo } from './components/AsciiArt.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
-import { useTheme } from './hooks/useTheme.js';
 
 export const App = () => {
   const appState = useAppState();
   const { columns: terminalWidth } = useTerminalSize();
-
-  // Subscribe to theme changes - triggers re-render when theme changes
-  const { themeName } = useTheme();
 
   // Enable bracketed paste mode for multiline content support
   useBracketedPaste();
@@ -54,7 +50,7 @@ export const App = () => {
 
   return (
     <StreamingContext.Provider value={appState.streamingState.state}>
-      <MainLayout key={themeName} />
+      <MainLayout />
     </StreamingContext.Provider>
   );
 };
