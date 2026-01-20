@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Agent when working with code in this repository.
 
 ## Project Overview
 
@@ -69,7 +69,7 @@ MainAgent can delegate specialized tasks to lightweight SubAgents via the `invok
 - **Read-Only**: SubAgents cannot execute simulations or modify files (no `pfc_execute_task`, `write`, `edit`)
 
 **Storage Mode** (determined by `agent_profile`):
-- MainAgent (`general`, `coding`, `pfc_expert`): `persistent=True` → local file (`workspace/todos.json`)
+- MainAgent (`pfc_expert`): `persistent=True` → local file (`workspace/todos.json`)
 - SubAgent (`pfc_explorer`, `pfc_diagnostic`): `persistent=False` → in-memory storage
 
 **Implementation**:
@@ -384,6 +384,13 @@ uv run python examples/pfc_integration/DEMo.py
 - **Startup**: Must be started in PFC GUI before using PFC tools
 - **Long tasks**: Return task_id immediately for non-blocking operation
 - **Troubleshooting**: Check `services/pfc-server/README.md`
+
+## Code Modification Guidelines
+
+When using batch commands (sed, find, etc.):
+- Consider the context: Will regex affect type annotations, decorators, or critical syntax?
+- Verify results: Check `git diff` samples and run imports/type checks on modified files
+- For Pydantic models and base classes: prefer manual Edit to preserve structure
 
 ## Related Guides
 
