@@ -32,6 +32,7 @@ from .monitors import (
     PfcMonitor,
     TodoMonitor,
     IterationMonitor,
+    SessionModeMonitor,
 )
 from .monitors.iteration_monitor import get_iteration_limit_tool_message
 
@@ -77,6 +78,7 @@ class StatusMonitor:
         self.pfc_monitor = PfcMonitor(session_id)
         self.todo_monitor = TodoMonitor(session_id)
         self.iteration_monitor = IterationMonitor(session_id)
+        self.session_mode_monitor = SessionModeMonitor(session_id)
 
     # -------------------------------------------------------------------------
     # Iteration Monitor Delegation
@@ -272,6 +274,10 @@ class StatusMonitor:
         # Iteration warning (should be first for maximum visibility)
         iteration_reminders = await self.iteration_monitor.get_reminders()
         reminders.extend(iteration_reminders)
+
+        # Session mode reminder (plan/build)
+        mode_reminders = await self.session_mode_monitor.get_reminders()
+        reminders.extend(mode_reminders)
 
         # Interrupt status
         interrupt_reminders = await self.interrupt_monitor.get_reminders()

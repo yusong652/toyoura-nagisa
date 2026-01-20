@@ -6,7 +6,7 @@
  */
 
 import { apiClient } from './HttpClient'
-import type { ChatSession } from '../types'
+import type { ChatSession, SessionMode } from '../types'
 
 export interface CreateSessionRequest {
   name?: string
@@ -22,6 +22,7 @@ export interface SwitchSessionRequest {
 }
 
 export interface SessionHistoryResponse {
+  session: ChatSession;
   history: Array<{
     id?: string
     role: string
@@ -32,6 +33,7 @@ export interface SessionHistoryResponse {
     image_path?: string
     video_path?: string
   }>
+  message_count: number
 }
 
 export interface GenerateTitleRequest {
@@ -48,6 +50,15 @@ export interface TokenUsageResponse {
   completion_tokens?: number
   total_tokens?: number
   tokens_left?: number
+}
+
+export interface UpdateSessionModeRequest {
+  mode: SessionMode
+}
+
+export interface UpdateSessionModeResponse {
+  session_id: string
+  mode: SessionMode
 }
 
 export class SessionService {
@@ -90,6 +101,14 @@ export class SessionService {
    */
   async getSessionHistory(sessionId: string): Promise<SessionHistoryResponse> {
     return await apiClient.get<SessionHistoryResponse>(`/api/history/${sessionId}`)
+  }
+
+  /**
+   * Update session mode (plan/build).
+   */
+  async updateSessionMode(sessionId: string, mode: SessionMode): Promise<UpdateSessionModeResponse> {
+    const request: UpdateSessionModeRequest = { mode }
+    return await apiClient.post<UpdateSessionModeResponse>(`/api/history/${sessionId}/mode`, request)
   }
 
   /**

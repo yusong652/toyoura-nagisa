@@ -8,7 +8,10 @@ export interface ChatSession {
   name: string;
   created_at: string;
   updated_at: string;
+  mode?: SessionMode;
 }
+
+export type SessionMode = 'build' | 'plan';
 
 /**
  * Token usage statistics from LLM API.

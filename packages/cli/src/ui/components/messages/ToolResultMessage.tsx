@@ -22,6 +22,7 @@ const MAX_RESULT_LINES = 3;
 // No limit when in full context mode
 const MAX_RESULT_LINES_FULL = Infinity;
 const STATUS_INDICATOR_WIDTH = 2;  // Match "● " prefix width
+const RESULT_INDENT = STATUS_INDICATOR_WIDTH + 1;
 // Maximum height for diff display
 const MAX_DIFF_HEIGHT = 15;
 const MAX_DIFF_HEIGHT_FULL = Infinity;
@@ -83,7 +84,7 @@ const DiffToolResultDisplay: React.FC<{
   return (
     <Box flexDirection="column" marginBottom={1}>
       {/* Tool header line - no status indicator */}
-      <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
+      <Box paddingLeft={RESULT_INDENT}>
         {isCompactHeader ? (
           <>
             <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
@@ -106,7 +107,7 @@ const DiffToolResultDisplay: React.FC<{
 
       {/* Diff content */}
       {diff.content && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH + 2} flexDirection="column">
+        <Box paddingLeft={RESULT_INDENT + 2} flexDirection="column">
           <DiffRenderer
             diffContent={diff.content}
             filename={fileName}
@@ -144,6 +145,7 @@ const DefaultToolResultDisplay: React.FC<{
   // Use plain text for file system tools to preserve path accuracy
   const usePlainText = isError || PLAIN_TEXT_TOOLS.has(item.toolName?.toLowerCase() || '');
   const isBashTool = BASH_TOOLS.has(item.toolName?.toLowerCase() || '');
+  const showBashPrefix = isBashTool && !isError;
 
   return (
     <Box
@@ -153,11 +155,13 @@ const DefaultToolResultDisplay: React.FC<{
       marginBottom={1}
     >
       {/* Content - plain text for errors and file tools, markdown for others */}
-      <Box paddingLeft={STATUS_INDICATOR_WIDTH} flexDirection="column">
+      <Box paddingLeft={RESULT_INDENT} flexDirection="column">
         {isBashTool ? (
           (text.length ? text.split('\n') : ['']).map((line, index) => (
             <Box key={index} flexDirection="row">
-              <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
+              {showBashPrefix && (
+                <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
+              )}
               <Text color={textColor ?? theme.text.secondary} wrap="truncate-end">
                 {text.length === 0 ? '(no output)' : line}
               </Text>
@@ -170,7 +174,7 @@ const DefaultToolResultDisplay: React.FC<{
         )}
       </Box>
       {truncated && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
+        <Box paddingLeft={RESULT_INDENT}>
           <Text color={theme.text.muted}>
             ... +{hiddenLines} lines (ctrl+o to expand)
           </Text>

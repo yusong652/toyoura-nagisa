@@ -23,6 +23,7 @@ from .pfc_monitor import PfcMonitor
 from .interrupt_monitor import InterruptMonitor
 from .queue_monitor import QueueMonitor
 from .iteration_monitor import IterationMonitor
+from .session_mode_monitor import SessionModeMonitor
 
 __all__ = [
     "BaseMonitor",
@@ -41,4 +42,5 @@ __all__ = [
     "InterruptMonitor",
     "QueueMonitor",
     "IterationMonitor",
+    "SessionModeMonitor",
 ]

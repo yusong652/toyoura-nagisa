@@ -74,7 +74,7 @@ class ToolExecutor:
         self.send_tool_result_notifications = send_tool_result_notifications
         self.confirmation_strategy = ConfirmationStrategy(tool_manager)
 
-    def classify_tools(self, tool_calls: List[Dict]) -> ClassifiedTools:
+    def classify_tools(self, tool_calls: List[Dict], tool_indices: Optional[List[int]] = None) -> ClassifiedTools:
         """
         Classify tools into confirm and non-confirm categories.
 
@@ -87,13 +87,14 @@ class ToolExecutor:
         classified = ClassifiedTools()
 
         for i, tool_call in enumerate(tool_calls):
+            original_index = tool_indices[i] if tool_indices else i
             tool_name = tool_call.get('name', 'unknown')
             tool_args = tool_call.get('arguments', {})
 
             if self.confirmation_strategy.requires_confirmation(tool_name, tool_args):
-                classified.confirm.append((i, tool_call))
+                classified.confirm.append((original_index, tool_call))
             else:
-                classified.non_confirm.append((i, tool_call))
+                classified.non_confirm.append((original_index, tool_call))
 
         return classified
 
@@ -118,14 +119,45 @@ class ToolExecutor:
             - reject: Cascade blocks remaining tools, agent should stop
             - reject_and_tell: Cascade blocks remaining tools, but agent continues with instruction
         """
-        # Classify tools
-        classified = self.classify_tools(tool_calls)
-
         # Prepare results storage
         results: List[Optional[Dict]] = [None] * len(tool_calls)
         rejected_tools: List[str] = []
         rejection_outcome: Optional[RejectionOutcome] = None
         rejection_message: Optional[str] = None
+
+        # Plan/build mode gate: block non-read-only tools in plan mode
+        from backend.application.policies.mode_policy import (
+            is_tool_allowed_in_mode,
+            build_mode_blocked_message,
+        )
+        from backend.infrastructure.mcp.utils.tool_result import error_response
+        from backend.infrastructure.storage.session_manager import get_session_mode
+
+        session_mode = get_session_mode(self.session_id)
+        allowed_calls: List[Dict] = []
+        allowed_indices: List[int] = []
+
+        for i, tool_call in enumerate(tool_calls):
+            tool_name = tool_call.get('name', 'unknown')
+            tool_args = tool_call.get('arguments', {})
+
+            if not is_tool_allowed_in_mode(session_mode, tool_name, tool_args):
+                blocked_message = build_mode_blocked_message(session_mode, tool_name)
+                result = error_response(
+                    blocked_message,
+                    blocked_by_mode=True,
+                    session_mode=session_mode,
+                )
+                results[i] = result
+                rejected_tools.append(tool_name)
+                await self._notify_result(tool_call, result, agent_profile)
+                continue
+
+            allowed_calls.append(tool_call)
+            allowed_indices.append(i)
+
+        # Classify allowed tools
+        classified = self.classify_tools(allowed_calls, allowed_indices)
 
         # Execute non-confirmation tools first
         for original_index, tool_call in classified.non_confirm:

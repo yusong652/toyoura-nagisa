@@ -32,7 +32,8 @@ from backend.presentation.websocket.messages.emotion import EmotionKeywordMessag
 from backend.presentation.websocket.messages.system import (
     ErrorMessage,
     StatusUpdate,
-    TitleUpdateMessage
+    TitleUpdateMessage,
+    SessionModeUpdateMessage,
 )
 
 # Message queue management
@@ -98,6 +99,7 @@ __all__ = [
     "ErrorMessage",
     "StatusUpdate",
     "TitleUpdateMessage",
+    "SessionModeUpdateMessage",
     # Message queue management
     "QueueUpdateMessage",
     "ProcessingStartMessage",

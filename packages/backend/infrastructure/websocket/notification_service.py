@@ -9,6 +9,8 @@ and message saved events.
 from typing import List, Dict, Any, Optional
 import logging
 
+from backend.domain.utils import filter_message_content
+
 logger = logging.getLogger(__name__)
 
 
@@ -207,6 +209,40 @@ class WebSocketNotificationService:
             # Don't re-raise - this is a non-critical notification
 
     @staticmethod
+    async def send_session_mode_update(
+        session_id: str,
+        mode: str
+    ) -> None:
+        """Send session mode update notification to frontend."""
+        try:
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+            connection_manager = get_connection_manager()
+
+            if not connection_manager:
+                logger.warning("No connection manager available for session mode update")
+                return
+
+            from backend.presentation.websocket.message_types import MessageType, create_message
+
+            mode_update_msg = create_message(
+                MessageType.SESSION_MODE_UPDATE,
+                session_id=session_id,
+                payload={
+                    "session_id": session_id,
+                    "mode": mode,
+                }
+            )
+
+            await connection_manager.send_json(
+                session_id,
+                mode_update_msg.model_dump()
+            )
+
+            logger.info(f"Session mode update notification sent for session {session_id}: {mode}")
+        except Exception as e:
+            logger.error(f"Failed to send session mode update notification: {e}")
+
+    @staticmethod
     async def send_todo_update(
         session_id: str,
         todo: Optional[Dict[str, Any]]
@@ -334,6 +370,11 @@ class WebSocketNotificationService:
                 # Include data field for diff display in CLI (edit/write tools)
                 "data": tool_result.get("data")
             }
+
+            # Strip display-only tags (e.g., <error>, <system-reminder>) for UI
+            filtered_blocks = filter_message_content([tool_result_content])
+            if isinstance(filtered_blocks, list) and filtered_blocks:
+                tool_result_content = filtered_blocks[0]
 
             # Send TOOL_RESULT_UPDATE notification
             notification = {

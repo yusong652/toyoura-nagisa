@@ -32,11 +32,12 @@ import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { useSlashCompletion } from '../hooks/useSlashCompletion.js';
 import { useFileMentionDetection } from '../hooks/useFileMentionDetection.js';
 import { toCodePoints } from '../utils/textUtils.js';
-import { theme } from '../colors.js';
+import { theme, colors } from '../colors.js';
 import { PanelSection } from './shared/PanelSection.js';
 import { SlashCommandSuggestions } from './SlashCommandSuggestions.js';
 import { FileMentionSuggestions } from './FileMentionSuggestions.js';
 import type { SlashCommand, CommandContext } from '../commands/types.js';
+import type { SessionMode } from '../types.js';
 import type { TextBuffer } from '../utils/text-buffer.js';
 
 interface InputPromptProps {
@@ -56,6 +57,10 @@ interface InputPromptProps {
   onPfcConsoleModeChange?: (isPfcConsoleMode: boolean) => void;
   /** Callback when PFC console command is blocked during streaming */
   onPfcConsoleBlocked?: () => void;
+  /** Callback to cycle session mode (plan/build) */
+  onModeCycle?: (direction: 1 | -1) => void;
+  /** Current session mode for input display */
+  sessionMode?: SessionMode;
   slashCommands?: readonly SlashCommand[];
   commandContext?: CommandContext;
   disabled?: boolean;
@@ -66,6 +71,8 @@ interface InputPromptProps {
   agentProfile?: string;
   /** Session ID for file search */
   sessionId?: string;
+  /** Terminal width for half-grid rendering */
+  terminalWidth?: number;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -78,6 +85,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onPfcConsoleCommand,
   onPfcConsoleModeChange,
   onPfcConsoleBlocked,
+  onModeCycle,
   slashCommands = [],
   commandContext,
   disabled = false,
@@ -85,8 +93,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   placeholder = 'Type your message...',
   agentProfile = 'pfc_expert',
   sessionId,
+  sessionMode = 'build',
+  terminalWidth = 80,
 }) => {
-  const MAX_INPUT_LINES = 6;
+  const INPUT_TEXT_LINES = 3;
   // Default prefix width (all prefixes should have same width for alignment)
   const prefixWidth = 2;
 
@@ -393,6 +403,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
+      // Tab cycles session mode when input is empty and no suggestions are active
+      if (key.name === 'tab' && onModeCycle) {
+        const isEmptyInput = buffer.text.trim().length === 0;
+        if (isEmptyInput) {
+          onModeCycle(key.shift ? -1 : 1);
+          return;
+        }
+      }
+
       // Check for backslash + Enter (newline in all terminals)
       if (key.name === 'return' && lastKeyWasBackslash.current) {
         lastKeyWasBackslash.current = false;
@@ -431,7 +450,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Use visual cursor for correct cursor positioning in wrapped lines
   const [visualCursorRow, visualCursorCol] = buffer.visualCursor;
   const totalVisualLines = buffer.visualLines.length;
-  const maxVisibleLines = Math.max(1, MAX_INPUT_LINES);
+  const maxVisibleLines = Math.max(1, INPUT_TEXT_LINES);
   const maxStartIndex = Math.max(0, totalVisualLines - maxVisibleLines);
   const visibleStartIndex = totalVisualLines > maxVisibleLines
     ? Math.min(Math.max(0, visualCursorRow - maxVisibleLines + 1), maxStartIndex)
@@ -439,6 +458,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const visibleEndIndex = visibleStartIndex + maxVisibleLines;
   const visibleLines = buffer.visualLines.slice(visibleStartIndex, visibleEndIndex);
   const visibleCursorRow = Math.max(0, visualCursorRow - visibleStartIndex);
+  const fillerLineCount = Math.max(0, INPUT_TEXT_LINES - visibleLines.length);
+
+  const modeLabel = sessionMode === 'plan' ? 'PLAN' : 'BUILD';
+  const modeColor = sessionMode === 'plan' ? theme.status.warning : theme.status.success;
 
   // Prefix color based on mode
   const prefixColor = useMemo(() => {
@@ -513,27 +536,61 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     );
   };
 
+  const renderModeLine = () => (
+    <Box flexDirection="row">
+      <Box width={prefixWidth} flexShrink={0}>
+        <Text color={theme.text.muted}>{continuationPrefix}</Text>
+      </Box>
+      <Text color={modeColor} bold>{modeLabel}</Text>
+    </Box>
+  );
+
+  const renderSpacerLine = (key: string) => (
+    <Box key={key} flexDirection="row">
+      <Box width={prefixWidth} flexShrink={0}>
+        <Text color={theme.text.muted}>{continuationPrefix}</Text>
+      </Box>
+      <Text> </Text>
+    </Box>
+  );
+
   return (
     <Box flexDirection="column">
       {/* Input box */}
-      <PanelSection paddingX={1}>
+      <PanelSection paddingX={1} paddingTop={1} paddingBottom={0}>
         {disabled ? (
-          <Box flexDirection="row">
-            <Box width={prefixWidth} flexShrink={0}>
-              <Text color={theme.text.muted}>{prefix}</Text>
+          <>
+            <Box flexDirection="row">
+              <Box width={prefixWidth} flexShrink={0}>
+                <Text color={theme.text.muted}>{prefix}</Text>
+              </Box>
+              <Text color={theme.text.muted}>...</Text>
             </Box>
-            <Text color={theme.text.muted}>...</Text>
-          </Box>
+            {Array.from({ length: INPUT_TEXT_LINES - 1 }).map((_, index) =>
+              renderSpacerLine(`disabled-input-${index}`)
+            )}
+          </>
         ) : (
-          visibleLines.map((visualLine, index) =>
-            renderVisualLine(
-              visualLine,
-              index + visibleStartIndex,
-              index === visibleCursorRow
-            )
-          )
+          <>
+            {visibleLines.map((visualLine, index) =>
+              renderVisualLine(
+                visualLine,
+                index + visibleStartIndex,
+                index === visibleCursorRow
+              )
+            )}
+            {Array.from({ length: fillerLineCount }).map((_, index) =>
+              renderVisualLine('', visibleStartIndex + visibleLines.length + index, false)
+            )}
+          </>
         )}
+        {renderModeLine()}
       </PanelSection>
+
+      {/* Half-grid transition line (upper half input color, lower half background) */}
+      <Box height={1}>
+        <Text color={colors.bgLight}>{'▀'.repeat(terminalWidth)}</Text>
+      </Box>
 
       {/* File mention suggestions popup (below input) */}
       {fileMention.isMentionActive && (

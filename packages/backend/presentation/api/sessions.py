@@ -14,7 +14,7 @@ Routes:
     DELETE /history/{id}     - Delete session
     GET    /history/{id}/token-usage - Get token usage
 """
-from typing import List, Optional
+from typing import List, Optional, Literal
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
@@ -39,6 +39,7 @@ class SessionData(BaseModel):
     created_at: str = Field(..., description="Creation timestamp (ISO format)")
     updated_at: str = Field(..., description="Last update timestamp (ISO format)")
     message_count: Optional[int] = Field(None, description="Number of messages")
+    mode: Optional[str] = Field(None, description="Session mode (build or plan)")
 
 
 class SessionCreateData(BaseModel):
@@ -65,6 +66,12 @@ class SessionDeleteData(BaseModel):
     session_id: str = Field(..., description="Deleted session ID")
 
 
+class SessionModeUpdateData(BaseModel):
+    """Response data for session mode updates."""
+    session_id: str = Field(..., description="Session UUID")
+    mode: str = Field(..., description="Updated session mode")
+
+
 class TokenUsageData(BaseModel):
     """Token usage statistics for a session."""
     prompt_tokens: int = Field(default=0, description="Input tokens (context window usage)")
@@ -84,6 +91,11 @@ class CreateSessionRequest(BaseModel):
 class SwitchSessionRequest(BaseModel):
     """Request body for switching to a different session."""
     session_id: str = Field(..., description="Target session UUID")
+
+
+class UpdateSessionModeRequest(BaseModel):
+    """Request body for updating session mode."""
+    mode: Literal["build", "plan"] = Field(..., description="Target session mode")
 
 
 # =====================
@@ -143,7 +155,8 @@ async def list_sessions(
                 name=s["name"],
                 created_at=s["created_at"],
                 updated_at=s["updated_at"],
-                message_count=s.get("message_count")
+                message_count=s.get("message_count"),
+                mode=s.get("mode"),
             )
             for s in sessions
         ]
@@ -308,4 +321,31 @@ async def get_token_usage(
             message=f"Failed to retrieve token usage: {str(e)}"
         )
 
+
+@router.post("/history/{session_id}/mode", response_model=ApiResponse[SessionModeUpdateData])
+async def update_session_mode(
+    session_id: str,
+    request: UpdateSessionModeRequest,
+    service: SessionService = Depends(get_session_service)
+) -> ApiResponse[SessionModeUpdateData]:
+    """Update the session mode (plan/build) and notify the frontend."""
+    try:
+        result = await service.update_session_mode(session_id, request.mode)
+        if not result:
+            raise SessionNotFoundError(session_id)
+
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+        await WebSocketNotificationService.send_session_mode_update(session_id, request.mode)
+
+        return ApiResponse(
+            success=True,
+            message="Session mode updated",
+            data=SessionModeUpdateData(session_id=session_id, mode=request.mode)
+        )
+    except SessionNotFoundError:
+        raise
+    except Exception as e:
+        raise InternalServerError(
+            message=f"Failed to update session mode: {str(e)}"
+        )
 

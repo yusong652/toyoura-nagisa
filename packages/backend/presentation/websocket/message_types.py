@@ -31,6 +31,7 @@ from backend.presentation.websocket.messages import (
     ErrorMessage,
     StatusUpdate,
     TitleUpdateMessage,
+    SessionModeUpdateMessage,
     # Message queue management
     QueueUpdateMessage,
     ProcessingStartMessage,
@@ -70,6 +71,7 @@ __all__ = [
     "ErrorMessage",
     "StatusUpdate",
     "TitleUpdateMessage",
+    "SessionModeUpdateMessage",
     # Message queue management
     "QueueUpdateMessage",
     "ProcessingStartMessage",

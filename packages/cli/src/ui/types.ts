@@ -328,6 +328,9 @@ export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'er
 // Dialog types
 export type DialogType = 'help' | 'profile' | 'session' | 'settings';
 
+// Session modes
+export type SessionMode = 'build' | 'plan';
+
 // Agent profile types (matches backend AgentProfile enum)
 export type AgentProfileType = 'pfc_expert' | 'disabled';
 

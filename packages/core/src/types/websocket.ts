@@ -25,6 +25,7 @@ export enum MessageType {
   
   // Title updates
   TITLE_UPDATE = "TITLE_UPDATE",
+  SESSION_MODE_UPDATE = "SESSION_MODE_UPDATE",
   
   // Location related
   LOCATION_REQUEST = "LOCATION_REQUEST", 
@@ -79,6 +80,14 @@ export interface TitleUpdateMessage extends BaseWebSocketMessage {
   };
 }
 
+export interface SessionModeUpdateMessage extends BaseWebSocketMessage {
+  type: MessageType.SESSION_MODE_UPDATE;
+  payload: {
+    session_id: string;
+    mode: "build" | "plan";
+  };
+}
+
 export interface LocationRequestMessage extends BaseWebSocketMessage {
   type: MessageType.LOCATION_REQUEST;
   reason?: string;
@@ -128,6 +137,7 @@ export type WebSocketMessage =
   | ErrorMessage
   | StatusMessage
   | TitleUpdateMessage
+  | SessionModeUpdateMessage
   | LocationRequestMessage
   | LocationResponseMessage
   | MessageCreateMessage

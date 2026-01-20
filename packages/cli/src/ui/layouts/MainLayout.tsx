@@ -912,6 +912,9 @@ export const MainLayout: React.FC = () => {
             onPfcConsoleCommand={handlePfcConsoleCommand}
             onPfcConsoleModeChange={setIsPfcConsoleMode}
             onPfcConsoleBlocked={handlePfcConsoleBlocked}
+            onModeCycle={appActions.cycleSessionMode}
+            sessionMode={appState.sessionMode}
+            terminalWidth={terminalWidth}
             slashCommands={commands}
             commandContext={commandContext}
             agentProfile={appState.currentProfile}

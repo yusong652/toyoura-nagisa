@@ -148,6 +148,7 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
 
 // Status indicator width (matches ToolCallMessage and ToolResultMessage)
 const STATUS_INDICATOR_WIDTH = 2;  // Match "● " prefix width
+const RESULT_INDENT = STATUS_INDICATOR_WIDTH + 1;
 // Maximum lines for tool result content (Claude Code style: 3-4 lines)
 const MAX_RESULT_LINES = 3;
 const MAX_RESULT_LINES_FULL = Infinity;
@@ -331,14 +332,15 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
   const isError = item.isError === true;
   const textColor = isError ? theme.status.error : theme.text.secondary;
   const isBashTool = item.toolName?.toLowerCase() === 'bash' || item.toolName?.toLowerCase() === 'bash_output';
+  const showBashPrefix = isBashTool && !isError;
   const displayLines = lines.length > 0 ? lines : (isBashTool ? [''] : []);
 
   return (
     <Box flexDirection="column" paddingX={1} marginBottom={1}>
       {/* Content lines - red for errors, secondary for success */}
       {displayLines.map((line, index) => (
-        <Box key={index} paddingLeft={STATUS_INDICATOR_WIDTH}>
-          {isBashTool && (
+        <Box key={index} paddingLeft={RESULT_INDENT}>
+          {showBashPrefix && (
             <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
           )}
           <Text wrap="truncate-end" color={textColor}>
@@ -347,7 +349,7 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
         </Box>
       ))}
       {truncated && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
+        <Box paddingLeft={RESULT_INDENT}>
           <Text color={theme.text.muted}>
             ... +{hiddenLines} lines (ctrl+o to expand)
           </Text>

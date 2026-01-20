@@ -7,7 +7,7 @@
 
 import { useCallback } from 'react';
 import { sessionService, type ConnectionManager, type SessionManager } from '@toyoura-nagisa/core';
-import { MessageType, type ContentBlock } from '../types.js';
+import { MessageType, type ContentBlock, type SessionMode } from '../types.js';
 import type { useHistoryManager } from './useHistoryManager.js';
 
 interface UseSessionManagementParams {
@@ -15,6 +15,7 @@ interface UseSessionManagementParams {
   sessionManager: SessionManager;
   historyManager: ReturnType<typeof useHistoryManager>;
   setCurrentSessionId: (sessionId: string) => void;
+  setSessionMode?: (mode: SessionMode) => void;
 }
 
 interface UseSessionManagementReturn {
@@ -183,19 +184,24 @@ export function useSessionManagement({
   sessionManager,
   historyManager,
   setCurrentSessionId,
+  setSessionMode,
 }: UseSessionManagementParams): UseSessionManagementReturn {
 
   // Load history for a session (reusable, doesn't manage connection)
   const loadHistory = useCallback(async (sessionId: string) => {
     try {
       const historyResponse = await sessionService.getSessionHistory(sessionId);
+      if (setSessionMode) {
+        const mode = historyResponse.session?.mode || 'build';
+        setSessionMode(mode);
+      }
       if (historyResponse.history && historyResponse.history.length > 0) {
         convertBackendHistory(historyResponse.history, historyManager);
       }
     } catch (err) {
       console.error('[useSessionManagement] Failed to load session history:', err);
     }
-  }, [historyManager]);
+  }, [historyManager, setSessionMode]);
 
   const switchSession = useCallback(async (sessionId: string) => {
     connectionManager.disconnect();

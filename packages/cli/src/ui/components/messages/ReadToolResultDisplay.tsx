@@ -13,6 +13,7 @@ import { TOOL_RESULT_PREFIX } from '../../markers.js';
 
 // Status indicator width (matches other tool displays)
 const STATUS_INDICATOR_WIDTH = 2;
+const RESULT_INDENT = STATUS_INDICATOR_WIDTH + 1;
 
 interface ReadToolResultDisplayProps {
   item: ToolResultHistoryItem;
@@ -42,7 +43,7 @@ export const ReadToolResultDisplay: React.FC<ReadToolResultDisplayProps> = ({
     : `Read ${lineCount} lines`;
 
   return (
-    <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginBottom={1}>
+    <Box paddingLeft={RESULT_INDENT} marginBottom={1}>
       <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
       <Text color={theme.text.secondary}>{summary}</Text>
     </Box>

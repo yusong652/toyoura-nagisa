@@ -22,6 +22,7 @@ import {
   SessionEvent,
   FileStorageAdapter,
   SessionService,
+  sessionService,
   apiClient,
   type TokenUsage,
 } from '@toyoura-nagisa/core';
@@ -42,7 +43,7 @@ import { useTodoStatus } from './hooks/useTodoStatus.js';
 import { useBackgroundProcesses } from './hooks/useBackgroundProcesses.js';
 import { usePfcTasks } from './hooks/usePfcTasks.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
-import { MessageType, type AgentProfileType } from './types.js';
+import { MessageType, type AgentProfileType, type SessionMode } from './types.js';
 import type { Config } from '../config/settings.js';
 
 interface AppContainerProps {
@@ -94,6 +95,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
   // ========== Local State ==========
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
+  const [sessionMode, setSessionMode] = useState<SessionMode>('build');
   const [isQuitting, setIsQuitting] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(false);
   const [sessionTokenUsage, setSessionTokenUsage] = useState<TokenUsage | null>(null);
@@ -164,6 +166,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     sessionManager,
     historyManager,
     setCurrentSessionId,
+    setSessionMode,
   });
 
   // Todo status (current in-progress task)
@@ -247,6 +250,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
         // Create new session if none exists
         if (!sessionId) {
           sessionId = await sessionManager.createSession();
+          setSessionMode('build');
         }
 
         setCurrentSessionId(sessionId);
@@ -310,6 +314,27 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     if (!text.trim()) return;
     submitQuery(text, mentionedFiles);
   }, [submitQuery]);
+
+  const updateSessionMode = useCallback(async (mode: SessionMode) => {
+    if (!currentSessionId) return;
+
+    try {
+      const response = await sessionService.updateSessionMode(currentSessionId, mode);
+      setSessionMode(response.mode || mode);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update session mode';
+      historyManager.addItem({
+        type: MessageType.ERROR,
+        message,
+      });
+    }
+  }, [currentSessionId, historyManager]);
+
+  const cycleSessionMode = useCallback((_direction: 1 | -1) => {
+    const nextMode: SessionMode = sessionMode === 'build' ? 'plan' : 'build';
+    updateSessionMode(nextMode);
+    return nextMode;
+  }, [sessionMode, updateSessionMode]);
 
   const quit = useCallback(() => {
     setIsQuitting(true);
@@ -399,6 +424,21 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 
+  useEffect(() => {
+    const handleSessionModeUpdate = (message: { payload?: { session_id?: string; mode?: SessionMode } }) => {
+      const payload = message?.payload;
+      if (!payload?.session_id || !payload?.mode) return;
+      if (payload.session_id !== currentSessionId) return;
+      setSessionMode(payload.mode);
+    };
+
+    connectionManager.on('session_mode_update', handleSessionModeUpdate);
+
+    return () => {
+      connectionManager.off('session_mode_update', handleSessionModeUpdate);
+    };
+  }, [connectionManager, currentSessionId]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -414,6 +454,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     connectionStatus,
     error,
     currentSessionId,
+    sessionMode,
     currentProfile,
     availableProfiles,
     isProfileLoading,
@@ -441,6 +482,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     connectionStatus,
     error,
     currentSessionId,
+    sessionMode,
     currentProfile,
     availableProfiles,
     isProfileLoading,
@@ -469,6 +511,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     clearHistory: historyManager.clearItems,
     switchSession,
     createSession,
+    setSessionMode: updateSessionMode,
+    cycleSessionMode,
     setProfile,
     refreshProfiles,
     setMemoryEnabled,
@@ -487,6 +531,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     historyManager.clearItems,
     switchSession,
     createSession,
+    updateSessionMode,
+    cycleSessionMode,
     setProfile,
     refreshProfiles,
     setMemoryEnabled,

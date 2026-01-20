@@ -56,3 +56,14 @@ class TitleUpdateMessage(BaseWebSocketMessage):
     """
     type: MessageType = MessageType.TITLE_UPDATE
     payload: Dict[str, Any]  # Contains session_id and title
+
+
+class SessionModeUpdateMessage(BaseWebSocketMessage):
+    """
+    Session mode update message schema for plan/build changes.
+
+    Attributes:
+        payload: Update payload containing session_id and mode
+    """
+    type: MessageType = MessageType.SESSION_MODE_UPDATE
+    payload: Dict[str, Any]  # Contains session_id and mode

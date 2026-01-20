@@ -46,6 +46,28 @@ export interface UseStreamHandlersReturn {
   handleError: (err: Error) => void;
 }
 
+const stripToolResultTags = (text: string): string => {
+  if (!text) return text;
+  const withoutSystem = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '');
+  return withoutSystem.replace(/<error>([\s\S]*?)<\/error>/g, '$1').trim();
+};
+
+const extractToolResultText = (llmContent: unknown): string => {
+  if (typeof llmContent === 'string') {
+    return llmContent;
+  }
+  if (llmContent && typeof llmContent === 'object') {
+    const content = llmContent as { parts?: Array<{ type?: string; text?: string }> };
+    if (Array.isArray(content.parts)) {
+      return content.parts
+        .filter((part) => part.type === 'text')
+        .map((part) => part.text || '')
+        .join('\n');
+    }
+  }
+  return '';
+};
+
 /**
  * Hook for handling WebSocket streaming events.
  */
@@ -175,12 +197,13 @@ export function useStreamHandlers({
         for (const block of toolResultBlocks) {
           if (block.type !== 'tool_result') continue;
 
+          const contentText = stripToolResultTags(extractToolResultText(block.content));
           const pair = pendingToolPairsRef.current.find((p) => p.toolCallId === block.tool_use_id);
           if (pair && !pair.toolResult) {
             pair.toolResult = {
               type: MessageType.TOOL_RESULT,
               toolCallId: block.tool_use_id,
-              content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content),
+              content: contentText,
               isError: block.is_error,
             };
             triggerRerender();
@@ -234,18 +257,8 @@ export function useStreamHandlers({
         if (block.type !== 'tool_result') continue;
 
         // Extract text content from llm_content
-        let contentText = '';
-        const llmContent = block.content;
-        if (typeof llmContent === 'string') {
-          contentText = llmContent;
-        } else if (llmContent && typeof llmContent === 'object') {
-          if ('parts' in llmContent && Array.isArray(llmContent.parts)) {
-            contentText = llmContent.parts
-              .filter((part: any) => part.type === 'text')
-              .map((part: any) => part.text || '')
-              .join('\n');
-          }
-        }
+        let contentText = extractToolResultText(block.content);
+        contentText = stripToolResultTags(contentText);
 
         // Extract diff info from data field (for edit/write tools)
         const diff = block.data?.diff;

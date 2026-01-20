@@ -12,7 +12,9 @@ from backend.infrastructure.storage.session_manager import (
     load_all_message_history,
     load_history,
     create_new_history,
-    load_token_usage
+    load_token_usage,
+    update_session_mode as update_session_mode_metadata,
+    get_session_metadata,
 )
 from backend.domain.models.message_factory import message_factory
 from backend.domain.utils import filter_message_content
@@ -228,3 +230,27 @@ class SessionService:
             Optional[Dict[str, int]]: Token usage statistics or None if not available
         """
         return load_token_usage(session_id)
+
+    async def update_session_mode(self, session_id: str, mode: str) -> Optional[Dict[str, Any]]:
+        """
+        Update session mode (plan/build).
+
+        Args:
+            session_id: Session UUID
+            mode: New session mode
+
+        Returns:
+            Optional[Dict[str, Any]]: Update result or None if session not found
+        """
+        session_metadata = get_session_metadata(session_id)
+        if not session_metadata:
+            return None
+
+        update_session_mode_metadata(session_id, mode)
+        updated_metadata = get_session_metadata(session_id)
+
+        return {
+            "session_id": session_id,
+            "mode": updated_metadata.get("mode", mode) if updated_metadata else mode,
+            "success": True,
+        }

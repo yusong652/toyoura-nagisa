@@ -18,6 +18,8 @@ from backend.domain.models.messages import BaseMessage
 # Chat history related tools
 HISTORY_BASE_DIR = "chat/data"
 BACKUP_DIR = "chat/data/backups"
+DEFAULT_SESSION_MODE = "build"
+VALID_SESSION_MODES = {"build", "plan"}
 
 
 def _get_session_dir(session_id: str) -> str:
@@ -33,6 +35,35 @@ def _get_session_file(session_id: str) -> str:
 def _get_runtime_state_file(session_id: str) -> str:
     """Get runtime state file path"""
     return os.path.join(_get_session_dir(session_id), "runtime_state.json")
+
+
+def _get_metadata_file() -> str:
+    return os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
+
+
+def _load_sessions_metadata() -> Dict[str, Any]:
+    metadata_file = _get_metadata_file()
+    if not os.path.exists(metadata_file):
+        return {}
+    try:
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_sessions_metadata(metadata: Dict[str, Any]) -> None:
+    metadata_file = _get_metadata_file()
+    with open(metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=4, ensure_ascii=False)
+
+
+def _normalize_session_metadata_entry(session_metadata: Dict[str, Any]) -> bool:
+    updated = False
+    if "mode" not in session_metadata:
+        session_metadata["mode"] = DEFAULT_SESSION_MODE
+        updated = True
+    return updated
 
 
 # ========== Session CRUD Operations ==========
@@ -57,24 +88,17 @@ def create_new_history(name: Optional[str] = None) -> str:
         "id": session_id,
         "name": name,
         "created_at": datetime.now().isoformat(),
-        "updated_at": datetime.now().isoformat()
+        "updated_at": datetime.now().isoformat(),
+        "mode": DEFAULT_SESSION_MODE,
     }
 
     # Ensure base directory exists
     os.makedirs(HISTORY_BASE_DIR, exist_ok=True)
 
     # Save metadata
-    metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
-    metadata = {}
-    if os.path.exists(metadata_file):
-        try:
-            with open(metadata_file, 'r', encoding='utf-8') as f:
-                metadata = json.load(f)
-        except json.JSONDecodeError:
-            metadata = {}
+    metadata = _load_sessions_metadata()
     metadata[session_id] = session_metadata
-    with open(metadata_file, 'w', encoding='utf-8') as f:
-        json.dump(metadata, f, indent=4, ensure_ascii=False)
+    _save_sessions_metadata(metadata)
 
     # Create session directory and empty chat history file
     session_dir = _get_session_dir(session_id)
@@ -93,19 +117,21 @@ def get_all_sessions() -> List[Dict[str, Any]]:
     Returns:
         List of session metadata, sorted by update time in descending order
     """
-    metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
-    if not os.path.exists(metadata_file):
+    metadata = _load_sessions_metadata()
+    if not metadata:
         return []
-    
-    try:
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
-            # Convert dictionary to list and sort by update time
-            sessions = list(metadata.values())
-            sessions.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
-            return sessions
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+
+    updated = False
+    sessions = list(metadata.values())
+    for session_metadata in sessions:
+        if _normalize_session_metadata_entry(session_metadata):
+            updated = True
+
+    if updated:
+        _save_sessions_metadata(metadata)
+
+    sessions.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
+    return sessions
 
 
 def delete_session_data(session_id: str) -> bool:
@@ -174,6 +200,48 @@ def update_session_title(session_id: str, new_title: str) -> bool:
     except Exception as e:
         print(f"[ERROR] Failed to update session title: {str(e)}")
         return False
+
+
+def get_session_metadata(session_id: str) -> Optional[Dict[str, Any]]:
+    """Get session metadata by session ID."""
+    metadata = _load_sessions_metadata()
+    session_metadata = metadata.get(session_id)
+    if not session_metadata:
+        return None
+
+    if _normalize_session_metadata_entry(session_metadata):
+        _save_sessions_metadata(metadata)
+
+    return session_metadata
+
+
+def update_session_metadata(session_id: str, updates: Dict[str, Any]) -> bool:
+    """Update session metadata fields and refresh updated_at timestamp."""
+    metadata = _load_sessions_metadata()
+    if session_id not in metadata:
+        return False
+
+    metadata[session_id].update(updates)
+    metadata[session_id]["updated_at"] = datetime.now().isoformat()
+    _save_sessions_metadata(metadata)
+    return True
+
+
+def get_session_mode(session_id: str) -> str:
+    """Get current session mode (build or plan)."""
+    session_metadata = get_session_metadata(session_id)
+    if not session_metadata:
+        return DEFAULT_SESSION_MODE
+    return session_metadata.get("mode", DEFAULT_SESSION_MODE)
+
+
+def update_session_mode(session_id: str, mode: str) -> bool:
+    """Update session mode in metadata."""
+    normalized_mode = (mode or "").lower()
+    if normalized_mode not in VALID_SESSION_MODES:
+        raise ValueError(f"Invalid session mode: {mode}")
+
+    return update_session_metadata(session_id, {"mode": normalized_mode})
 
 
 # ========== Message History Operations ==========

@@ -9,7 +9,15 @@
 
 import { createContext, useContext } from 'react';
 import type { TokenUsage } from '@toyoura-nagisa/core';
-import type { HistoryItem, HistoryItemWithoutId, ToolConfirmationData, ConnectionStatus, AgentProfileType, AgentProfileInfo } from '../types.js';
+import type {
+  HistoryItem,
+  HistoryItemWithoutId,
+  ToolConfirmationData,
+  ConnectionStatus,
+  AgentProfileType,
+  AgentProfileInfo,
+  SessionMode,
+} from '../types.js';
 import type { TodoItem } from '../hooks/useTodoStatus.js';
 import type { BackgroundTask, PfcTask } from '../types/streamEvents.js';
 import { StreamingState } from './StreamingContext.js';
@@ -29,6 +37,7 @@ export interface AppState {
 
   // Session
   currentSessionId: string | null;
+  sessionMode: SessionMode;
 
   // Agent profile
   currentProfile: AgentProfileType;
@@ -87,6 +96,8 @@ export interface AppActions {
   // Session
   switchSession: (sessionId: string) => Promise<void>;
   createSession: (name?: string) => Promise<string>;
+  setSessionMode: (mode: SessionMode) => void;
+  cycleSessionMode: (direction: 1 | -1) => void;
 
   // Agent profile
   setProfile: (profile: AgentProfileType) => void;
@@ -121,6 +132,7 @@ const defaultState: AppState = {
   connectionStatus: 'disconnected',
   error: null,
   currentSessionId: null,
+  sessionMode: 'build',
   currentProfile: 'pfc_expert',
   availableProfiles: [],
   isProfileLoading: false,
@@ -151,6 +163,8 @@ const defaultActions: AppActions = {
   clearHistory: () => {},
   switchSession: async () => {},
   createSession: async () => '',
+  setSessionMode: () => {},
+  cycleSessionMode: () => {},
   setProfile: () => {},
   refreshProfiles: async () => {},
   setMemoryEnabled: () => {},

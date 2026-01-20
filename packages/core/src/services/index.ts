@@ -27,7 +27,9 @@ export type {
   SessionHistoryResponse,
   GenerateTitleRequest,
   GenerateTitleData,
-  TokenUsageResponse
+  TokenUsageResponse,
+  UpdateSessionModeRequest,
+  UpdateSessionModeResponse,
 } from './SessionService';
 
 // Agent Service
