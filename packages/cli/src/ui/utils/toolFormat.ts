@@ -324,6 +324,11 @@ export function getToolLayoutConfig(toolName: string): ToolLayoutConfig {
     case 'bash_output':
       return { marginBottom: 0 };
 
+    // Write/edit: keep diff attached to call
+    case 'write':
+    case 'edit':
+      return { marginBottom: 0 };
+
     // Default: standard margin
     default:
       return DEFAULT_LAYOUT;

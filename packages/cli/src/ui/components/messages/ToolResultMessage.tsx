@@ -74,24 +74,39 @@ const DiffToolResultDisplay: React.FC<{
 }> = ({ item, terminalWidth, maxDiffHeight }) => {
   const diff = item.diff!;
   const fileName = getFileName(diff.file_path);
+  const toolName = item.toolName?.toLowerCase();
+  const isWriteTool = toolName === 'write';
+  const isEditTool = toolName === 'edit';
+  const isCompactHeader = isWriteTool || isEditTool;
   const contentWidth = terminalWidth ? terminalWidth - 4 : undefined;
 
   return (
     <Box flexDirection="column" marginBottom={1}>
       {/* Tool header line - no status indicator */}
-      <Box paddingX={1} paddingLeft={STATUS_INDICATOR_WIDTH + 1}>
-        <Text bold color={theme.text.primary}>{item.toolName || 'edit'}</Text>
-        <Text color={theme.text.secondary}> </Text>
-        <Text color={theme.text.link}>{fileName}</Text>
-        <Text color={theme.text.secondary}> </Text>
-        <Text color={theme.status.success}>+{diff.additions}</Text>
-        <Text color={theme.text.muted}>/</Text>
-        <Text color={theme.status.error}>-{diff.deletions}</Text>
+      <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
+        {isCompactHeader ? (
+          <>
+            <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
+            <Text color={theme.status.success}>+{diff.additions}</Text>
+            <Text color={theme.text.muted}>/</Text>
+            <Text color={theme.status.error}>-{diff.deletions}</Text>
+          </>
+        ) : (
+          <>
+            <Text bold color={theme.text.primary}>{item.toolName || 'edit'}</Text>
+            <Text color={theme.text.secondary}> </Text>
+            <Text color={theme.text.link}>{fileName}</Text>
+            <Text color={theme.text.secondary}> </Text>
+            <Text color={theme.status.success}>+{diff.additions}</Text>
+            <Text color={theme.text.muted}>/</Text>
+            <Text color={theme.status.error}>-{diff.deletions}</Text>
+          </>
+        )}
       </Box>
 
       {/* Diff content */}
       {diff.content && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH + 1} flexDirection="column">
+        <Box paddingLeft={STATUS_INDICATOR_WIDTH + 2} flexDirection="column">
           <DiffRenderer
             diffContent={diff.content}
             filename={fileName}

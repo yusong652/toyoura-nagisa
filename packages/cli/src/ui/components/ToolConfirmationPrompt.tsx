@@ -343,9 +343,11 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
 
   return (
     <PanelSection
-      title="Tool Confirmation Required"
-      titlePrefix="?"
+      title="Tool Confirmation"
       tone="accent"
+      headerRight="esc"
+      description={question}
+      descriptionColor={theme.text.secondary}
       paddingX={1}
       maxHeight={maxComponentHeight}
       overflow="hidden"
@@ -354,11 +356,6 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
       {/* Body Content (Diff or Command) - can shrink if needed */}
       <Box flexGrow={1} flexShrink={1} marginBottom={1} overflow="hidden">
         {bodyContent}
-      </Box>
-
-      {/* Question - fixed height, never shrinks */}
-      <Box marginBottom={1} flexShrink={0}>
-        <Text color={theme.text.primary}>{question}</Text>
       </Box>
 
       {/* Custom options with inline input for option 3 */}
@@ -372,7 +369,7 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
             1.{' '}
           </Text>
           <Text color={resolveTextColor(activeIndex === 0, theme.text.primary)}>
-            Yes, allow
+            Allow
           </Text>
         </Box>
 
@@ -385,7 +382,7 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
             2.{' '}
           </Text>
           <Text color={resolveTextColor(activeIndex === 1, theme.text.primary)}>
-            No, reject (Esc)
+            Reject
           </Text>
         </Box>
 
@@ -398,7 +395,7 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
             3.{' '}
           </Text>
           <Text color={resolveTextColor(activeIndex === 2, theme.text.primary)}>
-            Reject:{' '}
+            Reject + note:{' '}
           </Text>
           {/* Inline input area */}
           {activeIndex === 2 ? (
