@@ -128,3 +128,4 @@ nul
 *.zip
 reverse_tunnel.txt
 .toyoura-nagisa/
+coverage.xml
