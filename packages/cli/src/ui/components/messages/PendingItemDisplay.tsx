@@ -19,7 +19,7 @@ import {
   type ContentBlock,
 } from '../../types.js';
 import { theme } from '../../colors.js';
-import { TOOL_STATUS } from '../../markers.js';
+import { TOOL_STATUS, TOOL_RESULT_PREFIX } from '../../markers.js';
 import { BlinkingCircle } from '../BlinkingCircle.js';
 import { getCachedStringWidth } from '../../utils/textUtils.js';
 import { MarkdownText } from '../MarkdownText.js';
@@ -56,13 +56,21 @@ const renderContentBlock = (
   index: number,
   isStreaming: boolean,
   maxThinkingLines: number,
+  previousBlock?: ContentBlock,
 ): React.ReactNode => {
+  const needsSeparation =
+    previousBlock &&
+    previousBlock.type !== block.type &&
+    (block.type === 'text' || block.type === 'thinking') &&
+    (previousBlock.type === 'text' || previousBlock.type === 'thinking');
+  const blockMarginTop = needsSeparation ? 1 : 0;
+
   switch (block.type) {
     case 'text': {
       // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
       const displayText = block.text.trim();
       return (
-        <Box key={`text-${index}`} flexDirection="row">
+        <Box key={`text-${index}`} flexDirection="row" marginTop={blockMarginTop}>
           <MarkdownText>{displayText}</MarkdownText>
           {isStreaming && (
             <Text color={theme.text.muted}>▌</Text>
@@ -75,11 +83,11 @@ const renderContentBlock = (
       // Trim and limit thinking content to last N lines (auto-scroll effect)
       const { text, truncated } = getLastLines(block.thinking.trim(), maxThinkingLines);
       return (
-        <Box key={`thinking-${index}`} flexDirection="column">
+        <Box key={`thinking-${index}`} flexDirection="column" marginTop={blockMarginTop}>
           {truncated && (
             <Text color={theme.text.muted}>...</Text>
           )}
-          <MarkdownText dimColor baseColor={theme.message.thinking}>
+          <MarkdownText baseColor={theme.text.secondary}>
             {text}
           </MarkdownText>
         </Box>
@@ -125,7 +133,8 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
       <Box flexGrow={1} flexDirection="column">
         {content.map((block, index) => {
           const isLastTextBlock = block.type === 'text' && index === lastTextBlockIndex;
-          return renderContentBlock(block, index, isStreaming && isLastTextBlock, maxThinkingLines);
+          const previousBlock = index > 0 ? content[index - 1] : undefined;
+          return renderContentBlock(block, index, isStreaming && isLastTextBlock, maxThinkingLines, previousBlock);
         })}
         {isStreaming && !hasTextContent && (
           <Text color={theme.ui.spinner}>
@@ -312,6 +321,7 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
 
   // Trim and split content into lines (matches ToolResultMessage behavior)
   const content = (item.content || '').trimEnd();
+  const hasContent = content.length > 0;
   const allLines = content.split('\n');
   const truncated = allLines.length > maxResultLines;
   const lines = truncated ? allLines.slice(0, maxResultLines) : allLines;
@@ -320,14 +330,19 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
   // Error results displayed in red
   const isError = item.isError === true;
   const textColor = isError ? theme.status.error : theme.text.secondary;
+  const isBashTool = item.toolName?.toLowerCase() === 'bash' || item.toolName?.toLowerCase() === 'bash_output';
+  const displayLines = lines.length > 0 ? lines : (isBashTool ? [''] : []);
 
   return (
     <Box flexDirection="column" paddingX={1} marginBottom={1}>
       {/* Content lines - red for errors, secondary for success */}
-      {lines.map((line, index) => (
+      {displayLines.map((line, index) => (
         <Box key={index} paddingLeft={STATUS_INDICATOR_WIDTH}>
+          {isBashTool && (
+            <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
+          )}
           <Text wrap="truncate-end" color={textColor}>
-            {line}
+            {!hasContent && isBashTool ? '(no output)' : line}
           </Text>
         </Box>
       ))}

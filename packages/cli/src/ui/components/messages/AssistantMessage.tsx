@@ -46,13 +46,21 @@ const renderContentBlock = (
   index: number,
   isStreaming: boolean,
   maxThinkingLines: number,
+  previousBlock?: ContentBlock,
 ): React.ReactNode => {
+  const needsSeparation =
+    previousBlock &&
+    previousBlock.type !== block.type &&
+    (block.type === 'text' || block.type === 'thinking') &&
+    (previousBlock.type === 'text' || previousBlock.type === 'thinking');
+  const blockMarginTop = needsSeparation ? 1 : 0;
+
   switch (block.type) {
     case 'text': {
       // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
       const displayText = block.text.trim();
       return (
-        <Box key={`text-${index}`} flexDirection="row">
+        <Box key={`text-${index}`} flexDirection="row" marginTop={blockMarginTop}>
           <MarkdownText>{displayText}</MarkdownText>
           {/* Show cursor when streaming and this is the last text block */}
           {isStreaming && (
@@ -66,11 +74,11 @@ const renderContentBlock = (
       // Trim and limit thinking content to last N lines (auto-scroll effect)
       const { text, truncated } = getLastLines(block.thinking.trim(), maxThinkingLines);
       return (
-        <Box key={`thinking-${index}`} flexDirection="column">
+        <Box key={`thinking-${index}`} flexDirection="column" marginTop={blockMarginTop}>
           {truncated && (
             <Text color={theme.text.muted}>...</Text>
           )}
-          <MarkdownText dimColor baseColor={theme.message.thinking}>
+          <MarkdownText baseColor={theme.text.secondary}>
             {text}
           </MarkdownText>
         </Box>
@@ -114,7 +122,14 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item, termin
         {item.content.map((block, index) => {
           // Only show streaming cursor on the last text block
           const isLastTextBlock = block.type === 'text' && index === lastTextBlockIndex;
-          return renderContentBlock(block, index, item.isStreaming === true && isLastTextBlock, maxThinkingLines);
+          const previousBlock = index > 0 ? item.content[index - 1] : undefined;
+          return renderContentBlock(
+            block,
+            index,
+            item.isStreaming === true && isLastTextBlock,
+            maxThinkingLines,
+            previousBlock,
+          );
         })}
         {/* Show spinner when streaming but no content yet */}
         {item.isStreaming && !hasTextContent && (

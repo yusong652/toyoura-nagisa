@@ -319,6 +319,11 @@ export function getToolLayoutConfig(toolName: string): ToolLayoutConfig {
     case 'grep':
       return { marginBottom: 0 };
 
+    // Bash output: result displays inline
+    case 'bash':
+    case 'bash_output':
+      return { marginBottom: 0 };
+
     // Default: standard margin
     default:
       return DEFAULT_LAYOUT;

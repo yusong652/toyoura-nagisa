@@ -15,6 +15,7 @@ import { DiffRenderer } from '../DiffRenderer.js';
 import { MarkdownText } from '../MarkdownText.js';
 import { useAppState } from '../../contexts/AppStateContext.js';
 import { ReadToolResultDisplay } from './ReadToolResultDisplay.js';
+import { TOOL_RESULT_PREFIX } from '../../markers.js';
 
 // Maximum lines to show before truncating (Claude Code style: 3-4 lines)
 const MAX_RESULT_LINES = 3;
@@ -31,6 +32,8 @@ const PLAIN_TEXT_TOOLS = new Set([
   'glob', 'grep', 'bash', 'bash_output', 'kill_shell',
   'pfc_execute_task', 'pfc_check_task_status', 'pfc_list_tasks',
 ]);
+
+const BASH_TOOLS = new Set(['bash', 'bash_output']);
 
 interface ToolResultMessageProps {
   item: ToolResultHistoryItem;
@@ -125,6 +128,7 @@ const DefaultToolResultDisplay: React.FC<{
 
   // Use plain text for file system tools to preserve path accuracy
   const usePlainText = isError || PLAIN_TEXT_TOOLS.has(item.toolName?.toLowerCase() || '');
+  const isBashTool = BASH_TOOLS.has(item.toolName?.toLowerCase() || '');
 
   return (
     <Box
@@ -134,8 +138,17 @@ const DefaultToolResultDisplay: React.FC<{
       marginBottom={1}
     >
       {/* Content - plain text for errors and file tools, markdown for others */}
-      <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
-        {usePlainText ? (
+      <Box paddingLeft={STATUS_INDICATOR_WIDTH} flexDirection="column">
+        {isBashTool ? (
+          (text.length ? text.split('\n') : ['']).map((line, index) => (
+            <Box key={index} flexDirection="row">
+              <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
+              <Text color={textColor ?? theme.text.secondary} wrap="truncate-end">
+                {text.length === 0 ? '(no output)' : line}
+              </Text>
+            </Box>
+          ))
+        ) : usePlainText ? (
           <Text color={textColor}>{text}</Text>
         ) : (
           <MarkdownText>{text}</MarkdownText>
