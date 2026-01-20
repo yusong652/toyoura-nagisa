@@ -42,7 +42,7 @@ import { useTodoStatus } from './hooks/useTodoStatus.js';
 import { useBackgroundProcesses } from './hooks/useBackgroundProcesses.js';
 import { usePfcTasks } from './hooks/usePfcTasks.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
-import { MessageType } from './types.js';
+import { MessageType, type AgentProfileType } from './types.js';
 import type { Config } from '../config/settings.js';
 
 interface AppContainerProps {
@@ -105,6 +105,9 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   // Full context mode (Ctrl+O toggle)
   const [isFullContextMode, setIsFullContextMode] = useState(false);
 
+  const normalizedDefaultProfile: AgentProfileType =
+    config.agent.defaultProfile === 'disabled' ? 'disabled' : 'pfc_expert';
+
   // User shell execution state (for Ctrl+B backgrounding)
   const [isShellExecuting, setShellExecuting] = useState(false);
 
@@ -128,7 +131,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     isProfileLoading,
     setProfile,
     refreshProfiles,
-  } = useProfileManager({ defaultProfile: 'pfc' });
+  } = useProfileManager({ defaultProfile: normalizedDefaultProfile });
 
   // Chat stream (message handling, streaming state)
   const {

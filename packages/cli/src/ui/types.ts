@@ -329,7 +329,7 @@ export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'er
 export type DialogType = 'help' | 'profile' | 'session' | 'settings';
 
 // Agent profile types (matches backend AgentProfile enum)
-export type AgentProfileType = 'lifestyle' | 'coding' | 'pfc' | 'general' | 'disabled';
+export type AgentProfileType = 'pfc_expert' | 'disabled';
 
 // Agent profile info from backend API
 export interface AgentProfileInfo {

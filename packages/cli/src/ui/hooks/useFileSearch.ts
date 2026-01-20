@@ -36,7 +36,7 @@ export interface UseFileSearchReturn {
 }
 
 export function useFileSearch(
-  agentProfile: string = 'general',
+  agentProfile: string = 'pfc_expert',
   sessionId?: string
 ): UseFileSearchReturn {
   const [results, setResults] = useState<FileSearchResult[]>([]);

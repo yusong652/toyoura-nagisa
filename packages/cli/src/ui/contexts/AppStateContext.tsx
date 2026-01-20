@@ -121,7 +121,7 @@ const defaultState: AppState = {
   connectionStatus: 'disconnected',
   error: null,
   currentSessionId: null,
-  currentProfile: 'pfc',
+  currentProfile: 'pfc_expert',
   availableProfiles: [],
   isProfileLoading: false,
   memoryEnabled: false,

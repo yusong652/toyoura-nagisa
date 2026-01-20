@@ -28,13 +28,10 @@ const formatTokensK = (tokens: number): string => {
   return `${k}k`;
 };
 
-// Profile display info (GitHub-inspired colors)
+// Profile display info fallback (GitHub-inspired colors)
 const PROFILE_DISPLAY: Record<AgentProfileType, { color: string; name: string }> = {
-  coding: { color: '#3fb950', name: 'Coding' },      // GitHub green
-  lifestyle: { color: '#d29922', name: 'Lifestyle' }, // GitHub yellow
-  pfc: { color: '#a371f7', name: 'PFC' },            // GitHub purple
-  general: { color: '#8b949e', name: 'General' },    // GitHub gray
-  disabled: { color: '#f85149', name: 'Disabled' },  // GitHub red
+  pfc_expert: { color: '#a371f7', name: 'PFC Expert' }, // GitHub purple
+  disabled: { color: '#f85149', name: 'Disabled' },     // GitHub red
 };
 
 /**
@@ -74,7 +71,13 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isShellExec
         : 'Disconnected';
 
   // Get profile display info
-  const profileInfo = PROFILE_DISPLAY[appState.currentProfile] || PROFILE_DISPLAY.general;
+  const backendProfile = appState.availableProfiles.find(
+    (profile) => profile.profile_type === appState.currentProfile
+  );
+  const profileInfo = {
+    name: backendProfile?.name ?? PROFILE_DISPLAY[appState.currentProfile]?.name ?? appState.currentProfile,
+    color: backendProfile?.color ?? PROFILE_DISPLAY[appState.currentProfile]?.color ?? theme.text.primary,
+  };
 
   // Calculate token usage display
   const usage = appState.tokenUsage;

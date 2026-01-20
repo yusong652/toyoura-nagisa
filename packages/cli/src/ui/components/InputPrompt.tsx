@@ -83,7 +83,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   disabled = false,
   isStreaming = false,
   placeholder = 'Type your message...',
-  agentProfile = 'general',
+  agentProfile = 'pfc_expert',
   sessionId,
 }) => {
   // Default prefix width (all prefixes should have same width for alignment)

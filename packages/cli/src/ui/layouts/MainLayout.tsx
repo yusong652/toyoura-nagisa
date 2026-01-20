@@ -53,12 +53,20 @@ type ActiveDialog = 'profile' | 'memory' | 'session' | 'session_restore' | 'sess
 // Session action type
 type SessionAction = 'create' | 'restore' | 'delete';
 
-// Profile options for SelectDialog
-const PROFILE_OPTIONS: SelectOption<AgentProfileType>[] = [
-  { key: 'coding', value: 'coding', label: 'Coding', description: 'Code development and programming tasks' },
-  { key: 'pfc', value: 'pfc', label: 'PFC', description: 'ITASCA PFC simulation specialist' },
-  { key: 'general', value: 'general', label: 'General', description: 'Full tool capabilities for complex tasks' },
-  { key: 'disabled', value: 'disabled', label: 'Disabled', description: 'Pure text conversation mode (no tools)' },
+// Profile options fallback (used if profile list is unavailable)
+const FALLBACK_PROFILE_OPTIONS: SelectOption<AgentProfileType>[] = [
+  {
+    key: 'pfc_expert',
+    value: 'pfc_expert',
+    label: 'PFC Expert',
+    description: 'ITASCA PFC simulation with script-based workflow',
+  },
+  {
+    key: 'disabled',
+    value: 'disabled',
+    label: 'Chat Agent',
+    description: 'Pure conversation mode without tools',
+  },
 ];
 
 // Memory options for SelectDialog
@@ -153,6 +161,19 @@ export const MainLayout: React.FC = () => {
   }>>([]);
   const [isPfcTasksLoading, setIsPfcTasksLoading] = useState(false);
 
+  const profileOptions = useMemo<SelectOption<AgentProfileType>[]>(() => {
+    if (appState.availableProfiles.length === 0) {
+      return FALLBACK_PROFILE_OPTIONS;
+    }
+
+    return appState.availableProfiles.map((profile) => ({
+      key: profile.profile_type,
+      value: profile.profile_type as AgentProfileType,
+      label: profile.name,
+      description: profile.description,
+    }));
+  }, [appState.availableProfiles]);
+
   // Slash command processor context
   const commandProcessorContext = useMemo(() => ({
     ui: {
@@ -220,12 +241,13 @@ export const MainLayout: React.FC = () => {
   // Handle profile selection from dialog
   const handleProfileSelect = useCallback((profile: AgentProfileType) => {
     appActions.setProfile(profile);
+    const profileLabel = profileOptions.find((option) => option.value === profile)?.label ?? profile;
     appActions.addHistoryItem({
       type: MessageType.INFO,
-      message: `Switched to ${profile} profile`,
+      message: `Switched to ${profileLabel} profile`,
     });
     setActiveDialog(null);
-  }, [appActions]);
+  }, [appActions, profileOptions]);
 
   // Handle memory selection from dialog
   const handleMemorySelect = useCallback((enabled: boolean) => {
@@ -732,7 +754,7 @@ export const MainLayout: React.FC = () => {
           <SelectDialog
             title="Select Agent Profile"
             description="Choose a profile to optimize tool loading for your task:"
-            options={PROFILE_OPTIONS}
+            options={profileOptions}
             currentValue={appState.currentProfile}
             onSelect={handleProfileSelect}
             onCancel={handleDialogCancel}

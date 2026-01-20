@@ -51,7 +51,7 @@ export interface UseShellCommandReturn {
 
 export function useShellCommand(
   sessionId: string | null,
-  agentProfile: string = 'general'
+  agentProfile: string = 'pfc_expert'
 ): UseShellCommandReturn {
   const connectionManager = useConnectionManager();
   const [isExecuting, setIsExecuting] = useState(false);

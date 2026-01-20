@@ -22,7 +22,7 @@ interface UseProfileManagerReturn {
 }
 
 export function useProfileManager({
-  defaultProfile = 'pfc',
+  defaultProfile = 'pfc_expert',
 }: UseProfileManagerParams = {}): UseProfileManagerReturn {
   const [currentProfile, setCurrentProfile] = useState<AgentProfileType>(defaultProfile);
   const [availableProfiles, setAvailableProfiles] = useState<AgentProfileInfo[]>([]);
