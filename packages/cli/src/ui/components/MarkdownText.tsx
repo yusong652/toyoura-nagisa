@@ -311,26 +311,25 @@ function parseTableRow(line: string): string[] {
 
 /**
  * Strip markdown formatting to get plain text for width calculation
- * Removes: **bold**, *italic*, `code`, ~~strikethrough~~, [link](url), <br>, <tag>
+ * Returns the text AS IT WILL BE RENDERED (including markers that are visible)
+ * so that column width calculations match visual display.
  */
 function stripMarkdownForWidth(text: string): string {
-  return text
-    // Remove <br> and <br/> tags
-    .replace(/<br\s*\/?>/gi, ' ')
-    // Remove HTML tags like <u>, </u>, <mark>, etc.
-    .replace(/<\/?[a-z][a-z0-9]*[^>]*>/gi, '')
-    // Remove bold/italic markers (*** or ___)
-    .replace(/(\*\*\*|___)(.+?)\1/g, '$2')
-    // Remove bold markers (** or __)
-    .replace(/(\*\*|__)(.+?)\1/g, '$2')
-    // Remove strikethrough markers (~~)
-    .replace(/~~(.+?)~~/g, '$1')
-    // Remove italic markers (* or _)
-    .replace(/(\*|_)([^*_]+?)\1/g, '$2')
-    // Remove inline code markers (`)
-    .replace(/`([^`]+)`/g, '$1')
-    // Remove links, keep text
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+  const segments = parseInline(text);
+  return segments.map(seg => {
+    switch (seg.type) {
+      case 'code':
+        return `\`${seg.content}\``;
+      case 'kbd':
+        return `[${seg.content}]`;
+      case 'math':
+        return `$${seg.content}$`;
+      case 'link':
+        return `${seg.content} (${seg.url})`;
+      default:
+        return seg.content;
+    }
+  }).join('');
 }
 
 /**
