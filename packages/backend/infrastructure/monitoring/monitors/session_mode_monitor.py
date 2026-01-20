@@ -20,14 +20,13 @@ class SessionModeMonitor(BaseMonitor):
         if mode == "plan":
             reminder_text = (
                 "Your operational mode is PLAN.\n"
-                "You are in read-only mode.\n"
-                "File edits, shell commands, and execution tools are disabled."
+                "You are in read-only mode. Exploration tools (read, glob, grep, etc.) and read-only shell commands (ls, git status, etc.) are allowed.\n"
+                "File edits, modifying shell commands, and simulation execution tools are disabled."
             )
         else:
             reminder_text = (
                 "Your operational mode is BUILD.\n"
-                "You are not in read-only mode.\n"
-                "File edits, shell commands, and tool execution are allowed."
+                "Full operational mode. File edits, shell commands, and simulation execution tools are allowed."
             )
 
         reminder_block = f"<system-reminder>\n{reminder_text}\n</system-reminder>"
