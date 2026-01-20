@@ -86,6 +86,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   agentProfile = 'pfc_expert',
   sessionId,
 }) => {
+  const MAX_INPUT_LINES = 6;
   // Default prefix width (all prefixes should have same width for alignment)
   const prefixWidth = 2;
 
@@ -429,6 +430,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   // Use visual cursor for correct cursor positioning in wrapped lines
   const [visualCursorRow, visualCursorCol] = buffer.visualCursor;
+  const totalVisualLines = buffer.visualLines.length;
+  const maxVisibleLines = Math.max(1, MAX_INPUT_LINES);
+  const maxStartIndex = Math.max(0, totalVisualLines - maxVisibleLines);
+  const visibleStartIndex = totalVisualLines > maxVisibleLines
+    ? Math.min(Math.max(0, visualCursorRow - maxVisibleLines + 1), maxStartIndex)
+    : 0;
+  const visibleEndIndex = visibleStartIndex + maxVisibleLines;
+  const visibleLines = buffer.visualLines.slice(visibleStartIndex, visibleEndIndex);
+  const visibleCursorRow = Math.max(0, visualCursorRow - visibleStartIndex);
 
   // Prefix color based on mode
   const prefixColor = useMemo(() => {
@@ -440,11 +450,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Render a visual line with cursor
   const renderVisualLine = (
     visualLine: string,
-    visualLineIndex: number,
+    lineIndex: number,
     isCurrentLine: boolean
   ) => {
     // Only show prefix on the very first line
-    const isFirstLine = visualLineIndex === 0;
+    const isFirstLine = lineIndex === 0;
     const linePrefix = isFirstLine ? prefix : continuationPrefix;
 
     // Hide trigger character on first line in special modes
@@ -457,10 +467,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       ? Math.max(0, visualCursorCol - 1)
       : visualCursorCol;
 
-    if (isEmpty && visualLineIndex === 0 && !disabled) {
+    if (isEmpty && lineIndex === 0 && !disabled) {
       // Show placeholder with cursor at start
       return (
-        <Box key={visualLineIndex} flexDirection="row">
+        <Box key={lineIndex} flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
             <Text color={prefixColor}>{linePrefix}</Text>
           </Box>
@@ -473,7 +483,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     if (!isCurrentLine) {
       // Non-active line - just render text
       return (
-        <Box key={visualLineIndex} flexDirection="row">
+        <Box key={lineIndex} flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
             <Text color={isFirstLine ? prefixColor : theme.text.muted}>
               {linePrefix}
@@ -490,7 +500,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     const afterCursor = codePoints.slice(adjustedCursorCol + 1).join('');
 
     return (
-      <Box key={visualLineIndex} flexDirection="row">
+      <Box key={lineIndex} flexDirection="row">
         <Box width={prefixWidth} flexShrink={0}>
           <Text color={isFirstLine ? prefixColor : theme.text.muted}>
             {linePrefix}
@@ -515,8 +525,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             <Text color={theme.text.muted}>...</Text>
           </Box>
         ) : (
-          buffer.visualLines.map((visualLine, index) =>
-            renderVisualLine(visualLine, index, index === visualCursorRow)
+          visibleLines.map((visualLine, index) =>
+            renderVisualLine(
+              visualLine,
+              index + visibleStartIndex,
+              index === visibleCursorRow
+            )
           )
         )}
       </PanelSection>
