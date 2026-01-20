@@ -15,7 +15,6 @@ from backend.domain.models.message_factory import extract_text_from_message
 from backend.infrastructure.llm.shared.constants import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
     DEFAULT_TITLE_GENERATION_TEMPERATURE,
-    DEFAULT_TITLE_GENERATION_MAX_TOKENS,
     DEFAULT_TITLE_MAX_LENGTH,
 )
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
@@ -55,7 +54,6 @@ async def _generate_title(llm_client: Any, latest_messages: List[BaseMessage]) -
         context_contents=context_contents,
         api_config=api_config,
         temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
-        max_tokens=DEFAULT_TITLE_GENERATION_MAX_TOKENS,
         enable_thinking=False,
     )
 

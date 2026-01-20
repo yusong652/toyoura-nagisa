@@ -7,7 +7,6 @@ Common default values and settings that can be used by all provider implementati
 # Title generation defaults
 DEFAULT_TITLE_MAX_LENGTH = 50
 DEFAULT_TITLE_GENERATION_TEMPERATURE = 0.3
-DEFAULT_TITLE_GENERATION_MAX_TOKENS = 256
 
 # API timeout defaults
 DEFAULT_API_TIMEOUT = 60

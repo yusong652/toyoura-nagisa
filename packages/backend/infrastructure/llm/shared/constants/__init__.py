@@ -11,7 +11,6 @@ from .prompts import *
 __all__ = [
     # Default values
     "DEFAULT_TITLE_MAX_LENGTH",
-    "DEFAULT_TITLE_GENERATION_MAX_TOKENS",
     
     # System prompts
     "DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT",

@@ -5,9 +5,10 @@
  * Provides methods for creating, restoring, and deleting sessions.
  */
 
-import { useState, useCallback } from 'react';
-import { sessionService, type ChatSession } from '@toyoura-nagisa/core';
+import { useState, useCallback, useEffect } from 'react';
+import { sessionService, type ChatSession, type TitleUpdateMessage } from '@toyoura-nagisa/core';
 import type { SelectOption } from '../components/SelectDialog.js';
+import { useConnectionManager } from '../contexts/ConnectionContext.js';
 
 export interface UseSessionManagerReturn {
   /** List of available sessions */
@@ -29,6 +30,7 @@ export interface UseSessionManagerReturn {
 }
 
 export function useSessionManager(): UseSessionManagerReturn {
+  const connectionManager = useConnectionManager();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +109,34 @@ export function useSessionManager(): UseSessionManagerReturn {
     },
     [sessions]
   );
+
+  useEffect(() => {
+    const handleTitleUpdate = (message: TitleUpdateMessage) => {
+      const payload = message?.payload;
+      if (!payload?.session_id || !payload.title) {
+        return;
+      }
+
+      setSessions((prev) => {
+        const hasSession = prev.some((session) => session.id === payload.session_id);
+        if (!hasSession) {
+          return prev;
+        }
+
+        return prev.map((session) =>
+          session.id === payload.session_id
+            ? { ...session, name: payload.title }
+            : session
+        );
+      });
+    };
+
+    connectionManager.on('title_update', handleTitleUpdate);
+
+    return () => {
+      connectionManager.off('title_update', handleTitleUpdate);
+    };
+  }, [connectionManager]);
 
   return {
     sessions,

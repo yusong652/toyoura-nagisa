@@ -85,7 +85,7 @@ class LLMFactory:
                                  "max_tokens": cfg.max_tokens, "top_p": cfg.top_p, "top_k": cfg.top_k,
                                  "web_search_max_uses": cfg.web_search_max_uses}
             }
-        elif name in ["gpt", "openai"]:
+        elif name in ["openai"]:
             cfg = llm_settings.get_openai_config()
             if not cfg.openai_api_key:
                 raise ValueError("OpenAI API key not configured")
@@ -93,7 +93,7 @@ class LLMFactory:
                 "api_key": cfg.openai_api_key,
                 "extra_config": {**extra, "model": cfg.model, "temperature": cfg.temperature,
                                  "top_p": cfg.top_p, "top_k": cfg.top_k, "max_tokens": cfg.max_tokens}
-            }
+            }   
         elif name == "moonshot":
             cfg = llm_settings.get_moonshot_config()
             if not cfg.moonshot_api_key:
