@@ -25,6 +25,8 @@ from openai.types.responses import (
     ResponseReasoningItem,
 )
 from backend.infrastructure.llm.base.client import LLMClientBase
+from backend.infrastructure.llm.base.call_options import parse_call_options
+from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
 
@@ -116,7 +118,14 @@ class OpenAIClient(LLMClientBase):
         Returns:
             OpenAI Responses API `Response` object.
         """
+        call_options = parse_call_options(kwargs)
         debug = self.openai_config.debug
+        timeout = call_options.timeout if call_options.timeout is not None else self.openai_config.timeout
+        max_retries = (
+            call_options.max_retries
+            if call_options.max_retries is not None
+            else self.openai_config.max_retries
+        )
 
         tools = api_config.get("tools", []) or []
         instructions = api_config.get("instructions")
@@ -130,12 +139,14 @@ class OpenAIClient(LLMClientBase):
             tools=tools
         )
 
-        if 'temperature' in kwargs:
-            kwargs_api['temperature'] = kwargs['temperature']
-        if 'max_tokens' in kwargs:
-            kwargs_api['max_output_tokens'] = kwargs['max_tokens']
-        if 'top_p' in kwargs:
-            kwargs_api['top_p'] = kwargs['top_p']
+        if call_options.temperature is not None:
+            kwargs_api['temperature'] = call_options.temperature
+        if call_options.max_tokens is not None:
+            kwargs_api['max_output_tokens'] = call_options.max_tokens
+        if call_options.top_p is not None:
+            kwargs_api['top_p'] = call_options.top_p
+        if call_options.timeout is not None:
+            kwargs_api['timeout'] = call_options.timeout
 
         if debug:
             OpenAIDebugger.log_api_call_info(
@@ -144,8 +155,17 @@ class OpenAIClient(LLMClientBase):
             )
             OpenAIDebugger.print_debug_request_payload(kwargs_api)
 
+        async def _call_api():
+            return await self.async_client.responses.create(**kwargs_api)
+
         try:
-            response = await self.async_client.responses.create(**kwargs_api)
+            response = await run_with_retries(
+                _call_api,
+                max_retries=max_retries,
+                timeout=timeout,
+                debug=debug,
+                provider="OpenAI",
+            )
 
             if debug:
                 OpenAIDebugger.log_raw_response(response)
@@ -204,7 +224,14 @@ class OpenAIClient(LLMClientBase):
         """
         Execute streaming Responses API call and yield standardized chunks.
         """
+        call_options = parse_call_options(kwargs)
         debug = self.openai_config.debug
+        timeout = call_options.timeout if call_options.timeout is not None else self.openai_config.timeout
+        max_retries = (
+            call_options.max_retries
+            if call_options.max_retries is not None
+            else self.openai_config.max_retries
+        )
 
         tools = api_config.get("tools", []) or []
         instructions = api_config.get("instructions")
@@ -218,12 +245,14 @@ class OpenAIClient(LLMClientBase):
             tools=tools
         )
 
-        if 'temperature' in kwargs:
-            kwargs_api['temperature'] = kwargs['temperature']
-        if 'max_tokens' in kwargs:
-            kwargs_api['max_output_tokens'] = kwargs['max_tokens']
-        if 'top_p' in kwargs:
-            kwargs_api['top_p'] = kwargs['top_p']
+        if call_options.temperature is not None:
+            kwargs_api['temperature'] = call_options.temperature
+        if call_options.max_tokens is not None:
+            kwargs_api['max_output_tokens'] = call_options.max_tokens
+        if call_options.top_p is not None:
+            kwargs_api['top_p'] = call_options.top_p
+        if call_options.timeout is not None:
+            kwargs_api['timeout'] = call_options.timeout
 
         if debug:
             OpenAIDebugger.log_api_call_info(
@@ -232,51 +261,69 @@ class OpenAIClient(LLMClientBase):
             )
             OpenAIDebugger.print_debug_request_payload(kwargs_api)
 
-        final_response: Optional[Response] = None
+        async def _stream_once():
+            final_response: Optional[Response] = None
 
-        try:
-            # Create stateful streaming processor
-            streaming_processor = self._get_response_processor().create_streaming_processor()
+            try:
+                # Create stateful streaming processor
+                streaming_processor = self._get_response_processor().create_streaming_processor()
 
-            async with self.async_client.responses.stream(**kwargs_api) as stream:
-                async for event in stream:
-                    # Delegate event processing to streaming processor
-                    processed_chunks = streaming_processor.process_event(event)
-                    for chunk in processed_chunks:
-                        yield chunk
+                async with self.async_client.responses.stream(**kwargs_api) as stream:
+                    async for event in stream:
+                        # Delegate event processing to streaming processor
+                        processed_chunks = streaming_processor.process_event(event)
+                        for chunk in processed_chunks:
+                            yield chunk
 
-                    # Capture final response metadata
-                    if isinstance(event, ResponseCompletedEvent):
-                        final_response = event.response
+                        # Capture final response metadata
+                        if isinstance(event, ResponseCompletedEvent):
+                            final_response = event.response
 
-        except Exception:
-            if debug:
-                OpenAIDebugger.print_debug_request_payload(kwargs_api)
-            raise
+            except Exception:
+                if debug:
+                    OpenAIDebugger.print_debug_request_payload(kwargs_api)
+                raise
 
-        if final_response:
-            # Extract usage metadata from final response
-            final_metadata: Dict[str, Any] = {"__openai_final_response": final_response}
+            if final_response:
+                # Extract usage metadata from final response
+                final_metadata: Dict[str, Any] = {"__openai_final_response": final_response}
 
-            if hasattr(final_response, 'usage') and final_response.usage:
-                usage = final_response.usage
-                final_metadata.update({
-                    'prompt_token_count': getattr(usage, 'input_tokens', None),
-                    'candidates_token_count': getattr(usage, 'output_tokens', None),
-                    'total_token_count': getattr(usage, 'total_tokens', None),
-                })
+                if hasattr(final_response, 'usage') and final_response.usage:
+                    usage = final_response.usage
+                    final_metadata.update({
+                        'prompt_token_count': getattr(usage, 'input_tokens', None),
+                        'candidates_token_count': getattr(usage, 'output_tokens', None),
+                        'total_token_count': getattr(usage, 'total_tokens', None),
+                    })
 
-                # Extract detailed token counts
-                if hasattr(usage, 'output_tokens_details') and usage.output_tokens_details:
-                    final_metadata['reasoning_tokens'] = getattr(usage.output_tokens_details, 'reasoning_tokens', None)
+                    # Extract detailed token counts
+                    if hasattr(usage, 'output_tokens_details') and usage.output_tokens_details:
+                        final_metadata['reasoning_tokens'] = getattr(
+                            usage.output_tokens_details,
+                            'reasoning_tokens',
+                            None
+                        )
 
-                if hasattr(usage, 'input_tokens_details') and usage.input_tokens_details:
-                    final_metadata['cached_tokens'] = getattr(usage.input_tokens_details, 'cached_tokens', None)
+                    if hasattr(usage, 'input_tokens_details') and usage.input_tokens_details:
+                        final_metadata['cached_tokens'] = getattr(
+                            usage.input_tokens_details,
+                            'cached_tokens',
+                            None
+                        )
 
-            yield StreamingChunk(
-                chunk_type="text",
-                content="",
-                metadata=final_metadata
-            )
+                yield StreamingChunk(
+                    chunk_type="text",
+                    content="",
+                    metadata=final_metadata
+                )
+
+        async for chunk in stream_with_retries(
+            _stream_once,
+            max_retries=max_retries,
+            timeout=timeout,
+            debug=debug,
+            provider="OpenAI",
+        ):
+            yield chunk
 
     # _construct_response_from_streaming_chunks is now handled by ResponseProcessor

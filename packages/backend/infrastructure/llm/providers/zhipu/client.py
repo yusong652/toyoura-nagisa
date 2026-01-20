@@ -11,6 +11,8 @@ from zai import ZhipuAiClient
 from zai.types.chat import Completion
 
 from backend.infrastructure.llm.base.client import LLMClientBase
+from backend.infrastructure.llm.base.call_options import parse_call_options
+from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.streaming import StreamingChunk
 
 # Import Zhipu-specific implementations
@@ -160,7 +162,14 @@ class ZhipuClient(LLMClientBase):
         Returns:
             Response object from zai SDK.
         """
+        call_options = parse_call_options(kwargs)
         debug = self.zhipu_config.debug
+        timeout = call_options.timeout if call_options.timeout is not None else self.zhipu_config.timeout
+        max_retries = (
+            call_options.max_retries
+            if call_options.max_retries is not None
+            else self.zhipu_config.max_retries
+        )
 
         tools = api_config.get("tools", []) or []
 
@@ -175,43 +184,34 @@ class ZhipuClient(LLMClientBase):
                 "content": system_prompt
             })
 
-        # Build API call parameters
-        api_kwargs: Dict[str, Any] = {
-            "model": self.zhipu_config.model_settings.model,
-            "messages": messages,
-            "temperature": self.zhipu_config.model_settings.temperature,
-            "top_p": self.zhipu_config.model_settings.top_p,
-            "stream": False,
-        }
+        api_kwargs = self.zhipu_config.get_api_call_kwargs(
+            messages=messages,
+            tools=tools,
+            stream=False,
+        )
 
-        if self.zhipu_config.model_settings.max_tokens:
-            api_kwargs["max_tokens"] = self.zhipu_config.model_settings.max_tokens
+        if call_options.temperature is not None:
+            api_kwargs['temperature'] = call_options.temperature
+        if call_options.max_tokens is not None:
+            api_kwargs['max_tokens'] = call_options.max_tokens
+        if call_options.top_p is not None:
+            api_kwargs['top_p'] = call_options.top_p
+        if call_options.timeout is not None:
+            api_kwargs['timeout'] = call_options.timeout
 
-        # Add tools if provided
-        if tools:
-            api_kwargs["tools"] = tools
-            api_kwargs["tool_choice"] = "auto"
-
-        # Enable thinking mode by default (GLM thinking models)
-        # Users can disable by passing enable_thinking=False
-        if kwargs.get('enable_thinking', True):
+        enable_thinking = call_options.enable_thinking
+        if call_options.thinking is not None:
+            api_kwargs["thinking"] = call_options.thinking
+        elif enable_thinking is None or enable_thinking is True:
             api_kwargs["thinking"] = {"type": "enabled"}
-
-        # Apply runtime overrides
-        if 'temperature' in kwargs:
-            api_kwargs['temperature'] = kwargs['temperature']
-        if 'max_tokens' in kwargs:
-            api_kwargs['max_tokens'] = kwargs['max_tokens']
-        if 'top_p' in kwargs:
-            api_kwargs['top_p'] = kwargs['top_p']
 
         if debug:
             ZhipuDebugger.print_api_request(api_kwargs, messages, tools)
 
-        try:
+        async def _call_api():
             # Wrap synchronous call with asyncio.to_thread
             # Cast to Completion since stream=False guarantees this type
-            response = cast(
+            return cast(
                 Completion,
                 await asyncio.to_thread(
                     self.client.chat.completions.create,
@@ -219,7 +219,14 @@ class ZhipuClient(LLMClientBase):
                 )
             )
 
-            return response
+        try:
+            return await run_with_retries(
+                _call_api,
+                max_retries=max_retries,
+                timeout=timeout,
+                debug=debug,
+                provider="Zhipu",
+            )
         except Exception as exc:
             if debug:
                 print(f"[DEBUG] Zhipu API call failed: {exc}")
@@ -242,9 +249,14 @@ class ZhipuClient(LLMClientBase):
         Yields:
             StreamingChunk: Standardized streaming data chunks.
         """
+        call_options = parse_call_options(kwargs)
         debug = self.zhipu_config.debug
-        max_retries = self.zhipu_config.max_retries
-        base_delay = 1.0  # Base delay for exponential backoff
+        timeout = call_options.timeout if call_options.timeout is not None else self.zhipu_config.timeout
+        max_retries = (
+            call_options.max_retries
+            if call_options.max_retries is not None
+            else self.zhipu_config.max_retries
+        )
 
         tools = api_config.get("tools", []) or []
 
@@ -259,148 +271,78 @@ class ZhipuClient(LLMClientBase):
                 "content": system_prompt
             })
 
-        # Build API call parameters
-        api_kwargs: Dict[str, Any] = {
-            "model": self.zhipu_config.model_settings.model,
-            "messages": messages,
-            "temperature": self.zhipu_config.model_settings.temperature,
-            "top_p": self.zhipu_config.model_settings.top_p,
-            "stream": True,  # Enable streaming
-            # Note: Zhipu's zai SDK automatically includes usage in final chunk, no stream_options needed
-        }
+        api_kwargs = self.zhipu_config.get_api_call_kwargs(
+            messages=messages,
+            tools=tools,
+            stream=True,
+        )
 
-        if self.zhipu_config.model_settings.max_tokens:
-            api_kwargs["max_tokens"] = self.zhipu_config.model_settings.max_tokens
+        if call_options.temperature is not None:
+            api_kwargs['temperature'] = call_options.temperature
+        if call_options.max_tokens is not None:
+            api_kwargs['max_tokens'] = call_options.max_tokens
+        if call_options.top_p is not None:
+            api_kwargs['top_p'] = call_options.top_p
+        if call_options.timeout is not None:
+            api_kwargs['timeout'] = call_options.timeout
 
-        # Add tools if provided
-        if tools:
-            api_kwargs["tools"] = tools
-            api_kwargs["tool_choice"] = "auto"
-
-        # Enable thinking mode if requested (GLM thinking models)
-        if kwargs.get('enable_thinking', True):  # Default to enabled for streaming
+        enable_thinking = call_options.enable_thinking
+        if call_options.thinking is not None:
+            api_kwargs["thinking"] = call_options.thinking
+        elif enable_thinking is None or enable_thinking is True:
             api_kwargs["thinking"] = {"type": "enabled"}
-
-        # Apply runtime overrides
-        if 'temperature' in kwargs:
-            api_kwargs['temperature'] = kwargs['temperature']
-        if 'max_tokens' in kwargs:
-            api_kwargs['max_tokens'] = kwargs['max_tokens']
-        if 'top_p' in kwargs:
-            api_kwargs['top_p'] = kwargs['top_p']
 
         if debug:
             ZhipuDebugger.print_api_request(api_kwargs, messages, tools)
 
-        # Retry loop for streaming
-        last_exception: Optional[Exception] = None
-        for attempt in range(max_retries + 1):
-            try:
-                if attempt > 0:
-                    # Calculate delay with exponential backoff
-                    delay = base_delay * (2 ** (attempt - 1))
-                    if debug:
-                        print(f"[DEBUG] Zhipu streaming retry attempt {attempt}/{max_retries}, waiting {delay}s...")
-                    await asyncio.sleep(delay)
+        async def _stream_once():
+            # Create streaming response (synchronous generator)
+            # Type: StreamResponse[ChatCompletionChunk] when stream=True
+            # zai SDK is synchronous, we need to iterate in a thread to avoid blocking
+            stream = await asyncio.to_thread(
+                self.client.chat.completions.create,
+                **api_kwargs
+            )  # type: Any  # StreamResponse not publicly exported by zai SDK
 
-                # Create streaming response (synchronous generator)
-                # Type: StreamResponse[ChatCompletionChunk] when stream=True
-                # zai SDK is synchronous, we need to iterate in a thread to avoid blocking
-                stream = await asyncio.to_thread(
-                    self.client.chat.completions.create,
-                    **api_kwargs
-                )  # type: Any  # StreamResponse not publicly exported by zai SDK
+            # Create stateful streaming processor
+            streaming_processor = self._get_response_processor().create_streaming_processor()
 
-                # Create stateful streaming processor
-                streaming_processor = self._get_response_processor().create_streaming_processor()
+            # Convert synchronous stream iterator to async
+            # zai SDK returns a sync iterator, we need to iterate in executor
+            # to avoid blocking the event loop
+            loop = asyncio.get_running_loop()
 
-                # Convert synchronous stream iterator to async
-                # zai SDK returns a sync iterator, we need to iterate in executor
-                # to avoid blocking the event loop
-                loop = asyncio.get_event_loop()
+            # Create iterator from stream
+            stream_iter = iter(stream)
 
-                # Create iterator from stream
-                stream_iter = iter(stream)
+            # Helper function to get next chunk (will run in thread pool)
+            def get_next_chunk():
+                try:
+                    return next(stream_iter), False  # (chunk, is_done)
+                except StopIteration:
+                    return None, True  # (None, is_done)
 
-                # Helper function to get next chunk (will run in thread pool)
-                def get_next_chunk():
-                    try:
-                        return next(stream_iter), False  # (chunk, is_done)
-                    except StopIteration:
-                        return None, True  # (None, is_done)
+            # Iterate through chunks asynchronously
+            while True:
+                # Run next() in thread pool to avoid blocking
+                chunk, is_done = await loop.run_in_executor(None, get_next_chunk)
 
-                # Iterate through chunks asynchronously
-                while True:
-                    # Run next() in thread pool to avoid blocking
-                    chunk, is_done = await loop.run_in_executor(None, get_next_chunk)
+                if is_done or chunk is None:
+                    break
 
-                    if is_done or chunk is None:
-                        break
+                # Delegate chunk processing to streaming processor
+                processed_chunks = streaming_processor.process_event(chunk)
+                for processed_chunk in processed_chunks:
+                    yield processed_chunk
 
-                    # Delegate chunk processing to streaming processor
-                    processed_chunks = streaming_processor.process_event(chunk)
-                    for processed_chunk in processed_chunks:
-                        yield processed_chunk
-
-                # Successfully completed streaming, exit retry loop
-                return
-
-            except Exception as e:
-                last_exception = e
-                is_timeout_error = self._is_retryable_error(e)
-
-                if debug:
-                    print(f"[DEBUG] Zhipu streaming failed (attempt {attempt + 1}/{max_retries + 1}): {e}")
-
-                # Only retry on timeout/connection errors, not other errors
-                if not is_timeout_error or attempt >= max_retries:
-                    if debug:
-                        if not is_timeout_error:
-                            print(f"[DEBUG] Error is not retryable, raising immediately")
-                        else:
-                            print(f"[DEBUG] Max retries ({max_retries}) exceeded, raising exception")
-                    raise
-
-        # Should not reach here, but raise last exception if we do
-        if last_exception:
-            raise last_exception
-
-    def _is_retryable_error(self, error: Exception) -> bool:
-        """
-        Check if an error is retryable (timeout or connection related).
-
-        Args:
-            error: The exception to check
-
-        Returns:
-            True if the error is retryable, False otherwise
-        """
-        error_str = str(error).lower()
-        error_type = type(error).__name__.lower()
-
-        retryable_patterns = [
-            'timeout',
-            'timed out',
-            'connection',
-            'network',
-            'reset',
-            'broken pipe',
-            'eof',
-            'read error',
-        ]
-
-        # Check error message
-        for pattern in retryable_patterns:
-            if pattern in error_str:
-                return True
-
-        # Check error type name
-        retryable_types = ['timeout', 'connection', 'network']
-        for pattern in retryable_types:
-            if pattern in error_type:
-                return True
-
-        return False
+        async for chunk in stream_with_retries(
+            _stream_once,
+            max_retries=max_retries,
+            timeout=timeout,
+            debug=debug,
+            provider="Zhipu",
+        ):
+            yield chunk
 
     def get_or_create_context_manager(self, session_id: str):
         """

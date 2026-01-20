@@ -66,7 +66,7 @@ class GoogleModelConfig(BaseModel):
         le=2.0,
         description="Sampling temperature, controlling the randomness of the output"
     )
-    max_output_tokens: int = Field(
+    max_tokens: int = Field(
         default=4096,
         ge=1,
         description="Maximum output token number"
@@ -122,6 +122,16 @@ class GoogleClientConfig(BaseModel):
         default=False,
         description="Whether to enable debug mode"
     )
+
+    timeout: float = Field(
+        default=60.0,
+        description="Request timeout in seconds"
+    )
+
+    max_retries: int = Field(
+        default=3,
+        description="Maximum number of retries for failed requests"
+    )
     
     # 工具相关配置
     tools_enabled: bool = Field(
@@ -147,7 +157,7 @@ class GoogleClientConfig(BaseModel):
             "system_instruction": system_prompt,
             "safety_settings": self.safety_settings.to_gemini_format(),
             "temperature": self.model_settings.temperature,
-            "max_output_tokens": self.model_settings.max_output_tokens,
+            "max_output_tokens": self.model_settings.max_tokens,
         }
         
         # Add optional parameters

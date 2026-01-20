@@ -12,23 +12,10 @@ from backend.infrastructure.storage.session_manager import (
 )
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.domain.models.message_factory import extract_text_from_message
-from backend.infrastructure.llm.providers.anthropic.message_formatter import MessageFormatter
-from backend.infrastructure.llm.providers.anthropic.response_processor import AnthropicResponseProcessor
-from backend.infrastructure.llm.providers.google.message_formatter import GoogleMessageFormatter
-from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
-from backend.infrastructure.llm.providers.moonshot.response_processor import MoonshotResponseProcessor
-
-from backend.infrastructure.llm.providers.openai.constants import (
-    TITLE_GENERATION_TEMPERATURE,
-    TITLE_MAX_LENGTH,
-)
-from backend.infrastructure.llm.providers.openai.message_formatter import OpenAIMessageFormatter
-from backend.infrastructure.llm.providers.openai.response_processor import OpenAIResponseProcessor
-from backend.infrastructure.llm.providers.openrouter.response_processor import OpenRouterResponseProcessor
-from backend.infrastructure.llm.providers.zhipu.response_processor import ZhipuResponseProcessor
 from backend.infrastructure.llm.shared.constants import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
     DEFAULT_TITLE_GENERATION_TEMPERATURE,
+    DEFAULT_TITLE_GENERATION_MAX_TOKENS,
     DEFAULT_TITLE_MAX_LENGTH,
 )
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
@@ -55,177 +42,25 @@ def _build_title_user_message(conversation_context: str) -> UserMessage:
     )
 
 
-async def _generate_title_google(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
-    conversation_context = _format_conversation_context(latest_messages)
-    if not conversation_context:
-        return None
-
-    from google.genai import types
-
-    user_message = _build_title_user_message(conversation_context)
-    context_contents = GoogleMessageFormatter.format_messages([user_message])
-
-    title_config = types.GenerateContentConfig(
-        system_instruction=DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
-        temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
-        max_output_tokens=2048,
-    )
-
-    api_config = {
-        "config": title_config,
-    }
-
-    response = await llm_client.call_api_with_context(
-        context_contents=context_contents,
-        api_config=api_config,
-    )
-
-    title_response_text = GoogleResponseProcessor.extract_text_content(response)
-    return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
-
-
-async def _generate_title_anthropic(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
+async def _generate_title(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
     conversation_context = _format_conversation_context(latest_messages)
     if not conversation_context:
         return None
 
     user_message = _build_title_user_message(conversation_context)
-    context_contents = MessageFormatter.format_messages([user_message])
-
-    api_config = {
-        "system_prompt": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
-    }
-
-    response = await llm_client.call_api_with_context(
-        context_contents=context_contents,
-        api_config=api_config,
-        max_tokens=100,
-        temperature=1.0,
-    )
-
-    title_response_text = AnthropicResponseProcessor.extract_text_content(response)
-    return parse_title_response(title_response_text, max_length=30)
-
-
-async def _generate_title_openai(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
-    conversation_context = _format_conversation_context(latest_messages)
-    if not conversation_context:
-        return None
-
-    user_message = _build_title_user_message(conversation_context)
-    context_contents = OpenAIMessageFormatter.format_messages([user_message])
-
-    api_config = {
-        "instructions": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
-    }
-
-    response = await llm_client.call_api_with_context(
-        context_contents=context_contents,
-        api_config=api_config,
-        temperature=TITLE_GENERATION_TEMPERATURE,
-        max_tokens=100,
-    )
-
-    title_response_text = OpenAIResponseProcessor.extract_text_content(response)
-    return parse_title_response(title_response_text, max_length=TITLE_MAX_LENGTH)
-
-
-async def _generate_title_moonshot(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
-    conversation_context = _format_conversation_context(latest_messages)
-    if not conversation_context:
-        return None
-
-    user_message = _build_title_user_message(conversation_context)
-    context_contents = [
-        {"role": "user", "content": user_message.content},
-    ]
-
-    api_config = {
-        "system_prompt": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
-    }
+    context_contents = llm_client.format_messages([user_message])
+    api_config = llm_client.build_api_config(DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT)
 
     response = await llm_client.call_api_with_context(
         context_contents=context_contents,
         api_config=api_config,
         temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
-        max_tokens=100,
-    )
-
-    title_response_text = MoonshotResponseProcessor.extract_text_content(response)
-    return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
-
-
-async def _generate_title_openrouter(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
-    conversation_context = _format_conversation_context(latest_messages)
-    if not conversation_context:
-        return None
-
-    user_message = _build_title_user_message(conversation_context)
-    context_contents = [
-        {"role": "user", "content": user_message.content},
-    ]
-
-    api_config = {
-        "system_prompt": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
-    }
-
-    response = await llm_client.call_api_with_context(
-        context_contents=context_contents,
-        api_config=api_config,
-        temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
-        max_tokens=1000,
-    )
-
-    title_response_text = OpenRouterResponseProcessor.extract_text_content(response)
-    return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
-
-
-async def _generate_title_zhipu(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
-    conversation_context = _format_conversation_context(latest_messages)
-    if not conversation_context:
-        return None
-
-    user_message = _build_title_user_message(conversation_context)
-    context_contents = [
-        {"role": "user", "content": user_message.content},
-    ]
-
-    api_config = {
-        "system_prompt": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
-    }
-
-    response = await llm_client.call_api_with_context(
-        context_contents=context_contents,
-        api_config=api_config,
-        temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
-        max_tokens=2048,
+        max_tokens=DEFAULT_TITLE_GENERATION_MAX_TOKENS,
         enable_thinking=False,
     )
 
-    title_response_text = ZhipuResponseProcessor.extract_text_content(response)
+    title_response_text = llm_client.extract_text(response)
     return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
-
-
-TITLE_GENERATORS = {
-    "google": _generate_title_google,
-    "anthropic": _generate_title_anthropic,
-    "openai": _generate_title_openai,
-    "moonshot": _generate_title_moonshot,
-    "openrouter": _generate_title_openrouter,
-    "zhipu": _generate_title_zhipu,
-}
-
-
-def _get_title_generator(llm_client: Any):
-    provider_name = getattr(llm_client, "provider_name", None)
-    if not provider_name:
-        raise ValueError("LLM client is missing provider_name")
-
-    generator = TITLE_GENERATORS.get(provider_name.lower())
-    if not generator:
-        raise ValueError(f"Unsupported LLM provider for title generation: {provider_name}")
-
-    return generator
 
 
 class TitleService:
@@ -334,8 +169,7 @@ class TitleService:
                     "success": False
                 }
 
-            generator = _get_title_generator(llm_client)
-            new_title = await generator(llm_client, latest_messages)
+            new_title = await _generate_title(llm_client, latest_messages)
 
             if not new_title:
                 return {

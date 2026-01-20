@@ -9,6 +9,8 @@ execution) resides in the application layer (Agent, AgentService).
 
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any, Type, AsyncGenerator
+from backend.domain.models.messages import BaseMessage
+from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
 from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
@@ -54,6 +56,31 @@ class LLMClientBase(ABC):
         # Session-based context manager management
         self._session_context_managers: Dict[str, BaseContextManager] = {}
 
+    def format_messages(self, messages: List[BaseMessage]) -> List[Dict[str, Any]]:
+        if not self.provider_name:
+            raise ValueError("LLM client is missing provider_name")
+
+        formatter_class = get_message_formatter_class(self.provider_name.lower())
+        return formatter_class.format_messages(messages)
+
+    def extract_text(self, response: Any) -> str:
+        processor = self._get_response_processor()
+        return processor.extract_text_content(response)
+
+    def extract_web_search_sources(self, response: Any) -> List[Dict[str, Any]]:
+        processor = self._get_response_processor()
+        extractor = getattr(processor, "extract_web_search_sources", None)
+        if callable(extractor):
+            return extractor(response)
+        return []
+
+    def build_api_config(
+        self,
+        system_prompt: str,
+        tool_schemas: Optional[List[Any]] = None
+    ) -> Dict[str, Any]:
+        return self._build_api_config(system_prompt, tool_schemas)
+
     @abstractmethod
     async def call_api_with_context(
         self,
@@ -80,9 +107,13 @@ class LLMClientBase(ABC):
                 - Any other provider-specific configuration
             **kwargs: Additional runtime API parameters:
                 - temperature: Optional[float] - Sampling temperature override
-                - max_tokens/max_output_tokens: Optional[int] - Maximum output override
+                - max_tokens: Optional[int] - Maximum output override
                 - top_p: Optional[float] - Nucleus sampling parameter
                 - top_k: Optional[int] - Top-k sampling (provider-dependent)
+                - timeout: Optional[float] - Request timeout override
+                - max_retries: Optional[int] - Retry count override
+                - thinking: Optional[Dict[str, Any]] - Provider-specific thinking config
+                - enable_thinking: Optional[bool] - Enable thinking where supported
 
         Returns:
             Any: Raw API response object in provider-specific format:

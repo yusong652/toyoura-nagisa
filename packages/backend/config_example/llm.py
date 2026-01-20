@@ -155,7 +155,7 @@ class GoogleConfig(BaseSettings):
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
-    max_output_tokens: int = Field(default=8192, alias="maxOutputTokens", ge=1, description="Max output tokens")
+    max_tokens: int = Field(default=8192, ge=1, description="Max output tokens")
     web_search_max_uses: int = Field(default=5, alias="webSearchMaxUses", ge=1, le=20, description="Web search max uses")
 
     model_config = SettingsConfigDict(

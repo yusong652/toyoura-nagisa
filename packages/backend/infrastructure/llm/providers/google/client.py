@@ -10,6 +10,8 @@ from typing import List, Optional, Dict, Any, cast, AsyncGenerator
 from google import genai
 from google.genai import types
 from backend.infrastructure.llm.base.client import LLMClientBase
+from backend.infrastructure.llm.base.call_options import parse_call_options
+from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
 
@@ -65,12 +67,24 @@ class GoogleClient(LLMClientBase):
             if 'model_settings' not in config_overrides:
                 config_overrides['model_settings'] = {}
             config_overrides['model_settings']['temperature'] = self.extra_config['temperature']
-        if 'max_output_tokens' in self.extra_config:
+        if 'top_p' in self.extra_config:
             if 'model_settings' not in config_overrides:
                 config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['max_output_tokens'] = self.extra_config['max_output_tokens']
+            config_overrides['model_settings']['top_p'] = self.extra_config['top_p']
+        if 'top_k' in self.extra_config:
+            if 'model_settings' not in config_overrides:
+                config_overrides['model_settings'] = {}
+            config_overrides['model_settings']['top_k'] = self.extra_config['top_k']
+        if 'max_tokens' in self.extra_config:
+            if 'model_settings' not in config_overrides:
+                config_overrides['model_settings'] = {}
+            config_overrides['model_settings']['max_tokens'] = self.extra_config['max_tokens']
         if 'debug' in self.extra_config:
             config_overrides['debug'] = self.extra_config['debug']
+        if 'timeout' in self.extra_config:
+            config_overrides['timeout'] = self.extra_config['timeout']
+        if 'max_retries' in self.extra_config:
+            config_overrides['max_retries'] = self.extra_config['max_retries']
         
         self.google_config = get_google_client_config(**config_overrides)
         
@@ -104,7 +118,7 @@ class GoogleClient(LLMClientBase):
                 - config: types.GenerateContentConfig - Complete Gemini config object
             **kwargs: Additional API configuration parameters:
                 - temperature: Optional[float] - Sampling temperature override
-                - max_output_tokens: Optional[int] - Maximum output tokens override
+                - max_tokens: Optional[int] - Maximum output tokens override
                 - top_p: Optional[float] - Nucleus sampling parameter
                 - top_k: Optional[int] - Top-k sampling parameter
 
@@ -117,7 +131,14 @@ class GoogleClient(LLMClientBase):
         Note:
             This method is completely stateless. All configuration is passed via parameters.
         """
+        call_options = parse_call_options(kwargs)
         debug = self.google_config.debug
+        timeout = call_options.timeout if call_options.timeout is not None else self.google_config.timeout
+        max_retries = (
+            call_options.max_retries
+            if call_options.max_retries is not None
+            else self.google_config.max_retries
+        )
 
         # Extract Gemini config from api_config
         config = api_config.get('config')
@@ -127,21 +148,33 @@ class GoogleClient(LLMClientBase):
                 system_prompt="",
                 tool_schemas=[]
             )
-            config_kwargs.update(kwargs)
             config = types.GenerateContentConfig(**config_kwargs)
-        else:
-            # Apply any additional kwargs to the provided config
-            if kwargs:
-                config_dict = config.model_dump()
-                config_dict.update(kwargs)
-                config = types.GenerateContentConfig(**config_dict)
+
+        config_dict = config.model_dump()
+        if call_options.temperature is not None:
+            config_dict["temperature"] = call_options.temperature
+        if call_options.max_tokens is not None:
+            config_dict["max_output_tokens"] = call_options.max_tokens
+        if call_options.top_p is not None:
+            config_dict["top_p"] = call_options.top_p
+        if call_options.top_k is not None:
+            config_dict["top_k"] = call_options.top_k
+        if call_options.thinking is not None:
+            if isinstance(call_options.thinking, dict):
+                config_dict["thinking_config"] = types.ThinkingConfig(**call_options.thinking)
+            else:
+                config_dict["thinking_config"] = call_options.thinking
+        if call_options.enable_thinking is False:
+            config_dict.pop("thinking_config", None)
+
+        config = types.GenerateContentConfig(**config_dict)
 
         model = self.google_config.model_settings.model
 
         if debug:
             GoogleDebugger.print_request(context_contents, config, model)
 
-        try:
+        async def _call_api():
             response = await self.client.aio.models.generate_content(
                 model=model,
                 contents=cast(Any, context_contents),
@@ -158,7 +191,9 @@ class GoogleClient(LLMClientBase):
             if not hasattr(candidate, 'content') or not candidate.content:
                 if debug:
                     GoogleDebugger.print_error("Empty content", model, candidate=candidate)
-                raise Exception(f"Empty content. Model: {model}, finish_reason: {getattr(candidate, 'finish_reason', None)}")
+                raise Exception(
+                    f"Empty content. Model: {model}, finish_reason: {getattr(candidate, 'finish_reason', None)}"
+                )
 
             if not hasattr(candidate.content, 'parts') or not candidate.content.parts:
                 if debug:
@@ -174,6 +209,14 @@ class GoogleClient(LLMClientBase):
 
             return response
 
+        try:
+            return await run_with_retries(
+                _call_api,
+                max_retries=max_retries,
+                timeout=timeout,
+                debug=debug,
+                provider="Google",
+            )
         except Exception as e:
             if debug and "Empty" not in str(e):
                 print(f"[DEBUG] API error: {e}")
@@ -231,7 +274,7 @@ class GoogleClient(LLMClientBase):
         Args:
             context_contents: Complete Gemini context contents
             api_config: Gemini-specific configuration with 'config' key
-            **kwargs: Additional API parameters (temperature, max_output_tokens, etc.)
+            **kwargs: Additional API parameters (temperature, max_tokens, etc.)
 
         Yields:
             StreamingChunk: Standardized streaming chunks containing thinking,
@@ -240,7 +283,14 @@ class GoogleClient(LLMClientBase):
         Raises:
             Exception: If streaming API call fails
         """
+        call_options = parse_call_options(kwargs)
         debug = self.google_config.debug
+        timeout = call_options.timeout if call_options.timeout is not None else self.google_config.timeout
+        max_retries = (
+            call_options.max_retries
+            if call_options.max_retries is not None
+            else self.google_config.max_retries
+        )
 
         # Extract Gemini config from api_config
         config = api_config.get('config')
@@ -250,61 +300,83 @@ class GoogleClient(LLMClientBase):
                 system_prompt="",
                 tool_schemas=[]
             )
-            config_kwargs.update(kwargs)
             config = types.GenerateContentConfig(**config_kwargs)
-        else:
-            # Apply any additional kwargs to the provided config
-            if kwargs:
-                config_dict = config.model_dump()
-                config_dict.update(kwargs)
-                config = types.GenerateContentConfig(**config_dict)
+
+        config_dict = config.model_dump()
+        if call_options.temperature is not None:
+            config_dict["temperature"] = call_options.temperature
+        if call_options.max_tokens is not None:
+            config_dict["max_output_tokens"] = call_options.max_tokens
+        if call_options.top_p is not None:
+            config_dict["top_p"] = call_options.top_p
+        if call_options.top_k is not None:
+            config_dict["top_k"] = call_options.top_k
+        if call_options.thinking is not None:
+            if isinstance(call_options.thinking, dict):
+                config_dict["thinking_config"] = types.ThinkingConfig(**call_options.thinking)
+            else:
+                config_dict["thinking_config"] = call_options.thinking
+        if call_options.enable_thinking is False:
+            config_dict.pop("thinking_config", None)
+
+        config = types.GenerateContentConfig(**config_dict)
 
         model = self.google_config.model_settings.model
 
         if debug:
             GoogleDebugger.print_request(context_contents, config, model)
 
-        try:
-            # Use streaming API
-            stream_generator = self.client.aio.models.generate_content_stream(
-                model=model,
-                contents=cast(Any, context_contents),
-                config=config,
-            )
+        async def _stream_once():
+            try:
+                # Use streaming API
+                stream_generator = self.client.aio.models.generate_content_stream(
+                    model=model,
+                    contents=cast(Any, context_contents),
+                    config=config,
+                )
 
-            # Create stateful streaming processor
-            streaming_processor = self._get_response_processor().create_streaming_processor()
+                # Create stateful streaming processor
+                streaming_processor = self._get_response_processor().create_streaming_processor()
 
-            # Debug counters
-            chunk_index = 0
-            empty_chunk_count = 0
+                # Debug counters
+                chunk_index = 0
+                empty_chunk_count = 0
 
-            async for chunk in await stream_generator:
-                # Debug: print raw chunk before processing
+                async for chunk in await stream_generator:
+                    # Debug: print raw chunk before processing
+                    if debug:
+                        GoogleDebugger.print_streaming_chunk(chunk, chunk_index)
+
+                    # Delegate chunk processing to streaming processor
+                    processed_chunks = streaming_processor.process_event(chunk)
+
+                    # Track empty chunks for debugging
+                    if debug and not processed_chunks:
+                        empty_chunk_count += 1
+
+                    for processed_chunk in processed_chunks:
+                        yield processed_chunk
+
+                    chunk_index += 1
+
+                # Debug: print summary after streaming completes
                 if debug:
-                    GoogleDebugger.print_streaming_chunk(chunk, chunk_index)
+                    GoogleDebugger.print_streaming_summary(chunk_index, empty_chunk_count)
 
-                # Delegate chunk processing to streaming processor
-                processed_chunks = streaming_processor.process_event(chunk)
+            except Exception as e:
+                error_message = f"Gemini streaming API call failed: {str(e)}"
+                if debug:
+                    print(f"[DEBUG] {error_message}")
+                raise Exception(error_message)
 
-                # Track empty chunks for debugging
-                if debug and not processed_chunks:
-                    empty_chunk_count += 1
-
-                for processed_chunk in processed_chunks:
-                    yield processed_chunk
-
-                chunk_index += 1
-
-            # Debug: print summary after streaming completes
-            if debug:
-                GoogleDebugger.print_streaming_summary(chunk_index, empty_chunk_count)
-
-        except Exception as e:
-            error_message = f"Gemini streaming API call failed: {str(e)}"
-            if debug:
-                print(f"[DEBUG] {error_message}")
-            raise Exception(error_message)
+        async for chunk in stream_with_retries(
+            _stream_once,
+            max_retries=max_retries,
+            timeout=timeout,
+            debug=debug,
+            provider="Google",
+        ):
+            yield chunk
 
     # _streaming_tool_calling_loop is inherited from LLMClientBase
     # _construct_response_from_streaming_chunks is now handled by ResponseProcessor

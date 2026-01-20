@@ -74,7 +74,7 @@ class LLMFactory:
                 "api_key": cfg.google_api_key,
                 "extra_config": {**extra, "model": cfg.model, "temperature": cfg.temperature,
                                  "top_p": cfg.top_p, "top_k": cfg.top_k,
-                                 "max_output_tokens": cfg.max_output_tokens,
+                                 "max_tokens": cfg.max_tokens,
                                  "web_search_max_uses": cfg.web_search_max_uses}
             }
         elif name == "anthropic":
@@ -143,7 +143,7 @@ class LLMFactory:
                 "api_key": cfg.google_api_key,
                 "extra_config": {**extra, "model": cfg.secondary_model, "temperature": cfg.temperature,
                                  "top_p": cfg.top_p, "top_k": cfg.top_k,
-                                 "max_output_tokens": cfg.max_output_tokens,
+                                 "max_tokens": cfg.max_tokens,
                                  "web_search_max_uses": cfg.web_search_max_uses}
             }
         elif name == "anthropic":

@@ -1,5 +1,7 @@
 from typing import List, Optional, Dict, Any, AsyncGenerator
 from backend.infrastructure.llm.base.client import LLMClientBase
+from backend.infrastructure.llm.base.call_options import parse_call_options
+from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.streaming import StreamingChunk
 import anthropic
 from .config import get_anthropic_client_config
@@ -117,7 +119,18 @@ class AnthropicClient(LLMClientBase):
         Note:
             This method is completely stateless. All configuration is passed via parameters.
         """
+        call_options = parse_call_options(kwargs)
         debug = self.anthropic_config.debug
+        timeout = (
+            call_options.timeout
+            if call_options.timeout is not None
+            else self.anthropic_config.model_settings.timeout
+        )
+        max_retries = (
+            call_options.max_retries
+            if call_options.max_retries is not None
+            else self.anthropic_config.model_settings.max_retries
+        )
 
         # Extract configuration from api_config
         tools = api_config.get('tools', [])
@@ -130,15 +143,31 @@ class AnthropicClient(LLMClientBase):
             tools=tools
         )
 
-        # Apply any additional kwargs
-        kwargs_api.update(kwargs)
+        if call_options.temperature is not None:
+            kwargs_api["temperature"] = call_options.temperature
+        if call_options.max_tokens is not None:
+            kwargs_api["max_tokens"] = call_options.max_tokens
+        if call_options.top_p is not None:
+            kwargs_api["top_p"] = call_options.top_p
+        if call_options.top_k is not None:
+            kwargs_api["top_k"] = call_options.top_k
+        if call_options.thinking is not None:
+            kwargs_api["thinking"] = call_options.thinking
+        if call_options.enable_thinking is False:
+            kwargs_api.pop("thinking", None)
+
+        async def _call_api():
+            # call the Anthropic API (async)
+            return await self.client.messages.create(**kwargs_api)
 
         try:
-            # call the Anthropic API (async)
-            response = await self.client.messages.create(**kwargs_api)
-
-            return response
-
+            return await run_with_retries(
+                _call_api,
+                max_retries=max_retries,
+                timeout=timeout,
+                debug=debug,
+                provider="Anthropic",
+            )
         except Exception as e:
             # Log debug information if in debug mode
             if debug:
@@ -174,7 +203,18 @@ class AnthropicClient(LLMClientBase):
         Raises:
             Exception: If streaming API call fails
         """
+        call_options = parse_call_options(kwargs)
         debug = self.anthropic_config.debug
+        timeout = (
+            call_options.timeout
+            if call_options.timeout is not None
+            else self.anthropic_config.model_settings.timeout
+        )
+        max_retries = (
+            call_options.max_retries
+            if call_options.max_retries is not None
+            else self.anthropic_config.model_settings.max_retries
+        )
 
         # Extract configuration from api_config
         tools = api_config.get('tools', [])
@@ -187,30 +227,50 @@ class AnthropicClient(LLMClientBase):
             tools=tools
         )
 
-        # Apply any additional kwargs
-        kwargs_api.update(kwargs)
+        if call_options.temperature is not None:
+            kwargs_api["temperature"] = call_options.temperature
+        if call_options.max_tokens is not None:
+            kwargs_api["max_tokens"] = call_options.max_tokens
+        if call_options.top_p is not None:
+            kwargs_api["top_p"] = call_options.top_p
+        if call_options.top_k is not None:
+            kwargs_api["top_k"] = call_options.top_k
+        if call_options.thinking is not None:
+            kwargs_api["thinking"] = call_options.thinking
+        if call_options.enable_thinking is False:
+            kwargs_api.pop("thinking", None)
 
         if debug:
             AnthropicDebugger.print_debug_request_payload(kwargs_api)
 
-        try:
-            # Create stateful streaming processor
-            streaming_processor = self._get_response_processor().create_streaming_processor()
+        async def _stream_once():
+            try:
+                # Create stateful streaming processor
+                streaming_processor = self._get_response_processor().create_streaming_processor()
 
-            # Use Anthropic's async streaming context manager
-            async with self.client.messages.stream(**kwargs_api) as stream:
-                async for event in stream:
-                    # Delegate event processing to streaming processor
-                    processed_chunks = streaming_processor.process_event(event)
-                    for chunk in processed_chunks:
-                        yield chunk
+                # Use Anthropic's async streaming context manager
+                async with self.client.messages.stream(**kwargs_api) as stream:
+                    async for event in stream:
+                        # Delegate event processing to streaming processor
+                        processed_chunks = streaming_processor.process_event(event)
+                        for chunk in processed_chunks:
+                            yield chunk
 
-        except Exception as e:
-            if debug:
-                print(f"[DEBUG] Streaming API call failed with error: {str(e)}")
-                print(f"[DEBUG] Failed request payload:")
-                AnthropicDebugger.print_debug_request_payload(kwargs_api)
+            except Exception as e:
+                if debug:
+                    print(f"[DEBUG] Streaming API call failed with error: {str(e)}")
+                    print(f"[DEBUG] Failed request payload:")
+                    AnthropicDebugger.print_debug_request_payload(kwargs_api)
 
-            raise e
+                raise e
+
+        async for chunk in stream_with_retries(
+            _stream_once,
+            max_retries=max_retries,
+            timeout=timeout,
+            debug=debug,
+            provider="Anthropic",
+        ):
+            yield chunk
 
     # _construct_response_from_streaming_chunks is now handled by ResponseProcessor

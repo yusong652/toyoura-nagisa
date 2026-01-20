@@ -14,6 +14,8 @@ from openai import OpenAI, AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 from backend.infrastructure.llm.base.client import LLMClientBase
+from backend.infrastructure.llm.base.call_options import parse_call_options
+from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
@@ -118,7 +120,14 @@ class MoonshotClient(LLMClientBase):
         Returns:
             ChatCompletion object from OpenAI-compatible API.
         """
+        call_options = parse_call_options(kwargs)
         debug = self.moonshot_config.debug
+        timeout = call_options.timeout if call_options.timeout is not None else self.moonshot_config.timeout
+        max_retries = (
+            call_options.max_retries
+            if call_options.max_retries is not None
+            else self.moonshot_config.max_retries
+        )
 
         tools = api_config.get("tools", []) or []
 
@@ -134,35 +143,35 @@ class MoonshotClient(LLMClientBase):
             })
 
         # Build API call parameters
-        api_kwargs: Dict[str, Any] = {
-            "model": self.moonshot_config.model_settings.model,
-            "messages": messages,
-            "temperature": self.moonshot_config.model_settings.temperature,
-            "top_p": self.moonshot_config.model_settings.top_p,
-        }
+        api_kwargs = self.moonshot_config.get_api_call_kwargs(
+            messages=messages,
+            tools=tools,
+            stream=False,
+        )
 
-        if self.moonshot_config.model_settings.max_tokens:
-            api_kwargs["max_tokens"] = self.moonshot_config.model_settings.max_tokens
-
-        # Add tools if provided
-        if tools:
-            api_kwargs["tools"] = tools
-            api_kwargs["tool_choice"] = "auto"
-
-        # Apply runtime overrides
-        if 'temperature' in kwargs:
-            api_kwargs['temperature'] = kwargs['temperature']
-        if 'max_tokens' in kwargs:
-            api_kwargs['max_tokens'] = kwargs['max_tokens']
-        if 'top_p' in kwargs:
-            api_kwargs['top_p'] = kwargs['top_p']
+        if call_options.temperature is not None:
+            api_kwargs['temperature'] = call_options.temperature
+        if call_options.max_tokens is not None:
+            api_kwargs['max_tokens'] = call_options.max_tokens
+        if call_options.top_p is not None:
+            api_kwargs['top_p'] = call_options.top_p
+        if call_options.timeout is not None:
+            api_kwargs['timeout'] = call_options.timeout
 
         if debug:
             MoonshotDebugger.print_api_request(api_kwargs, messages, tools)
 
+        async def _call_api():
+            return await self.async_client.chat.completions.create(**api_kwargs)
+
         try:
-            response = await self.async_client.chat.completions.create(**api_kwargs)
-            return response
+            return await run_with_retries(
+                _call_api,
+                max_retries=max_retries,
+                timeout=timeout,
+                debug=debug,
+                provider="Moonshot",
+            )
         except Exception as exc:
             if debug:
                 print(f"[DEBUG] Moonshot API call failed: {exc}")
@@ -185,7 +194,14 @@ class MoonshotClient(LLMClientBase):
         Yields:
             StreamingChunk: Standardized streaming data chunks.
         """
+        call_options = parse_call_options(kwargs)
         debug = self.moonshot_config.debug
+        timeout = call_options.timeout if call_options.timeout is not None else self.moonshot_config.timeout
+        max_retries = (
+            call_options.max_retries
+            if call_options.max_retries is not None
+            else self.moonshot_config.max_retries
+        )
 
         tools = api_config.get("tools", []) or []
 
@@ -201,48 +217,49 @@ class MoonshotClient(LLMClientBase):
             })
 
         # Build API call parameters
-        api_kwargs: Dict[str, Any] = {
-            "model": self.moonshot_config.model_settings.model,
-            "messages": messages,
-            "temperature": self.moonshot_config.model_settings.temperature,
-            "top_p": self.moonshot_config.model_settings.top_p,
-            "stream": True,  # Enable streaming
-            "stream_options": {"include_usage": True},  # Request usage metadata in stream
-        }
+        api_kwargs = self.moonshot_config.get_api_call_kwargs(
+            messages=messages,
+            tools=tools,
+            stream=True,
+        )
+        api_kwargs["stream_options"] = {"include_usage": True}
 
-        if self.moonshot_config.model_settings.max_tokens:
-            api_kwargs["max_tokens"] = self.moonshot_config.model_settings.max_tokens
-
-        # Add tools if provided
-        if tools:
-            api_kwargs["tools"] = tools
-            api_kwargs["tool_choice"] = "auto"
-
-        # Apply runtime overrides
-        if 'temperature' in kwargs:
-            api_kwargs['temperature'] = kwargs['temperature']
-        if 'max_tokens' in kwargs:
-            api_kwargs['max_tokens'] = kwargs['max_tokens']
-        if 'top_p' in kwargs:
-            api_kwargs['top_p'] = kwargs['top_p']
+        if call_options.temperature is not None:
+            api_kwargs['temperature'] = call_options.temperature
+        if call_options.max_tokens is not None:
+            api_kwargs['max_tokens'] = call_options.max_tokens
+        if call_options.top_p is not None:
+            api_kwargs['top_p'] = call_options.top_p
+        if call_options.timeout is not None:
+            api_kwargs['timeout'] = call_options.timeout
 
         if debug:
             MoonshotDebugger.print_api_request(api_kwargs, messages, tools)
 
-        try:
-            stream = await self.async_client.chat.completions.create(**api_kwargs)
+        async def _stream_once():
+            try:
+                stream = await self.async_client.chat.completions.create(**api_kwargs)
 
-            # Create stateful streaming processor
-            streaming_processor = self._get_response_processor().create_streaming_processor()
+                # Create stateful streaming processor
+                streaming_processor = self._get_response_processor().create_streaming_processor()
 
-            async for chunk in stream:
-                # Delegate chunk processing to streaming processor
-                processed_chunks = streaming_processor.process_event(chunk)
-                for processed_chunk in processed_chunks:
-                    yield processed_chunk
+                async for chunk in stream:
+                    # Delegate chunk processing to streaming processor
+                    processed_chunks = streaming_processor.process_event(chunk)
+                    for processed_chunk in processed_chunks:
+                        yield processed_chunk
 
-        except Exception as e:
-            raise e
+            except Exception as e:
+                raise e
+
+        async for chunk in stream_with_retries(
+            _stream_once,
+            max_retries=max_retries,
+            timeout=timeout,
+            debug=debug,
+            provider="Moonshot",
+        ):
+            yield chunk
 
     def get_or_create_context_manager(self, session_id: str):
         """
