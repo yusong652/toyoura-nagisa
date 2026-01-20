@@ -5,7 +5,7 @@
  * Shows task ID, command, status, and recent output.
  */
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../colors.js';
 import type { BackgroundTask } from '../types/streamEvents.js';
@@ -43,10 +43,9 @@ function truncateCommand(command: string, maxLength: number = 40): string {
  */
 interface TaskItemProps {
   task: BackgroundTask;
-  blink: boolean;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, blink }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const runtime = formatRuntime(task.runtime_seconds);
   const displayCommand = truncateCommand(task.description || task.command, 50);
 
@@ -55,8 +54,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, blink }) => {
     ? task.recent_output[task.recent_output.length - 1].slice(0, 70)
     : '';
 
-  // Blink effect: task indicator ↔ muted
-  const indicatorColor = blink ? theme.task.indicator : theme.text.muted;
+  const indicatorColor = theme.task.indicator;
 
   return (
     <Box flexDirection="column">
@@ -97,19 +95,6 @@ export const BackgroundTaskMonitor: React.FC<BackgroundTaskMonitorProps> = ({
   activeTasks,
   activeCount,
 }) => {
-  const [blink, setBlink] = useState(true);
-
-  // Blink effect for running tasks
-  useEffect(() => {
-    if (activeCount === 0) return;
-
-    const interval = setInterval(() => {
-      setBlink(prev => !prev);
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [activeCount]);
-
   // Sort tasks by start time (oldest first)
   const sortedTasks = useMemo(() => {
     return [...activeTasks].sort((a, b) => {
@@ -125,7 +110,7 @@ export const BackgroundTaskMonitor: React.FC<BackgroundTaskMonitorProps> = ({
   return (
     <>
       {sortedTasks.map(task => (
-        <TaskItem key={task.process_id} task={task} blink={blink} />
+        <TaskItem key={task.process_id} task={task} />
       ))}
     </>
   );

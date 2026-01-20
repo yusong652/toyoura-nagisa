@@ -8,7 +8,7 @@
  * Note: PFC only supports single-task execution.
  */
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Text } from 'ink';
 import { theme } from '../colors.js';
 import type { PfcTask } from '../types/streamEvents.js';
@@ -45,18 +45,6 @@ export interface PfcTaskMonitorProps {
 }
 
 export const PfcTaskMonitor: React.FC<PfcTaskMonitorProps> = ({ currentTask }) => {
-  const [blink, setBlink] = useState(true);
-
-  useEffect(() => {
-    if (!currentTask || currentTask.status !== 'running') return;
-
-    const interval = setInterval(() => {
-      setBlink(prev => !prev);
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [currentTask]);
-
   if (!currentTask || currentTask.status !== 'running') {
     return null;
   }
@@ -69,7 +57,7 @@ export const PfcTaskMonitor: React.FC<PfcTaskMonitorProps> = ({ currentTask }) =
 
   return (
     <Text>
-      <Text color={blink ? theme.task.indicator : theme.text.muted}>▶ </Text>
+      <Text color={theme.task.indicator}>▶ </Text>
       <Text color={theme.task.title} inverse>PFC</Text>
       <Text color={theme.task.title}> {truncate(desc, 45)}</Text>
       <Text color={theme.task.meta}> ({runtime})</Text>
