@@ -257,11 +257,6 @@ export const MainLayout: React.FC = () => {
   // Handle profile selection from dialog
   const handleProfileSelect = useCallback((profile: AgentProfileType) => {
     appActions.setProfile(profile);
-    const profileLabel = profileOptions.find((option) => option.value === profile)?.label ?? profile;
-    appActions.addHistoryItem({
-      type: MessageType.INFO,
-      message: `Switched to ${profileLabel} profile`,
-    });
     setActiveDialog(null);
   }, [appActions, profileOptions]);
 

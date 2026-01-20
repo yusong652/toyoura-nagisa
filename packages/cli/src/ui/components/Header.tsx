@@ -55,6 +55,7 @@ const formatCwd = (cwd: string | null | undefined, maxLength: number = 30): stri
 
 export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isShellExecuting = false, isPfcConsoleMode = false, cwd }) => {
   const appState = useAppState();
+  const separator = <Text color={theme.text.muted}>  </Text>;
 
   const statusColor =
     appState.connectionStatus === 'connected'
@@ -98,21 +99,24 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isShellExec
           {displayCwd}
         </Text>
         {appState.currentSessionId && (
-          <Text color={theme.text.muted}>
-            {' '}[{appState.currentSessionId.slice(0, 8)}]
-          </Text>
+          <>
+            {separator}
+            <Text color={theme.text.muted}>
+              [{appState.currentSessionId.slice(0, 8)}]
+            </Text>
+          </>
         )}
-        <Text color={theme.text.muted}> | </Text>
+        {separator}
         <Text color={profileInfo.color}>
           {profileInfo.name}
         </Text>
-        <Text color={theme.text.muted}> | </Text>
+        {separator}
         <Text color={appState.memoryEnabled ? '#3fb950' : theme.text.muted}>
           {appState.memoryEnabled ? 'Memory ON' : 'Memory OFF'}
         </Text>
         {(isShellMode || isShellExecuting) && (
           <>
-            <Text color={theme.text.muted}> | </Text>
+            {separator}
             {isShellExecuting ? (
               <>
                 <Text color={theme.status.warning}>Running...</Text>
@@ -127,13 +131,13 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isShellExec
         )}
         {isPfcConsoleMode && (
           <>
-            <Text color={theme.text.muted}> | </Text>
+            {separator}
             <Text color={theme.status.info} bold>PFC</Text>
           </>
         )}
         {appState.isFullContextMode && (
           <>
-            <Text color={theme.text.muted}> | </Text>
+            {separator}
             <Text color={theme.status.info} bold>FULL</Text>
           </>
         )}
@@ -142,7 +146,7 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isShellExec
         <Text color={theme.text.muted}>
           usage: {remainingPercent}% ({formatTokensK(tokensLeft)})
         </Text>
-        <Text color={theme.text.muted}> | </Text>
+        {separator}
         <Text color={statusColor}>{statusText}</Text>
       </Box>
     </Box>
