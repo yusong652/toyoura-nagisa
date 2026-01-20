@@ -111,4 +111,3 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
         except Exception as e:
             return error_response(f"Error querying Python API: {str(e)}")
 
-    print("[DEBUG] Registered PFC Python API query tool: pfc_query_python_api")

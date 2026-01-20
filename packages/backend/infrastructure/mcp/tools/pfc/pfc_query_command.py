@@ -112,4 +112,3 @@ def register_pfc_query_command_tool(mcp: FastMCP):
         except Exception as e:
             return error_response(f"Error querying command documentation: {str(e)}")
 
-    print("[DEBUG] Registered PFC command query tool: pfc_query_command")

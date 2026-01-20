@@ -128,5 +128,3 @@ def register_pfc_task_status_tool(mcp: FastMCP):
 
         except Exception as e:
             return error_response(f"System error querying task status: {str(e)}")
-
-    print(f"[DEBUG] Registered PFC task status tool: pfc_check_task_status")

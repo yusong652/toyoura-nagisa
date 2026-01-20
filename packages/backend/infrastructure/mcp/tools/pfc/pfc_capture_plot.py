@@ -277,8 +277,6 @@ def register_pfc_capture_plot_tool(mcp: FastMCP):
         except Exception as e:
             return error_response(f"Plot capture error: {str(e)}")
 
-    print(f"[DEBUG] Registered PFC plot capture tool: pfc_capture_plot")
-
 
 def _create_temp_script(working_dir: str, content: str) -> str:
     """

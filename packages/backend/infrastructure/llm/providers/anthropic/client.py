@@ -191,7 +191,6 @@ class AnthropicClient(LLMClientBase):
         kwargs_api.update(kwargs)
 
         if debug:
-            print(f"[DEBUG] Streaming API call with {len(context_contents)} messages")
             AnthropicDebugger.print_debug_request_payload(kwargs_api)
 
         try:

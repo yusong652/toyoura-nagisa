@@ -287,5 +287,3 @@ def register_pfc_task_tool(mcp: FastMCP):
             if 'task_id' in locals():
                 task_manager.update_status(task_id, "failed", error=str(e))
             return error_response(f"System error executing task: {str(e)}")
-
-    print(f"[DEBUG] Registered PFC task tool: pfc_execute_task")

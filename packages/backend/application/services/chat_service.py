@@ -156,20 +156,15 @@ class ChatService:
         if not session_id:
             raise ValueError("Session ID is required in the message data")
 
-        # 3. Get validated file mentions from frontend (only files selected via search API)
-        mentioned_files = parsed_data.get('mentioned_files', [])
-        if mentioned_files:
-            print(f"[DEBUG] Processing {len(mentioned_files)} file mentions: {mentioned_files}", flush=True)
-
-        # 4. Inject system status reminders into content
+        # 3. Inject system status reminders into content
         await self._inject_status_reminders(session_id, parsed_data)
 
-        # 5. Reset interrupt flag for new conversation turn
+        # 4. Reset interrupt flag for new conversation turn
         from backend.infrastructure.monitoring import get_status_monitor
         status_monitor = get_status_monitor(session_id)
         status_monitor.reset_user_interrupted()
 
-        # 6. Build UserMessage object
+        # 5. Build UserMessage object
         content = parsed_data.get('content', [])
         message_id = parsed_data.get('id') or ''
         timestamp = parsed_data.get('timestamp')

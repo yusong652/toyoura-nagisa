@@ -178,4 +178,3 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
         except Exception as e:
             return error_response(f"System error listing tasks: {str(e)}")
 
-    print(f"[DEBUG] Registered PFC list tasks tool: pfc_list_tasks")

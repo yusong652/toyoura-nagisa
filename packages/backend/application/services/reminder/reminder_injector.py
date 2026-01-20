@@ -316,7 +316,6 @@ class ReminderInjector:
                 if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
                     part['text'] += reminder_text
                     injected = True
-                    print(f"[DEBUG] Injected {len(text_reminders)} text reminders to existing text part")
                     break
 
             # If no text part exists (image-only message), create one
@@ -325,7 +324,6 @@ class ReminderInjector:
                     "type": "text",
                     "text": reminder_text.lstrip()
                 })
-                print(f"[DEBUG] Created new text part for {len(text_reminders)} text reminders")
 
         # Inject inline_data parts directly
         if inline_data_parts:

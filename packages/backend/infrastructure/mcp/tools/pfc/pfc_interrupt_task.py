@@ -79,5 +79,3 @@ def register_pfc_interrupt_task_tool(mcp: FastMCP):
 
         except Exception as e:
             return error_response(f"System error requesting interrupt: {str(e)}")
-
-    print(f"[DEBUG] Registered PFC interrupt task tool: pfc_interrupt_task")
