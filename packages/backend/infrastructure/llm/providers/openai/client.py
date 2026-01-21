@@ -64,23 +64,18 @@ class OpenAIClient(LLMClientBase):
         self.api_key = api_key
         
         # Initialize OpenAI-specific configuration
-        config_overrides = {}
-        
         # Extract relevant configuration from extra_config for overrides
+        # Factory only passes: model, debug
+        config_overrides = {}
         if 'model' in self.extra_config:
-            config_overrides['model_settings'] = {'model': self.extra_config['model']}
-        if 'temperature' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['temperature'] = self.extra_config['temperature']
-        if 'max_tokens' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['max_tokens'] = self.extra_config['max_tokens']
+            config_overrides['model'] = self.extra_config['model']
         if 'debug' in self.extra_config:
             config_overrides['debug'] = self.extra_config['debug']
-        
+
         self.openai_config = get_openai_client_config(**config_overrides)
+
+        print(f"OpenAI Client initialized")
+        print(f"  Model: {self.openai_config.model}")
 
         # Initialize both sync and async API clients
         client_kwargs: Dict[str, Any] = {"api_key": self.api_key}
@@ -151,7 +146,7 @@ class OpenAIClient(LLMClientBase):
         if debug:
             OpenAIDebugger.log_api_call_info(
                 tools_count=len(tools),
-                model=self.openai_config.model_settings.model
+                model=self.openai_config.model
             )
             OpenAIDebugger.print_debug_request_payload(kwargs_api)
 
@@ -256,7 +251,7 @@ class OpenAIClient(LLMClientBase):
         if debug:
             OpenAIDebugger.log_api_call_info(
                 tools_count=len(tools),
-                model=self.openai_config.model_settings.model
+                model=self.openai_config.model
             )
             OpenAIDebugger.print_debug_request_payload(kwargs_api)
 
