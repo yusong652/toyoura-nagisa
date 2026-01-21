@@ -6,10 +6,10 @@ Supports GLM-4 series models with tool calling and streaming capabilities.
 """
 
 from .client import ZhipuClient
-from .config import get_zhipu_client_config, ZhipuClientConfig
+from .config import ZhipuConfig, get_zhipu_client_config
 
 __all__ = [
     "ZhipuClient",
+    "ZhipuConfig",
     "get_zhipu_client_config",
-    "ZhipuClientConfig",
 ]

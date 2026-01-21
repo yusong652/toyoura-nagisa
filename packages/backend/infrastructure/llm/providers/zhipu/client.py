@@ -70,7 +70,7 @@ class ZhipuClient(LLMClientBase):
 
         # Log initialization
         print(f"Zhipu Client initialized")
-        print(f"  Model: {self.zhipu_config.model_settings.model}")
+        print(f"  Model: {self.zhipu_config.model}")
         print(f"  Base URL: {self.zhipu_config.base_url}")
 
         # Debug: Print masked API key
