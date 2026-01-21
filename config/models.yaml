@@ -11,139 +11,145 @@
 #       models:
 #         - id: Model identifier for API calls
 #           name: Display name
-#           description: Model description
-#           context_window: Token limit (optional)
+#           description: Model description (optional)
+#           context_window: Token limit (optional, integer without commas)
 
 providers:
+
+  # OpenAI GPT
+  - provider: openai
+    name: OpenAI GPT
+    description: OpenAI's GPT models with advanced reasoning capabilities
+    models:
+      - id: gpt-5.2-2025-12-11
+        name: GPT-5.2
+        description: Latest GPT-5.2 model with enhanced capabilities
+        context_window: 400000
+
+      - id: gpt-5.2-codex
+        name: GPT-5.2 Codex
+        description: Specialized coding model based on GPT-5.2
+        context_window: 400000
+
+      - id: gpt-5-mini-2025-08-07
+        name: GPT-5 Mini
+        description: Lightweight GPT-5 variant for fast responses
+        context_window: 400000
+
+      - id: gpt-4o-2024-08-06
+        name: GPT-4o
+        description: GPT-4 optimized for general tasks
+        context_window: 128000
+
   # Google Gemini
   - provider: google
     name: Google Gemini
-    description: Google's Gemini models with advanced reasoning and long context
+    description: Google's Gemini models with multimodal capabilities and long context
     models:
-      - id: gemini-2.0-flash-exp
-        name: Gemini 2.0 Flash (Experimental)
-        description: Latest experimental model with enhanced capabilities
+      - id: gemini-3-pro-preview
+        name: Gemini 3.0 Pro
+        description: Preview of next-generation Gemini Pro
         context_window: 1048576
 
-      - id: gemini-2.0-flash-thinking-exp-01-21
-        name: Gemini 2.0 Flash Thinking (01-21)
-        description: Experimental model with extended thinking capabilities
+      - id: gemini-3-flash-preview
+        name: Gemini 3.0 Flash
+        description: Fast preview variant of Gemini 3.0
         context_window: 1048576
 
-      - id: gemini-exp-1206
-        name: Gemini Experimental 1206
-        description: Experimental release from December 2024
-        context_window: 200000
+      - id: gemini-2.5-pro
+        name: Gemini 2.5 Pro
+        description: Latest production Gemini Pro model
+        context_window: 1048576
 
       - id: gemini-2.5-flash
         name: Gemini 2.5 Flash
-        description: Fast and efficient model for everyday tasks
+        description: Fast and efficient Gemini model
         context_window: 1048576
 
   # Anthropic Claude
   - provider: anthropic
     name: Anthropic Claude
-    description: Anthropic's Claude models with strong tool use and analysis
+    description: Anthropic's Claude models with strong reasoning and tool use
     models:
+      - id: claude-opus-4-5-20251101
+        name: Claude Opus 4.5
+        description: Most capable Claude model for complex tasks
+        context_window: 200000
+
       - id: claude-sonnet-4-5-20250929
         name: Claude Sonnet 4.5
-        description: Latest Sonnet model with improved performance
+        description: Balanced performance and speed
         context_window: 200000
 
-      - id: claude-3-7-sonnet-20250219
-        name: Claude 3.7 Sonnet
-        description: Claude 3.7 Sonnet released February 2025
+      - id: claude-haiku-4-5-20251001
+        name: Claude Haiku 4.5
+        description: Fast and lightweight Claude model
         context_window: 200000
-
-      - id: claude-3-5-sonnet-20241022
-        name: Claude 3.5 Sonnet
-        description: Previous generation Sonnet model
-        context_window: 200000
-
-  # OpenAI GPT
-  - provider: openai
-    name: OpenAI GPT
-    description: OpenAI's GPT models
-    models:
-      - id: gpt-4o
-        name: GPT-4o
-        description: Latest GPT-4 optimized model
-        context_window: 128000
-
-      - id: gpt-4-turbo
-        name: GPT-4 Turbo
-        description: Fast and efficient GPT-4
-        context_window: 128000
-
-      - id: gpt-4
-        name: GPT-4
-        description: Original GPT-4 model
-        context_window: 8192
 
   # Moonshot AI
   - provider: moonshot
-    name: Moonshot AI
-    description: Moonshot's Kimi models with extended context
+    name: Moonshot Kimi
+    description: Moonshot's Kimi models with extended thinking capabilities
     models:
-      - id: moonshot-v1-8k
-        name: Moonshot v1 8K
-        description: 8K context window
-        context_window: 8000
+      - id: kimi-k2-thinking-turbo
+        name: Kimi K2 Thinking Turbo
+        description: Fast thinking model with enhanced reasoning
+        context_window: 262144
 
-      - id: moonshot-v1-32k
-        name: Moonshot v1 32K
-        description: 32K context window
-        context_window: 32000
+      - id: kimi-k2-thinking
+        name: Kimi K2 Thinking
+        description: Deep reasoning model with extended context
+        context_window: 262144
 
-      - id: moonshot-v1-128k
-        name: Moonshot v1 128K
-        description: 128K context window
-        context_window: 128000
+      - id: kimi-k2-turbo-preview
+        name: Kimi K2 Turbo Preview
+        description: Preview of high-speed K2 variant
+        context_window: 262144
+
+      - id: kimi-k2-0905-preview
+        name: Kimi K2 0905 Preview
+        description: September 2024 preview release
+        context_window: 262144
 
   # Zhipu AI
   - provider: zhipu
-    name: Zhipu AI
-    description: Zhipu's GLM models
+    name: Zhipu GLM
+    description: Zhipu's GLM models with bilingual capabilities
     models:
-      - id: glm-4-plus
-        name: GLM-4 Plus
-        description: Enhanced GLM-4 with better performance
-        context_window: 128000
+      - id: glm-4.7
+        name: GLM-4.7
+        description: Latest GLM generation with improved performance
+        context_window: 200000
 
-      - id: glm-4
-        name: GLM-4
-        description: Latest GLM generation
-        context_window: 128000
+      - id: glm-4.6v
+        name: GLM-4.6v
+        description: Vision-enabled GLM model
+        context_window: 200000
 
-      - id: glm-4-air
-        name: GLM-4 Air
-        description: Lightweight GLM-4 variant
-        context_window: 128000
+      - id: glm-4.7-flash
+        name: GLM-4.7 Flash
+        description: Fast variant of GLM-4.7
+        context_window: 200000
 
   # OpenRouter
   - provider: openrouter
     name: OpenRouter
-    description: Access to multiple model providers through OpenRouter
+    description: Access to multiple model providers through unified API
     models:
-      - id: anthropic/claude-3.5-sonnet
-        name: Claude 3.5 Sonnet (via OpenRouter)
-        description: Anthropic Claude via OpenRouter
+      - id: qwen/qwen3-235b-a22b-2507
+        name: Qwen 3 235B
+        description: Large-scale Qwen model via OpenRouter
         context_window: 200000
 
-      - id: google/gemini-2.0-flash-exp:free
-        name: Gemini 2.0 Flash (via OpenRouter)
-        description: Google Gemini via OpenRouter (free tier)
+      - id: x-ai/grok-4.1-fast
+        name: Grok 4.1 Fast
+        description: xAI's Grok model via OpenRouter
         context_window: 1048576
-
-      - id: openai/gpt-4o
-        name: GPT-4o (via OpenRouter)
-        description: OpenAI GPT-4o via OpenRouter
-        context_window: 128000
 
   # Local LLM
   - provider: local_llm
     name: Local LLM
-    description: Self-hosted LLM via vLLM or Ollama
+    description: Self-hosted models via vLLM or Ollama
     models:
       - id: local-model
         name: Local Model
