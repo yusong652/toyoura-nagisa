@@ -1,67 +1,68 @@
 """
-Anthropic Client Configuration Module
+Anthropic Client Configuration
 
-This module contains all Anthropic-specific configuration settings,
-including safety settings, model parameters, and other Anthropic-specific options.
+Unified configuration for Anthropic Claude models including API credentials,
+model parameters, and client settings.
 """
 import copy
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AnthropicConfig(BaseSettings):
-    """Anthropic configuration loaded from environment variables."""
+    """
+    Unified Anthropic configuration.
 
+    Combines environment variable loading (API keys) with
+    runtime-overridable parameters (model, temperature, etc.).
+
+    Available Models:
+    - claude-sonnet-4-5-20250929: Latest Sonnet 4.5 (recommended)
+    - claude-haiku-4-5-20251001: Fast and efficient Haiku 4.5
+    - claude-opus-4-5-20251101: Most capable Opus 4.5
+    - claude-3-7-sonnet-20250219: Sonnet 3.7 with thinking
+    """
+
+    # API credentials (from environment variables)
     anthropic_api_key: str = Field(description="Anthropic API key")
-    model: str = Field(default="claude-sonnet-4-5-20250929", description="Default model")
+
+    # Model selection (from environment variables, runtime overridable)
+    model: str = Field(
+        default="claude-sonnet-4-5-20250929",
+        description="Default model"
+    )
     secondary_model: str = Field(
         default="claude-haiku-4-5-20251001",
         description="Secondary model for SubAgent"
     )
 
-    model_config = SettingsConfigDict(
-        env_file='packages/backend/.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
-    )
-
-
-class AnthropicModelConfig(BaseModel):
-    """Anthropic model configuration"""
-    
-    # 模型参数
-    model: str = Field(
-        default="claude-sonnet-4-5-20250929",  # 平衡性能和成本的优秀选择
-        description="Claude model to use"
-    )
+    # Model parameters (runtime overridable)
     max_tokens: int = Field(
         default=1024*16,
         ge=1,
-        le=64000,  # Claude 4 系列支持更高输出限制
+        le=64000,
         description="Maximum number of tokens to generate"
     )
     temperature: float = Field(
         default=1.0,
         ge=0.0,
         le=2.0,
-        description="Sampling temperature"
+        description="Sampling temperature. Do not set both temperature and top_p."
     )
     top_p: Optional[float] = Field(
         default=None,
         ge=0.0,
         le=1.0,
-        description="Nucleus sampling parameter"
+        description="Nucleus sampling parameter. Do not set both temperature and top_p."
     )
     top_k: Optional[int] = Field(
         default=None,
         ge=1,
         description="Top-K sampling parameter"
     )
-    
-    # Thinking配置 - 为支持thinking的模型
+
+    # Thinking configuration (for models that support thinking)
     enable_thinking: bool = Field(
         default=True,
         description="Whether to enable thinking for supported models"
@@ -72,8 +73,8 @@ class AnthropicModelConfig(BaseModel):
         le=50000,
         description="Budget tokens for thinking process"
     )
-    
-    # API设置
+
+    # API settings
     api_version: str = Field(
         default="2023-06-01",
         description="Anthropic API version"
@@ -88,27 +89,8 @@ class AnthropicModelConfig(BaseModel):
         ge=0,
         description="Maximum number of retries for failed requests"
     )
-    
-    def supports_thinking(self) -> bool:
-        """Check if the current model supports thinking"""
-        return (
-            self.model.startswith("claude-3-7-") or
-            self.model.startswith("claude-sonnet-4-") or
-            self.model.startswith("claude-4-") or
-            self.model.startswith("claude-3-opus-")
-        )
 
-
-class AnthropicClientConfig(BaseModel):
-    """Complete Anthropic client configuration"""
-    
-    # 模型配置
-    model_settings: AnthropicModelConfig = Field(
-        default_factory=AnthropicModelConfig,
-        description="Model-specific configuration"
-    )
-    
-    # 工具调用设置
+    # Tool settings
     tools_enabled: bool = Field(
         default=True,
         description="Enable tool calling functionality"
@@ -118,8 +100,8 @@ class AnthropicClientConfig(BaseModel):
         ge=1,
         description="Tool execution timeout in seconds"
     )
-    
-    # 调试设置
+
+    # Debug settings
     debug: bool = Field(
         default=False,
         description="Enable debug logging"
@@ -128,7 +110,24 @@ class AnthropicClientConfig(BaseModel):
         default=False,
         description="Log API requests and responses"
     )
-    
+
+    model_config = SettingsConfigDict(
+        env_file='packages/backend/.env',
+        env_nested_delimiter='__',
+        case_sensitive=False,
+        env_prefix='',
+        extra='ignore'
+    )
+
+    def supports_thinking(self) -> bool:
+        """Check if the current model supports thinking"""
+        return (
+            self.model.startswith("claude-3-7-") or
+            self.model.startswith("claude-sonnet-4-") or
+            self.model.startswith("claude-4-") or
+            self.model.startswith("claude-opus-")
+        )
+
     def get_api_call_kwargs(
         self,
         system_prompt: str,
@@ -161,18 +160,18 @@ class AnthropicClientConfig(BaseModel):
         cached_messages = MessageFormatter.add_cache_control_to_messages(messages)
 
         kwargs = {
-            "model": self.model_settings.model,
-            "max_tokens": self.model_settings.max_tokens,
+            "model": self.model,
+            "max_tokens": self.max_tokens,
             "messages": cached_messages,
             "system": system_with_cache,
-            "temperature": self.model_settings.temperature,
+            "temperature": self.temperature,
         }
 
         # Add optional parameters
-        if self.model_settings.top_p is not None:
-            kwargs["top_p"] = self.model_settings.top_p
-        if self.model_settings.top_k is not None:
-            kwargs["top_k"] = self.model_settings.top_k
+        if self.top_p is not None:
+            kwargs["top_p"] = self.top_p
+        if self.top_k is not None:
+            kwargs["top_k"] = self.top_k
 
         # Add tools with cache_control on the last tool for prompt caching
         # This caches all tool definitions as a single prefix
@@ -183,44 +182,72 @@ class AnthropicClientConfig(BaseModel):
             kwargs["tools"] = cached_tools
 
         # Add thinking configuration for supported models
-        if (self.model_settings.supports_thinking() and
-            self.model_settings.enable_thinking):
+        if self.supports_thinking() and self.enable_thinking:
             kwargs["thinking"] = {
                 "type": "enabled",
-                "budget_tokens": self.model_settings.thinking_budget_tokens
+                "budget_tokens": self.thinking_budget_tokens
             }
 
         return kwargs
 
+    def model_copy(self, **overrides) -> "AnthropicConfig":
+        """
+        Create a copy with overrides applied.
 
-# Default configuration instance
-DEFAULT_ANTHROPIC_CONFIG = AnthropicClientConfig()
+        Args:
+            **overrides: Fields to override
+
+        Returns:
+            New AnthropicConfig instance with overrides
+        """
+        config_dict = self.model_dump()
+        config_dict.update(overrides)
+        return AnthropicConfig(**config_dict)
 
 
-def get_anthropic_client_config(**overrides) -> AnthropicClientConfig:
+def get_anthropic_client_config(**overrides: Any) -> AnthropicConfig:
     """
-    Get Anthropic Client configuration, support runtime overrides
-    
+    Get Anthropic client configuration with optional overrides.
+
+    This function provides backward compatibility and a convenient way
+    to create AnthropicConfig with overrides.
+
     Args:
-        **overrides: Configuration items to override
-        
+        **overrides: Configuration overrides. Supports:
+            - Direct field overrides: model, temperature, debug, etc.
+            - Nested overrides: model_settings={'temperature': 0.8}
+
     Returns:
-        AnthropicClientConfig: Configuration instance
+        AnthropicConfig instance
+
+    Example:
+        >>> config = get_anthropic_client_config(
+        ...     model='claude-opus-4-5-20251101',
+        ...     temperature=0.8,
+        ...     debug=True
+        ... )
     """
-    if not overrides:
-        return DEFAULT_ANTHROPIC_CONFIG
-    
-    # Create configuration copy and apply overrides
-    config_dict = DEFAULT_ANTHROPIC_CONFIG.model_dump()
-    
-    # Process nested configuration overrides
-    for key, value in overrides.items():
-        if key == "model_settings" and isinstance(value, dict):
-            config_dict["model_settings"].update(value)
-        else:
-            config_dict[key] = value
-    
-    return AnthropicClientConfig(**config_dict)
+    # Start with base config from environment
+    try:
+        base_config = AnthropicConfig()
+    except Exception:
+        # If env loading fails, use defaults
+        base_config = AnthropicConfig(
+            anthropic_api_key="",
+            model="claude-sonnet-4-5-20250929"
+        )
+
+    # Handle nested model_settings overrides for backward compatibility
+    if 'model_settings' in overrides:
+        model_settings = overrides.pop('model_settings')
+        if isinstance(model_settings, dict):
+            overrides.update(model_settings)
+
+    # Apply overrides
+    if overrides:
+        return base_config.model_copy(**overrides)
+
+    return base_config
 
 
 # Backward compatibility alias

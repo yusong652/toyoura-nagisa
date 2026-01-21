@@ -27,33 +27,18 @@ class AnthropicClient(LLMClientBase):
         self.api_key = api_key
         
         # Initialize Anthropic-specific configuration
+        # Extract relevant configuration from extra_config for overrides
+        # Factory only passes: model, debug
         config_overrides = {}
-        
-        # Apply any extra configuration overrides
         if 'model' in self.extra_config:
-            config_overrides['model_settings'] = {'model': self.extra_config['model']}
-        if 'temperature' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['temperature'] = self.extra_config['temperature']
-        if 'max_tokens' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['max_tokens'] = self.extra_config['max_tokens']
-        if 'thinking_budget_tokens' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['thinking_budget_tokens'] = self.extra_config['thinking_budget_tokens']
-        if 'enable_thinking' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['enable_thinking'] = self.extra_config['enable_thinking']
+            config_overrides['model'] = self.extra_config['model']
         if 'debug' in self.extra_config:
             config_overrides['debug'] = self.extra_config['debug']
-        
+
         self.anthropic_config = get_anthropic_client_config(**config_overrides)
-        
-        print(f"Enhanced Anthropic Client initialized with model: {self.anthropic_config.model_settings.model}")
+
+        print(f"Anthropic Client initialized")
+        print(f"  Model: {self.anthropic_config.model}")
 
         # initialize Anthropic API client (use async client for streaming)
         self.client = anthropic.AsyncAnthropic(api_key=self.api_key)

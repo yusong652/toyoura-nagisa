@@ -22,7 +22,7 @@ from .client import AnthropicClient
 from .message_formatter import MessageFormatter
 from .response_processor import AnthropicResponseProcessor
 from .debug import AnthropicDebugger
-from .config import get_anthropic_config, AnthropicClientConfig
+from .config import AnthropicConfig, get_anthropic_config, get_anthropic_client_config
 from .constants import SUPPORTED_MODELS, DEFAULT_MODEL
 
 __all__ = [
@@ -30,8 +30,9 @@ __all__ = [
     "MessageFormatter",
     "AnthropicResponseProcessor",
     "AnthropicDebugger",
+    "AnthropicConfig",
     "get_anthropic_config",
-    "AnthropicClientConfig",
+    "get_anthropic_client_config",
     "SUPPORTED_MODELS",
     "DEFAULT_MODEL"
 ]
