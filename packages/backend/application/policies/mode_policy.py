@@ -30,6 +30,7 @@ READ_ONLY_TOOLS: Set[str] = {
     "pfc_list_tasks",
     "pfc_capture_plot",
     "trigger_skill",
+    "invoke_agent",  # SubAgents (pfc_explorer, pfc_diagnostic) are read-only
 }
 
 READ_ONLY_BASH_COMMANDS: Set[str] = {
