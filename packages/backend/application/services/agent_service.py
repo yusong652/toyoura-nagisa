@@ -8,10 +8,11 @@ Responsibilities:
 - Agent instantiation with proper dependencies
 - MainAgent chat processing (streaming with persistence)
 - SubAgent task execution (non-streaming, temporary context)
+- Dynamic LLM client creation based on global default configuration
 - Separation of concerns: presentation layer doesn't know Agent internals
 """
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from backend.application.services.agent import Agent
 from backend.domain.models.agent import AgentResult
@@ -21,6 +22,7 @@ from backend.domain.models.agent_profiles import (
 )
 from backend.domain.models.messages import UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
+from backend.infrastructure.llm.base.factory import LLMFactory
 
 
 class AgentService:
@@ -32,11 +34,21 @@ class AgentService:
 
     Usage:
         # In presentation layer (e.g., chat_request_handler)
-        service = AgentService(llm_client)
+        service = AgentService(llm_client, llm_factory)
+
+        # With default configuration (from config files)
         result = await service.process_chat(
             session_id=session_id,
             instruction=user_message,
             agent_profile="pfc_expert"
+        )
+
+        # With custom configuration (from global default_llm.json)
+        result = await service.process_chat(
+            session_id=session_id,
+            instruction=user_message,
+            agent_profile="pfc_expert",
+            llm_config={"provider": "anthropic", "model": "claude-sonnet-4-5"}
         )
 
         # For SubAgent execution
@@ -47,14 +59,21 @@ class AgentService:
         )
     """
 
-    def __init__(self, llm_client: LLMClientBase):
+    def __init__(
+        self,
+        llm_client: LLMClientBase,
+        llm_factory: Optional[LLMFactory] = None
+    ):
         """
         Initialize AgentService.
 
         Args:
-            llm_client: LLM client instance (typically from app.state)
+            llm_client: Default LLM client instance (typically from app.state)
+            llm_factory: LLM factory for creating custom clients based on config.
+                        If None, custom LLM configs will not be supported.
         """
         self._llm_client = llm_client
+        self._llm_factory = llm_factory
 
     async def process_chat(
         self,
@@ -62,6 +81,7 @@ class AgentService:
         instruction: UserMessage,
         agent_profile: str = "pfc_expert",
         enable_memory: bool = True,
+        llm_config: Optional[Dict[str, Any]] = None,
     ) -> AgentResult:
         """
         Process a chat request using MainAgent.
@@ -69,19 +89,51 @@ class AgentService:
         Creates a MainAgent with the appropriate configuration based on profile
         and executes the conversation turn with full streaming support.
 
+        If llm_config is provided, creates a custom LLM client using the specified
+        provider and model. Otherwise, uses the default LLM client.
+
         Args:
             session_id: Session ID for the conversation
             instruction: UserMessage object containing user input
             agent_profile: Agent profile for tool selection (default: "pfc_expert")
             enable_memory: Whether to enable memory persistence (default: True)
+            llm_config: Optional LLM configuration with keys:
+                       - provider: LLM provider name (e.g., "google", "anthropic")
+                       - model: Model identifier (e.g., "gemini-2.0-flash-exp")
+                       If provided, this overrides the default client.
 
         Returns:
             AgentResult with execution outcome and response message
+
+        Raises:
+            ValueError: If llm_config is provided but llm_factory is not available,
+                       or if the configuration is invalid
         """
+        # Determine which LLM client to use
+        llm_client = self._llm_client
+
+        if llm_config:
+            if not self._llm_factory:
+                raise ValueError(
+                    "Cannot use custom LLM config: LLMFactory not provided during initialization"
+                )
+
+            # Validate config structure
+            if "provider" not in llm_config or "model" not in llm_config:
+                raise ValueError(
+                    "Invalid LLM config: must contain 'provider' and 'model' keys"
+                )
+
+            # Create custom client based on provided config
+            llm_client = self._llm_factory.create_client_with_config(
+                provider=llm_config["provider"],
+                model=llm_config["model"]
+            )
+
         config = get_profile_config(agent_profile)
         agent = Agent(
             config=config,
-            llm_client=self._llm_client,
+            llm_client=llm_client,
             session_id=session_id,
             enable_memory=enable_memory,
         )

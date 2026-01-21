@@ -57,11 +57,17 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
 
         try:
             # ========== PHASE 2: Get LLM response using AgentService ==========
-            from backend.shared.utils.app_context import get_llm_client
+            from backend.shared.utils.app_context import get_llm_client, get_llm_factory
+            from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+
             llm_client = get_llm_client()
+            llm_factory = get_llm_factory()
+
+            # Load global default LLM configuration if set
+            llm_config = get_default_llm_config()
 
             from backend.application.services.agent_service import AgentService
-            agent_service = AgentService(llm_client)
+            agent_service = AgentService(llm_client, llm_factory)
 
             # Send WebSocket read status just before LLM processing starts
             if status_service and user_message_id:
@@ -74,6 +80,7 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
                 instruction=prepared_message.instruction,
                 agent_profile=prepared_message.agent_profile,
                 enable_memory=prepared_message.enable_memory,
+                llm_config=llm_config,  # Use global default config
             )
 
             # ========== PHASE 3: Content processing pipeline ==========

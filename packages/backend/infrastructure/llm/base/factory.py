@@ -3,7 +3,7 @@ LLM Factory - Creates LLM client instances based on configuration.
 """
 
 import logging
-from typing import Dict, Optional, Type, Any, List
+from typing import Dict, Optional, Type, Any
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.config import get_llm_settings
 
@@ -62,6 +62,66 @@ class LLMFactory:
         config = self._build_secondary_config(provider, llm_settings, app)
         logger.info(f"Creating secondary {provider} client")
         return self._clients[provider](**config)
+
+    def create_client_with_config(
+        self,
+        provider: str,
+        model: str,
+        app: Optional[Any] = None
+    ) -> LLMClientBase:
+        """
+        Create an LLM client with runtime configuration.
+
+        API keys are sourced from .env, only provider and model are overridden.
+        Other parameters (temperature, top_p, etc.) use defaults from config files.
+
+        Args:
+            provider: LLM provider name (e.g., "google", "anthropic", "openai")
+            model: Model identifier (e.g., "gemini-2.0-flash-exp", "claude-sonnet-4-5")
+            app: Optional application instance for dependency injection
+
+        Returns:
+            LLMClientBase: Configured LLM client instance
+
+        Raises:
+            ValueError: If provider is not supported or API key is missing
+        """
+        if provider not in self._clients:
+            raise ValueError(
+                f"Unsupported LLM provider: '{provider}'. "
+                f"Supported: {list(self._clients.keys())}"
+            )
+
+        llm_settings = get_llm_settings()
+        config = self._build_config_with_overrides(provider, model, llm_settings, app)
+        logger.info(f"Creating {provider} client with custom model: {model}")
+        return self._clients[provider](**config)
+
+    def _build_config_with_overrides(
+        self,
+        provider: str,
+        model: str,
+        llm_settings: Any,
+        app: Optional[Any]
+    ) -> Dict[str, Any]:
+        """
+        Build configuration with model override.
+
+        Uses the base config from _build_config() but overrides the model parameter.
+        This ensures API keys and other settings come from .env while allowing
+        per-session model customization.
+        """
+        # Get base config from provider settings
+        base_config = self._build_config(provider, llm_settings, app)
+
+        # Override model in extra_config
+        if "extra_config" in base_config:
+            base_config["extra_config"]["model"] = model
+        elif provider == "local_llm":
+            # local_llm stores model at top level, not in extra_config
+            base_config["model"] = model
+
+        return base_config
 
     def _build_config(self, name: str, llm_settings: Any, app: Optional[Any]) -> Dict[str, Any]:
         """Build configuration for primary client."""

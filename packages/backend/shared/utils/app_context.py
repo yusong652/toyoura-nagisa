@@ -118,3 +118,26 @@ def get_mcp_server():
         raise RuntimeError("MCP server not found in app state")
 
     return app.state.mcp
+
+
+def get_llm_factory():
+    """
+    Get LLM factory from app state.
+
+    The factory is used to create custom LLM clients based on
+    runtime configuration (provider and model selection).
+
+    Returns:
+        LLMFactory: LLM factory instance from app state
+
+    Raises:
+        RuntimeError: If app is not initialized or LLM factory not found
+    """
+    app = get_app()
+    if not app:
+        raise RuntimeError("FastAPI app not initialized")
+
+    if not hasattr(app.state, 'llm_factory'):
+        raise RuntimeError("LLM factory not found in app state")
+
+    return app.state.llm_factory
