@@ -50,21 +50,13 @@ class ZhipuClient(LLMClientBase):
         self.api_key = api_key
 
         # Initialize Zhipu-specific configuration
+        # Extract relevant configuration from extra_config for overrides
         config_overrides = {}
 
-        # Extract relevant configuration from extra_config for overrides
-        if 'model' in self.extra_config:
-            config_overrides['model_settings'] = {'model': self.extra_config['model']}
-        if 'temperature' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['temperature'] = self.extra_config['temperature']
-        if 'max_tokens' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['max_tokens'] = self.extra_config['max_tokens']
-        if 'debug' in self.extra_config:
-            config_overrides['debug'] = self.extra_config['debug']
+        # Direct field overrides (flat structure)
+        for field in ['model', 'temperature', 'max_tokens', 'top_p', 'debug', 'timeout', 'max_retries']:
+            if field in self.extra_config:
+                config_overrides[field] = self.extra_config[field]
 
         self.zhipu_config = get_zhipu_client_config(**config_overrides)
 
