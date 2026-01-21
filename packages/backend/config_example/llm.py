@@ -1,6 +1,14 @@
 """
 LLM Configuration Module
 Contains all large language model related configurations
+
+Configuration Architecture:
+- config/models.yaml: Available providers and models (data definition)
+- config/default_llm.json: User's default provider/model choice (runtime config)
+- config/llm.py (this file): Reads above configs + provides API keys from .env
+- .env: API keys and environment variables (security)
+
+Priority: default_llm.json > .env (LLM_PROVIDER) > hardcoded default
 """
 from __future__ import annotations
 from typing import Literal, Optional
@@ -10,13 +18,27 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class LLMSettings(BaseSettings):
-    """LLM Master Configuration"""
+    """
+    LLM Configuration - Unified Configuration Reader
 
-    # Current LLM provider
-    provider: Literal["openai", "google", "anthropic", "local_llm", "moonshot", "openrouter", "zhipu"] = Field(
-        default="google",
-        description="Current LLM provider"
+    Reads configuration from multiple sources with priority:
+    1. config/default_llm.json (user selection via frontend)
+    2. .env LLM_PROVIDER variable (developer override)
+    3. Hardcoded default ("google")
+
+    This ensures consistent configuration across:
+    - Application startup (app.py)
+    - Chat requests (chat_request_handler)
+    - API endpoints
+    """
+
+    # Environment variable override (LLM_PROVIDER in .env)
+    env_provider_override: Optional[str] = Field(
+        default=None,
+        alias="PROVIDER",  # Maps to LLM_PROVIDER env variable
+        description="Provider from environment variable (overrides default_llm.json)"
     )
+
     debug: bool = Field(default=False, description="Debug mode")
 
     model_config = SettingsConfigDict(
@@ -26,6 +48,33 @@ class LLMSettings(BaseSettings):
         env_prefix='LLM_',
         extra='ignore'
     )
+
+    @property
+    def provider(self) -> str:
+        """
+        Get the current LLM provider.
+
+        Configuration Priority (highest to lowest):
+        1. LLM_PROVIDER env variable (developer override, highest priority)
+        2. config/default_llm.json (user configuration via frontend)
+        3. Hardcoded default ("google")
+
+        Returns:
+            str: Provider identifier (e.g., "google", "anthropic")
+        """
+        from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+
+        # Priority 1: Environment variable (developer override)
+        if self.env_provider_override:
+            return self.env_provider_override
+
+        # Priority 2: User configuration (frontend selection)
+        user_config = get_default_llm_config()
+        if user_config and 'provider' in user_config:
+            return user_config['provider']
+
+        # Priority 3: Hardcoded default
+        return "google"
 
     def get_openai_config(self) -> OpenAIConfig:
         """Get OpenAI configuration"""
