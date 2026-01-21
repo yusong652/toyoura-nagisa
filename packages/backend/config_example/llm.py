@@ -11,7 +11,7 @@ Configuration Architecture:
 Priority: default_llm.json > .env (LLM_PROVIDER) > hardcoded default
 """
 from __future__ import annotations
-from typing import Literal, Optional
+from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -100,9 +100,25 @@ class LLMSettings(BaseSettings):
         """Get Zhipu configuration"""
         return ZhipuConfig()  # type: ignore
 
-    def get_local_llm_config(self) -> LocalLLMConfig:
-        """Get Local LLM configuration"""
-        return LocalLLMConfig()
+    def _resolve_model_for_provider(self, provider: str) -> Optional[str]:
+        """Resolve model for provider from YAML configuration."""
+        from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+        from backend.infrastructure.llm.shared.models_registry import (
+            get_provider_models,
+            is_model_valid_for_provider,
+        )
+
+        user_config = get_default_llm_config()
+        if user_config and user_config.get("provider") == provider:
+            user_model = user_config.get("model")
+            if user_model and is_model_valid_for_provider(provider, user_model):
+                return user_model
+
+        models = get_provider_models(provider)
+        if models:
+            return models[0].id
+
+        return None
 
     def get_current_llm_config(self):
         """
@@ -118,14 +134,18 @@ class LLMSettings(BaseSettings):
             "moonshot": self.get_moonshot_config,
             "openrouter": self.get_openrouter_config,
             "zhipu": self.get_zhipu_config,
-            "local_llm": self.get_local_llm_config
         }
 
         config_getter = config_map.get(self.provider)
         if not config_getter:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
-        return config_getter()
+        config = config_getter()
+        selected_model = self._resolve_model_for_provider(self.provider)
+        if selected_model and hasattr(config, "model"):
+            config.model = selected_model
+
+        return config
 
     def validate_current_llm(self):
         """
@@ -170,11 +190,6 @@ class OpenAIConfig(BaseSettings):
         description="Secondary model for SubAgent to reduce primary model RPM usage"
     )
 
-    temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
-    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
-    top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
-    max_tokens: Optional[int] = Field(default=None, ge=1, description="Max output tokens")
-    reasoning_effort: Optional[str] = Field(default=None, description="Reasoning effort level: minimal, medium, high")
     
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -201,11 +216,6 @@ class GoogleConfig(BaseSettings):
         description="Secondary model for SubAgent to reduce primary model RPM usage"
     )
 
-    temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
-    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
-    top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
-    max_tokens: int = Field(default=8192, ge=1, description="Max output tokens")
-    web_search_max_uses: int = Field(default=5, alias="webSearchMaxUses", ge=1, le=20, description="Web search max uses")
 
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -232,11 +242,6 @@ class AnthropicConfig(BaseSettings):
         description="Secondary model for SubAgent to reduce primary model RPM usage"
     )
 
-    temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
-    max_tokens: int = Field(default=4096, ge=1, description="Max output tokens")
-    web_search_max_uses: int = Field(default=5, alias="webSearchMaxUses", ge=1, le=20, description="Web search max uses")
-    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
-    top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
 
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -264,9 +269,6 @@ class MoonshotConfig(BaseSettings):
         description="Secondary model for SubAgent to reduce primary model RPM usage"
     )
 
-    temperature: float = Field(default=0.6, ge=0.0, le=1.0, description="Sampling temperature")
-    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
-    max_tokens: Optional[int] = Field(default=None, ge=1, description="Max output tokens")
 
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -311,9 +313,6 @@ class OpenRouterConfig(BaseSettings):
         description="X-Title header for OpenRouter requests"
     )
 
-    temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
-    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
-    max_tokens: Optional[int] = Field(default=None, ge=1, description="Max output tokens")
 
     # Embedding model for memory system
     embedding_model: str = Field(
@@ -353,39 +352,12 @@ class ZhipuConfig(BaseSettings):
         description="Secondary model for SubAgent to reduce primary model RPM usage"
     )
 
-    temperature: float = Field(default=0.6, ge=0.0, le=1.0, description="Sampling temperature")
-    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
-    max_tokens: Optional[int] = Field(default=None, ge=1, description="Max output tokens")
 
     model_config = SettingsConfigDict(
         env_file='.env',
         env_nested_delimiter='__',
         case_sensitive=False,
         env_prefix='',
-        extra='ignore'
-    )
-
-
-class LocalLLMConfig(BaseSettings):
-    """Local LLM Configuration"""
-
-    # Local LLM server settings
-    enabled: bool = Field(default=False, description="Enable local LLM client")
-    server_url: str = Field(default="http://localhost:8000", description="Local LLM server URL")
-    api_key: Optional[str] = Field(default=None, description="API key if authentication required")
-    model: str = Field(default="default", description="Default model name")
-    timeout: float = Field(default=120.0, ge=1.0, description="Request timeout in seconds")
-
-    # Generation parameters
-    temperature: float = Field(default=0.6, ge=0.0, le=2.0, description="Sampling temperature")
-    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
-    max_tokens: int = Field(default=4000, ge=1, description="Max output tokens")
-
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_nested_delimiter='_',
-        case_sensitive=False,
-        env_prefix='LOCAL_LLM_',
         extra='ignore'
     )
 

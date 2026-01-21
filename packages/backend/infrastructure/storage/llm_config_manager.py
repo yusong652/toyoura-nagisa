@@ -211,11 +211,6 @@ def validate_llm_config(provider: str, model: str) -> tuple[bool, Optional[str]]
             if not cfg.openrouter_api_key:
                 return False, "OpenRouter API key not configured"
 
-        elif provider == "local_llm":
-            cfg = llm_settings.get_local_llm_config()
-            if not cfg.server_url:
-                return False, "Local LLM server URL not configured"
-
     except Exception as e:
         return False, f"Failed to validate configuration: {str(e)}"
 

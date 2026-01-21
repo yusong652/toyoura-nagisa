@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 MULTIMODAL_PROVIDERS = {"google", "anthropic", "openai", "openrouter", "zhipu"}
 
 # LLM providers that do NOT support multimodal content
-NON_MULTIMODAL_PROVIDERS = {"local_llm", "moonshot"}
+NON_MULTIMODAL_PROVIDERS = {"moonshot"}
 
 
 def _check_multimodal_support() -> bool:

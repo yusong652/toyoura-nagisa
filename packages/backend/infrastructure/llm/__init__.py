@@ -2,7 +2,7 @@
 LLM infrastructure package for toyoura-nagisa with unified architecture.
 
 This package provides a unified interface for multiple LLM providers including
-Gemini, Anthropic, OpenAI, and local model support using the new base/shared/providers architecture.
+Gemini, Anthropic, OpenAI, and others using the new base/shared/providers architecture.
 """
 
 from backend.presentation.models.api_models import ErrorResponse
@@ -16,11 +16,6 @@ from backend.infrastructure.llm.providers.anthropic import AnthropicClient
 from backend.infrastructure.llm.providers.openai import OpenAIClient
 from backend.infrastructure.llm.providers.moonshot import MoonshotClient
 from backend.infrastructure.llm.providers.zhipu import ZhipuClient
-
-try:
-    from backend.infrastructure.llm.providers.local import LocalLLMClient
-except ImportError:
-    LocalLLMClient = None
 
 # ========== SOTA架构 - 统一导出 ==========
 # 导出核心接口和新架构组件
@@ -43,5 +38,4 @@ __all__ = [
     "OpenAIClient",
     "MoonshotClient",
     "ZhipuClient",
-    "LocalLLMClient",
 ] 

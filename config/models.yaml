@@ -145,13 +145,3 @@ providers:
         name: Grok 4.1 Fast
         description: xAI's Grok model via OpenRouter
         context_window: 1048576
-
-  # Local LLM
-  - provider: local_llm
-    name: Local LLM
-    description: Self-hosted models via vLLM or Ollama
-    models:
-      - id: local-model
-        name: Local Model
-        description: Model running on local server (vLLM/Ollama)
-        # context_window depends on local setup

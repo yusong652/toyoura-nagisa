@@ -4,7 +4,6 @@ Web Search Service - Application layer web search orchestration.
 
 import json
 from typing import Dict, Any, Optional, List
-from backend.config import get_llm_settings
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.infrastructure.llm.shared.constants import DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
 
@@ -14,14 +13,13 @@ async def perform_web_search(
     query: str,
     max_uses: Optional[int] = None,
 ) -> Dict[str, Any]:
-    llm_settings = get_llm_settings()
     provider_name = _get_provider_name(llm_client)
 
     if max_uses is None:
         if provider_name == "google":
-            max_uses = llm_settings.get_google_config().web_search_max_uses
+            max_uses = 10
         elif provider_name == "anthropic":
-            max_uses = llm_settings.get_anthropic_config().web_search_max_uses
+            max_uses = 10
         elif provider_name == "openai":
             max_uses = 5
         elif provider_name in ("moonshot", "zhipu"):
@@ -29,10 +27,12 @@ async def perform_web_search(
         else:
             max_uses = 5
 
+    max_uses_value: int = max_uses if max_uses is not None else 5
+
     if provider_name == "google":
         return await _perform_google_search(llm_client, query)
     if provider_name == "anthropic":
-        return await _perform_anthropic_search(llm_client, query, max_uses)
+        return await _perform_anthropic_search(llm_client, query, max_uses_value)
     if provider_name == "openai":
         return await _perform_openai_search(llm_client, query)
     if provider_name == "moonshot":

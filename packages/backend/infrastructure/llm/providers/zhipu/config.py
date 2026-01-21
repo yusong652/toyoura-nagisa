@@ -17,7 +17,7 @@ class ZhipuModelSettings:
     """Zhipu model-specific settings"""
     model: str = "glm-4.6"  # Default to GLM-4 Plus model
     temperature: float = 0.95  # Recommended temperature for Zhipu API (range: 0-1)
-    max_tokens: Optional[int] = None
+    max_tokens: Optional[int] = 1024*16
     top_p: float = 0.7
 
     # Zhipu-specific features
@@ -98,24 +98,15 @@ def get_zhipu_client_config(**overrides) -> ZhipuClientConfig:
     try:
         zhipu_config = llm_settings.get_zhipu_config()
         model = zhipu_config.model
-        temperature = zhipu_config.temperature
-        max_tokens = zhipu_config.max_tokens
-        top_p = zhipu_config.top_p if zhipu_config.top_p is not None else 0.7
         api_key = zhipu_config.zhipu_api_key
     except (AttributeError, KeyError):
         # Fallback to defaults if zhipu config not available
         model = "glm-4.6"
-        temperature = 0.6
-        max_tokens = None
-        top_p = 0.7
         api_key = None
 
     # Build model settings
     model_settings_dict = {
         'model': model,
-        'temperature': temperature,
-        'max_tokens': max_tokens,
-        'top_p': top_p,
     }
 
     # Apply overrides to model settings

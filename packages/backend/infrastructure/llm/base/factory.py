@@ -25,7 +25,6 @@ class LLMFactory:
         from backend.infrastructure.llm.providers.moonshot import MoonshotClient
         from backend.infrastructure.llm.providers.zhipu import ZhipuClient
         from backend.infrastructure.llm.providers.openrouter import OpenRouterClient
-        from backend.infrastructure.llm.providers.local.local_llm_client import LocalLLMClient
 
         self._clients = {
             "google": GoogleClient,
@@ -35,7 +34,6 @@ class LLMFactory:
             "moonshot": MoonshotClient,
             "zhipu": ZhipuClient,
             "openrouter": OpenRouterClient,
-            "local_llm": LocalLLMClient,
         }
 
     def create_client(self, name: Optional[str] = None, app: Optional[Any] = None) -> LLMClientBase:
@@ -55,7 +53,7 @@ class LLMFactory:
         llm_settings = get_llm_settings()
         provider = llm_settings.provider
 
-        if provider not in self._clients or provider == "local_llm":
+        if provider not in self._clients:
             logger.warning(f"Secondary model not supported for '{provider}', using primary")
             return self.create_client(app=app)
 
@@ -73,7 +71,7 @@ class LLMFactory:
         Create an LLM client with runtime configuration.
 
         API keys are sourced from .env, only provider and model are overridden.
-        Other parameters (temperature, top_p, etc.) use defaults from config files.
+        Other parameters use defaults from config files.
 
         Args:
             provider: LLM provider name (e.g., "google", "anthropic", "openai")
@@ -117,9 +115,6 @@ class LLMFactory:
         # Override model in extra_config
         if "extra_config" in base_config:
             base_config["extra_config"]["model"] = model
-        elif provider == "local_llm":
-            # local_llm stores model at top level, not in extra_config
-            base_config["model"] = model
 
         return base_config
 
@@ -132,18 +127,13 @@ class LLMFactory:
             cfg = llm_settings.get_google_config()
             return {
                 "api_key": cfg.google_api_key,
-                "extra_config": {**extra, "model": cfg.model, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "top_k": cfg.top_k,
-                                 "max_tokens": cfg.max_tokens,
-                                 "web_search_max_uses": cfg.web_search_max_uses}
+                "extra_config": {**extra, "model": cfg.model}
             }
         elif name == "anthropic":
             cfg = llm_settings.get_anthropic_config()
             return {
                 "api_key": cfg.anthropic_api_key,
-                "extra_config": {**extra, "model": cfg.model, "temperature": cfg.temperature,
-                                 "max_tokens": cfg.max_tokens, "top_p": cfg.top_p, "top_k": cfg.top_k,
-                                 "web_search_max_uses": cfg.web_search_max_uses}
+                "extra_config": {**extra, "model": cfg.model}
             }
         elif name in ["openai"]:
             cfg = llm_settings.get_openai_config()
@@ -151,8 +141,7 @@ class LLMFactory:
                 raise ValueError("OpenAI API key not configured")
             return {
                 "api_key": cfg.openai_api_key,
-                "extra_config": {**extra, "model": cfg.model, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "top_k": cfg.top_k, "max_tokens": cfg.max_tokens}
+                "extra_config": {**extra, "model": cfg.model}
             }   
         elif name == "moonshot":
             cfg = llm_settings.get_moonshot_config()
@@ -160,8 +149,7 @@ class LLMFactory:
                 raise ValueError("Moonshot API key not configured")
             return {
                 "api_key": cfg.moonshot_api_key,
-                "extra_config": {**extra, "model": cfg.model, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "max_tokens": cfg.max_tokens}
+                "extra_config": {**extra, "model": cfg.model}
             }
         elif name == "zhipu":
             cfg = llm_settings.get_zhipu_config()
@@ -169,25 +157,13 @@ class LLMFactory:
                 raise ValueError("Zhipu API key not configured")
             return {
                 "api_key": cfg.zhipu_api_key,
-                "extra_config": {**extra, "model": cfg.model, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "max_tokens": cfg.max_tokens}
+                "extra_config": {**extra, "model": cfg.model}
             }
         elif name == "openrouter":
             cfg = llm_settings.get_openrouter_config()
             return {
                 "api_key": cfg.openrouter_api_key,
-                "extra_config": {**extra, "model": cfg.model, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "max_tokens": cfg.max_tokens}
-            }
-        elif name == "local_llm":
-            cfg = llm_settings.get_local_llm_config()
-            return {
-                "server_url": cfg.server_url,
-                "api_key": cfg.api_key,
-                "model": cfg.model,
-                "timeout": cfg.timeout,
-                "extra_config": {**extra, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "max_tokens": cfg.max_tokens}
+                "extra_config": {**extra, "model": cfg.model}
             }
         raise ValueError(f"Unknown provider: {name}")
 
@@ -201,51 +177,42 @@ class LLMFactory:
             logger.info(f"Secondary model: {cfg.secondary_model}")
             return {
                 "api_key": cfg.google_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "top_k": cfg.top_k,
-                                 "max_tokens": cfg.max_tokens,
-                                 "web_search_max_uses": cfg.web_search_max_uses}
+                "extra_config": {**extra, "model": cfg.secondary_model}
             }
         elif name == "anthropic":
             cfg = llm_settings.get_anthropic_config()
             logger.info(f"Secondary model: {cfg.secondary_model}")
             return {
                 "api_key": cfg.anthropic_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model, "temperature": cfg.temperature,
-                                 "max_tokens": cfg.max_tokens, "top_p": cfg.top_p, "top_k": cfg.top_k,
-                                 "web_search_max_uses": cfg.web_search_max_uses}
+                "extra_config": {**extra, "model": cfg.secondary_model}
             }
         elif name in ["gpt", "openai"]:
             cfg = llm_settings.get_openai_config()
             logger.info(f"Secondary model: {cfg.secondary_model}")
             return {
                 "api_key": cfg.openai_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "top_k": cfg.top_k, "max_tokens": cfg.max_tokens}
+                "extra_config": {**extra, "model": cfg.secondary_model}
             }
         elif name == "moonshot":
             cfg = llm_settings.get_moonshot_config()
             logger.info(f"Secondary model: {cfg.secondary_model}")
             return {
                 "api_key": cfg.moonshot_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "max_tokens": cfg.max_tokens}
+                "extra_config": {**extra, "model": cfg.secondary_model}
             }
         elif name == "zhipu":
             cfg = llm_settings.get_zhipu_config()
             logger.info(f"Secondary model: {cfg.secondary_model}")
             return {
                 "api_key": cfg.zhipu_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "max_tokens": cfg.max_tokens}
+                "extra_config": {**extra, "model": cfg.secondary_model}
             }
         elif name == "openrouter":
             cfg = llm_settings.get_openrouter_config()
             logger.info(f"Secondary model: {cfg.secondary_model}")
             return {
                 "api_key": cfg.openrouter_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model, "temperature": cfg.temperature,
-                                 "top_p": cfg.top_p, "max_tokens": cfg.max_tokens}
+                "extra_config": {**extra, "model": cfg.secondary_model}
             }
         raise ValueError(f"Secondary model not supported for: {name}")
 

@@ -110,10 +110,6 @@ def _check_api_key_configured(provider: str) -> bool:
             cfg = llm_settings.get_openrouter_config()
             return bool(cfg.openrouter_api_key)
 
-        elif provider == "local_llm":
-            cfg = llm_settings.get_local_llm_config()
-            return bool(cfg.server_url)
-
         return False
 
     except Exception:

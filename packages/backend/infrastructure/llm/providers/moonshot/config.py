@@ -17,7 +17,7 @@ class MoonshotModelSettings:
     """Moonshot model-specific settings"""
     model: str = "kimi-k2-thinking"  # Default to K2 Thinking model with reasoning support
     temperature: float = 0.6  # Recommended temperature for Moonshot API (range: 0-1)
-    max_tokens: Optional[int] = None
+    max_tokens: Optional[int] = 1024*16
     top_p: float = 1.0
 
     # Moonshot-specific features
@@ -99,24 +99,15 @@ def get_moonshot_client_config(**overrides) -> MoonshotClientConfig:
     try:
         moonshot_config = llm_settings.get_moonshot_config()
         model = moonshot_config.model
-        temperature = moonshot_config.temperature
-        max_tokens = moonshot_config.max_tokens
-        top_p = moonshot_config.top_p if moonshot_config.top_p is not None else 1.0
         api_key = moonshot_config.moonshot_api_key
     except (AttributeError, KeyError):
         # Fallback to defaults
         model = "kimi-k2-0905-preview"
-        temperature = 0.6
-        max_tokens = None
-        top_p = 1.0
         api_key = None
 
     # Build model settings
     model_settings_dict = {
         'model': model,
-        'temperature': temperature,
-        'max_tokens': max_tokens,
-        'top_p': top_p,
     }
 
     # Apply overrides to model settings

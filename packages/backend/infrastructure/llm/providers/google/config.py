@@ -67,7 +67,7 @@ class GoogleModelConfig(BaseModel):
         description="Sampling temperature, controlling the randomness of the output"
     )
     max_tokens: int = Field(
-        default=4096,
+        default=1024*16,
         ge=1,
         description="Maximum output token number"
     )

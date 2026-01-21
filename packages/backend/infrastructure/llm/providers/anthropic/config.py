@@ -18,7 +18,7 @@ class AnthropicModelConfig(BaseModel):
         description="Claude model to use"
     )
     max_tokens: int = Field(
-        default=4096,
+        default=1024*16,
         ge=1,
         le=64000,  # Claude 4 系列支持更高输出限制
         description="Maximum number of tokens to generate"

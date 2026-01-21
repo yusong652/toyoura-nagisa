@@ -17,7 +17,7 @@ class OpenRouterModelSettings:
     """OpenRouter model-specific settings"""
     model: str = "anthropic/claude-sonnet-4-5"  # Default model
     temperature: float = 0.7
-    max_tokens: Optional[int] = None
+    max_tokens: Optional[int] = 1024*16
     top_p: float = 1.0
 
     # OpenRouter supports any model in their catalog:
@@ -105,9 +105,6 @@ def get_openrouter_client_config(**overrides) -> OpenRouterClientConfig:
     try:
         openrouter_config = llm_settings.get_openrouter_config()
         model = openrouter_config.model
-        temperature = openrouter_config.temperature
-        max_tokens = openrouter_config.max_tokens
-        top_p = openrouter_config.top_p if openrouter_config.top_p is not None else 1.0
         api_key = openrouter_config.openrouter_api_key
 
         # Build OpenRouter headers
@@ -118,9 +115,6 @@ def get_openrouter_client_config(**overrides) -> OpenRouterClientConfig:
     except (AttributeError, KeyError):
         # Fallback to defaults if config not available
         model = "anthropic/claude-sonnet-4-5"
-        temperature = 0.7
-        max_tokens = None
-        top_p = 1.0
         api_key = None
         openrouter_headers = {
             "HTTP-Referer": "https://github.com/yusong652/toyoura-nagisa",
@@ -130,9 +124,6 @@ def get_openrouter_client_config(**overrides) -> OpenRouterClientConfig:
     # Build model settings
     model_settings_dict = {
         'model': model,
-        'temperature': temperature,
-        'max_tokens': max_tokens,
-        'top_p': top_p,
     }
 
     # Apply overrides to model settings

@@ -15,7 +15,7 @@ class OpenAIModelSettings:
     """OpenAI model-specific settings"""
     model: str = "gpt-4o-2024-11-20"  # Use specific version that supports function calling + vision
     temperature: float = 0.7
-    max_tokens: Optional[int] = None
+    max_tokens: Optional[int] = 1024*16
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
@@ -102,10 +102,6 @@ def get_openai_client_config(**overrides) -> OpenAIClientConfig:
     # Build model settings from global config
     model_settings_dict = {
         'model': openai_config.model,
-        'temperature': openai_config.temperature,
-        'max_tokens': openai_config.max_tokens,
-        'top_p': openai_config.top_p if openai_config.top_p is not None else 1.0,
-        'reasoning_effort': openai_config.reasoning_effort
     }
 
     # Apply overrides to model settings
