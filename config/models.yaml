@@ -5,14 +5,14 @@
 #
 # Structure:
 #   providers:
-#     - provider: identifier (must match llm.py config)
-#       name: Display name for UI
-#       description: Provider description
+#     - provider: identifier (must match llm.py config, required)
+#       name: Display name for UI (required)
+#       description: Provider description (optional)
 #       models:
-#         - id: Model identifier for API calls
-#           name: Display name
+#         - id: Model identifier for API calls (required)
+#           name: Display name (required)
 #           description: Model description (optional)
-#           context_window: Token limit (optional, integer without commas)
+#           context_window: Token limit in tokens (optional, integer without commas)
 
 providers:
 
