@@ -1,13 +1,14 @@
 """
 LLM Configuration API.
 
-Provides endpoints for managing global default LLM provider and model configuration.
-The configuration is stored in config/default_llm.json and applies to all new sessions.
+Provides endpoints for managing LLM provider and model configuration.
+Global defaults are stored in config/default_llm.json and apply to all new sessions.
+Session overrides are stored in session metadata when a session_id is provided.
 
 Routes:
-    GET /api/llm-config - Get current default LLM configuration
-    POST /api/llm-config - Update default LLM configuration
-    DELETE /api/llm-config - Clear default LLM configuration (revert to system defaults)
+    GET /api/llm-config - Get current LLM configuration (global or session)
+    POST /api/llm-config - Update LLM configuration (global or session)
+    DELETE /api/llm-config - Clear LLM configuration (global or session)
     GET /api/llm-config/providers - Get available providers and models
 """
 from typing import List, Optional
@@ -21,6 +22,11 @@ from backend.infrastructure.storage.llm_config_manager import (
     save_default_llm_config,
     clear_default_llm_config,
     validate_llm_config,
+)
+from backend.infrastructure.storage.session_manager import (
+    get_session_llm_config,
+    update_session_llm_config,
+    clear_session_llm_config,
 )
 from backend.infrastructure.llm.shared.models_registry import (
     get_all_providers,
@@ -38,12 +44,20 @@ class LLMConfigData(BaseModel):
     """LLM configuration data."""
     provider: str = Field(..., description="LLM provider name (e.g., 'google', 'anthropic')")
     model: str = Field(..., description="Model identifier (e.g., 'gemini-2.0-flash-exp')")
+    secondary_model: Optional[str] = Field(
+        None,
+        description="Secondary model identifier for SubAgents"
+    )
 
 
 class LLMConfigUpdateRequest(BaseModel):
     """Request to update LLM configuration."""
     provider: str = Field(..., description="LLM provider name")
     model: str = Field(..., description="Model identifier")
+    secondary_model: Optional[str] = Field(
+        None,
+        description="Secondary model identifier for SubAgents"
+    )
 
 
 class ModelInfo(BaseModel):
@@ -161,17 +175,42 @@ def _get_available_providers() -> List[ProviderInfo]:
 # API Endpoints
 # =====================
 @router.get("/", response_model=ApiResponse[Optional[LLMConfigData]])
-async def get_llm_config() -> ApiResponse[Optional[LLMConfigData]]:
+async def get_llm_config(
+    session_id: Optional[str] = None,
+) -> ApiResponse[Optional[LLMConfigData]]:
     """
-    Get current default LLM configuration.
+    Get current LLM configuration.
 
-    Returns the global default provider and model that will be used for new sessions.
+    Returns the session override if session_id is provided, otherwise the global default.
     If no configuration is set, returns null (system defaults from llm.py will be used).
 
     Returns:
         ApiResponse containing LLMConfigData or null
     """
     try:
+        if session_id:
+            config = get_session_llm_config(session_id)
+            if config:
+                return ApiResponse(
+                    success=True,
+                    message="Retrieved session LLM configuration",
+                    data=LLMConfigData(**config)
+                )
+
+            config = get_default_llm_config()
+            if config:
+                return ApiResponse(
+                    success=True,
+                    message="No session LLM override (using global defaults)",
+                    data=LLMConfigData(**config)
+                )
+
+            return ApiResponse(
+                success=True,
+                message="No custom LLM configuration set (using system defaults)",
+                data=None
+            )
+
         config = get_default_llm_config()
 
         if config:
@@ -180,12 +219,12 @@ async def get_llm_config() -> ApiResponse[Optional[LLMConfigData]]:
                 message="Retrieved default LLM configuration",
                 data=LLMConfigData(**config)
             )
-        else:
-            return ApiResponse(
-                success=True,
-                message="No custom LLM configuration set (using system defaults)",
-                data=None
-            )
+
+        return ApiResponse(
+            success=True,
+            message="No custom LLM configuration set (using system defaults)",
+            data=None
+        )
 
     except Exception as e:
         raise InternalServerError(
@@ -194,12 +233,16 @@ async def get_llm_config() -> ApiResponse[Optional[LLMConfigData]]:
 
 
 @router.post("/", response_model=ApiResponse[LLMConfigData])
-async def update_llm_config(request: LLMConfigUpdateRequest) -> ApiResponse[LLMConfigData]:
+async def update_llm_config(
+    request: LLMConfigUpdateRequest,
+    session_id: Optional[str] = None,
+) -> ApiResponse[LLMConfigData]:
     """
-    Update default LLM configuration.
+    Update LLM configuration.
 
-    Sets the global default provider and model that will be used for all new sessions.
-    The configuration is validated before being saved.
+    Sets the session override when session_id is provided, otherwise updates the
+    global default provider and model for new sessions. The configuration is
+    validated before being saved.
 
     Args:
         request: LLMConfigUpdateRequest with provider and model
@@ -212,19 +255,50 @@ async def update_llm_config(request: LLMConfigUpdateRequest) -> ApiResponse[LLMC
     """
     try:
         # Validate configuration
-        is_valid, error_message = validate_llm_config(request.provider, request.model)
+        is_valid, error_message = validate_llm_config(
+            request.provider,
+            request.model,
+            request.secondary_model,
+        )
         if not is_valid:
             raise BadRequestError(message=f"Invalid LLM configuration: {error_message}")
 
-        # Save configuration
-        success = save_default_llm_config(request.provider, request.model)
+        if session_id:
+            success = update_session_llm_config(
+                session_id,
+                request.provider,
+                request.model,
+                request.secondary_model,
+            )
+            if not success:
+                raise BadRequestError(message=f"Session not found: {session_id}")
+
+            return ApiResponse(
+                success=True,
+                message=f"Updated session LLM to {request.provider}/{request.model}",
+                data=LLMConfigData(
+                    provider=request.provider,
+                    model=request.model,
+                    secondary_model=request.secondary_model,
+                )
+            )
+
+        success = save_default_llm_config(
+            request.provider,
+            request.model,
+            request.secondary_model,
+        )
         if not success:
             raise InternalServerError(message="Failed to save LLM configuration")
 
         return ApiResponse(
             success=True,
             message=f"Updated default LLM to {request.provider}/{request.model}",
-            data=LLMConfigData(provider=request.provider, model=request.model)
+            data=LLMConfigData(
+                provider=request.provider,
+                model=request.model,
+                secondary_model=request.secondary_model,
+            )
         )
 
     except BadRequestError:
@@ -236,16 +310,30 @@ async def update_llm_config(request: LLMConfigUpdateRequest) -> ApiResponse[LLMC
 
 
 @router.delete("/", response_model=ApiResponse[None])
-async def clear_llm_config() -> ApiResponse[None]:
+async def clear_llm_config(
+    session_id: Optional[str] = None,
+) -> ApiResponse[None]:
     """
-    Clear default LLM configuration.
+    Clear LLM configuration.
 
-    Removes the custom configuration, causing the system to revert to defaults from llm.py.
+    Removes the session override when session_id is provided; otherwise clears the
+    global default and reverts to defaults from llm.py.
 
     Returns:
         ApiResponse confirming the deletion
     """
     try:
+        if session_id:
+            success = clear_session_llm_config(session_id)
+            if not success:
+                raise BadRequestError(message=f"Session not found: {session_id}")
+
+            return ApiResponse(
+                success=True,
+                message="Cleared session LLM override",
+                data=None
+            )
+
         success = clear_default_llm_config()
         if not success:
             raise InternalServerError(message="Failed to clear LLM configuration")

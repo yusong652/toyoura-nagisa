@@ -49,10 +49,44 @@ const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
 
 // Dialog types
-type ActiveDialog = 'profile' | 'memory' | 'session' | 'session_restore' | 'session_delete' | 'theme' | 'pfc_reset' | 'pfc_reset_confirm' | 'pfc_tasks' | null;
+type ActiveDialog =
+  | 'profile'
+  | 'memory'
+  | 'session'
+  | 'session_restore'
+  | 'session_delete'
+  | 'theme'
+  | 'pfc_reset'
+  | 'pfc_reset_confirm'
+  | 'pfc_tasks'
+  | 'models_provider'
+  | 'models_primary'
+  | 'models_secondary'
+  | null;
 
 // Session action type
 type SessionAction = 'create' | 'restore' | 'delete';
+
+interface LlmModelInfo {
+  id: string;
+  name: string;
+  description?: string | null;
+  context_window?: number | null;
+}
+
+interface LlmProviderInfo {
+  provider: string;
+  name: string;
+  description?: string | null;
+  models: LlmModelInfo[];
+  api_key_configured: boolean;
+}
+
+interface SessionLlmConfig {
+  provider: string;
+  model: string;
+  secondary_model?: string | null;
+}
 
 // Profile options fallback (used if profile list is unavailable)
 const FALLBACK_PROFILE_OPTIONS: SelectOption<AgentProfileType>[] = [
@@ -96,6 +130,22 @@ const PFC_RESET_OPTIONS: SelectOption<boolean>[] = [
   { key: 'cancel', value: false, label: 'Cancel', description: 'Abort reset operation' },
   { key: 'confirm', value: true, label: 'Confirm Reset', description: 'Delete all PFC history (cannot be undone)' },
 ];
+
+function formatContextWindow(value?: number | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  if (value >= 1_000_000) {
+    return `${Math.round(value / 1_000_000)}m`;
+  }
+
+  if (value >= 1_000) {
+    return `${Math.round(value / 1_000)}k`;
+  }
+
+  return String(value);
+}
 
 export const MainLayout: React.FC = () => {
   const appState = useAppState();
@@ -172,6 +222,14 @@ export const MainLayout: React.FC = () => {
   }>>([]);
   const [isPfcTasksLoading, setIsPfcTasksLoading] = useState(false);
 
+  // LLM model selection state
+  const [llmProviders, setLlmProviders] = useState<LlmProviderInfo[]>([]);
+  const [isLlmProvidersLoading, setIsLlmProvidersLoading] = useState(false);
+  const [llmProvidersError, setLlmProvidersError] = useState<string | null>(null);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [selectedPrimaryModelId, setSelectedPrimaryModelId] = useState<string | null>(null);
+  const [currentLlmConfig, setCurrentLlmConfig] = useState<SessionLlmConfig | null>(null);
+
   const profileOptions = useMemo<SelectOption<AgentProfileType>[]>(() => {
     if (appState.availableProfiles.length === 0) {
       return FALLBACK_PROFILE_OPTIONS;
@@ -184,6 +242,92 @@ export const MainLayout: React.FC = () => {
       description: profile.description,
     }));
   }, [appState.availableProfiles]);
+
+  const loadLlmProviders = useCallback(async (sessionId: string) => {
+    setIsLlmProvidersLoading(true);
+    setLlmProvidersError(null);
+    try {
+      const providersResponse = await apiClient.get<{ providers: LlmProviderInfo[] }>(
+        '/api/llm-config/providers'
+      );
+      const providers = providersResponse.providers ?? [];
+      setLlmProviders(providers);
+
+      const sessionConfig = await apiClient.get<SessionLlmConfig | null>(
+        `/api/llm-config?session_id=${sessionId}`
+      );
+      setCurrentLlmConfig(sessionConfig);
+      setSelectedProviderId(sessionConfig?.provider ?? null);
+      setSelectedPrimaryModelId(sessionConfig?.model ?? null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load LLM models';
+      setLlmProvidersError(message);
+      setLlmProviders([]);
+    } finally {
+      setIsLlmProvidersLoading(false);
+    }
+  }, []);
+
+  const activeProviderId = selectedProviderId ?? currentLlmConfig?.provider ?? null;
+
+  const activeProvider = useMemo(() => {
+    if (!activeProviderId) {
+      return null;
+    }
+    return llmProviders.find((provider) => provider.provider === activeProviderId) ?? null;
+  }, [llmProviders, activeProviderId]);
+
+  const providerOptions = useMemo<SelectOption<string>[]>(() => {
+    return llmProviders.map((provider) => {
+      const descriptionParts = [];
+      if (provider.description) {
+        descriptionParts.push(provider.description);
+      }
+      if (!provider.api_key_configured) {
+        descriptionParts.push('API key not configured');
+      }
+      return {
+        key: provider.provider,
+        value: provider.provider,
+        label: provider.name,
+        description: descriptionParts.join(' | '),
+        disabled: !provider.api_key_configured,
+      };
+    });
+  }, [llmProviders]);
+
+  const primaryModelOptions = useMemo<SelectOption<string>[]>(() => {
+    if (!activeProvider) {
+      return [];
+    }
+
+    return activeProvider.models.map((model) => {
+      const descriptionParts = [];
+      if (model.description) {
+        descriptionParts.push(model.description);
+      }
+      const contextWindow = formatContextWindow(model.context_window ?? undefined);
+      if (contextWindow) {
+        descriptionParts.push(`context ${contextWindow}`);
+      }
+      if (model.id !== model.name) {
+        descriptionParts.push(model.id);
+      }
+      return {
+        key: model.id,
+        value: model.id,
+        label: model.name,
+        description: descriptionParts.join(' | '),
+      };
+    });
+  }, [activeProvider]);
+
+  const currentPrimaryModelId = selectedPrimaryModelId
+    ?? (currentLlmConfig?.provider === activeProviderId ? currentLlmConfig.model : null);
+
+  const currentSecondaryModelId = currentLlmConfig?.provider === activeProviderId
+    ? (currentLlmConfig.secondary_model ?? currentPrimaryModelId)
+    : currentPrimaryModelId;
 
   // Slash command processor context
   const commandProcessorContext = useMemo(() => ({
@@ -205,6 +349,22 @@ export const MainLayout: React.FC = () => {
   const { commands, processCommand, commandContext } = useSlashCommandProcessor({
     context: commandProcessorContext,
   });
+
+  useEffect(() => {
+    if (activeDialog !== 'models_provider') {
+      return;
+    }
+
+    if (!appState.currentSessionId) {
+      setLlmProvidersError('No active session. Create or restore a session first.');
+      setIsLlmProvidersLoading(false);
+      return;
+    }
+
+    setSelectedProviderId(null);
+    setSelectedPrimaryModelId(null);
+    void loadLlmProviders(appState.currentSessionId);
+  }, [activeDialog, appState.currentSessionId, loadLlmProviders]);
 
   // Track session ID to detect session changes
   const previousSessionIdRef = useRef(appState.currentSessionId);
@@ -358,6 +518,91 @@ export const MainLayout: React.FC = () => {
     }
     setActiveDialog(null);
   }, [sessionManager, appActions]);
+
+  const resolvePrimaryModelId = useCallback((providerId: string): string | null => {
+    const provider = llmProviders.find((item) => item.provider === providerId);
+    if (!provider || provider.models.length === 0) {
+      return null;
+    }
+
+    if (currentLlmConfig?.provider === providerId && currentLlmConfig.model) {
+      return currentLlmConfig.model;
+    }
+
+    return provider.models[0]?.id ?? null;
+  }, [llmProviders, currentLlmConfig]);
+
+  const handleModelsProviderSelect = useCallback((providerId: string) => {
+    setSelectedProviderId(providerId);
+    setSelectedPrimaryModelId(resolvePrimaryModelId(providerId));
+    setActiveDialog('models_primary');
+  }, [resolvePrimaryModelId]);
+
+  const handleModelsPrimarySelect = useCallback((modelId: string) => {
+    setSelectedPrimaryModelId(modelId);
+    setActiveDialog('models_secondary');
+  }, []);
+
+  const handleModelsSecondarySelect = useCallback(async (secondaryModelId: string) => {
+    if (!appState.currentSessionId) {
+      appActions.addHistoryItem({
+        type: MessageType.ERROR,
+        message: 'No active session. Create or restore a session first.',
+      });
+      setActiveDialog(null);
+      return;
+    }
+
+    if (!selectedProviderId || !selectedPrimaryModelId) {
+      appActions.addHistoryItem({
+        type: MessageType.ERROR,
+        message: 'Please select a provider and primary model first.',
+      });
+      setActiveDialog(null);
+      return;
+    }
+
+    try {
+      await apiClient.post(`/api/llm-config?session_id=${appState.currentSessionId}`, {
+        provider: selectedProviderId,
+        model: selectedPrimaryModelId,
+        secondary_model: secondaryModelId,
+      });
+
+      const updatedConfig: SessionLlmConfig = {
+        provider: selectedProviderId,
+        model: selectedPrimaryModelId,
+        secondary_model: secondaryModelId,
+      };
+      setCurrentLlmConfig(updatedConfig);
+
+      appActions.addHistoryItem({
+        type: MessageType.INFO,
+        message: `Session LLM updated: ${selectedProviderId}/${selectedPrimaryModelId}`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update session LLM config';
+      appActions.addHistoryItem({
+        type: MessageType.ERROR,
+        message,
+      });
+    }
+
+    setActiveDialog(null);
+  }, [
+    appActions,
+    appState.currentSessionId,
+    selectedProviderId,
+    selectedPrimaryModelId,
+  ]);
+
+  const handleModelsPrimaryCancel = useCallback(() => {
+    setActiveDialog('models_provider');
+  }, []);
+
+  const handleModelsSecondaryCancel = useCallback(() => {
+    setActiveDialog('models_primary');
+  }, []);
 
   // Handle PFC reset confirmation
   const handlePfcResetConfirm = useCallback(async (confirmed: boolean) => {
@@ -659,6 +904,8 @@ export const MainLayout: React.FC = () => {
         } else if (result.dialog === 'pfc_tasks') {
           setActiveDialog('pfc_tasks');
           loadPfcTasks();
+        } else if (result.dialog === 'models_provider') {
+          setActiveDialog('models_provider');
         }
         break;
 
@@ -841,6 +1088,56 @@ export const MainLayout: React.FC = () => {
             showDescriptions={false}
             maxItemsToShow={8}
             borderColor={theme.status.error}
+          />
+        )}
+
+        {/* LLM provider selection dialog */}
+        {activeDialog === 'models_provider' && (
+          <SelectDialog
+            title="Select LLM Provider"
+            description="Choose a provider for this session:"
+            options={providerOptions}
+            currentValue={activeProviderId ?? undefined}
+            onSelect={handleModelsProviderSelect}
+            onCancel={handleDialogCancel}
+            isLoading={isLlmProvidersLoading}
+            loadingMessage="Loading providers..."
+            emptyMessage={llmProvidersError || 'No providers available.'}
+            showNumbers={true}
+            showDescriptions={true}
+            maxItemsToShow={8}
+          />
+        )}
+
+        {/* Primary model selection dialog */}
+        {activeDialog === 'models_primary' && (
+          <SelectDialog
+            title="Select Primary Model"
+            description={`Provider: ${activeProvider?.name || activeProviderId || 'Unknown'}`}
+            options={primaryModelOptions}
+            currentValue={currentPrimaryModelId ?? undefined}
+            onSelect={handleModelsPrimarySelect}
+            onCancel={handleModelsPrimaryCancel}
+            emptyMessage="No models available for this provider."
+            showNumbers={true}
+            showDescriptions={true}
+            maxItemsToShow={10}
+          />
+        )}
+
+        {/* Secondary model selection dialog */}
+        {activeDialog === 'models_secondary' && (
+          <SelectDialog
+            title="Select Secondary Model"
+            description="Choose a model for SubAgents (defaults to primary if unsure):"
+            options={primaryModelOptions}
+            currentValue={currentSecondaryModelId ?? undefined}
+            onSelect={handleModelsSecondarySelect}
+            onCancel={handleModelsSecondaryCancel}
+            emptyMessage="No models available for this provider."
+            showNumbers={true}
+            showDescriptions={true}
+            maxItemsToShow={10}
           />
         )}
 

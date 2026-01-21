@@ -9,7 +9,7 @@ import os
 import json
 import uuid
 import shutil
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, cast
 from datetime import datetime
 from backend.domain.models.message_factory import message_factory
 from backend.domain.models.messages import BaseMessage
@@ -58,10 +58,127 @@ def _save_sessions_metadata(metadata: Dict[str, Any]) -> None:
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
 
+def _get_env_provider_override() -> Optional[str]:
+    from backend.config import get_llm_settings
+
+    provider = get_llm_settings().env_provider_override
+    if not provider:
+        return None
+
+    return provider.lower()
+
+
+def _get_provider_secondary_model(provider: str) -> Optional[str]:
+    from backend.config import get_llm_settings
+
+    llm_settings = get_llm_settings()
+    if provider == "google":
+        return llm_settings.get_google_config().secondary_model
+    if provider == "anthropic":
+        return llm_settings.get_anthropic_config().secondary_model
+    if provider in ("openai", "gpt"):
+        return llm_settings.get_openai_config().secondary_model
+    if provider == "moonshot":
+        return llm_settings.get_moonshot_config().secondary_model
+    if provider == "zhipu":
+        return llm_settings.get_zhipu_config().secondary_model
+    if provider == "openrouter":
+        return llm_settings.get_openrouter_config().secondary_model
+
+    return None
+
+
+def _build_default_session_llm_config() -> Optional[Dict[str, Any]]:
+    from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+    from backend.infrastructure.llm.shared.models_registry import (
+        get_all_providers,
+        get_provider_models,
+        is_model_valid_for_provider,
+        is_provider_supported,
+    )
+
+    default_config = get_default_llm_config()
+    if isinstance(default_config, dict):
+        provider = default_config.get("provider")
+        model = default_config.get("model")
+        secondary_model = default_config.get("secondary_model")
+        if provider and model and is_provider_supported(provider):
+            if is_model_valid_for_provider(provider, model):
+                if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
+                    secondary_model = None
+
+                if not secondary_model:
+                    secondary_model = _get_provider_secondary_model(provider) or model
+
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "secondary_model": secondary_model,
+                }
+
+    env_provider = _get_env_provider_override()
+    provider = env_provider
+    if provider and not is_provider_supported(provider):
+        provider = None
+
+    if not provider:
+        providers = get_all_providers()
+        provider = providers[0].provider if providers else None
+
+    if not provider:
+        return None
+
+    models = get_provider_models(provider)
+    if not models:
+        return None
+
+    model = models[0].id
+    secondary_model = _get_provider_secondary_model(provider) or model
+    if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
+        secondary_model = model
+
+    return {
+        "provider": provider,
+        "model": model,
+        "secondary_model": secondary_model,
+    }
+
+
 def _normalize_session_metadata_entry(session_metadata: Dict[str, Any]) -> bool:
     updated = False
     if "mode" not in session_metadata:
         session_metadata["mode"] = DEFAULT_SESSION_MODE
+        updated = True
+
+    from backend.infrastructure.llm.shared.models_registry import (
+        is_model_valid_for_provider,
+        is_provider_supported,
+    )
+
+    llm_config = session_metadata.get("llm_config")
+    if not isinstance(llm_config, dict):
+        llm_config = None
+
+    if llm_config:
+        provider = llm_config.get("provider")
+        model = llm_config.get("model")
+        secondary_model = llm_config.get("secondary_model")
+        if provider and model and is_provider_supported(provider):
+            if is_model_valid_for_provider(provider, model):
+                if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
+                    secondary_model = None
+                    updated = True
+                if not secondary_model:
+                    secondary_model = _get_provider_secondary_model(provider) or model
+                    updated = True
+                if secondary_model:
+                    llm_config["secondary_model"] = secondary_model
+                    session_metadata["llm_config"] = llm_config
+                    return updated
+
+    default_llm_config = _build_default_session_llm_config()
+    if default_llm_config:
+        session_metadata["llm_config"] = cast(Any, default_llm_config)
         updated = True
     return updated
 
@@ -84,7 +201,7 @@ def create_new_history(name: Optional[str] = None) -> str:
 
     print(f"[DEBUG] Creating new session, ID: {session_id}, name: '{name}'")
 
-    session_metadata = {
+    session_metadata: Dict[str, Any] = {
         "id": session_id,
         "name": name,
         "created_at": datetime.now().isoformat(),
@@ -92,11 +209,15 @@ def create_new_history(name: Optional[str] = None) -> str:
         "mode": DEFAULT_SESSION_MODE,
     }
 
+    default_llm_config = _build_default_session_llm_config()
+    if default_llm_config:
+        session_metadata["llm_config"] = cast(Any, default_llm_config)
+
     # Ensure base directory exists
     os.makedirs(HISTORY_BASE_DIR, exist_ok=True)
 
     # Save metadata
-    metadata = _load_sessions_metadata()
+    metadata: Dict[str, Any] = _load_sessions_metadata()
     metadata[session_id] = session_metadata
     _save_sessions_metadata(metadata)
 
@@ -222,6 +343,60 @@ def update_session_metadata(session_id: str, updates: Dict[str, Any]) -> bool:
         return False
 
     metadata[session_id].update(updates)
+    metadata[session_id]["updated_at"] = datetime.now().isoformat()
+    _save_sessions_metadata(metadata)
+    return True
+
+
+def get_session_llm_config(session_id: str) -> Optional[Dict[str, Any]]:
+    """Get session-level LLM configuration from metadata."""
+    session_metadata = get_session_metadata(session_id)
+    if not session_metadata:
+        return None
+
+    llm_config = session_metadata.get("llm_config")
+    if not isinstance(llm_config, dict):
+        return None
+
+    if "provider" not in llm_config or "model" not in llm_config:
+        return None
+
+    return llm_config
+
+
+def update_session_llm_config(
+    session_id: str,
+    provider: str,
+    model: str,
+    secondary_model: Optional[str] = None,
+) -> bool:
+    """Update session-level LLM configuration in metadata."""
+    metadata = _load_sessions_metadata()
+    if session_id not in metadata:
+        return False
+
+    llm_config: Dict[str, Any] = {
+        "provider": provider,
+        "model": model,
+    }
+    if secondary_model:
+        llm_config["secondary_model"] = secondary_model
+
+    metadata[session_id]["llm_config"] = llm_config
+    metadata[session_id]["updated_at"] = datetime.now().isoformat()
+    _save_sessions_metadata(metadata)
+    return True
+
+
+def clear_session_llm_config(session_id: str) -> bool:
+    """Clear session-level LLM configuration from metadata."""
+    metadata = _load_sessions_metadata()
+    if session_id not in metadata:
+        return False
+
+    if "llm_config" in metadata[session_id]:
+        del metadata[session_id]["llm_config"]
+
     metadata[session_id]["updated_at"] = datetime.now().isoformat()
     _save_sessions_metadata(metadata)
     return True

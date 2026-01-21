@@ -19,6 +19,9 @@ export { themeCommand } from './themeCommand.js';
 // Session command for session management
 export { sessionCommand } from './sessionCommand.js';
 
+// Models command for LLM selection
+export { modelsCommand } from './modelsCommand.js';
+
 // PFC reset command for workspace reset (testing/development)
 export { pfcResetCommand } from './pfcResetCommand.js';
 

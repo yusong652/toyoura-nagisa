@@ -19,7 +19,7 @@ class OpenAIModelSettings:
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
-    reasoning_effort: str = "minimal"  # Reasoning effort: minimal, medium, high
+    reasoning_effort: Optional[str] = None  # Reasoning effort: minimal, medium, high
     
     def to_api_params(self) -> Dict[str, Any]:
         """Convert to OpenAI API parameters"""

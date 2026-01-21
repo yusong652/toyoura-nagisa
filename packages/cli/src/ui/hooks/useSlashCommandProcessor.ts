@@ -22,6 +22,7 @@ import { sessionCommand } from '../commands/sessionCommand.js';
 import { themeCommand } from '../commands/themeCommand.js';
 import { pfcResetCommand } from '../commands/pfcResetCommand.js';
 import { pfcTasksCommand } from '../commands/pfcTasksCommand.js';
+import { modelsCommand } from '../commands/modelsCommand.js';
 
 // Built-in commands (help first for visibility)
 const BUILT_IN_COMMANDS: SlashCommand[] = [
@@ -29,6 +30,7 @@ const BUILT_IN_COMMANDS: SlashCommand[] = [
   profileCommand,
   memoryCommand,
   sessionCommand,
+  modelsCommand,
   themeCommand,
   pfcResetCommand,
   pfcTasksCommand,

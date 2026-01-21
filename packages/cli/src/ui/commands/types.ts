@@ -90,7 +90,8 @@ export interface QuitActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'profile' | 'memory' | 'session' | 'settings' | 'theme' | 'pfc_reset' | 'pfc_tasks';
+  dialog: 'help' | 'profile' | 'memory' | 'session' | 'settings' | 'theme' | 'pfc_reset' | 'pfc_tasks' |
+    'models_provider' | 'models_primary' | 'models_secondary';
   props?: Record<string, unknown>;
 }
 

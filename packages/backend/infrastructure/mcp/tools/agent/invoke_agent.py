@@ -79,13 +79,52 @@ Usage notes:
         # Import here to avoid circular dependencies
         from backend.domain.models.agent_profiles import get_subagent_config
         from backend.application.services.agent_service import AgentService
-        from backend.shared.utils.app_context import get_secondary_llm_client
+        from backend.shared.utils.app_context import get_secondary_llm_client, get_llm_factory
+        from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+        from backend.infrastructure.storage.session_manager import get_session_llm_config
+        from backend.config import get_llm_settings
 
         # Get SubAgent configuration
         config = get_subagent_config(subagent_type)
 
         # Create AgentService with secondary LLM client (lighter model to reduce RPM)
-        llm_client = get_secondary_llm_client()
+        llm_client = None
+        session_llm_config = get_session_llm_config(session_id)
+        default_llm_config = get_default_llm_config()
+
+        provider = None
+        secondary_model = None
+        if session_llm_config:
+            provider = session_llm_config.get("provider")
+            secondary_model = session_llm_config.get("secondary_model")
+
+        if not secondary_model and default_llm_config:
+            provider = provider or default_llm_config.get("provider")
+            secondary_model = default_llm_config.get("secondary_model")
+
+        if provider and not secondary_model:
+            llm_settings = get_llm_settings()
+            if provider == "google":
+                secondary_model = llm_settings.get_google_config().secondary_model
+            elif provider == "anthropic":
+                secondary_model = llm_settings.get_anthropic_config().secondary_model
+            elif provider in ("openai", "gpt"):
+                secondary_model = llm_settings.get_openai_config().secondary_model
+            elif provider == "moonshot":
+                secondary_model = llm_settings.get_moonshot_config().secondary_model
+            elif provider == "zhipu":
+                secondary_model = llm_settings.get_zhipu_config().secondary_model
+            elif provider == "openrouter":
+                secondary_model = llm_settings.get_openrouter_config().secondary_model
+
+        if provider and secondary_model:
+            llm_factory = get_llm_factory()
+            llm_client = llm_factory.create_client_with_config(
+                provider=provider,
+                model=secondary_model,
+            )
+        else:
+            llm_client = get_secondary_llm_client()
         agent_service = AgentService(llm_client)
 
         # Get tool_call_id from request_context.meta (passed by tool_manager)

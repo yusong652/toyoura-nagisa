@@ -7,13 +7,14 @@ Configuration is stored in a JSON file and automatically loaded when creating ne
 Configuration Structure:
 {
     "provider": "google",  # LLM provider name
-    "model": "gemini-2.0-flash-exp"  # Model identifier
+    "model": "gemini-2.0-flash-exp",  # Model identifier
+    "secondary_model": "gemini-2.0-flash-exp"  # Optional subagent model identifier
 }
 
 Design Principles:
 - Global default: One configuration for all sessions
 - File-based: Persisted in config directory
-- Simple: Only provider and model, no other parameters
+- Simple: Only provider/model/secondary_model, no other parameters
 - Validation: Existing llm.py config validates providers and provides API keys
 """
 
@@ -36,6 +37,7 @@ def get_default_llm_config() -> Optional[Dict[str, Any]]:
         Optional[Dict[str, Any]]: Configuration dict with keys:
             - provider: LLM provider name (e.g., "google", "anthropic")
             - model: Model identifier (e.g., "gemini-2.0-flash-exp")
+            - secondary_model: Optional subagent model identifier
         Returns None if configuration file doesn't exist.
 
     Example:
@@ -68,7 +70,11 @@ def get_default_llm_config() -> Optional[Dict[str, Any]]:
         return None
 
 
-def save_default_llm_config(provider: str, model: str) -> bool:
+def save_default_llm_config(
+    provider: str,
+    model: str,
+    secondary_model: Optional[str] = None,
+) -> bool:
     """
     Save the global default LLM configuration.
 
@@ -78,6 +84,7 @@ def save_default_llm_config(provider: str, model: str) -> bool:
     Args:
         provider: LLM provider name (e.g., "google", "anthropic", "openai")
         model: Model identifier (e.g., "gemini-2.0-flash-exp", "claude-sonnet-4-5")
+        secondary_model: Optional subagent model identifier
 
     Returns:
         bool: True if save succeeded, False otherwise
@@ -94,10 +101,12 @@ def save_default_llm_config(provider: str, model: str) -> bool:
             os.makedirs(config_dir, exist_ok=True)
 
         # Build configuration
-        config = {
+        config: Dict[str, Any] = {
             "provider": provider,
             "model": model
         }
+        if secondary_model:
+            config["secondary_model"] = secondary_model
 
         # Save to file
         with open(DEFAULT_LLM_CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -138,7 +147,11 @@ def clear_default_llm_config() -> bool:
         return False
 
 
-def validate_llm_config(provider: str, model: str) -> tuple[bool, Optional[str]]:
+def validate_llm_config(
+    provider: str,
+    model: str,
+    secondary_model: Optional[str] = None,
+) -> tuple[bool, Optional[str]]:
     """
     Validate LLM configuration against available providers and models.
 
@@ -150,6 +163,7 @@ def validate_llm_config(provider: str, model: str) -> tuple[bool, Optional[str]]
     Args:
         provider: LLM provider name to validate
         model: Model identifier to validate
+        secondary_model: Optional subagent model identifier to validate
 
     Returns:
         tuple[bool, Optional[str]]: (is_valid, error_message)
@@ -176,6 +190,11 @@ def validate_llm_config(provider: str, model: str) -> tuple[bool, Optional[str]]
     # Check if model is valid for this provider
     if not is_model_valid_for_provider(provider, model):
         return False, f"Model '{model}' is not available for provider '{provider}'"
+
+    if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
+        return False, (
+            f"Secondary model '{secondary_model}' is not available for provider '{provider}'"
+        )
 
     # Check if API key exists for this provider
     try:
