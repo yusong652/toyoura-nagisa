@@ -58,37 +58,18 @@ class GoogleClient(LLMClientBase):
         self.client = genai.Client(api_key=api_key)
         
         # Initialize Gemini-specific configuration
-        config_overrides = {}
-        
         # Extract relevant configuration from extra_config for overrides
+        # Factory only passes: model, debug
+        config_overrides = {}
         if 'model' in self.extra_config:
-            config_overrides['model_settings'] = {'model': self.extra_config['model']}
-        if 'temperature' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['temperature'] = self.extra_config['temperature']
-        if 'top_p' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['top_p'] = self.extra_config['top_p']
-        if 'top_k' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['top_k'] = self.extra_config['top_k']
-        if 'max_tokens' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['max_tokens'] = self.extra_config['max_tokens']
+            config_overrides['model'] = self.extra_config['model']
         if 'debug' in self.extra_config:
             config_overrides['debug'] = self.extra_config['debug']
-        if 'timeout' in self.extra_config:
-            config_overrides['timeout'] = self.extra_config['timeout']
-        if 'max_retries' in self.extra_config:
-            config_overrides['max_retries'] = self.extra_config['max_retries']
-        
+
         self.google_config = get_google_client_config(**config_overrides)
-        
-        print(f"Gemini Client initialized with model: {self.google_config.model_settings.model}")
+
+        print(f"Gemini Client initialized")
+        print(f"  Model: {self.google_config.model}")
 
         # Initialize component managers with unified architecture
         self.tool_manager = GoogleToolManager()
@@ -169,7 +150,7 @@ class GoogleClient(LLMClientBase):
 
         config = types.GenerateContentConfig(**config_dict)
 
-        model = self.google_config.model_settings.model
+        model = self.google_config.model
 
         if debug:
             GoogleDebugger.print_request(context_contents, config, model)
@@ -320,7 +301,7 @@ class GoogleClient(LLMClientBase):
 
         config = types.GenerateContentConfig(**config_dict)
 
-        model = self.google_config.model_settings.model
+        model = self.google_config.model
 
         if debug:
             GoogleDebugger.print_request(context_contents, config, model)
