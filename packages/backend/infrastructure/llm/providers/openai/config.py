@@ -124,7 +124,7 @@ class OpenAIConfig(BaseSettings):
                 params['temperature'] = self.temperature
             if self.top_p is not None:
                 params['top_p'] = self.top_p
-        
+
         if self.max_tokens is not None:
             params['max_output_tokens'] = self.max_tokens
 

@@ -21,8 +21,7 @@ Key differences from OpenAI provider:
 
 from .client import MoonshotClient
 from .config import (
-    MoonshotClientConfig,
-    MoonshotModelSettings,
+    MoonshotConfig,
     get_moonshot_client_config
 )
 from .message_formatter import MoonshotMessageFormatter
@@ -33,8 +32,7 @@ from .debug import MoonshotDebugger
 
 __all__ = [
     'MoonshotClient',
-    'MoonshotClientConfig',
-    'MoonshotModelSettings',
+    'MoonshotConfig',
     'get_moonshot_client_config',
     'MoonshotMessageFormatter',
     'MoonshotContextManager',

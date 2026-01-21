@@ -228,7 +228,7 @@ class GoogleClient(LLMClientBase):
         Returns:
             Dict with 'config' key containing GenerateContentConfig
         """
-        config_kwargs = self.google_config.get_generation_config_kwargs(
+        config_kwargs = self.google_config.get_api_call_kwargs(
             system_prompt=system_prompt,
             tool_schemas=tool_schemas or []
         )

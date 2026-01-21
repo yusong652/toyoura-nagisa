@@ -7,25 +7,22 @@ since Moonshot/Moonshot provides full OpenAI compatibility.
 Base URL: https://api.moonshot.ai/v1
 """
 
-import json
-import time
-from typing import List, Optional, Dict, Any, AsyncGenerator, Type
+from typing import List, Optional, Dict, Any, AsyncGenerator, cast
 from openai import OpenAI, AsyncOpenAI
-from openai.types.chat import ChatCompletion, ChatCompletionChunk
+from openai.types.chat import ChatCompletion
 
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.llm.base.call_options import parse_call_options
 from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
-from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
-from backend.infrastructure.llm.base.context_manager import BaseContextManager
 
-# Import Moonshot-specific implementations (aliases for OpenAI components)
+# Import Moonshot-specific implementations
 from .config import get_moonshot_client_config
 from .message_formatter import MoonshotMessageFormatter
 from .tool_manager import MoonshotToolManager
 from .context_manager import MoonshotContextManager
 from .debug import MoonshotDebugger
+from .response_processor import MoonshotResponseProcessor
 
 
 class MoonshotClient(LLMClientBase):
@@ -51,10 +48,6 @@ class MoonshotClient(LLMClientBase):
         Args:
             api_key: Moonshot API key (MOONSHOT_API_KEY)
             **kwargs: Additional configuration parameters
-                - base_url: Custom API base URL (default: https://api.moonshot.cn/v1)
-                - model: Model name override
-                - temperature: Sampling temperature
-                - max_tokens: Maximum output tokens
         """
         super().__init__(**kwargs)
         self.provider_name = "moonshot"
@@ -62,22 +55,22 @@ class MoonshotClient(LLMClientBase):
 
         # Initialize Moonshot-specific configuration
         config_overrides = {}
-
-        # Extract relevant configuration from extra_config for overrides
         if 'model' in self.extra_config:
-            config_overrides['model_settings'] = {'model': self.extra_config['model']}
-        if 'temperature' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['temperature'] = self.extra_config['temperature']
-        if 'max_tokens' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['max_tokens'] = self.extra_config['max_tokens']
+            config_overrides['model'] = self.extra_config['model']
         if 'debug' in self.extra_config:
             config_overrides['debug'] = self.extra_config['debug']
 
         self.moonshot_config = get_moonshot_client_config(**config_overrides)
+
+        # Log initialization
+        print(f"Moonshot Client initialized")
+        print(f"  Model: {self.moonshot_config.model}")
+        print(f"  Base URL: {self.moonshot_config.base_url}")
+
+        # Debug: Print masked API key
+        if self.api_key:
+            masked_key = f"{self.api_key[:8]}...{self.api_key[-4:]}" if len(self.api_key) > 12 else "***"
+            print(f"  API Key (masked): {masked_key}")
 
         # Initialize both sync and async OpenAI clients with Moonshot base URL
         client_kwargs: Dict[str, Any] = {
@@ -85,18 +78,14 @@ class MoonshotClient(LLMClientBase):
             "base_url": self.moonshot_config.base_url
         }
 
-        # Allow custom base URL override
+        # Allow custom base URL override from extra_config
         if 'base_url' in self.extra_config:
             client_kwargs['base_url'] = self.extra_config['base_url']
-
-        # Add custom headers if needed
-        if 'default_headers' in self.extra_config:
-            client_kwargs['default_headers'] = self.extra_config['default_headers']
 
         self.client = OpenAI(**client_kwargs)
         self.async_client = AsyncOpenAI(**client_kwargs)
 
-        # Initialize unified tool manager (uses OpenAI-compatible format)
+        # Initialize unified tool manager
         self.tool_manager = MoonshotToolManager()
 
     # ========== CORE API METHODS ==========
@@ -109,8 +98,6 @@ class MoonshotClient(LLMClientBase):
     ) -> ChatCompletion:
         """
         Execute a stateless Moonshot API call with prepared context.
-
-        Uses standard OpenAI Chat Completions API format.
 
         Args:
             context_contents: Conversation messages in OpenAI format.
@@ -130,8 +117,6 @@ class MoonshotClient(LLMClientBase):
         )
 
         tools = api_config.get("tools", []) or []
-
-        # Build messages (Moonshot uses standard OpenAI format)
         messages = context_contents.copy()
 
         # Add system message if provided
@@ -203,8 +188,6 @@ class MoonshotClient(LLMClientBase):
         )
 
         tools = api_config.get("tools", []) or []
-
-        # Build messages
         messages = context_contents.copy()
 
         # Add system message if provided
@@ -236,20 +219,16 @@ class MoonshotClient(LLMClientBase):
             MoonshotDebugger.print_api_request(api_kwargs, messages, tools)
 
         async def _stream_once():
-            try:
-                stream = await self.async_client.chat.completions.create(**api_kwargs)
+            stream = await self.async_client.chat.completions.create(**api_kwargs)
 
-                # Create stateful streaming processor
-                streaming_processor = self._get_response_processor().create_streaming_processor()
+            # Create stateful streaming processor
+            streaming_processor = self._get_response_processor().create_streaming_processor()
 
-                async for chunk in stream:
-                    # Delegate chunk processing to streaming processor
-                    processed_chunks = streaming_processor.process_event(chunk)
-                    for processed_chunk in processed_chunks:
-                        yield processed_chunk
-
-            except Exception as e:
-                raise e
+            async for chunk in stream:
+                # Delegate chunk processing to streaming processor
+                processed_chunks = streaming_processor.process_event(chunk)
+                for processed_chunk in processed_chunks:
+                    yield processed_chunk
 
         async for chunk in stream_with_retries(
             _stream_once,
@@ -277,7 +256,6 @@ class MoonshotClient(LLMClientBase):
 
     def _get_response_processor(self):
         """Get Moonshot-specific response processor instance."""
-        from .response_processor import MoonshotResponseProcessor
         return MoonshotResponseProcessor()
 
     def _get_context_manager_class(self):
@@ -307,5 +285,3 @@ class MoonshotClient(LLMClientBase):
             'tools': tool_schemas or [],
             'system_prompt': system_prompt
         }
-
-    # _construct_response_from_streaming_chunks is now handled by ResponseProcessor

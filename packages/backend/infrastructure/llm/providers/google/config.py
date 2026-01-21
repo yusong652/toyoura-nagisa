@@ -67,7 +67,7 @@ class GoogleConfig(BaseSettings):
     """
 
     # API credentials (from environment variables)
-    google_api_key: str = Field(description="Google API key")
+    google_api_key: Optional[str] = Field(default=None, description="Google API key")
 
     # Model selection (from environment variables, runtime overridable)
     model: str = Field(
@@ -147,13 +147,26 @@ class GoogleConfig(BaseSettings):
         extra='ignore'
     )
 
-    # Backward compatibility alias
-    @property
-    def enable_thinking_for_gemini_2_5(self) -> bool:
-        """Backward compatibility alias for enable_thinking"""
-        return self.enable_thinking
+    def to_api_params(self) -> Dict[str, Any]:
+        """
+        Convert model parameters to Google API format.
 
-    def get_generation_config_kwargs(
+        Returns:
+            Dict with model parameters (temperature, max_output_tokens, top_p, top_k)
+        """
+        params = {
+            "temperature": self.temperature,
+            "max_output_tokens": self.max_tokens,
+        }
+
+        if self.top_p is not None:
+            params["top_p"] = self.top_p
+        if self.top_k is not None:
+            params["top_k"] = self.top_k
+
+        return params
+
+    def get_api_call_kwargs(
         self,
         system_prompt: str,
         tool_schemas: Optional[List[types.Tool]]
@@ -171,15 +184,9 @@ class GoogleConfig(BaseSettings):
         config_kwargs = {
             "system_instruction": system_prompt,
             "safety_settings": self.safety_settings.to_gemini_format(),
-            "temperature": self.temperature,
-            "max_output_tokens": self.max_tokens,
         }
 
-        # Add optional parameters
-        if self.top_p is not None:
-            config_kwargs["top_p"] = self.top_p
-        if self.top_k is not None:
-            config_kwargs["top_k"] = self.top_k
+        config_kwargs.update(self.to_api_params())
 
         # Add tool schemas
         if tool_schemas:
@@ -201,6 +208,11 @@ class GoogleConfig(BaseSettings):
                 )
 
         return config_kwargs
+
+    # Backward compatibility alias
+    def get_generation_config_kwargs(self, *args, **kwargs) -> Dict[str, Any]:
+        """Alias for get_api_call_kwargs for backward compatibility"""
+        return self.get_api_call_kwargs(*args, **kwargs)
 
     def model_copy(self, **overrides) -> "GoogleConfig":
         """
@@ -253,7 +265,7 @@ def get_google_client_config(**overrides: Any) -> GoogleConfig:
     except Exception:
         # If env loading fails, use defaults
         base_config = GoogleConfig(
-            google_api_key="",
+            google_api_key="missing-key",
             model="gemini-3-flash-preview"
         )
 

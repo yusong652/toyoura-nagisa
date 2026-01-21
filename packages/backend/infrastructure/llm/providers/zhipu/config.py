@@ -22,7 +22,7 @@ class ZhipuConfig(BaseSettings):
     """
 
     # API credentials (from environment variables)
-    zhipu_api_key: str = Field(description="Zhipu API key")
+    zhipu_api_key: Optional[str] = Field(default=None, description="Zhipu API key")
 
     # Model selection (from environment variables, runtime overridable)
     model: str = Field(default="glm-4.7", description="Default model")

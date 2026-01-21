@@ -7,17 +7,14 @@ since OpenRouter provides full OpenAI compatibility.
 Base URL: https://openrouter.ai/api/v1
 """
 
-import time
-from typing import List, Optional, Dict, Any, AsyncGenerator, Type
+from typing import List, Optional, Dict, Any, AsyncGenerator, cast
 from openai import OpenAI, AsyncOpenAI
-from openai.types.chat import ChatCompletion, ChatCompletionChunk
+from openai.types.chat import ChatCompletion
 
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.llm.base.call_options import parse_call_options
 from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
-from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
-from backend.infrastructure.llm.base.context_manager import BaseContextManager
 
 # Import OpenRouter-specific implementations
 from .config import get_openrouter_client_config
@@ -25,6 +22,7 @@ from .message_formatter import OpenRouterMessageFormatter
 from .tool_manager import OpenRouterToolManager
 from .context_manager import OpenRouterContextManager
 from .debug import OpenRouterDebugger
+from .response_processor import OpenRouterResponseProcessor
 
 
 class OpenRouterClient(LLMClientBase):
@@ -50,9 +48,6 @@ class OpenRouterClient(LLMClientBase):
         Args:
             api_key: OpenRouter API key
             **kwargs: Additional configuration parameters
-                - model: Model name override (e.g., "anthropic/claude-sonnet-4-5")
-                - temperature: Sampling temperature
-                - max_tokens: Maximum output tokens
         """
         super().__init__(**kwargs)
         self.provider_name = "openrouter"
@@ -60,18 +55,8 @@ class OpenRouterClient(LLMClientBase):
 
         # Initialize OpenRouter-specific configuration
         config_overrides = {}
-
-        # Extract relevant configuration from extra_config for overrides
         if 'model' in self.extra_config:
-            config_overrides['model_settings'] = {'model': self.extra_config['model']}
-        if 'temperature' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['temperature'] = self.extra_config['temperature']
-        if 'max_tokens' in self.extra_config:
-            if 'model_settings' not in config_overrides:
-                config_overrides['model_settings'] = {}
-            config_overrides['model_settings']['max_tokens'] = self.extra_config['max_tokens']
+            config_overrides['model'] = self.extra_config['model']
         if 'debug' in self.extra_config:
             config_overrides['debug'] = self.extra_config['debug']
 
@@ -79,10 +64,10 @@ class OpenRouterClient(LLMClientBase):
 
         # Log initialization
         print(f"OpenRouter Client initialized")
-        print(f"  Model: {self.openrouter_config.model_settings.model}")
+        print(f"  Model: {self.openrouter_config.model}")
         print(f"  Base URL: {self.openrouter_config.base_url}")
 
-        # Debug: Print masked API key to verify it's passed correctly
+        # Debug: Print masked API key
         if self.api_key:
             masked_key = f"{self.api_key[:8]}...{self.api_key[-4:]}" if len(self.api_key) > 12 else "***"
             print(f"  API Key (masked): {masked_key}")
@@ -93,21 +78,18 @@ class OpenRouterClient(LLMClientBase):
             "base_url": self.openrouter_config.base_url
         }
 
-        # Allow custom base URL override
+        # Allow custom base URL override from extra_config
         if 'base_url' in self.extra_config:
             client_kwargs['base_url'] = self.extra_config['base_url']
 
-        # Add custom headers if needed
+        # Add custom headers if needed (common for OpenRouter)
         if 'default_headers' in self.extra_config:
-            if 'default_headers' in client_kwargs:
-                client_kwargs['default_headers'].update(self.extra_config['default_headers'])
-            else:
-                client_kwargs['default_headers'] = self.extra_config['default_headers']
+            client_kwargs['default_headers'] = self.extra_config['default_headers']
 
         self.client = OpenAI(**client_kwargs)
         self.async_client = AsyncOpenAI(**client_kwargs)
 
-        # Initialize unified tool manager (uses OpenAI-compatible format)
+        # Initialize unified tool manager
         self.tool_manager = OpenRouterToolManager()
 
     # ========== CORE API METHODS ==========
@@ -120,8 +102,6 @@ class OpenRouterClient(LLMClientBase):
     ) -> ChatCompletion:
         """
         Execute a stateless OpenRouter API call with prepared context.
-
-        Uses standard OpenAI Chat Completions API format.
 
         Args:
             context_contents: Conversation messages in OpenAI format.
@@ -141,8 +121,6 @@ class OpenRouterClient(LLMClientBase):
         )
 
         tools = api_config.get("tools", []) or []
-
-        # Build messages (OpenRouter uses standard OpenAI format)
         messages = context_contents.copy()
 
         # Add system message if provided
@@ -176,20 +154,12 @@ class OpenRouterClient(LLMClientBase):
             return await self.async_client.chat.completions.create(**api_kwargs)
 
         try:
-            response = await run_with_retries(
+            return await run_with_retries(
                 _call_api,
                 max_retries=max_retries,
                 timeout=timeout,
                 debug=debug,
             )
-
-            if debug:
-                print(f"[DEBUG] OpenRouter response received:")
-                print(f"[DEBUG] Finish reason: {response.choices[0].finish_reason}")
-                if response.usage:
-                    print(f"[DEBUG] Token usage: {response.usage}")
-
-            return response
         except Exception as exc:
             if debug:
                 print(f"[DEBUG] OpenRouter API call failed: {exc}")
@@ -222,8 +192,6 @@ class OpenRouterClient(LLMClientBase):
         )
 
         tools = api_config.get("tools", []) or []
-
-        # Build messages
         messages = context_contents.copy()
 
         # Add system message if provided
@@ -255,20 +223,16 @@ class OpenRouterClient(LLMClientBase):
             OpenRouterDebugger.print_api_request(api_kwargs, messages, tools)
 
         async def _stream_once():
-            try:
-                stream = await self.async_client.chat.completions.create(**api_kwargs)
+            stream = await self.async_client.chat.completions.create(**api_kwargs)
 
-                # Create stateful streaming processor
-                streaming_processor = self._get_response_processor().create_streaming_processor()
+            # Create stateful streaming processor
+            streaming_processor = self._get_response_processor().create_streaming_processor()
 
-                async for chunk in stream:
-                    # Delegate chunk processing to streaming processor
-                    processed_chunks = streaming_processor.process_event(chunk)
-                    for processed_chunk in processed_chunks:
-                        yield processed_chunk
-
-            except Exception as e:
-                raise e
+            async for chunk in stream:
+                # Delegate chunk processing to streaming processor
+                processed_chunks = streaming_processor.process_event(chunk)
+                for processed_chunk in processed_chunks:
+                    yield processed_chunk
 
         async for chunk in stream_with_retries(
             _stream_once,
@@ -296,7 +260,6 @@ class OpenRouterClient(LLMClientBase):
 
     def _get_response_processor(self):
         """Get OpenRouter-specific response processor instance."""
-        from .response_processor import OpenRouterResponseProcessor
         return OpenRouterResponseProcessor()
 
     def _get_context_manager_class(self):
@@ -326,5 +289,3 @@ class OpenRouterClient(LLMClientBase):
             'tools': tool_schemas or [],
             'system_prompt': system_prompt
         }
-
-    # _construct_response_from_streaming_chunks is now handled by ResponseProcessor

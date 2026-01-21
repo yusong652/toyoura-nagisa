@@ -30,8 +30,7 @@ Use Cases:
 
 from .client import OpenRouterClient
 from .config import (
-    OpenRouterClientConfig,
-    OpenRouterModelSettings,
+    OpenRouterConfig,
     get_openrouter_client_config
 )
 from .message_formatter import OpenRouterMessageFormatter
@@ -42,8 +41,7 @@ from .debug import OpenRouterDebugger
 
 __all__ = [
     'OpenRouterClient',
-    'OpenRouterClientConfig',
-    'OpenRouterModelSettings',
+    'OpenRouterConfig',
     'get_openrouter_client_config',
     'OpenRouterMessageFormatter',
     'OpenRouterContextManager',

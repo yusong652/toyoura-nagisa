@@ -25,7 +25,7 @@ class AnthropicConfig(BaseSettings):
     """
 
     # API credentials (from environment variables)
-    anthropic_api_key: str = Field(description="Anthropic API key")
+    anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API key")
 
     # Model selection (from environment variables, runtime overridable)
     model: str = Field(
@@ -128,6 +128,26 @@ class AnthropicConfig(BaseSettings):
             self.model.startswith("claude-opus-")
         )
 
+    def to_api_params(self) -> Dict[str, Any]:
+        """
+        Convert model parameters to Anthropic API format.
+
+        Returns:
+            Dict with model, temperature, max_tokens, and optional top_p/top_k
+        """
+        params = {
+            'model': self.model,
+            'max_tokens': self.max_tokens,
+            'temperature': self.temperature,
+        }
+
+        if self.top_p is not None:
+            params['top_p'] = self.top_p
+        if self.top_k is not None:
+            params['top_k'] = self.top_k
+
+        return params
+
     def get_api_call_kwargs(
         self,
         system_prompt: str,
@@ -160,18 +180,11 @@ class AnthropicConfig(BaseSettings):
         cached_messages = MessageFormatter.add_cache_control_to_messages(messages)
 
         kwargs = {
-            "model": self.model,
-            "max_tokens": self.max_tokens,
             "messages": cached_messages,
             "system": system_with_cache,
-            "temperature": self.temperature,
         }
 
-        # Add optional parameters
-        if self.top_p is not None:
-            kwargs["top_p"] = self.top_p
-        if self.top_k is not None:
-            kwargs["top_k"] = self.top_k
+        kwargs.update(self.to_api_params())
 
         # Add tools with cache_control on the last tool for prompt caching
         # This caches all tool definitions as a single prefix
@@ -233,7 +246,7 @@ def get_anthropic_client_config(**overrides: Any) -> AnthropicConfig:
     except Exception:
         # If env loading fails, use defaults
         base_config = AnthropicConfig(
-            anthropic_api_key="",
+            anthropic_api_key="missing-key",
             model="claude-sonnet-4-5-20250929"
         )
 

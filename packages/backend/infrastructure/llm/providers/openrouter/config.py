@@ -1,32 +1,54 @@
 """
 OpenRouter Client Configuration
 
-Handles configuration settings for OpenRouter models including
-model parameters, API settings, and debug options.
+Unified configuration for OpenRouter models including API credentials,
+model parameters, and client settings.
 
 OpenRouter uses OpenAI-compatible API format with base URL: https://openrouter.ai/api/v1
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from backend.config import get_llm_settings
 
 
 class OpenRouterConfig(BaseSettings):
-    """OpenRouter configuration loaded from environment variables."""
+    """
+    Unified OpenRouter configuration.
 
-    openrouter_api_key: str = Field(description="OpenRouter API key")
+    Combines environment variable loading (API keys, base URL) with
+    runtime-overridable parameters (model, temperature, etc.).
+    """
+
+    # API credentials (from environment variables)
+    openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API key")
+    base_url: str = Field(default="https://openrouter.ai/api/v1", description="API base URL")
+
+    # Model selection (from environment variables, runtime overridable)
     model: str = Field(default="qwen/qwen3-235b-a22b-2507", description="Default model")
     secondary_model: str = Field(
-        default="google/gemini-2.5-flash",
+        default="google/gemini-2.0-flash-001",
         description="Secondary model for SubAgent"
     )
-    embedding_model: str = Field(
-        default="google/gemini-embedding-001",
-        description="Embedding model name"
+
+    # Model parameters (runtime overridable)
+    temperature: float = Field(
+        default=0.7,
+        description="Sampling temperature (0-1)."
     )
+    max_tokens: Optional[int] = Field(
+        default=1024*16,
+        description="Maximum tokens to generate"
+    )
+    top_p: Optional[float] = Field(
+        default=1.0,
+        description="Nucleus sampling threshold."
+    )
+
+    # Client settings (runtime overridable)
+    debug: bool = Field(default=False, description="Enable debug logging")
+    timeout: float = Field(default=60.0, description="Request timeout in seconds")
+    max_retries: int = Field(default=3, description="Maximum retry attempts")
 
     model_config = SettingsConfigDict(
         env_file='packages/backend/.env',
@@ -36,46 +58,23 @@ class OpenRouterConfig(BaseSettings):
         extra='ignore'
     )
 
-
-@dataclass
-class OpenRouterModelSettings:
-    """OpenRouter model-specific settings"""
-    model: str = "anthropic/claude-sonnet-4-5"  # Default model
-    temperature: Union[float, str] = 0.7
-    max_tokens: Optional[Union[int, str]] = 1024*16
-    top_p: Union[float, str] = 1.0
-
-    # OpenRouter supports any model in their catalog:
-    # - anthropic/claude-sonnet-4-5
-    # - google/gemini-2.5-pro
-    # - meta-llama/llama-3.3-70b-instruct
-    # - moonshotai/kimi-k2-0905
-    # - deepseek/deepseek-chat
-    # See: https://openrouter.ai/models
-
     def to_api_params(self) -> Dict[str, Any]:
-        """Convert to OpenRouter API parameters (OpenAI-compatible format)"""
+        """
+        Convert model parameters to OpenRouter API format.
+
+        Returns:
+            Dict with model, temperature, and optional max_tokens/top_p
+        """
         params = {
             'model': self.model,
             'temperature': self.temperature,
-            'top_p': self.top_p
+            'top_p': self.top_p,
         }
 
         if self.max_tokens is not None:
             params['max_tokens'] = self.max_tokens
 
         return params
-
-
-@dataclass
-class OpenRouterClientConfig:
-    """Complete OpenRouter client configuration"""
-    model_settings: OpenRouterModelSettings = field(default_factory=OpenRouterModelSettings)
-    api_key: Optional[str] = None
-    base_url: str = "https://openrouter.ai/api/v1"  # Fixed for OpenRouter
-    debug: bool = False
-    timeout: float = 60.0
-    max_retries: int = 3
 
     def get_api_call_kwargs(
         self,
@@ -88,12 +87,12 @@ class OpenRouterClientConfig:
         Build complete kwargs for OpenRouter API call (OpenAI-compatible).
 
         Args:
-            messages: Conversation messages in OpenAI format.
-            tools: Optional tool schemas in OpenAI format.
-            stream: Whether to stream the response.
+            messages: Conversation messages in OpenAI format
+            tools: Optional tool schemas in OpenAI format
+            stream: Whether to stream the response
 
         Returns:
-            Dict containing all API call parameters.
+            Dict containing all API call parameters
         """
         kwargs: Dict[str, Any] = {
             "messages": messages,
@@ -101,7 +100,7 @@ class OpenRouterClientConfig:
             "timeout": self.timeout,
         }
 
-        kwargs.update(self.model_settings.to_api_params())
+        kwargs.update(self.to_api_params())
 
         if tools:
             kwargs["tools"] = tools
@@ -109,46 +108,50 @@ class OpenRouterClientConfig:
 
         return kwargs
 
+    def model_copy(self, **overrides) -> "OpenRouterConfig":
+        """
+        Create a copy with overrides applied.
 
-def get_openrouter_client_config(**overrides: Any) -> OpenRouterClientConfig:
+        Args:
+            **overrides: Fields to override
+
+        Returns:
+            New OpenRouterConfig instance with overrides
+        """
+        config_dict = self.model_dump()
+        config_dict.update(overrides)
+        return OpenRouterConfig(**config_dict)
+
+
+def get_openrouter_client_config(**overrides: Any) -> OpenRouterConfig:
     """
-    Get OpenRouter client configuration with optional overrides
+    Get OpenRouter client configuration with optional overrides.
 
     Args:
-        **overrides: Configuration overrides
+        **overrides: Configuration overrides. Supports direct field overrides
+                    or nested model_settings overrides.
 
     Returns:
-        OpenRouterClientConfig instance
+        OpenRouterConfig instance
     """
-    # Get base settings from global config
-    llm_settings = get_llm_settings()
-
-    # Try to get OpenRouter config from settings
+    # Start with base config from environment
     try:
-        openrouter_config = llm_settings.get_openrouter_config()
-        model = openrouter_config.model
-        api_key = openrouter_config.openrouter_api_key
-    except (AttributeError, KeyError):
-        # Fallback to defaults if config not available
-        model = "anthropic/claude-sonnet-4-5"
-        api_key = None
+        base_config = OpenRouterConfig()
+    except Exception:
+        # If env loading fails, use defaults
+        base_config = OpenRouterConfig(
+            openrouter_api_key="",
+            model="qwen/qwen3-235b-a22b-2507"
+        )
 
-    model_settings = OpenRouterModelSettings()
-    model_settings.model = model
+    # Handle nested model_settings overrides for backward compatibility
+    if 'model_settings' in overrides:
+        model_settings = overrides.pop('model_settings')
+        if isinstance(model_settings, dict):
+            overrides.update(model_settings)
 
-    model_overrides = overrides.get('model_settings')
-    if isinstance(model_overrides, dict):
-        for key, value in model_overrides.items():
-            setattr(model_settings, key, value)
+    # Apply overrides
+    if overrides:
+        return base_config.model_copy(**overrides)
 
-    # Build client config
-    config_dict: Dict[str, Any] = {
-        'model_settings': model_settings,
-        'api_key': overrides.get('api_key', api_key),
-        'base_url': "https://openrouter.ai/api/v1",  # Always use OpenRouter
-        'debug': overrides.get('debug', llm_settings.debug),
-        'timeout': overrides.get('timeout', 60.0),
-        'max_retries': overrides.get('max_retries', 3)
-    }
-
-    return OpenRouterClientConfig(**config_dict)
+    return base_config

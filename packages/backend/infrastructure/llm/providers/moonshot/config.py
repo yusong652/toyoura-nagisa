@@ -1,28 +1,54 @@
 """
 Moonshot (Moonshot) Client Configuration
 
-Handles configuration settings for Moonshot/Moonshot models including
-model parameters, API settings, and debug options.
+Unified configuration for Moonshot models including API credentials,
+model parameters, and client settings.
 
 Moonshot uses OpenAI-compatible API format with base URL: https://api.moonshot.ai/v1
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from backend.config import get_llm_settings
 
 
 class MoonshotConfig(BaseSettings):
-    """Moonshot configuration loaded from environment variables."""
+    """
+    Unified Moonshot configuration.
 
+    Combines environment variable loading (API keys, base URL) with
+    runtime-overridable parameters (model, temperature, etc.).
+    """
+
+    # API credentials (from environment variables)
     moonshot_api_key: Optional[str] = Field(default=None, description="Moonshot API key")
+    base_url: str = Field(default="https://api.moonshot.ai/v1", description="API base URL")
+
+    # Model selection (from environment variables, runtime overridable)
     model: str = Field(default="kimi-k2-thinking", description="Default model")
     secondary_model: str = Field(
         default="kimi-k2-0905-preview",
         description="Secondary model for SubAgent"
     )
+
+    # Model parameters (runtime overridable)
+    temperature: float = Field(
+        default=0.6,
+        description="Sampling temperature (0-1). Recommended 0.6 for Moonshot."
+    )
+    max_tokens: Optional[int] = Field(
+        default=1024*16,
+        description="Maximum tokens to generate"
+    )
+    top_p: Optional[float] = Field(
+        default=1.0,
+        description="Nucleus sampling threshold."
+    )
+
+    # Client settings (runtime overridable)
+    debug: bool = Field(default=False, description="Enable debug logging")
+    timeout: float = Field(default=60.0, description="Request timeout in seconds")
+    max_retries: int = Field(default=3, description="Maximum retry attempts")
 
     model_config = SettingsConfigDict(
         env_file='packages/backend/.env',
@@ -32,44 +58,23 @@ class MoonshotConfig(BaseSettings):
         extra='ignore'
     )
 
-
-@dataclass
-class MoonshotModelSettings:
-    """Moonshot model-specific settings"""
-    model: str = "kimi-k2-thinking"  # Default to K2 Thinking model with reasoning support
-    temperature: Union[float, str] = 0.6  # Recommended temperature for Moonshot API (range: 0-1)
-    max_tokens: Optional[Union[int, str]] = 1024*16
-    top_p: Union[float, str] = 1.0
-
-    # Moonshot-specific features
-    # Models: kimi-k2-thinking, kimi-k2-0905-preview, kimi-k2-turbo-preview,
-    #         moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k
-    # Note: Moonshot excels at long-context understanding (up to 200K tokens)
-    # K2 Thinking models expose reasoning_content field with intermediate thinking steps
-
     def to_api_params(self) -> Dict[str, Any]:
-        """Convert to Moonshot API parameters (OpenAI-compatible format)"""
+        """
+        Convert model parameters to Moonshot API format.
+
+        Returns:
+            Dict with model, temperature, and optional max_tokens/top_p
+        """
         params = {
             'model': self.model,
             'temperature': self.temperature,
-            'top_p': self.top_p
+            'top_p': self.top_p,
         }
 
         if self.max_tokens is not None:
             params['max_tokens'] = self.max_tokens
 
         return params
-
-
-@dataclass
-class MoonshotClientConfig:
-    """Complete Moonshot client configuration"""
-    model_settings: MoonshotModelSettings = field(default_factory=MoonshotModelSettings)
-    api_key: Optional[str] = None
-    base_url: str = "https://api.moonshot.ai/v1"
-    debug: bool = False
-    timeout: float = 60.0  # Longer timeout for long-context processing
-    max_retries: int = 3
 
     def get_api_call_kwargs(
         self,
@@ -82,12 +87,12 @@ class MoonshotClientConfig:
         Build complete kwargs for Moonshot API call (OpenAI-compatible).
 
         Args:
-            messages: Conversation messages in OpenAI format.
-            tools: Optional tool schemas in OpenAI format.
-            stream: Whether to stream the response.
+            messages: Conversation messages in OpenAI format
+            tools: Optional tool schemas in OpenAI format
+            stream: Whether to stream the response
 
         Returns:
-            Dict containing all API call parameters.
+            Dict containing all API call parameters
         """
         kwargs: Dict[str, Any] = {
             "messages": messages,
@@ -95,7 +100,7 @@ class MoonshotClientConfig:
             "timeout": self.timeout,
         }
 
-        kwargs.update(self.model_settings.to_api_params())
+        kwargs.update(self.to_api_params())
 
         if tools:
             kwargs["tools"] = tools
@@ -103,45 +108,50 @@ class MoonshotClientConfig:
 
         return kwargs
 
+    def model_copy(self, **overrides) -> "MoonshotConfig":
+        """
+        Create a copy with overrides applied.
 
-def get_moonshot_client_config(**overrides: Any) -> MoonshotClientConfig:
+        Args:
+            **overrides: Fields to override
+
+        Returns:
+            New MoonshotConfig instance with overrides
+        """
+        config_dict = self.model_dump()
+        config_dict.update(overrides)
+        return MoonshotConfig(**config_dict)
+
+
+def get_moonshot_client_config(**overrides: Any) -> MoonshotConfig:
     """
     Get Moonshot client configuration with optional overrides.
 
     Args:
-        **overrides: Configuration overrides
+        **overrides: Configuration overrides. Supports direct field overrides
+                    or nested model_settings overrides.
 
     Returns:
-        MoonshotClientConfig instance
+        MoonshotConfig instance
     """
-    llm_settings = get_llm_settings()
-
-    # Get Moonshot config from settings
+    # Start with base config from environment
     try:
-        moonshot_config = llm_settings.get_moonshot_config()
-        model = moonshot_config.model
-        api_key = moonshot_config.moonshot_api_key
-    except (AttributeError, KeyError):
-        # Fallback to defaults
-        model = "kimi-k2-0905-preview"
-        api_key = None
+        base_config = MoonshotConfig()
+    except Exception:
+        # If env loading fails (e.g. missing API key during init), use defaults
+        base_config = MoonshotConfig(
+            moonshot_api_key="",
+            model="kimi-k2-thinking"
+        )
 
-    model_settings = MoonshotModelSettings()  # type: ignore[call-arg]
-    model_settings.model = model
+    # Handle nested model_settings overrides for backward compatibility
+    if 'model_settings' in overrides:
+        model_settings = overrides.pop('model_settings')
+        if isinstance(model_settings, dict):
+            overrides.update(model_settings)
 
-    model_overrides = overrides.get('model_settings')
-    if isinstance(model_overrides, dict):
-        for key, value in model_overrides.items():
-            setattr(model_settings, key, value)
+    # Apply overrides
+    if overrides:
+        return base_config.model_copy(**overrides)
 
-    # Build client config
-    config_dict: Dict[str, Any] = {
-        'model_settings': model_settings,
-        'api_key': overrides.get('api_key', api_key),
-        'base_url': overrides.get('base_url', "https://api.moonshot.ai/v1"),
-        'debug': overrides.get('debug', llm_settings.debug),
-        'timeout': overrides.get('timeout', 60.0),
-        'max_retries': overrides.get('max_retries', 3)
-    }
-
-    return MoonshotClientConfig(**config_dict)
+    return base_config
