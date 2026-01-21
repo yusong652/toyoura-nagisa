@@ -63,26 +63,18 @@ class ZhipuClient(LLMClientBase):
         # Log initialization
         print(f"Zhipu Client initialized")
         print(f"  Model: {self.zhipu_config.model}")
-        print(f"  Base URL: {self.zhipu_config.base_url}")
 
         # Debug: Print masked API key
         if self.api_key:
             masked_key = f"{self.api_key[:8]}...{self.api_key[-4:]}" if len(self.api_key) > 12 else "***"
             print(f"  API Key (masked): {masked_key}")
 
-        # Initialize zai SDK client
-        client_kwargs: Dict[str, Any] = {
-            "api_key": self.api_key,
-            "base_url": self.zhipu_config.base_url,
-            "timeout": self.zhipu_config.timeout,
-            "max_retries": self.zhipu_config.max_retries
-        }
-
-        # Allow custom base URL override
-        if 'base_url' in self.extra_config:
-            client_kwargs['base_url'] = self.extra_config['base_url']
-
-        self.client = ZhipuAiClient(**client_kwargs)
+        # Initialize zai SDK client (use SDK default base_url)
+        self.client = ZhipuAiClient(
+            api_key=self.api_key,
+            timeout=self.zhipu_config.timeout,
+            max_retries=self.zhipu_config.max_retries
+        )
 
         # Initialize unified tool manager
         self.tool_manager = ZhipuToolManager()

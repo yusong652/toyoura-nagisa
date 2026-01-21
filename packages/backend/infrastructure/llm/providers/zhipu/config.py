@@ -19,19 +19,10 @@ class ZhipuConfig(BaseSettings):
     Combines environment variable loading (API keys, base URL) with
     runtime-overridable parameters (model, temperature, etc.).
 
-    Available Models:
-    - glm-4.7: Latest GLM-4 model with improved capabilities
-    - glm-4.6: GLM-4 Plus model
-    - glm-4-plus, glm-4-0520, glm-4, glm-4-air, glm-4-airx, glm-4-flash
-    - glm-4-long: Supports up to 1M tokens context
     """
 
     # API credentials (from environment variables)
     zhipu_api_key: str = Field(description="Zhipu API key")
-    base_url: str = Field(
-        default="https://open.bigmodel.cn/api/paas/v4/",
-        description="Zhipu API base URL"
-    )
 
     # Model selection (from environment variables, runtime overridable)
     model: str = Field(default="glm-4.7", description="Default model")
@@ -151,7 +142,7 @@ def get_zhipu_client_config(**overrides: Any) -> ZhipuConfig:
 
     Example:
         >>> config = get_zhipu_client_config(
-        ...     model='glm-4-plus',
+        ...     model='glm-4.7',
         ...     temperature=0.8,
         ...     debug=True
         ... )
