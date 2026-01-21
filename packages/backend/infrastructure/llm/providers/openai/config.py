@@ -7,7 +7,28 @@ model parameters, API settings, and debug options.
 
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from backend.config import get_llm_settings
+
+
+class OpenAIConfig(BaseSettings):
+    """OpenAI configuration loaded from environment variables."""
+
+    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
+    model: str = Field(default="gpt-5-mini-2025-08-07", description="Default model")
+    secondary_model: str = Field(
+        default="gpt-5-mini-2025-08-07",
+        description="Secondary model for SubAgent"
+    )
+
+    model_config = SettingsConfigDict(
+        env_file='packages/backend/.env',
+        env_nested_delimiter='__',
+        case_sensitive=False,
+        env_prefix='',
+        extra='ignore'
+    )
 
 
 @dataclass
@@ -85,7 +106,7 @@ class OpenAIClientConfig:
         return kwargs
 
 
-def get_openai_client_config(**overrides) -> OpenAIClientConfig:
+def get_openai_client_config(**overrides: Any) -> OpenAIClientConfig:
     """
     Get OpenAI client configuration with optional overrides
 
@@ -99,16 +120,13 @@ def get_openai_client_config(**overrides) -> OpenAIClientConfig:
     llm_settings = get_llm_settings()
     openai_config = llm_settings.get_openai_config()
 
-    # Build model settings from global config
-    model_settings_dict = {
-        'model': openai_config.model,
-    }
+    model_settings = OpenAIModelSettings()
+    model_settings.model = openai_config.model
 
-    # Apply overrides to model settings
-    if 'model_settings' in overrides:
-        model_settings_dict.update(overrides['model_settings'])
-
-    model_settings = OpenAIModelSettings(**model_settings_dict)
+    model_overrides = overrides.get('model_settings')
+    if isinstance(model_overrides, dict):
+        for key, value in model_overrides.items():
+            setattr(model_settings, key, value)
 
     # Build client config
     config_dict = {

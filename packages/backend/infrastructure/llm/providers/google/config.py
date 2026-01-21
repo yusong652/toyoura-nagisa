@@ -6,7 +6,27 @@ including safety settings, model parameters, and other Google-specific options.
 """
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from google.genai import types
+
+
+class GoogleConfig(BaseSettings):
+    """Google (Gemini) configuration loaded from environment variables."""
+
+    google_api_key: str = Field(description="Google API key")
+    model: str = Field(default="gemini-3-flash-preview", description="Default model")
+    secondary_model: str = Field(
+        default="gemini-3-flash-preview",
+        description="Secondary model for SubAgent"
+    )
+
+    model_config = SettingsConfigDict(
+        env_file='packages/backend/.env',
+        env_nested_delimiter='__',
+        case_sensitive=False,
+        env_prefix='',
+        extra='ignore'
+    )
 
 
 class GoogleSafetySettings(BaseModel):

@@ -93,16 +93,11 @@ class OpenRouterClient(LLMClientBase):
             "base_url": self.openrouter_config.base_url
         }
 
-        # Add OpenRouter headers
-        if self.openrouter_config.openrouter_headers:
-            client_kwargs['default_headers'] = self.openrouter_config.openrouter_headers
-            print(f"  OpenRouter headers: {list(self.openrouter_config.openrouter_headers.keys())}")
-
         # Allow custom base URL override
         if 'base_url' in self.extra_config:
             client_kwargs['base_url'] = self.extra_config['base_url']
 
-        # Add custom headers if needed (merge with OpenRouter headers)
+        # Add custom headers if needed
         if 'default_headers' in self.extra_config:
             if 'default_headers' in client_kwargs:
                 client_kwargs['default_headers'].update(self.extra_config['default_headers'])

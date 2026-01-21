@@ -7,6 +7,26 @@ including safety settings, model parameters, and other Anthropic-specific option
 import copy
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class AnthropicConfig(BaseSettings):
+    """Anthropic configuration loaded from environment variables."""
+
+    anthropic_api_key: str = Field(description="Anthropic API key")
+    model: str = Field(default="claude-sonnet-4-5-20250929", description="Default model")
+    secondary_model: str = Field(
+        default="claude-haiku-4-5-20251001",
+        description="Secondary model for SubAgent"
+    )
+
+    model_config = SettingsConfigDict(
+        env_file='packages/backend/.env',
+        env_nested_delimiter='__',
+        case_sensitive=False,
+        env_prefix='',
+        extra='ignore'
+    )
 
 
 class AnthropicModelConfig(BaseModel):

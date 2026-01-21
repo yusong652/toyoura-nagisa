@@ -8,17 +8,42 @@ OpenRouter uses OpenAI-compatible API format with base URL: https://openrouter.a
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from backend.config import get_llm_settings
+
+
+class OpenRouterConfig(BaseSettings):
+    """OpenRouter configuration loaded from environment variables."""
+
+    openrouter_api_key: str = Field(description="OpenRouter API key")
+    model: str = Field(default="qwen/qwen3-235b-a22b-2507", description="Default model")
+    secondary_model: str = Field(
+        default="google/gemini-2.5-flash",
+        description="Secondary model for SubAgent"
+    )
+    embedding_model: str = Field(
+        default="google/gemini-embedding-001",
+        description="Embedding model name"
+    )
+
+    model_config = SettingsConfigDict(
+        env_file='packages/backend/.env',
+        env_nested_delimiter='__',
+        case_sensitive=False,
+        env_prefix='',
+        extra='ignore'
+    )
 
 
 @dataclass
 class OpenRouterModelSettings:
     """OpenRouter model-specific settings"""
     model: str = "anthropic/claude-sonnet-4-5"  # Default model
-    temperature: float = 0.7
-    max_tokens: Optional[int] = 1024*16
-    top_p: float = 1.0
+    temperature: Union[float, str] = 0.7
+    max_tokens: Optional[Union[int, str]] = 1024*16
+    top_p: Union[float, str] = 1.0
 
     # OpenRouter supports any model in their catalog:
     # - anthropic/claude-sonnet-4-5
@@ -51,9 +76,6 @@ class OpenRouterClientConfig:
     debug: bool = False
     timeout: float = 60.0
     max_retries: int = 3
-
-    # OpenRouter required headers
-    openrouter_headers: Optional[Dict[str, str]] = None
 
     def get_api_call_kwargs(
         self,
@@ -88,7 +110,7 @@ class OpenRouterClientConfig:
         return kwargs
 
 
-def get_openrouter_client_config(**overrides) -> OpenRouterClientConfig:
+def get_openrouter_client_config(**overrides: Any) -> OpenRouterClientConfig:
     """
     Get OpenRouter client configuration with optional overrides
 
@@ -106,38 +128,24 @@ def get_openrouter_client_config(**overrides) -> OpenRouterClientConfig:
         openrouter_config = llm_settings.get_openrouter_config()
         model = openrouter_config.model
         api_key = openrouter_config.openrouter_api_key
-
-        # Build OpenRouter headers
-        openrouter_headers = {
-            "HTTP-Referer": openrouter_config.openrouter_http_referer,
-            "X-Title": openrouter_config.openrouter_title,
-        }
     except (AttributeError, KeyError):
         # Fallback to defaults if config not available
         model = "anthropic/claude-sonnet-4-5"
         api_key = None
-        openrouter_headers = {
-            "HTTP-Referer": "https://github.com/yusong652/toyoura-nagisa",
-            "X-Title": "toyoura-nagisa",
-        }
 
-    # Build model settings
-    model_settings_dict = {
-        'model': model,
-    }
+    model_settings = OpenRouterModelSettings()
+    model_settings.model = model
 
-    # Apply overrides to model settings
-    if 'model_settings' in overrides:
-        model_settings_dict.update(overrides['model_settings'])
-
-    model_settings = OpenRouterModelSettings(**model_settings_dict)
+    model_overrides = overrides.get('model_settings')
+    if isinstance(model_overrides, dict):
+        for key, value in model_overrides.items():
+            setattr(model_settings, key, value)
 
     # Build client config
-    config_dict = {
+    config_dict: Dict[str, Any] = {
         'model_settings': model_settings,
         'api_key': overrides.get('api_key', api_key),
         'base_url': "https://openrouter.ai/api/v1",  # Always use OpenRouter
-        'openrouter_headers': openrouter_headers,
         'debug': overrides.get('debug', llm_settings.debug),
         'timeout': overrides.get('timeout', 60.0),
         'max_retries': overrides.get('max_retries', 3)

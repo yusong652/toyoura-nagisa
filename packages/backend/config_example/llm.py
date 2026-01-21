@@ -8,8 +8,7 @@ Configuration Architecture:
 - config/llm.py (this file): API keys and provider defaults
 - .env: API keys and environment variables (security)
 """
-from __future__ import annotations
-from typing import Optional
+from typing import Optional, Any
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -53,29 +52,41 @@ class LLMSettings(BaseSettings):
 
         return "google"
 
-    def get_openai_config(self) -> OpenAIConfig:
+    def get_openai_config(self) -> Any:
         """Get OpenAI configuration"""
-        return OpenAIConfig()  # type: ignore
+        from backend.infrastructure.llm.providers.openai.config import OpenAIConfig as ProviderOpenAIConfig
 
-    def get_google_config(self) -> GoogleConfig:
+        return ProviderOpenAIConfig()  # type: ignore
+
+    def get_google_config(self) -> Any:
         """Get Google configuration"""
-        return GoogleConfig()  # type: ignore
+        from backend.infrastructure.llm.providers.google.config import GoogleConfig as ProviderGoogleConfig
 
-    def get_anthropic_config(self) -> AnthropicConfig:
+        return ProviderGoogleConfig()  # type: ignore
+
+    def get_anthropic_config(self) -> Any:
         """Get Anthropic configuration"""
-        return AnthropicConfig()  # type: ignore
+        from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig as ProviderAnthropicConfig
 
-    def get_moonshot_config(self) -> MoonshotConfig:
+        return ProviderAnthropicConfig()  # type: ignore
+
+    def get_moonshot_config(self) -> Any:
         """Get Moonshot configuration"""
-        return MoonshotConfig()  # type: ignore
+        from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig as ProviderMoonshotConfig
 
-    def get_openrouter_config(self) -> OpenRouterConfig:
+        return ProviderMoonshotConfig()  # type: ignore
+
+    def get_openrouter_config(self) -> Any:
         """Get OpenRouter configuration"""
-        return OpenRouterConfig()  # type: ignore
+        from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig as ProviderOpenRouterConfig
 
-    def get_zhipu_config(self) -> ZhipuConfig:
+        return ProviderOpenRouterConfig()  # type: ignore
+
+    def get_zhipu_config(self) -> Any:
         """Get Zhipu configuration"""
-        return ZhipuConfig()  # type: ignore
+        from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig as ProviderZhipuConfig
+
+        return ProviderZhipuConfig()  # type: ignore
 
     def get_current_llm_config(self):
         """
@@ -124,195 +135,6 @@ class LLMSettings(BaseSettings):
         """
         config = self.get_current_llm_config()
         return config.model
-
-
-class OpenAIConfig(BaseSettings):
-    """OpenAI Configuration"""
-
-    # API Key - set via environment variable OPENAI_API_KEY
-    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API Key")
-
-    # Model configuration
-    model: str = Field(default="gpt-4o", description="Model name")
-    # Available models: gpt-4o, gpt-4o-mini, gpt-4-turbo, o1-preview, o1-mini
-
-    # Secondary model for SubAgents to reduce primary model RPM consumption
-    secondary_model: str = Field(
-        default="gpt-4o-mini",
-        description="Secondary model for SubAgent to reduce primary model RPM usage"
-    )
-
-    
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
-    )
-
-
-class GoogleConfig(BaseSettings):
-    """Google (Gemini) Configuration"""
-
-    # API Key - set via environment variable GOOGLE_API_KEY
-    google_api_key: str = Field(default="", description="Google API Key")
-
-    # Model configuration
-    model: str = Field(default="gemini-2.5-flash", description="Model name")
-    # Available models: gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-pro
-
-    # Secondary model for SubAgents to reduce primary model RPM consumption
-    secondary_model: str = Field(
-        default="gemini-2.5-flash",
-        description="Secondary model for SubAgent to reduce primary model RPM usage"
-    )
-
-
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
-    )
-
-
-class AnthropicConfig(BaseSettings):
-    """Anthropic Configuration"""
-
-    # API Key - set via environment variable ANTHROPIC_API_KEY
-    anthropic_api_key: str = Field(default="", description="Anthropic API Key")
-
-    # Model configuration
-    model: str = Field(default="claude-3-5-sonnet-20241022", description="Model name")
-    # Available models: claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-haiku-20240307
-
-    # Secondary model for SubAgents to reduce primary model RPM consumption
-    secondary_model: str = Field(
-        default="claude-3-haiku-20240307",
-        description="Secondary model for SubAgent to reduce primary model RPM usage"
-    )
-
-
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
-    )
-
-
-class MoonshotConfig(BaseSettings):
-    """Moonshot Configuration"""
-
-    # API Key - set via environment variable MOONSHOT_API_KEY
-    moonshot_api_key: Optional[str] = Field(default=None, description="Moonshot API Key")
-
-    # Model configuration
-    model: str = Field(default="kimi-k2-thinking", description="Model name")
-    # Available models: kimi-k2-thinking, kimi-k2-0905-preview, kimi-k2-turbo-preview
-    # Note: K2 Thinking models expose reasoning_content field with intermediate thinking steps
-
-    # Secondary model for SubAgents
-    secondary_model: str = Field(
-        default="kimi-k2-0905-preview",
-        description="Secondary model for SubAgent to reduce primary model RPM usage"
-    )
-
-
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
-    )
-
-
-class OpenRouterConfig(BaseSettings):
-    """OpenRouter Configuration - supports any model via OpenRouter"""
-
-    # API Key - set via environment variable OPENROUTER_API_KEY
-    openrouter_api_key: str = Field(default="", description="OpenRouter API Key")
-
-    # Model configuration - supports any OpenRouter model
-    model: str = Field(
-        default="anthropic/claude-3.5-sonnet",
-        description="OpenRouter model name"
-    )
-    # Popular models:
-    # - anthropic/claude-3.5-sonnet
-    # - google/gemini-2.5-pro
-    # - openai/gpt-4o
-    # - moonshotai/kimi-k2-0905
-    # Full list: https://openrouter.ai/models
-
-    # Secondary model for SubAgents
-    secondary_model: str = Field(
-        default="google/gemini-2.5-flash",
-        description="Secondary model for SubAgent to reduce primary model RPM usage"
-    )
-
-    # OpenRouter specific headers
-    openrouter_http_referer: str = Field(
-        default="https://github.com/yusong652/toyoura-nagisa",
-        description="HTTP-Referer header for OpenRouter requests"
-    )
-    openrouter_title: str = Field(
-        default="toyoura-nagisa Voice Assistant",
-        description="X-Title header for OpenRouter requests"
-    )
-
-
-    # Embedding model for memory system
-    embedding_model: str = Field(
-        default="google/gemini-embedding-001",
-        description="OpenRouter embedding model name"
-    )
-
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
-    )
-
-
-class ZhipuConfig(BaseSettings):
-    """Zhipu (智谱) Configuration"""
-
-    # API Key - set via environment variable ZHIPU_API_KEY
-    zhipu_api_key: str = Field(default="", description="Zhipu API Key")
-
-    # Model configuration
-    model: str = Field(
-        default="glm-4",
-        description="Zhipu model name"
-    )
-    # Available models:
-    # - glm-4: Most capable, suitable for complex tasks
-    # - glm-4-air: Balanced version for most tasks
-    # - glm-4-flash: Fast model for simple tasks
-    # Full list: https://bigmodel.cn/console/modelcenter/square
-
-    # Secondary model for SubAgents
-    secondary_model: str = Field(
-        default="glm-4-air",
-        description="Secondary model for SubAgent to reduce primary model RPM usage"
-    )
-
-
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
-    )
-
 
 def get_llm_settings() -> LLMSettings:
     """Get LLM configuration instance"""

@@ -8,17 +8,38 @@ Uses official zai-sdk for API access.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from backend.config import get_llm_settings
+
+
+class ZhipuConfig(BaseSettings):
+    """Zhipu configuration loaded from environment variables."""
+
+    zhipu_api_key: str = Field(description="Zhipu API key")
+    model: str = Field(default="glm-4.7", description="Default model")
+    secondary_model: str = Field(
+        default="glm-4.7",
+        description="Secondary model for SubAgent"
+    )
+
+    model_config = SettingsConfigDict(
+        env_file='packages/backend/.env',
+        env_nested_delimiter='__',
+        case_sensitive=False,
+        env_prefix='',
+        extra='ignore'
+    )
 
 
 @dataclass
 class ZhipuModelSettings:
     """Zhipu model-specific settings"""
     model: str = "glm-4.6"  # Default to GLM-4 Plus model
-    temperature: float = 0.95  # Recommended temperature for Zhipu API (range: 0-1)
-    max_tokens: Optional[int] = 1024*16
-    top_p: float = 0.7
+    temperature: Union[float, str] = 0.95  # Recommended temperature for Zhipu API (range: 0-1)
+    max_tokens: Optional[Union[int, str]] = 1024*16
+    top_p: Union[float, str] = 0.7
 
     # Zhipu-specific features
     # Models: glm-4-plus, glm-4-0520, glm-4, glm-4-air, glm-4-airx, glm-4-flash, glm-4-long
@@ -81,7 +102,7 @@ class ZhipuClientConfig:
         return kwargs
 
 
-def get_zhipu_client_config(**overrides) -> ZhipuClientConfig:
+def get_zhipu_client_config(**overrides: Any) -> ZhipuClientConfig:
     """
     Get Zhipu client configuration with optional overrides
 
@@ -104,19 +125,16 @@ def get_zhipu_client_config(**overrides) -> ZhipuClientConfig:
         model = "glm-4.6"
         api_key = None
 
-    # Build model settings
-    model_settings_dict = {
-        'model': model,
-    }
+    model_settings = ZhipuModelSettings()
+    model_settings.model = model
 
-    # Apply overrides to model settings
-    if 'model_settings' in overrides:
-        model_settings_dict.update(overrides['model_settings'])
-
-    model_settings = ZhipuModelSettings(**model_settings_dict)
+    model_overrides = overrides.get('model_settings')
+    if isinstance(model_overrides, dict):
+        for key, value in model_overrides.items():
+            setattr(model_settings, key, value)
 
     # Build client config
-    config_dict = {
+    config_dict: Dict[str, Any] = {
         'model_settings': model_settings,
         'api_key': overrides.get('api_key', api_key),
         'base_url': overrides.get('base_url', "https://open.bigmodel.cn/api/paas/v4/"),
