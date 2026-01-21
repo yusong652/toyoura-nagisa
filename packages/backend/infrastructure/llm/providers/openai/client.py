@@ -134,12 +134,26 @@ class OpenAIClient(LLMClientBase):
             tools=tools
         )
 
+        # Apply call options if provided, but respect model constraints
+        is_reasoning = self.openai_config.is_reasoning_model
+
         if call_options.temperature is not None:
-            kwargs_api['temperature'] = call_options.temperature
+            if not is_reasoning:
+                kwargs_api['temperature'] = call_options.temperature
+            else:
+                # Omit temperature for reasoning models as it's unsupported
+                kwargs_api.pop('temperature', None)
+
         if call_options.max_tokens is not None:
             kwargs_api['max_output_tokens'] = call_options.max_tokens
+
         if call_options.top_p is not None:
-            kwargs_api['top_p'] = call_options.top_p
+            if not is_reasoning:
+                kwargs_api['top_p'] = call_options.top_p
+            else:
+                # Omit top_p for reasoning models as it's unsupported
+                kwargs_api.pop('top_p', None)
+
         if call_options.timeout is not None:
             kwargs_api['timeout'] = call_options.timeout
 
@@ -239,12 +253,26 @@ class OpenAIClient(LLMClientBase):
             tools=tools
         )
 
+        # Apply call options if provided, but respect model constraints
+        is_reasoning = self.openai_config.is_reasoning_model
+
         if call_options.temperature is not None:
-            kwargs_api['temperature'] = call_options.temperature
+            if not is_reasoning:
+                kwargs_api['temperature'] = call_options.temperature
+            else:
+                # Omit temperature for reasoning models as it's unsupported
+                kwargs_api.pop('temperature', None)
+
         if call_options.max_tokens is not None:
             kwargs_api['max_output_tokens'] = call_options.max_tokens
+
         if call_options.top_p is not None:
-            kwargs_api['top_p'] = call_options.top_p
+            if not is_reasoning:
+                kwargs_api['top_p'] = call_options.top_p
+            else:
+                # Omit top_p for reasoning models as it's unsupported
+                kwargs_api.pop('top_p', None)
+
         if call_options.timeout is not None:
             kwargs_api['timeout'] = call_options.timeout
 
