@@ -1,0 +1,151 @@
+# LLM Providers and Models Configuration
+#
+# This file defines available LLM providers and their models.
+# You can add/modify entries here without changing code.
+#
+# Structure:
+#   providers:
+#     - provider: identifier (must match llm.py config)
+#       name: Display name for UI
+#       description: Provider description
+#       models:
+#         - id: Model identifier for API calls
+#           name: Display name
+#           description: Model description
+#           context_window: Token limit (optional)
+
+providers:
+  # Google Gemini
+  - provider: google
+    name: Google Gemini
+    description: Google's Gemini models with advanced reasoning and long context
+    models:
+      - id: gemini-2.0-flash-exp
+        name: Gemini 2.0 Flash (Experimental)
+        description: Latest experimental model with enhanced capabilities
+        context_window: 1048576
+
+      - id: gemini-2.0-flash-thinking-exp-01-21
+        name: Gemini 2.0 Flash Thinking (01-21)
+        description: Experimental model with extended thinking capabilities
+        context_window: 1048576
+
+      - id: gemini-exp-1206
+        name: Gemini Experimental 1206
+        description: Experimental release from December 2024
+        context_window: 200000
+
+      - id: gemini-2.5-flash
+        name: Gemini 2.5 Flash
+        description: Fast and efficient model for everyday tasks
+        context_window: 1048576
+
+  # Anthropic Claude
+  - provider: anthropic
+    name: Anthropic Claude
+    description: Anthropic's Claude models with strong tool use and analysis
+    models:
+      - id: claude-sonnet-4-5-20250929
+        name: Claude Sonnet 4.5
+        description: Latest Sonnet model with improved performance
+        context_window: 200000
+
+      - id: claude-3-7-sonnet-20250219
+        name: Claude 3.7 Sonnet
+        description: Claude 3.7 Sonnet released February 2025
+        context_window: 200000
+
+      - id: claude-3-5-sonnet-20241022
+        name: Claude 3.5 Sonnet
+        description: Previous generation Sonnet model
+        context_window: 200000
+
+  # OpenAI GPT
+  - provider: openai
+    name: OpenAI GPT
+    description: OpenAI's GPT models
+    models:
+      - id: gpt-4o
+        name: GPT-4o
+        description: Latest GPT-4 optimized model
+        context_window: 128000
+
+      - id: gpt-4-turbo
+        name: GPT-4 Turbo
+        description: Fast and efficient GPT-4
+        context_window: 128000
+
+      - id: gpt-4
+        name: GPT-4
+        description: Original GPT-4 model
+        context_window: 8192
+
+  # Moonshot AI
+  - provider: moonshot
+    name: Moonshot AI
+    description: Moonshot's Kimi models with extended context
+    models:
+      - id: moonshot-v1-8k
+        name: Moonshot v1 8K
+        description: 8K context window
+        context_window: 8000
+
+      - id: moonshot-v1-32k
+        name: Moonshot v1 32K
+        description: 32K context window
+        context_window: 32000
+
+      - id: moonshot-v1-128k
+        name: Moonshot v1 128K
+        description: 128K context window
+        context_window: 128000
+
+  # Zhipu AI
+  - provider: zhipu
+    name: Zhipu AI
+    description: Zhipu's GLM models
+    models:
+      - id: glm-4-plus
+        name: GLM-4 Plus
+        description: Enhanced GLM-4 with better performance
+        context_window: 128000
+
+      - id: glm-4
+        name: GLM-4
+        description: Latest GLM generation
+        context_window: 128000
+
+      - id: glm-4-air
+        name: GLM-4 Air
+        description: Lightweight GLM-4 variant
+        context_window: 128000
+
+  # OpenRouter
+  - provider: openrouter
+    name: OpenRouter
+    description: Access to multiple model providers through OpenRouter
+    models:
+      - id: anthropic/claude-3.5-sonnet
+        name: Claude 3.5 Sonnet (via OpenRouter)
+        description: Anthropic Claude via OpenRouter
+        context_window: 200000
+
+      - id: google/gemini-2.0-flash-exp:free
+        name: Gemini 2.0 Flash (via OpenRouter)
+        description: Google Gemini via OpenRouter (free tier)
+        context_window: 1048576
+
+      - id: openai/gpt-4o
+        name: GPT-4o (via OpenRouter)
+        description: OpenAI GPT-4o via OpenRouter
+        context_window: 128000
+
+  # Local LLM
+  - provider: local_llm
+    name: Local LLM
+    description: Self-hosted LLM via vLLM or Ollama
+    models:
+      - id: local-model
+        name: Local Model
+        description: Model running on local server (vLLM/Ollama)
+        # context_window depends on local setup
