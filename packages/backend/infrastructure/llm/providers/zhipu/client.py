@@ -51,12 +51,12 @@ class ZhipuClient(LLMClientBase):
 
         # Initialize Zhipu-specific configuration
         # Extract relevant configuration from extra_config for overrides
+        # Factory only passes: model, debug
         config_overrides = {}
-
-        # Direct field overrides (flat structure)
-        for field in ['model', 'temperature', 'max_tokens', 'top_p', 'debug', 'timeout', 'max_retries']:
-            if field in self.extra_config:
-                config_overrides[field] = self.extra_config[field]
+        if 'model' in self.extra_config:
+            config_overrides['model'] = self.extra_config['model']
+        if 'debug' in self.extra_config:
+            config_overrides['debug'] = self.extra_config['debug']
 
         self.zhipu_config = get_zhipu_client_config(**config_overrides)
 
