@@ -109,12 +109,12 @@ class AnthropicClient(LLMClientBase):
         timeout = (
             call_options.timeout
             if call_options.timeout is not None
-            else self.anthropic_config.model_settings.timeout
+            else self.anthropic_config.timeout
         )
         max_retries = (
             call_options.max_retries
             if call_options.max_retries is not None
-            else self.anthropic_config.model_settings.max_retries
+            else self.anthropic_config.max_retries
         )
 
         # Extract configuration from api_config
@@ -192,12 +192,12 @@ class AnthropicClient(LLMClientBase):
         timeout = (
             call_options.timeout
             if call_options.timeout is not None
-            else self.anthropic_config.model_settings.timeout
+            else self.anthropic_config.timeout
         )
         max_retries = (
             call_options.max_retries
             if call_options.max_retries is not None
-            else self.anthropic_config.model_settings.max_retries
+            else self.anthropic_config.max_retries
         )
 
         # Extract configuration from api_config
