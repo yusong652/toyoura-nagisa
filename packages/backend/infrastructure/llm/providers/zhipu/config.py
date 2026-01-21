@@ -43,15 +43,15 @@ class ZhipuConfig(BaseSettings):
     # Model parameters (runtime overridable)
     temperature: float = Field(
         default=0.95,
-        description="Sampling temperature (0-1)"
+        description="Sampling temperature (0-1). Do not set both temperature and top_p."
     )
     max_tokens: Optional[int] = Field(
         default=1024*16,
         description="Maximum tokens to generate"
     )
-    top_p: float = Field(
-        default=0.7,
-        description="Nucleus sampling threshold"
+    top_p: Optional[float] = Field(
+        default=None,
+        description="Nucleus sampling threshold. Do not set both temperature and top_p."
     )
 
     # Client settings (runtime overridable)
@@ -72,16 +72,18 @@ class ZhipuConfig(BaseSettings):
         Convert model parameters to Zhipu API format.
 
         Returns:
-            Dict with model, temperature, top_p, and optional max_tokens
+            Dict with model, temperature, and optional max_tokens/top_p
         """
         params = {
             'model': self.model,
             'temperature': self.temperature,
-            'top_p': self.top_p
         }
 
         if self.max_tokens is not None:
             params['max_tokens'] = self.max_tokens
+
+        if self.top_p is not None:
+            params['top_p'] = self.top_p
 
         return params
 
