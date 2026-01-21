@@ -209,7 +209,6 @@ class ZhipuClient(LLMClientBase):
                 max_retries=max_retries,
                 timeout=timeout,
                 debug=debug,
-                provider="Zhipu",
             )
         except Exception as exc:
             if debug:
@@ -324,7 +323,6 @@ class ZhipuClient(LLMClientBase):
             max_retries=max_retries,
             timeout=timeout,
             debug=debug,
-            provider="Zhipu",
         ):
             yield chunk
 

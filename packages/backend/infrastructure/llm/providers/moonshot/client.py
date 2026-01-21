@@ -170,7 +170,6 @@ class MoonshotClient(LLMClientBase):
                 max_retries=max_retries,
                 timeout=timeout,
                 debug=debug,
-                provider="Moonshot",
             )
         except Exception as exc:
             if debug:
@@ -257,7 +256,6 @@ class MoonshotClient(LLMClientBase):
             max_retries=max_retries,
             timeout=timeout,
             debug=debug,
-            provider="Moonshot",
         ):
             yield chunk
 

@@ -181,7 +181,6 @@ class OpenRouterClient(LLMClientBase):
                 max_retries=max_retries,
                 timeout=timeout,
                 debug=debug,
-                provider="OpenRouter",
             )
 
             if debug:
@@ -276,7 +275,6 @@ class OpenRouterClient(LLMClientBase):
             max_retries=max_retries,
             timeout=timeout,
             debug=debug,
-            provider="OpenRouter",
         ):
             yield chunk
 

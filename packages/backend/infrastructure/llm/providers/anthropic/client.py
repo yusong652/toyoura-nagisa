@@ -166,7 +166,6 @@ class AnthropicClient(LLMClientBase):
                 max_retries=max_retries,
                 timeout=timeout,
                 debug=debug,
-                provider="Anthropic",
             )
         except Exception as e:
             # Log debug information if in debug mode
@@ -269,7 +268,6 @@ class AnthropicClient(LLMClientBase):
             max_retries=max_retries,
             timeout=timeout,
             debug=debug,
-            provider="Anthropic",
         ):
             yield chunk
 

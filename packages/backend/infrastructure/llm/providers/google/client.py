@@ -215,7 +215,6 @@ class GoogleClient(LLMClientBase):
                 max_retries=max_retries,
                 timeout=timeout,
                 debug=debug,
-                provider="Google",
             )
         except Exception as e:
             if debug and "Empty" not in str(e):
@@ -374,7 +373,6 @@ class GoogleClient(LLMClientBase):
             max_retries=max_retries,
             timeout=timeout,
             debug=debug,
-            provider="Google",
         ):
             yield chunk
 

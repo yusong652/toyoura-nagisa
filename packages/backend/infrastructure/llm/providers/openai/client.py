@@ -164,7 +164,6 @@ class OpenAIClient(LLMClientBase):
                 max_retries=max_retries,
                 timeout=timeout,
                 debug=debug,
-                provider="OpenAI",
             )
 
             if debug:
@@ -322,7 +321,6 @@ class OpenAIClient(LLMClientBase):
             max_retries=max_retries,
             timeout=timeout,
             debug=debug,
-            provider="OpenAI",
         ):
             yield chunk
 

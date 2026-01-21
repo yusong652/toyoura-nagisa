@@ -39,7 +39,6 @@ async def run_with_retries(
     timeout: Optional[float] = None,
     base_delay: float = 1.0,
     debug: bool = False,
-    provider: str = "",
 ) -> T:
     attempt = 0
 
@@ -51,16 +50,14 @@ async def run_with_retries(
         except Exception as exc:
             retryable = is_retryable_error(exc)
             if debug:
-                label = provider or "LLM"
-                print(f"[DEBUG] {label} call failed (attempt {attempt + 1}/{max_retries + 1}): {exc}")
+                print(f"[DEBUG] LLM call failed (attempt {attempt + 1}/{max_retries + 1}): {exc}")
 
             if not retryable or attempt >= max_retries:
                 raise
 
             delay = base_delay * (2 ** attempt)
             if debug:
-                label = provider or "LLM"
-                print(f"[DEBUG] {label} retrying in {delay}s")
+                print(f"[DEBUG] LLM retrying in {delay}s")
 
             attempt += 1
             await asyncio.sleep(delay)
@@ -73,7 +70,6 @@ async def stream_with_retries(
     timeout: Optional[float] = None,
     base_delay: float = 1.0,
     debug: bool = False,
-    provider: str = "",
 ) -> AsyncGenerator[T, None]:
     attempt = 0
 
@@ -100,9 +96,8 @@ async def stream_with_retries(
         except Exception as exc:
             retryable = is_retryable_error(exc)
             if debug:
-                label = provider or "LLM"
                 print(
-                    f"[DEBUG] {label} streaming failed (attempt {attempt + 1}/{max_retries + 1}): {exc}"
+                    f"[DEBUG] LLM streaming failed (attempt {attempt + 1}/{max_retries + 1}): {exc}"
                 )
 
             if had_chunk or not retryable or attempt >= max_retries:
@@ -110,8 +105,7 @@ async def stream_with_retries(
 
             delay = base_delay * (2 ** attempt)
             if debug:
-                label = provider or "LLM"
-                print(f"[DEBUG] {label} retrying stream in {delay}s")
+                print(f"[DEBUG] LLM retrying stream in {delay}s")
 
             attempt += 1
             await asyncio.sleep(delay)
