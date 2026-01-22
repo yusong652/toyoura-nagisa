@@ -1,6 +1,6 @@
 """Universal Web Search tool supporting multiple LLM providers."""
 
-from typing import Dict, Any
+from typing import Dict, Any, cast
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from pydantic import Field
@@ -22,13 +22,15 @@ async def web_search(
     from the web with source citations and comprehensive response text.
     """
     try:
-        # Get LLM client from global app context
-        from backend.shared.utils.app_context import get_llm_client
+        # Get LLM client from session context or fallback to global
+        from backend.infrastructure.llm.session_client import get_session_llm_client
+        
+        session_id = cast(str, context.client_id)
         
         try:
-            llm_client = get_llm_client()
-        except RuntimeError:
-            llm_client = None
+            llm_client = get_session_llm_client(session_id)
+        except Exception as e:
+            return error_response(f"Failed to create LLM client: {e}")
         
         if not llm_client:
             return error_response(

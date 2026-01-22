@@ -256,21 +256,25 @@ class MessageService:
         # Refresh context manager if it exists for this session
         # This ensures in-memory state (working_contents) stays synchronized with database
         try:
-            from backend.shared.utils.app_context import get_llm_client
-            llm_client = get_llm_client()
+            from backend.infrastructure.llm.session_client import get_session_llm_client
+            
+            try:
+                llm_client = get_session_llm_client(session_id)
 
-            if llm_client and hasattr(llm_client, '_session_context_managers'):
-                # Check if context manager exists for this session (avoid creating new one)
-                if session_id in llm_client._session_context_managers:
-                    context_manager = llm_client._session_context_managers[session_id]
+                if llm_client and hasattr(llm_client, '_session_context_managers'):
+                    # Check if context manager exists for this session (avoid creating new one)
+                    if session_id in llm_client._session_context_managers:
+                        context_manager = llm_client._session_context_managers[session_id]
 
-                    # Reload history from storage and reinitialize context
-                    from backend.infrastructure.storage.session_manager import load_history
-                    history = load_history(session_id)
-                    messages = [message_factory(msg) for msg in history]
-                    context_manager.initialize_from_messages(messages)
+                        # Reload history from storage and reinitialize context
+                        from backend.infrastructure.storage.session_manager import load_history
+                        history = load_history(session_id)
+                        messages = [message_factory(msg) for msg in history]
+                        context_manager.initialize_from_messages(messages)
 
-                    print(f"[DEBUG] Refreshed context manager for session {session_id} after deleting message {message_id}")
+                        print(f"[DEBUG] Refreshed context manager for session {session_id} after deleting message {message_id}")
+            except Exception as e:
+                print(f"[WARNING] Could not get LLM client for session {session_id}: {e}")
 
         except Exception as e:
             # Context refresh failure should not fail the delete operation

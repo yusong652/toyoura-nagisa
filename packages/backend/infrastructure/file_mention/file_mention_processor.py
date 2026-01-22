@@ -102,9 +102,11 @@ class FileMentionProcessor:
 
                 # Track read file in tool_manager (for edit prerequisite validation)
                 try:
-                    from backend.shared.utils.app_context import get_llm_client
-                    llm_client = get_llm_client()
+                    from backend.infrastructure.llm.session_client import get_session_llm_client
+                    
+                    llm_client = get_session_llm_client(self.session_id)
                     llm_client.tool_manager._track_read_file(self.session_id, file_content.path)
+                        
                 except Exception as e:
                     # Non-critical: Log warning but don't block file injection
                     logger.warning(f"Failed to track read file '{file_path}': {e}")

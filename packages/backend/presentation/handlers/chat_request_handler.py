@@ -57,29 +57,13 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
 
         try:
             # ========== PHASE 2: Get LLM response using AgentService ==========
-            from backend.shared.utils.app_context import get_llm_client, get_llm_factory, get_app
-            from backend.infrastructure.storage.session_manager import get_session_llm_config
+            from backend.shared.utils.app_context import get_llm_factory
+            from backend.infrastructure.llm.session_client import get_session_llm_client
 
             llm_factory = get_llm_factory()
             
-            # Load session-level LLM configuration
-            session_llm_config = get_session_llm_config(session_id)
-            llm_config = None
-            
-            if session_llm_config:
-                llm_config = {
-                    "provider": session_llm_config["provider"],
-                    "model": session_llm_config["model"],
-                    "secondary_model": session_llm_config.get("secondary_model"),
-                }
-                # Create client directly from session config
-                current_llm_client = llm_factory.create_client_with_config(
-                    provider=llm_config["provider"],
-                    model=llm_config["model"]
-                )
-            else:
-                # Fall back to default client if session has no specific config
-                current_llm_client = get_llm_client()
+            # Get correct client for this session
+            current_llm_client = get_session_llm_client(session_id)
 
             from backend.application.services.agent_service import AgentService
             agent_service = AgentService(current_llm_client, llm_factory)
@@ -95,7 +79,7 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
                 instruction=prepared_message.instruction,
                 agent_profile=prepared_message.agent_profile,
                 enable_memory=prepared_message.enable_memory,
-                llm_config=llm_config,  # Use session-level config
+                llm_config=None,  # Client is already configured correctly
             )
 
             # ========== PHASE 3: Content processing pipeline ==========

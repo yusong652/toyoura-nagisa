@@ -157,9 +157,11 @@ class Agent:
             # SubAgent: Also register in primary LLM client for tool workspace resolution
             # Tools use get_llm_client() to find agent_profile, so SubAgent must be visible there
             if not self.is_main_agent:
-                from backend.shared.utils.app_context import get_llm_client
+                from backend.infrastructure.llm.session_client import get_session_llm_client
                 try:
-                    primary_ctx = get_llm_client().get_or_create_context_manager(self.session_id)
+                    # Resolve primary session LLM client
+                    primary_client = get_session_llm_client(self.session_id)
+                    primary_ctx = primary_client.get_or_create_context_manager(self.session_id)
                     primary_ctx.agent_profile = self.config.tool_profile
                 except Exception:
                     pass  # Fallback gracefully if primary client unavailable

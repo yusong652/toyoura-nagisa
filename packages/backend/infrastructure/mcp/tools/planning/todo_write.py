@@ -252,9 +252,16 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
 
     try:
         # Get agent_profile from context_manager (set by Agent before tool execution)
-        from backend.shared.utils.app_context import get_llm_client
-        llm_client = get_llm_client()
-        context_manager = llm_client.get_or_create_context_manager(session_id)
+        from backend.infrastructure.llm.session_client import get_session_llm_client
+        
+        try:
+            llm_client = get_session_llm_client(session_id)
+            context_manager = llm_client.get_or_create_context_manager(session_id)
+        except Exception as e:
+            # Should effectively never happen given app initialization ensures default config
+            logger.warning(f"Failed to get LLM client for session {session_id}: {e}")
+            context_manager = None
+
         agent_profile = 'pfc_expert'
 
         # Determine persistent flag based on agent_profile
