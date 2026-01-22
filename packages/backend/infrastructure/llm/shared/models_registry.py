@@ -38,6 +38,7 @@ class ModelInfo(BaseModel):
     name: str = Field(..., description="Display name for UI")
     description: Optional[str] = Field(None, description="Model description")
     context_window: Optional[int] = Field(None, description="Context window size (tokens)")
+    multimodal: bool = Field(False, description="Whether the model supports multimodal content like images")
 
 
 class ProviderInfo(BaseModel):

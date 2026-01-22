@@ -18,6 +18,7 @@
 #           name: Display name (required)
 #           description: Model description (optional)
 #           context_window: Token limit in tokens (optional, integer without commas)
+#           multimodal: Whether the model supports multimodal content like images (optional, default: false)
 
 # System default configuration (used when user hasn't set custom config via frontend)
 default:
@@ -36,21 +37,25 @@ providers:
         name: GPT-5.2
         description: Latest GPT-5.2 model with enhanced capabilities
         context_window: 400000
+        multimodal: true
 
       - id: gpt-5.2-codex
         name: GPT-5.2 Codex
         description: Specialized coding model based on GPT-5.2
         context_window: 400000
+        multimodal: true
 
       - id: gpt-5-mini-2025-08-07
         name: GPT-5 Mini
         description: Lightweight GPT-5 variant for fast responses
         context_window: 400000
+        multimodal: true
 
       - id: gpt-4o-2024-08-06
         name: GPT-4o
         description: GPT-4 optimized for general tasks
         context_window: 128000
+        multimodal: true
 
   # Google Gemini
   - provider: google
@@ -61,21 +66,25 @@ providers:
         name: Gemini 3.0 Pro
         description: Preview of next-generation Gemini Pro
         context_window: 1048576
+        multimodal: true
 
       - id: gemini-3-flash-preview
         name: Gemini 3.0 Flash
         description: Fast preview variant of Gemini 3.0
         context_window: 1048576
+        multimodal: true
 
       - id: gemini-2.5-pro
         name: Gemini 2.5 Pro
         description: Latest production Gemini Pro model
         context_window: 1048576
+        multimodal: true
 
       - id: gemini-2.5-flash
         name: Gemini 2.5 Flash
         description: Fast and efficient Gemini model
         context_window: 1048576
+        multimodal: true
 
   # Anthropic Claude
   - provider: anthropic
@@ -86,16 +95,19 @@ providers:
         name: Claude Opus 4.5
         description: Most capable Claude model for complex tasks
         context_window: 200000
+        multimodal: true
 
       - id: claude-sonnet-4-5-20250929
         name: Claude Sonnet 4.5
         description: Balanced performance and speed
         context_window: 200000
+        multimodal: true
 
       - id: claude-haiku-4-5-20251001
         name: Claude Haiku 4.5
         description: Fast and lightweight Claude model
         context_window: 200000
+        multimodal: true
 
   # Moonshot AI
   - provider: moonshot
@@ -106,21 +118,25 @@ providers:
         name: Kimi K2 Thinking Turbo
         description: Fast thinking model with enhanced reasoning
         context_window: 262144
+        multimodal: false
 
       - id: kimi-k2-thinking
         name: Kimi K2 Thinking
         description: Deep reasoning model with extended context
         context_window: 262144
+        multimodal: false
 
       - id: kimi-k2-turbo-preview
         name: Kimi K2 Turbo Preview
         description: Preview of high-speed K2 variant
         context_window: 262144
+        multimodal: false
 
       - id: kimi-k2-0905-preview
         name: Kimi K2 0905 Preview
         description: September 2024 preview release
         context_window: 262144
+        multimodal: false
 
   # Zhipu AI
   - provider: zhipu
@@ -131,16 +147,19 @@ providers:
         name: GLM-4.7
         description: Latest GLM generation with improved performance
         context_window: 200000
+        multimodal: false
 
       - id: glm-4.6v
         name: GLM-4.6v
         description: Vision-enabled GLM model
         context_window: 200000
+        multimodal: true
 
       - id: glm-4.7-flash
         name: GLM-4.7 Flash
         description: Fast variant of GLM-4.7
         context_window: 200000
+        multimodal: false
 
   # OpenRouter
   - provider: openrouter
@@ -151,8 +170,10 @@ providers:
         name: Qwen 3 235B
         description: Large-scale Qwen model via OpenRouter
         context_window: 200000
+        multimodal: false
 
       - id: x-ai/grok-4.1-fast
         name: Grok 4.1 Fast
         description: xAI's Grok model via OpenRouter
         context_window: 1048576
+        multimodal: false

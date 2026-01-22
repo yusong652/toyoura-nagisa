@@ -14,10 +14,75 @@ Supports:
 
 import mimetypes
 import base64
+import logging
 from pathlib import Path
 from typing import Optional, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
+
+logger = logging.getLogger(__name__)
+
+# -----------------------------------------------------------------------------
+# Multimodal support checking (Centralized logic)
+# -----------------------------------------------------------------------------
+
+def check_multimodal_support(provider: str, model: str) -> bool:
+    """
+    Check if a specific provider and model combination supports multimodal content.
+    Uses models_registry.py as the single source of truth.
+
+    Args:
+        provider: LLM provider name (e.g., "google", "zhipu")
+        model: Model identifier (e.g., "glm-4.6v")
+
+    Returns:
+        bool: True if multimodal is supported, False otherwise
+    """
+    try:
+        from backend.infrastructure.llm.shared.models_registry import get_model_info
+        model_info = get_model_info(provider, model)
+        if model_info:
+            return model_info.multimodal
+    except Exception as e:
+        logger.warning(f"Failed to check multimodal support from registry for {provider}/{model}: {e}")
+
+    # Default to False if not explicitly configured in models.yaml
+    return False
+
+
+def get_multimodal_support_for_session(session_id: str) -> bool:
+    """
+    Get multimodal support status for a specific session by checking its LLM config.
+
+    Args:
+        session_id: The session identifier
+
+    Returns:
+        bool: True if multimodal is supported for the current session config
+    """
+    try:
+        from backend.infrastructure.storage.session_manager import get_session_llm_config
+        from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+
+        # Priority 1: Session-specific configuration
+        config = get_session_llm_config(session_id)
+
+        # Priority 2: Global default configuration
+        if not config:
+            config = get_default_llm_config()
+
+        if not config:
+            # If no config found, default to True for backward compatibility
+            # but usually this shouldn't happen in a configured system
+            return True
+
+        provider = config.get("provider", "")
+        model = config.get("model", "")
+
+        return check_multimodal_support(provider, model)
+    except Exception as e:
+        logger.warning(f"Failed to check multimodal support for session {session_id}: {e}")
+        return True
 
 
 # -----------------------------------------------------------------------------
