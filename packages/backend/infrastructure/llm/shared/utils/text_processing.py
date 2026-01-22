@@ -83,7 +83,8 @@ def parse_title_response(
 
     except Exception as e:
         from backend.config import get_llm_settings
-        debug = get_llm_settings().debug
+        from backend.config.dev import get_dev_config
+        debug = get_dev_config().debug_mode
         if debug:
             print(f"[title_generation] Error parsing title response: {str(e)}")
         return None

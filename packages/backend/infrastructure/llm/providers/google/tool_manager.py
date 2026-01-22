@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 from google.genai import types
 from backend.infrastructure.llm.base.tool_manager import BaseToolManager
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
+from backend.config.dev import get_dev_config
 
 
 class GoogleToolManager(BaseToolManager):
@@ -85,7 +86,7 @@ class GoogleToolManager(BaseToolManager):
                 }
                 prompt_schemas.append(schema_dict)
             except Exception as e:
-                if llm_settings.debug:
+                if get_dev_config().debug_mode:
                     print(f"[WARNING] Failed to convert tool {tool_name} for system prompt: {e}")
                 continue
         

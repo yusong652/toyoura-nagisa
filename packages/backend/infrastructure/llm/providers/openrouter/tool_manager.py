@@ -10,6 +10,7 @@ OpenRouter uses the same nested tool schema format as OpenAI Chat Completions AP
 from typing import List, Dict, Any
 from backend.infrastructure.llm.base.tool_manager import BaseToolManager
 from backend.infrastructure.llm.shared.utils.tool_schema import transform_schema_for_openai_compat
+from backend.config.dev import get_dev_config
 
 
 class OpenRouterToolManager(BaseToolManager):
@@ -68,7 +69,7 @@ class OpenRouterToolManager(BaseToolManager):
 
         from backend.config.llm import get_llm_settings
         llm_settings = get_llm_settings()
-        if llm_settings.debug:
+        if get_dev_config().debug_mode:
             print(f"[DEBUG] Final OpenRouter tools count: {len(openrouter_tools)}")
 
         return openrouter_tools if openrouter_tools else None
@@ -162,11 +163,11 @@ class OpenRouterToolManager(BaseToolManager):
                 }
                 prompt_schemas.append(schema_dict)
             except Exception as e:
-                if llm_settings.debug:
+                if get_dev_config().debug_mode:
                     print(f"[WARNING] Failed to convert tool {tool_name} for system prompt: {e}")
                 continue
 
-        if llm_settings.debug:
+        if get_dev_config().debug_mode:
             print(f"[DEBUG] OpenRouter system prompt schemas count: {len(prompt_schemas)}")
 
         return prompt_schemas

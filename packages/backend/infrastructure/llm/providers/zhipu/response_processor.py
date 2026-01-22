@@ -12,6 +12,7 @@ from backend.domain.models.messages import AssistantMessage
 from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor, BaseStreamingProcessor
 from .debug import ZhipuDebugger
+from backend.config.dev import get_dev_config
 
 
 class ZhipuStreamingProcessor(BaseStreamingProcessor):
@@ -245,7 +246,7 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
 
         # Debug: Print raw tool calls from API
         from backend.config.llm import get_llm_settings
-        if get_llm_settings().debug:
+        if get_dev_config().debug_mode:
             raw_tool_calls = []
             for tc in message.tool_calls:
                 function = getattr(tc, 'function', None)
@@ -312,7 +313,7 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
 
         # Debug: Print extracted tool calls
         from backend.config.llm import get_llm_settings
-        if get_llm_settings().debug:
+        if get_dev_config().debug_mode:
             print(f"[DEBUG] Zhipu extracted tool calls: {tool_calls}")
 
         return tool_calls
