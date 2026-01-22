@@ -2,72 +2,121 @@
 Global LLM Configuration Manager
 
 Manages the default LLM provider and model configuration that applies to all new sessions.
-Configuration is stored in a JSON file and automatically loaded when creating new sessions.
+
+Configuration Sources (priority order):
+1. data/default_llm.json - User customization via frontend settings
+2. config/models.yaml (default section) - System default configuration
 
 Configuration Structure:
 {
     "provider": "google",  # LLM provider name
-    "model": "gemini-2.0-flash-exp",  # Model identifier
-    "secondary_model": "gemini-2.0-flash-exp"  # Optional subagent model identifier
+    "model": "gemini-2.5-flash",  # Model identifier
+    "secondary_model": "gemini-2.5-flash"  # Optional subagent model identifier
 }
 
 Design Principles:
-- Global default: One configuration for all sessions
-- File-based: Persisted in config directory
+- Two-tier defaults: User preference overrides system default
+- User config stored in data/ directory (runtime data, not version controlled)
+- System default in config/models.yaml (version controlled)
 - Simple: Only provider/model/secondary_model, no other parameters
 - Validation: Existing llm.py config validates providers and provides API keys
 """
 
 import json
 import os
+import yaml
 from typing import Any, Dict, Optional
 
-# Configuration file path
-DEFAULT_LLM_CONFIG_FILE = "config/default_llm.json"
+# Configuration file paths
+# Note: run.py changes working directory to project root, so paths are relative to root
+DEFAULT_LLM_CONFIG_FILE = "data/default_llm.json"  # User customization (root/data/)
+MODELS_YAML_FILE = "config/models.yaml"  # System defaults (root/config/)
+
+
+def _get_system_default_config() -> Optional[Dict[str, Any]]:
+    """
+    Get system default configuration from config/models.yaml.
+
+    Returns:
+        Optional[Dict[str, Any]]: System default configuration or None if not defined
+    """
+    try:
+        if not os.path.exists(MODELS_YAML_FILE):
+            return None
+
+        with open(MODELS_YAML_FILE, 'r', encoding='utf-8') as f:
+            models_config = yaml.safe_load(f)
+
+        if not isinstance(models_config, dict):
+            return None
+
+        default_config = models_config.get('default')
+        if not default_config:
+            return None
+
+        # Validate required fields
+        if not isinstance(default_config, dict):
+            print(f"[WARNING] Invalid system default config in models.yaml: not a dict")
+            return None
+
+        if "provider" not in default_config or "model" not in default_config:
+            print(f"[WARNING] Invalid system default config: missing provider or model")
+            return None
+
+        return default_config
+
+    except Exception as e:
+        print(f"[WARNING] Failed to load system default from models.yaml: {e}")
+        return None
 
 
 def get_default_llm_config() -> Optional[Dict[str, Any]]:
     """
     Get the global default LLM configuration.
 
-    Returns the default provider and model that should be used for new sessions.
-    If no configuration file exists, returns None (use system defaults from llm.py).
+    Configuration priority:
+    1. User customization (data/default_llm.json) - highest priority
+    2. System default (config/models.yaml default section)
+    3. None if neither exists
 
     Returns:
         Optional[Dict[str, Any]]: Configuration dict with keys:
             - provider: LLM provider name (e.g., "google", "anthropic")
-            - model: Model identifier (e.g., "gemini-2.0-flash-exp")
+            - model: Model identifier (e.g., "gemini-2.5-flash")
             - secondary_model: Optional subagent model identifier
-        Returns None if configuration file doesn't exist.
+        Returns None if no configuration is available.
 
     Example:
         config = get_default_llm_config()
         if config:
             print(f"Using {config['provider']}/{config['model']}")
         else:
-            print("Using system default from llm.py")
+            print("No default configuration available")
     """
-    if not os.path.exists(DEFAULT_LLM_CONFIG_FILE):
-        return None
+    # Priority 1: User customization (data/default_llm.json)
+    if os.path.exists(DEFAULT_LLM_CONFIG_FILE):
+        try:
+            with open(DEFAULT_LLM_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
 
-    try:
-        with open(DEFAULT_LLM_CONFIG_FILE, 'r', encoding='utf-8') as f:
-            config = json.load(f)
+            # Validate required fields
+            if not isinstance(config, dict):
+                print(f"[WARNING] Invalid user LLM config: not a dict")
+            elif "provider" not in config or "model" not in config:
+                print(f"[WARNING] Invalid user LLM config: missing provider or model")
+            else:
+                return config
 
-        # Validate required fields
-        if not isinstance(config, dict):
-            print(f"[WARNING] Invalid default LLM config: not a dict")
-            return None
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"[WARNING] Failed to load user LLM config: {e}")
 
-        if "provider" not in config or "model" not in config:
-            print(f"[WARNING] Invalid default LLM config: missing provider or model")
-            return None
+    # Priority 2: System default (config/models.yaml)
+    system_default = _get_system_default_config()
+    if system_default:
+        return system_default
 
-        return config
-
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"[WARNING] Failed to load default LLM config: {e}")
-        return None
+    # Priority 3: No configuration available
+    return None
 
 
 def save_default_llm_config(

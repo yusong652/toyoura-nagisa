@@ -58,37 +58,45 @@ def _save_sessions_metadata(metadata: Dict[str, Any]) -> None:
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
 
-def _get_env_provider_override() -> Optional[str]:
-    from backend.config import get_llm_settings
-
-    provider = get_llm_settings().env_provider_override
-    if not provider:
-        return None
-
-    return provider.lower()
-
-
 def _get_provider_secondary_model(provider: str) -> Optional[str]:
-    from backend.config import get_llm_settings
-
-    llm_settings = get_llm_settings()
-    if provider == "google":
-        return llm_settings.get_google_config().secondary_model
-    if provider == "anthropic":
-        return llm_settings.get_anthropic_config().secondary_model
-    if provider in ("openai", "gpt"):
-        return llm_settings.get_openai_config().secondary_model
-    if provider == "moonshot":
-        return llm_settings.get_moonshot_config().secondary_model
-    if provider == "zhipu":
-        return llm_settings.get_zhipu_config().secondary_model
-    if provider == "openrouter":
-        return llm_settings.get_openrouter_config().secondary_model
+    """Get secondary model for a provider from its configuration."""
+    try:
+        if provider == "google":
+            from backend.infrastructure.llm.providers.google.config import GoogleConfig
+            return GoogleConfig().secondary_model
+        if provider == "anthropic":
+            from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
+            return AnthropicConfig().secondary_model
+        if provider in ("openai", "gpt"):
+            from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
+            return OpenAIConfig().secondary_model
+        if provider == "moonshot":
+            from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
+            return MoonshotConfig().secondary_model
+        if provider == "zhipu":
+            from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
+            return ZhipuConfig().secondary_model
+        if provider == "openrouter":
+            from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
+            return OpenRouterConfig().secondary_model
+    except Exception:
+        pass
 
     return None
 
 
 def _build_default_session_llm_config() -> Optional[Dict[str, Any]]:
+    """
+    Build default LLM configuration for new sessions.
+
+    Configuration sources (in priority order):
+    1. data/default_llm.json - User customization via frontend
+    2. config/models.yaml (default section) - System defaults
+    3. models_registry first provider - Fallback
+
+    Returns:
+        Optional[Dict[str, Any]]: Configuration with provider, model, secondary_model
+    """
     from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
     from backend.infrastructure.llm.shared.models_registry import (
         get_all_providers,
@@ -97,16 +105,20 @@ def _build_default_session_llm_config() -> Optional[Dict[str, Any]]:
         is_provider_supported,
     )
 
+    # Priority 1 & 2: User config or system default from models.yaml
     default_config = get_default_llm_config()
     if isinstance(default_config, dict):
         provider = default_config.get("provider")
         model = default_config.get("model")
         secondary_model = default_config.get("secondary_model")
+
         if provider and model and is_provider_supported(provider):
             if is_model_valid_for_provider(provider, model):
+                # Validate secondary_model
                 if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
                     secondary_model = None
 
+                # Fallback to provider's secondary_model or primary model
                 if not secondary_model:
                     secondary_model = _get_provider_secondary_model(provider) or model
 
@@ -116,18 +128,12 @@ def _build_default_session_llm_config() -> Optional[Dict[str, Any]]:
                     "secondary_model": secondary_model,
                 }
 
-    env_provider = _get_env_provider_override()
-    provider = env_provider
-    if provider and not is_provider_supported(provider):
-        provider = None
-
-    if not provider:
-        providers = get_all_providers()
-        provider = providers[0].provider if providers else None
-
-    if not provider:
+    # Priority 3: Fallback to first available provider from models_registry
+    providers = get_all_providers()
+    if not providers:
         return None
 
+    provider = providers[0].provider
     models = get_provider_models(provider)
     if not models:
         return None

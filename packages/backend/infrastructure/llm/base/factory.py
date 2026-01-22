@@ -1,11 +1,13 @@
 """
 LLM Factory - Creates LLM client instances based on configuration.
+
+Factory now requires explicit provider/model configuration.
+Use get_default_llm_config() to get system defaults from config/models.yaml.
 """
 
 import logging
 from typing import Dict, Optional, Type, Any
 from backend.infrastructure.llm.base.client import LLMClientBase
-from backend.config import get_llm_settings
 
 logger = logging.getLogger(__name__)
 
@@ -37,29 +39,82 @@ class LLMFactory:
         }
 
     def create_client(self, name: Optional[str] = None, app: Optional[Any] = None) -> LLMClientBase:
-        """Create an LLM client instance."""
-        llm_settings = get_llm_settings()
-        name = name or llm_settings.provider
+        """
+        DEPRECATED: Use create_client_from_default_config() instead.
 
-        if name not in self._clients:
-            raise ValueError(f"Unsupported LLM client: '{name}'. Supported: {list(self._clients.keys())}")
-
-        config = self._build_config(name, llm_settings, app)
-        logger.info(f"Creating {name} client")
-        return self._clients[name](**config)
+        This method is kept for backward compatibility but will be removed.
+        """
+        logger.warning(
+            "create_client() is deprecated. Use create_client_from_default_config() instead."
+        )
+        return self.create_client_from_default_config(app=app)
 
     def create_secondary_client(self, app: Optional[Any] = None) -> LLMClientBase:
-        """Create a secondary LLM client for SubAgents (lighter model to reduce RPM)."""
-        llm_settings = get_llm_settings()
-        provider = llm_settings.provider
+        """
+        DEPRECATED: Use create_secondary_client_from_default_config() instead.
 
-        if provider not in self._clients:
-            logger.warning(f"Secondary model not supported for '{provider}', using primary")
-            return self.create_client(app=app)
+        This method is kept for backward compatibility but will be removed.
+        """
+        logger.warning(
+            "create_secondary_client() is deprecated. "
+            "Use create_secondary_client_from_default_config() instead."
+        )
+        return self.create_secondary_client_from_default_config(app=app)
 
-        config = self._build_secondary_config(provider, llm_settings, app)
-        logger.info(f"Creating secondary {provider} client")
-        return self._clients[provider](**config)
+    def create_client_from_default_config(self, app: Optional[Any] = None) -> LLMClientBase:
+        """
+        Create LLM client using default configuration.
+
+        Configuration source: config/models.yaml (default section) or data/default_llm.json
+        Used by: App startup, title generation, etc.
+
+        Returns:
+            LLMClientBase: Configured LLM client instance
+
+        Raises:
+            RuntimeError: If no default configuration is available
+        """
+        from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+
+        default_config = get_default_llm_config()
+        if not default_config:
+            raise RuntimeError(
+                "No default LLM configuration found. "
+                "Please ensure config/models.yaml has a 'default' section."
+            )
+
+        return self.create_client_with_config(
+            provider=default_config["provider"],
+            model=default_config["model"],
+            app=app
+        )
+
+    def create_secondary_client_from_default_config(self, app: Optional[Any] = None) -> LLMClientBase:
+        """
+        Create secondary LLM client using default configuration.
+
+        Used by: SubAgents (lighter model to reduce RPM)
+
+        Returns:
+            LLMClientBase: Configured secondary LLM client instance
+
+        Raises:
+            RuntimeError: If no default configuration is available
+        """
+        from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+
+        default_config = get_default_llm_config()
+        if not default_config:
+            raise RuntimeError("No default LLM configuration found")
+
+        # Use secondary_model if specified, otherwise use primary model
+        model = default_config.get("secondary_model") or default_config["model"]
+
+        return self.create_client_with_config(
+            provider=default_config["provider"],
+            model=model,
+            app=app
+        )
 
     def create_client_with_config(
         self,
@@ -68,14 +123,14 @@ class LLMFactory:
         app: Optional[Any] = None
     ) -> LLMClientBase:
         """
-        Create an LLM client with runtime configuration.
+        Create an LLM client with explicit configuration.
 
-        API keys are sourced from .env, only provider and model are overridden.
-        Other parameters use defaults from config files.
+        API keys are sourced from .env files via provider config classes.
+        Provider and model must be explicitly specified.
 
         Args:
             provider: LLM provider name (e.g., "google", "anthropic", "openai")
-            model: Model identifier (e.g., "gemini-2.0-flash-exp", "claude-sonnet-4-5")
+            model: Model identifier (e.g., "gemini-2.5-flash", "claude-sonnet-4-5-20250929")
             app: Optional application instance for dependency injection
 
         Returns:
@@ -90,131 +145,89 @@ class LLMFactory:
                 f"Supported: {list(self._clients.keys())}"
             )
 
-        llm_settings = get_llm_settings()
-        config = self._build_config_with_overrides(provider, model, llm_settings, app)
-        logger.info(f"Creating {provider} client with custom model: {model}")
+        config = self._build_config(provider, model, app)
+        logger.info(f"Creating {provider} client with model: {model}")
         return self._clients[provider](**config)
 
-    def _build_config_with_overrides(
+    def _build_config(
         self,
         provider: str,
         model: str,
-        llm_settings: Any,
         app: Optional[Any]
     ) -> Dict[str, Any]:
         """
-        Build configuration with model override.
+        Build configuration for LLM client.
 
-        Uses the base config from _build_config() but overrides the model parameter.
-        This ensures API keys and other settings come from .env while allowing
-        per-session model customization.
+        Directly imports provider config classes to get API keys from .env.
+        Debug setting is loaded from config/dev.py.
+
+        Args:
+            provider: LLM provider name
+            model: Model identifier
+            app: Optional application instance
+
+        Returns:
+            Dict with api_key and extra_config for client initialization
         """
-        # Get base config from provider settings
-        base_config = self._build_config(provider, llm_settings, app)
+        from backend.config.dev import get_dev_config
 
-        # Override model in extra_config
-        if "extra_config" in base_config:
-            base_config["extra_config"]["model"] = model
-
-        return base_config
-
-    def _build_config(self, name: str, llm_settings: Any, app: Optional[Any]) -> Dict[str, Any]:
-        """Build configuration for primary client."""
+        dev_config = get_dev_config()
         extra = {"app": app} if app else {}
-        extra["debug"] = llm_settings.debug
+        extra["debug"] = dev_config.debug_mode  # From dev.py instead of llm.py
 
-        if name == "google":
-            cfg = llm_settings.get_google_config()
+        if provider == "google":
+            from backend.infrastructure.llm.providers.google.config import GoogleConfig
+            cfg = GoogleConfig()
             return {
                 "api_key": cfg.google_api_key,
-                "extra_config": {**extra, "model": cfg.model}
+                "extra_config": {**extra, "model": model}
             }
-        elif name == "anthropic":
-            cfg = llm_settings.get_anthropic_config()
+        elif provider == "anthropic":
+            from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
+            cfg = AnthropicConfig()
             return {
                 "api_key": cfg.anthropic_api_key,
-                "extra_config": {**extra, "model": cfg.model}
+                "extra_config": {**extra, "model": model}
             }
-        elif name in ["openai"]:
-            cfg = llm_settings.get_openai_config()
+        elif provider in ["openai", "gpt"]:
+            from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
+            cfg = OpenAIConfig()
             if not cfg.openai_api_key:
                 raise ValueError("OpenAI API key not configured")
             return {
                 "api_key": cfg.openai_api_key,
-                "extra_config": {**extra, "model": cfg.model}
-            }   
-        elif name == "moonshot":
-            cfg = llm_settings.get_moonshot_config()
+                "extra_config": {**extra, "model": model}
+            }
+        elif provider == "moonshot":
+            from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
+            cfg = MoonshotConfig()
             if not cfg.moonshot_api_key:
                 raise ValueError("Moonshot API key not configured")
             return {
                 "api_key": cfg.moonshot_api_key,
-                "extra_config": {**extra, "model": cfg.model}
+                "extra_config": {**extra, "model": model}
             }
-        elif name == "zhipu":
-            cfg = llm_settings.get_zhipu_config()
+        elif provider == "zhipu":
+            from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
+            cfg = ZhipuConfig()
             if not cfg.zhipu_api_key:
                 raise ValueError("Zhipu API key not configured")
             return {
                 "api_key": cfg.zhipu_api_key,
-                "extra_config": {**extra, "model": cfg.model}
+                "extra_config": {**extra, "model": model}
             }
-        elif name == "openrouter":
-            cfg = llm_settings.get_openrouter_config()
+        elif provider == "openrouter":
+            from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
+            cfg = OpenRouterConfig()
+            if not cfg.openrouter_api_key:
+                raise ValueError("OpenRouter API key not configured")
             return {
                 "api_key": cfg.openrouter_api_key,
-                "extra_config": {**extra, "model": cfg.model}
+                "extra_config": {**extra, "model": model}
             }
-        raise ValueError(f"Unknown provider: {name}")
 
-    def _build_secondary_config(self, name: str, llm_settings: Any, app: Optional[Any]) -> Dict[str, Any]:
-        """Build configuration for secondary client (uses secondary_model)."""
-        extra = {"app": app} if app else {}
-        extra["debug"] = llm_settings.debug
+        raise ValueError(f"Unknown provider: {provider}")
 
-        if name == "google":
-            cfg = llm_settings.get_google_config()
-            logger.info(f"Secondary model: {cfg.secondary_model}")
-            return {
-                "api_key": cfg.google_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model}
-            }
-        elif name == "anthropic":
-            cfg = llm_settings.get_anthropic_config()
-            logger.info(f"Secondary model: {cfg.secondary_model}")
-            return {
-                "api_key": cfg.anthropic_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model}
-            }
-        elif name in ["gpt", "openai"]:
-            cfg = llm_settings.get_openai_config()
-            logger.info(f"Secondary model: {cfg.secondary_model}")
-            return {
-                "api_key": cfg.openai_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model}
-            }
-        elif name == "moonshot":
-            cfg = llm_settings.get_moonshot_config()
-            logger.info(f"Secondary model: {cfg.secondary_model}")
-            return {
-                "api_key": cfg.moonshot_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model}
-            }
-        elif name == "zhipu":
-            cfg = llm_settings.get_zhipu_config()
-            logger.info(f"Secondary model: {cfg.secondary_model}")
-            return {
-                "api_key": cfg.zhipu_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model}
-            }
-        elif name == "openrouter":
-            cfg = llm_settings.get_openrouter_config()
-            logger.info(f"Secondary model: {cfg.secondary_model}")
-            return {
-                "api_key": cfg.openrouter_api_key,
-                "extra_config": {**extra, "model": cfg.secondary_model}
-            }
-        raise ValueError(f"Secondary model not supported for: {name}")
 
 
 # Global factory instance

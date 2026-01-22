@@ -51,7 +51,8 @@ class ProviderInfo(BaseModel):
 # =====================
 # YAML Configuration Loader
 # =====================
-MODELS_YAML_PATH = "config/models.yaml"
+# Note: run.py changes working directory to project root, so path is relative to root
+MODELS_YAML_PATH = "config/models.yaml"  # Project root config/models.yaml
 
 
 def _load_providers_from_yaml() -> List[ProviderInfo]:

@@ -40,12 +40,14 @@ async def lifespan(app: FastAPI):
 
         # Initialize LLM Factory
         llm_factory = initialize_factory()
-        llm_client = llm_factory.create_client()
-        app.state.llm_client = llm_client
         app.state.llm_factory = llm_factory
 
+        # Initialize LLM Client from default config (config/models.yaml or data/default_llm.json)
+        llm_client = llm_factory.create_client_from_default_config(app=app)
+        app.state.llm_client = llm_client
+
         # Initialize Secondary LLM Client for SubAgents (lighter model to reduce RPM)
-        secondary_llm_client = llm_factory.create_secondary_client()
+        secondary_llm_client = llm_factory.create_secondary_client_from_default_config(app=app)
         app.state.secondary_llm_client = secondary_llm_client
 
         # Initialize MCP server and client

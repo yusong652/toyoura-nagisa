@@ -4,6 +4,11 @@
 # You can add/modify entries here without changing code.
 #
 # Structure:
+#   default: (optional)
+#     provider: Default provider identifier (required)
+#     model: Default model identifier (required)
+#     secondary_model: Default secondary model for SubAgents (optional)
+#
 #   providers:
 #     - provider: identifier (must match llm.py config, required)
 #       name: Display name for UI (required)
@@ -13,6 +18,12 @@
 #           name: Display name (required)
 #           description: Model description (optional)
 #           context_window: Token limit in tokens (optional, integer without commas)
+
+# System default configuration (used when user hasn't set custom config via frontend)
+default:
+  provider: google
+  model: gemini-3-flash-preview
+  secondary_model: gemini-3-flash-preview
 
 providers:
 

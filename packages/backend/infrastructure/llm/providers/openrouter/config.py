@@ -41,7 +41,7 @@ class OpenRouterConfig(BaseSettings):
         description="Maximum tokens to generate"
     )
     top_p: Optional[float] = Field(
-        default=1.0,
+        default=None,
         description="Nucleus sampling threshold."
     )
 
@@ -68,11 +68,13 @@ class OpenRouterConfig(BaseSettings):
         params = {
             'model': self.model,
             'temperature': self.temperature,
-            'top_p': self.top_p,
         }
 
         if self.max_tokens is not None:
             params['max_tokens'] = self.max_tokens
+
+        if self.top_p is not None:
+            params['top_p'] = self.top_p
 
         return params
 
