@@ -42,14 +42,17 @@ def get_llm_client():
         LLMClientBase: LLM client instance from app state
 
     Raises:
-        RuntimeError: If app is not initialized or LLM client not found
+        RuntimeError: If app is not initialized or LLM client not configured
     """
     app = get_app()
     if not app:
         raise RuntimeError("FastAPI app not initialized")
 
-    if not hasattr(app.state, 'llm_client'):
-        raise RuntimeError("LLM client not found in app state")
+    if not hasattr(app.state, 'llm_client') or app.state.llm_client is None:
+        raise RuntimeError(
+            "Primary LLM client not configured. "
+            "Please configure your API key in the settings page or .env file."
+        )
 
     return app.state.llm_client
 
@@ -57,27 +60,25 @@ def get_llm_client():
 def get_secondary_llm_client():
     """
     Get secondary LLM client from app state (for SubAgents).
-
-    The secondary client uses a lighter/cheaper model (e.g., gemini-2.5-flash)
-    to reduce RPM consumption on the primary model.
-
+    
     Falls back to primary client if secondary is not configured.
 
     Returns:
         LLMClientBase: Secondary LLM client instance from app state
 
     Raises:
-        RuntimeError: If app is not initialized
+        RuntimeError: If app is not initialized or no LLM client is configured
     """
     app = get_app()
     if not app:
         raise RuntimeError("FastAPI app not initialized")
 
-    # Fall back to primary client if secondary not available
-    if not hasattr(app.state, 'secondary_llm_client'):
-        return get_llm_client()
-
-    return app.state.secondary_llm_client
+    # Try secondary first
+    if hasattr(app.state, 'secondary_llm_client') and app.state.secondary_llm_client is not None:
+        return app.state.secondary_llm_client
+    
+    # Fall back to primary
+    return get_llm_client()
 
 
 def get_mcp_client():

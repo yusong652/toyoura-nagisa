@@ -42,8 +42,6 @@ def print_banner(
     environment: str,
     host: str,
     port: int,
-    llm_client: str,
-    secondary_llm_client: Optional[str] = None,
     cors_origins: Optional[List[str]] = None,
     mcp_port: int = 9000,
     version: str = "0.1.0"
@@ -55,8 +53,6 @@ def print_banner(
         environment: Environment name (development/staging/production)
         host: Server host
         port: Server port
-        llm_client: Primary LLM client name
-        secondary_llm_client: Secondary LLM client name (optional)
         cors_origins: List of allowed CORS origins (optional)
         mcp_port: MCP server port
         version: Application version
@@ -77,16 +73,12 @@ def print_banner(
     server_url = f"{protocol}://{host}:{port}"
     mcp_url = f"{protocol}://{host}:{mcp_port}/sse"
 
-    # Extract provider name from LLM client (e.g., "GoogleLLMClient" -> "Google Gemini")
-    provider_name = llm_client.replace("LLMClient", "").replace("Google", "Google Gemini")
-
     # Create information table (minimal, essential info only)
     info_table = Table.grid(padding=(0, 1))
     info_table.add_column(style="bold", justify="center")  # Emoji column
     info_table.add_column(style="white", justify="left")  # Value column
 
     info_table.add_row("🔗", Text(server_url, style="white"))
-    info_table.add_row("🤖", Text(provider_name, style="white"))
     info_table.add_row("📚", Text("github.com/yusong652/toyoura-nagisa", style="dim cyan"))
 
     # Create panel content with Group
