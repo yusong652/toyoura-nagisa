@@ -44,22 +44,35 @@ MULTIMODAL_PROVIDERS = {"google", "anthropic", "openai", "openrouter", "zhipu"}
 NON_MULTIMODAL_PROVIDERS = {"moonshot"}
 
 
-def _check_multimodal_support() -> bool:
+def _check_multimodal_support(session_id: str) -> bool:
     """
     Check if current LLM provider supports multimodal content.
+
+    Args:
+        session_id: Session ID to check for session-specific configuration
 
     Returns:
         bool: True if provider supports multimodal, False otherwise
     """
     try:
-        from backend.config.llm import get_llm_settings
-        settings = get_llm_settings()
-        provider = settings.provider
+        from backend.infrastructure.storage.session_manager import get_session_llm_config
+        from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+        
+        # Priority 1: Session-specific configuration
+        config = get_session_llm_config(session_id)
+        
+        # Priority 2: Global default configuration
+        if not config:
+            config = get_default_llm_config()
+            
+        if not config:
+            return True
 
+        provider = config.get("provider")
         # Check if provider supports multimodal
         return provider in MULTIMODAL_PROVIDERS
     except Exception as e:
-        logger.warning(f"Failed to check multimodal support: {e}")
+        logger.warning(f"Failed to check multimodal support for session {session_id}: {e}")
         # Default to True to maintain backward compatibility
         return True
 
@@ -313,7 +326,7 @@ class FileMentionProcessor:
                 inline_data = result.content["inline_data"]
 
                 # Check if current LLM provider supports multimodal
-                supports_multimodal = _check_multimodal_support()
+                supports_multimodal = _check_multimodal_support(self.session_id)
 
                 if not supports_multimodal:
                     # Graceful degradation: return simple text message for LLM

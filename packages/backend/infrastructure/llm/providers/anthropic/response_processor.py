@@ -541,8 +541,8 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
         # Construct Message object
         # Note: We use minimal required fields for reconstruction
         # Get the model name from config if available
-        from backend.config.llm import get_llm_settings
-        model_name = get_llm_settings().get_anthropic_config().model
+        from .config import AnthropicConfig
+        model_name = AnthropicConfig().model
 
         return anthropic.types.Message(
             id="reconstructed",

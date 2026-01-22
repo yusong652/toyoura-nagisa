@@ -82,7 +82,6 @@ def parse_title_response(
         return title if title else None
 
     except Exception as e:
-        from backend.config import get_llm_settings
         from backend.config.dev import get_dev_config
         debug = get_dev_config().debug_mode
         if debug:

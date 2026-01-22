@@ -58,134 +58,21 @@ def _save_sessions_metadata(metadata: Dict[str, Any]) -> None:
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
 
-def _get_provider_secondary_model(provider: str) -> Optional[str]:
-    """Get secondary model for a provider from its configuration."""
-    try:
-        if provider == "google":
-            from backend.infrastructure.llm.providers.google.config import GoogleConfig
-            return GoogleConfig().secondary_model
-        if provider == "anthropic":
-            from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
-            return AnthropicConfig().secondary_model
-        if provider in ("openai", "gpt"):
-            from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
-            return OpenAIConfig().secondary_model
-        if provider == "moonshot":
-            from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
-            return MoonshotConfig().secondary_model
-        if provider == "zhipu":
-            from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
-            return ZhipuConfig().secondary_model
-        if provider == "openrouter":
-            from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
-            return OpenRouterConfig().secondary_model
-    except Exception:
-        pass
-
-    return None
-
-
-def _build_default_session_llm_config() -> Optional[Dict[str, Any]]:
-    """
-    Build default LLM configuration for new sessions.
-
-    Configuration sources (in priority order):
-    1. data/default_llm.json - User customization via frontend
-    2. config/models.yaml (default section) - System defaults
-    3. models_registry first provider - Fallback
-
-    Returns:
-        Optional[Dict[str, Any]]: Configuration with provider, model, secondary_model
-    """
-    from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
-    from backend.infrastructure.llm.shared.models_registry import (
-        get_all_providers,
-        get_provider_models,
-        is_model_valid_for_provider,
-        is_provider_supported,
-    )
-
-    # Priority 1 & 2: User config or system default from models.yaml
-    default_config = get_default_llm_config()
-    if isinstance(default_config, dict):
-        provider = default_config.get("provider")
-        model = default_config.get("model")
-        secondary_model = default_config.get("secondary_model")
-
-        if provider and model and is_provider_supported(provider):
-            if is_model_valid_for_provider(provider, model):
-                # Validate secondary_model
-                if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
-                    secondary_model = None
-
-                # Fallback to provider's secondary_model or primary model
-                if not secondary_model:
-                    secondary_model = _get_provider_secondary_model(provider) or model
-
-                return {
-                    "provider": provider,
-                    "model": model,
-                    "secondary_model": secondary_model,
-                }
-
-    # Priority 3: Fallback to first available provider from models_registry
-    providers = get_all_providers()
-    if not providers:
-        return None
-
-    provider = providers[0].provider
-    models = get_provider_models(provider)
-    if not models:
-        return None
-
-    model = models[0].id
-    secondary_model = _get_provider_secondary_model(provider) or model
-    if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
-        secondary_model = model
-
-    return {
-        "provider": provider,
-        "model": model,
-        "secondary_model": secondary_model,
-    }
-
-
 def _normalize_session_metadata_entry(session_metadata: Dict[str, Any]) -> bool:
     updated = False
     if "mode" not in session_metadata:
         session_metadata["mode"] = DEFAULT_SESSION_MODE
         updated = True
 
-    from backend.infrastructure.llm.shared.models_registry import (
-        is_model_valid_for_provider,
-        is_provider_supported,
-    )
+    from backend.infrastructure.storage.llm_config_manager import normalize_llm_config
 
     llm_config = session_metadata.get("llm_config")
-    if not isinstance(llm_config, dict):
-        llm_config = None
-
-    if llm_config:
-        provider = llm_config.get("provider")
-        model = llm_config.get("model")
-        secondary_model = llm_config.get("secondary_model")
-        if provider and model and is_provider_supported(provider):
-            if is_model_valid_for_provider(provider, model):
-                if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
-                    secondary_model = None
-                    updated = True
-                if not secondary_model:
-                    secondary_model = _get_provider_secondary_model(provider) or model
-                    updated = True
-                if secondary_model:
-                    llm_config["secondary_model"] = secondary_model
-                    session_metadata["llm_config"] = llm_config
-                    return updated
-
-    default_llm_config = _build_default_session_llm_config()
-    if default_llm_config:
-        session_metadata["llm_config"] = cast(Any, default_llm_config)
+    normalized_config, llm_updated = normalize_llm_config(llm_config)
+    
+    if llm_updated:
+        session_metadata["llm_config"] = normalized_config
         updated = True
+        
     return updated
 
 
@@ -215,7 +102,8 @@ def create_new_history(name: Optional[str] = None) -> str:
         "mode": DEFAULT_SESSION_MODE,
     }
 
-    default_llm_config = _build_default_session_llm_config()
+    from backend.infrastructure.storage.llm_config_manager import build_initial_llm_config
+    default_llm_config = build_initial_llm_config()
     if default_llm_config:
         session_metadata["llm_config"] = cast(Any, default_llm_config)
 

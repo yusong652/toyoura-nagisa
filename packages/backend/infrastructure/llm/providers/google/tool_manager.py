@@ -44,7 +44,6 @@ class GoogleToolManager(BaseToolManager):
             if func_decl:
                 function_declarations.append(func_decl)
         
-        from backend.config.llm import get_llm_settings
         # Return as Tool objects
         if function_declarations:
             return [types.Tool(function_declarations=function_declarations)]
@@ -66,9 +65,6 @@ class GoogleToolManager(BaseToolManager):
             List[dict]: Tool schemas in standardized dictionary format for system prompt
         """
         # Get standardized tools from base class
-        from backend.config.llm import get_llm_settings
-        llm_settings = get_llm_settings()
-
         tools_dict = await self.get_standardized_tools(session_id, agent_profile)
 
         if not tools_dict:

@@ -31,10 +31,10 @@ async def web_fetch(
     try:
         # Initialize Gemini client for this request
         from google import genai
-        from backend.config import get_llm_settings
+        from backend.infrastructure.llm.providers.google.config import GoogleConfig
 
         try:
-            google_config = get_llm_settings().get_google_config()
+            google_config = GoogleConfig()
             google_client = genai.Client(api_key=google_config.google_api_key)
         except Exception as e:
             return error_response(

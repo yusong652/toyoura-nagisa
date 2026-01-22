@@ -379,7 +379,6 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
             return []
 
         # Debug: Print raw tool calls from API
-        from backend.config.llm import get_llm_settings
         if get_dev_config().debug_mode:
             raw_tool_calls = []
             for tc in message.tool_calls:
@@ -432,7 +431,6 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
                 continue
 
         # Debug: Print extracted tool calls
-        from backend.config.llm import get_llm_settings
         if get_dev_config().debug_mode:
             OpenRouterDebugger.print_extracted_tool_calls(tool_calls)
 
@@ -646,8 +644,8 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
         )
 
         # Get model name from config
-        from backend.config.llm import get_llm_settings
-        model_name = get_llm_settings().get_openrouter_config().model
+        from .config import OpenRouterConfig
+        model_name = OpenRouterConfig().model
 
         return ChatCompletion(
             id="constructed_from_chunks",

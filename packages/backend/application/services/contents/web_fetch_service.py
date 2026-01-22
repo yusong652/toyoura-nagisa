@@ -4,7 +4,6 @@ Web Fetch Service - Application layer URL content retrieval.
 
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
-from backend.config import get_llm_settings
 from backend.infrastructure.llm.providers.google.config import get_google_client_config
 from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
 
@@ -127,8 +126,8 @@ async def fetch_url_content(llm_client, url: str, prompt: str) -> WebFetchResult
 
     _log_fetch_start(url)
 
-    llm_settings = get_llm_settings()
-    google_llm_config = llm_settings.get_google_config()
+    from backend.infrastructure.llm.providers.google.config import GoogleConfig
+    google_llm_config = GoogleConfig()
     google_client_config = get_google_client_config()
 
     from google.genai import types

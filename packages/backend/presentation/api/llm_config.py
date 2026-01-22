@@ -95,33 +95,35 @@ def _check_api_key_configured(provider: str) -> bool:
     Returns:
         bool: True if API key/server URL is configured
     """
-    from backend.config import get_llm_settings
-
     try:
-        llm_settings = get_llm_settings()
-
         if provider == "google":
-            cfg = llm_settings.get_google_config()
+            from backend.infrastructure.llm.providers.google.config import GoogleConfig
+            cfg = GoogleConfig()
             return bool(cfg.google_api_key)
 
         elif provider == "anthropic":
-            cfg = llm_settings.get_anthropic_config()
+            from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
+            cfg = AnthropicConfig()
             return bool(cfg.anthropic_api_key)
 
         elif provider in ["openai", "gpt"]:
-            cfg = llm_settings.get_openai_config()
+            from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
+            cfg = OpenAIConfig()
             return bool(cfg.openai_api_key)
 
         elif provider == "moonshot":
-            cfg = llm_settings.get_moonshot_config()
+            from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
+            cfg = MoonshotConfig()
             return bool(cfg.moonshot_api_key)
 
         elif provider == "zhipu":
-            cfg = llm_settings.get_zhipu_config()
+            from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
+            cfg = ZhipuConfig()
             return bool(cfg.zhipu_api_key)
 
         elif provider == "openrouter":
-            cfg = llm_settings.get_openrouter_config()
+            from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
+            cfg = OpenRouterConfig()
             return bool(cfg.openrouter_api_key)
 
         return False

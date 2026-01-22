@@ -85,7 +85,6 @@ class AnthropicToolManager(BaseToolManager):
                 "parameters": input_schema_dict
             })
             anthropic_tools.append(anthropic_tool)
-        from backend.config import get_llm_settings
         from backend.config.dev import get_dev_config
         debug = get_dev_config().debug_mode
         if debug:
@@ -110,7 +109,6 @@ class AnthropicToolManager(BaseToolManager):
         
         # Get standardized tools from base class
         tools_dict = await self.get_standardized_tools(session_id, agent_profile)
-        from backend.config import get_llm_settings
         from backend.config.dev import get_dev_config
         debug = get_dev_config().debug_mode
         if not tools_dict:

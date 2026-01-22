@@ -196,6 +196,147 @@ def clear_default_llm_config() -> bool:
         return False
 
 
+def get_provider_secondary_model(provider: str) -> Optional[str]:
+    """
+    Get secondary model for a provider from its specific configuration.
+    
+    Args:
+        provider: Provider identifier
+        
+    Returns:
+        Optional[str]: Secondary model identifier or None if not found
+    """
+    try:
+        if provider == "google":
+            from backend.infrastructure.llm.providers.google.config import GoogleConfig
+            return GoogleConfig().secondary_model
+        if provider == "anthropic":
+            from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
+            return AnthropicConfig().secondary_model
+        if provider in ("openai", "gpt"):
+            from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
+            return OpenAIConfig().secondary_model
+        if provider == "moonshot":
+            from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
+            return MoonshotConfig().secondary_model
+        if provider == "zhipu":
+            from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
+            return ZhipuConfig().secondary_model
+        if provider == "openrouter":
+            from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
+            return OpenRouterConfig().secondary_model
+    except Exception:
+        pass
+
+    return None
+
+
+def build_initial_llm_config() -> Optional[Dict[str, Any]]:
+    """
+    Build default LLM configuration for new sessions.
+
+    Logic priority:
+    1. User customization (data/default_llm.json)
+    2. System default (config/models.yaml)
+    3. First available provider from registry (fallback)
+
+    Returns:
+        Optional[Dict[str, Any]]: Initial configuration dict
+    """
+    from backend.infrastructure.llm.shared.models_registry import (
+        get_all_providers,
+        get_provider_models,
+        is_model_valid_for_provider,
+        is_provider_supported,
+    )
+
+    # Try user/system default first
+    default_config = get_default_llm_config()
+    if isinstance(default_config, dict):
+        provider = default_config.get("provider")
+        model = default_config.get("model")
+        secondary_model = default_config.get("secondary_model")
+
+        if provider and model and is_provider_supported(provider):
+            if is_model_valid_for_provider(provider, model):
+                # Validate secondary_model
+                if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
+                    secondary_model = None
+
+                # Fallback to provider's secondary_model or primary model
+                if not secondary_model:
+                    secondary_model = get_provider_secondary_model(provider) or model
+
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "secondary_model": secondary_model,
+                }
+
+    # Fallback to registry
+    providers = get_all_providers()
+    if not providers:
+        return None
+
+    provider = providers[0].provider
+    models = get_provider_models(provider)
+    if not models:
+        return None
+
+    model = models[0].id
+    secondary_model = get_provider_secondary_model(provider) or model
+    if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
+        secondary_model = model
+
+    return {
+        "provider": provider,
+        "model": model,
+        "secondary_model": secondary_model,
+    }
+
+
+def normalize_llm_config(llm_config: Optional[Dict[str, Any]]) -> tuple[Optional[Dict[str, Any]], bool]:
+    """
+    Normalize and validate an LLM configuration dictionary.
+    Fixes missing secondary_model or invalid combinations.
+
+    Args:
+        llm_config: Configuration dictionary to validate
+
+    Returns:
+        tuple[Optional[Dict[str, Any]], bool]: (Normalized config, whether changes were made)
+    """
+    from backend.infrastructure.llm.shared.models_registry import (
+        is_model_valid_for_provider,
+        is_provider_supported,
+    )
+
+    if not isinstance(llm_config, dict):
+        return build_initial_llm_config(), True
+
+    updated = False
+    provider = llm_config.get("provider")
+    model = llm_config.get("model")
+    secondary_model = llm_config.get("secondary_model")
+
+    if not provider or not model or not is_provider_supported(provider) or not is_model_valid_for_provider(provider, model):
+        return build_initial_llm_config(), True
+
+    # Check secondary_model
+    if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
+        secondary_model = None
+        updated = True
+
+    if not secondary_model:
+        secondary_model = get_provider_secondary_model(provider) or model
+        updated = True
+
+    if updated:
+        llm_config["secondary_model"] = secondary_model
+
+    return llm_config, updated
+
+
 def validate_llm_config(
     provider: str,
     model: str,
@@ -224,7 +365,6 @@ def validate_llm_config(
         if not is_valid:
             print(f"Invalid config: {error}")
     """
-    from backend.config import get_llm_settings
     from backend.infrastructure.llm.shared.models_registry import (
         is_provider_supported,
         is_model_valid_for_provider
@@ -247,35 +387,39 @@ def validate_llm_config(
 
     # Check if API key exists for this provider
     try:
-        llm_settings = get_llm_settings()
-
         if provider == "google":
-            cfg = llm_settings.get_google_config()
+            from backend.infrastructure.llm.providers.google.config import GoogleConfig
+            cfg = GoogleConfig()
             if not cfg.google_api_key:
                 return False, "Google API key not configured"
 
         elif provider == "anthropic":
-            cfg = llm_settings.get_anthropic_config()
+            from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
+            cfg = AnthropicConfig()
             if not cfg.anthropic_api_key:
                 return False, "Anthropic API key not configured"
 
         elif provider in ["openai", "gpt"]:
-            cfg = llm_settings.get_openai_config()
+            from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
+            cfg = OpenAIConfig()
             if not cfg.openai_api_key:
                 return False, "OpenAI API key not configured"
 
         elif provider == "moonshot":
-            cfg = llm_settings.get_moonshot_config()
+            from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
+            cfg = MoonshotConfig()
             if not cfg.moonshot_api_key:
                 return False, "Moonshot API key not configured"
 
         elif provider == "zhipu":
-            cfg = llm_settings.get_zhipu_config()
+            from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
+            cfg = ZhipuConfig()
             if not cfg.zhipu_api_key:
                 return False, "Zhipu API key not configured"
 
         elif provider == "openrouter":
-            cfg = llm_settings.get_openrouter_config()
+            from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
+            cfg = OpenRouterConfig()
             if not cfg.openrouter_api_key:
                 return False, "OpenRouter API key not configured"
 

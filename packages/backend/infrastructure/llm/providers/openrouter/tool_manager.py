@@ -67,8 +67,6 @@ class OpenRouterToolManager(BaseToolManager):
             if openrouter_tool:
                 openrouter_tools.append(openrouter_tool)
 
-        from backend.config.llm import get_llm_settings
-        llm_settings = get_llm_settings()
         if get_dev_config().debug_mode:
             print(f"[DEBUG] Final OpenRouter tools count: {len(openrouter_tools)}")
 
@@ -150,8 +148,6 @@ class OpenRouterToolManager(BaseToolManager):
 
         # Convert ToolSchema objects to clean dictionary format for system prompt
         prompt_schemas = []
-        from backend.config.llm import get_llm_settings
-        llm_settings = get_llm_settings()
 
         for tool_name, tool_schema in tools_dict.items():
             try:

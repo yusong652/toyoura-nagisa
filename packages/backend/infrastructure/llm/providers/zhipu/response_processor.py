@@ -245,7 +245,6 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
             return []
 
         # Debug: Print raw tool calls from API
-        from backend.config.llm import get_llm_settings
         if get_dev_config().debug_mode:
             raw_tool_calls = []
             for tc in message.tool_calls:
@@ -312,7 +311,6 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
                 continue
 
         # Debug: Print extracted tool calls
-        from backend.config.llm import get_llm_settings
         if get_dev_config().debug_mode:
             print(f"[DEBUG] Zhipu extracted tool calls: {tool_calls}")
 

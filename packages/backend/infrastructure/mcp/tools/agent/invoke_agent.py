@@ -82,7 +82,6 @@ Usage notes:
         from backend.shared.utils.app_context import get_secondary_llm_client, get_llm_factory
         from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
         from backend.infrastructure.storage.session_manager import get_session_llm_config
-        from backend.config import get_llm_settings
 
         # Get SubAgent configuration
         config = get_subagent_config(subagent_type)
@@ -103,19 +102,24 @@ Usage notes:
             secondary_model = default_llm_config.get("secondary_model")
 
         if provider and not secondary_model:
-            llm_settings = get_llm_settings()
             if provider == "google":
-                secondary_model = llm_settings.get_google_config().secondary_model
+                from backend.infrastructure.llm.providers.google.config import GoogleConfig
+                secondary_model = GoogleConfig().secondary_model
             elif provider == "anthropic":
-                secondary_model = llm_settings.get_anthropic_config().secondary_model
+                from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
+                secondary_model = AnthropicConfig().secondary_model
             elif provider in ("openai", "gpt"):
-                secondary_model = llm_settings.get_openai_config().secondary_model
+                from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
+                secondary_model = OpenAIConfig().secondary_model
             elif provider == "moonshot":
-                secondary_model = llm_settings.get_moonshot_config().secondary_model
+                from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
+                secondary_model = MoonshotConfig().secondary_model
             elif provider == "zhipu":
-                secondary_model = llm_settings.get_zhipu_config().secondary_model
+                from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
+                secondary_model = ZhipuConfig().secondary_model
             elif provider == "openrouter":
-                secondary_model = llm_settings.get_openrouter_config().secondary_model
+                from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
+                secondary_model = OpenRouterConfig().secondary_model
 
         if provider and secondary_model:
             llm_factory = get_llm_factory()

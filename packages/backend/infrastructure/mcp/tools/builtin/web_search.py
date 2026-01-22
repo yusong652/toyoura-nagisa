@@ -6,7 +6,6 @@ from fastmcp.server.context import Context
 from pydantic import Field
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from .web_search_factory import WebSearchToolFactory
-from backend.config import get_llm_settings
 
 __all__ = ["web_search", "register_web_search_tool"]
 

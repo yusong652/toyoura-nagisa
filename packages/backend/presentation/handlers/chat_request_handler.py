@@ -70,6 +70,7 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
                 llm_config = {
                     "provider": session_llm_config["provider"],
                     "model": session_llm_config["model"],
+                    "secondary_model": session_llm_config.get("secondary_model"),
                 }
 
             from backend.application.services.agent_service import AgentService

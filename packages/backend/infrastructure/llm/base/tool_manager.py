@@ -14,7 +14,6 @@ from pydantic import ValidationError
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
 from backend.domain.models.agent_profiles import get_tools_for_profile
-from backend.config.llm import get_llm_settings
 from backend.config.dev import get_dev_config
 # Security imports removed - all tools now require session ID
 
@@ -91,7 +90,6 @@ class BaseToolManager(ABC):
         normalized_path = self._normalize_file_path(file_path)
         self._session_read_files[session_id].add(normalized_path)
 
-        llm_settings = get_llm_settings()
         if get_dev_config().debug_mode:
             print(f"[BaseToolManager] Tracked read file for session {session_id}: {normalized_path}")
 
@@ -109,7 +107,6 @@ class BaseToolManager(ABC):
         normalized_path = self._normalize_file_path(file_path)
         has_read = normalized_path in self._session_read_files.get(session_id, set())
 
-        llm_settings = get_llm_settings()
         if get_dev_config().debug_mode:
             print(f"[BaseToolManager] Check read file {normalized_path}: {has_read}")
 
@@ -127,7 +124,6 @@ class BaseToolManager(ABC):
         if session_id in self._session_read_files:
             del self._session_read_files[session_id]
 
-            llm_settings = get_llm_settings()
             if get_dev_config().debug_mode:
                 print(f"[BaseToolManager] Cleared read file tracking for session {session_id}")
 
@@ -147,7 +143,6 @@ class BaseToolManager(ABC):
         tools_dict: Dict[str, ToolSchema] = {}
 
         try:
-            llm_settings = get_llm_settings()
             mcp_client = self.get_mcp_client()
             async with mcp_client as mcp_async_client:
                 # Get all MCP tools - list_tools() always returns a list
@@ -169,7 +164,6 @@ class BaseToolManager(ABC):
                 return tools_dict
 
         except Exception as e:
-            llm_settings = get_llm_settings()
             if get_dev_config().debug_mode:
                 print(f"[DEBUG] Error getting standardized tools: {e}")
             return {}
@@ -276,7 +270,6 @@ class BaseToolManager(ABC):
                 except asyncio.CancelledError:
                     pass
 
-                llm_settings = get_llm_settings()
                 if get_dev_config().debug_mode:
                     print(f"[BaseToolManager] Tool {tool_name} interrupted by user")
 
@@ -349,7 +342,6 @@ class BaseToolManager(ABC):
                             f"This ensures you have the current file content and correct line numbers."
                         )
 
-                        llm_settings = get_llm_settings()
                         if get_dev_config().debug_mode:
                             print(f"[BaseToolManager] Edit blocked: {file_path} not read yet in session {session_id}")
 
@@ -390,7 +382,6 @@ class BaseToolManager(ABC):
 
         except ValidationError as e:
             # Pydantic validation error - format for LLM understanding
-            llm_settings = get_llm_settings()
             if get_dev_config().debug_mode:
                 print(f"[BaseToolManager] Validation error for tool {tool_name}: {e}")
 
@@ -445,7 +436,6 @@ class BaseToolManager(ABC):
                 raise
 
             # System/infrastructure errors - re-raise for upper layer handling
-            llm_settings = get_llm_settings()
             if get_dev_config().debug_mode:
                 print(f"Error calling tool {tool_name}: {str(e)}")
             raise RuntimeError(f"Tool '{tool_name}' execution failed: {str(e)}") from e
@@ -537,7 +527,6 @@ class BaseToolManager(ABC):
                 "new": new_content
             }
         except Exception as e:
-            llm_settings = get_llm_settings()
             if get_dev_config().debug_mode:
                 print(f"[BaseToolManager] Error generating edit diff: {e}")
             return None
@@ -586,7 +575,6 @@ class BaseToolManager(ABC):
                 "new": new_content
             }
         except Exception as e:
-            llm_settings = get_llm_settings()
             if get_dev_config().debug_mode:
                 print(f"[BaseToolManager] Error generating write diff: {e}")
             return None

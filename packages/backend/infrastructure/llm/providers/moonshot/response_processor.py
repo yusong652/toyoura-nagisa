@@ -268,7 +268,6 @@ class MoonshotResponseProcessor(BaseResponseProcessor):
             return []
 
         # Debug: Print raw tool calls from API
-        from backend.config.llm import get_llm_settings
         if get_dev_config().debug_mode:
             raw_tool_calls = []
             for tc in message.tool_calls:
@@ -569,8 +568,8 @@ class MoonshotResponseProcessor(BaseResponseProcessor):
         )
 
         # Get model name from config
-        from backend.config.llm import get_llm_settings
-        model_name = get_llm_settings().get_moonshot_config().model
+        from .config import MoonshotConfig
+        model_name = MoonshotConfig().model
 
         return ChatCompletion(
             id="constructed_from_chunks",

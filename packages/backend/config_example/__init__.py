@@ -10,7 +10,6 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # BaseConfig removed - not used in actual configuration
-from .llm import LLMSettings, get_llm_settings
 from .dev import DevelopmentConfig
 
 
@@ -29,10 +28,6 @@ class AppSettings(BaseSettings):
         env_prefix='APP_',
         extra='ignore'
     )
-    
-    def get_llm_settings(self) -> LLMSettings:
-        """Get LLM configuration"""
-        return LLMSettings()
     
 
 # Global configuration instance - recreate each time to ensure latest config

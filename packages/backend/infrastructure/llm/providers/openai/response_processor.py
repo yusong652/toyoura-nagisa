@@ -560,8 +560,8 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
             )
 
         # Get model name from config
-        from backend.config.llm import get_llm_settings
-        model_name = get_llm_settings().get_openai_config().model
+        from .config import OpenAIConfig
+        model_name = OpenAIConfig().model
 
         return Response.model_construct(
             id="resp_stream",
