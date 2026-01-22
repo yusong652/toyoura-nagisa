@@ -15,6 +15,7 @@ export interface CreateSessionRequest {
 export interface CreateSessionResponse {
   session_id: string
   name?: string
+  llm_config?: ChatSession['llm_config']
 }
 
 export interface SwitchSessionRequest {

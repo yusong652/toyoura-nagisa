@@ -254,6 +254,12 @@ export const AppContainer: React.FC<AppContainerProps> = ({
         if (!sessionId) {
           sessionId = await sessionManager.createSession();
           setSessionMode('build');
+          
+          const sessions = sessionManager.getSessions();
+          const session = sessions.find(s => s.id === sessionId);
+          if (session) {
+            setLlmConfig(session.llm_config || null);
+          }
         }
 
         setCurrentSessionId(sessionId);

@@ -40,11 +40,13 @@ class SessionData(BaseModel):
     updated_at: str = Field(..., description="Last update timestamp (ISO format)")
     message_count: Optional[int] = Field(None, description="Number of messages")
     mode: Optional[str] = Field(None, description="Session mode (build or plan)")
+    llm_config: Optional[dict] = Field(None, description="Session-specific LLM configuration")
 
 
 class SessionCreateData(BaseModel):
     """Response data for session creation."""
     session_id: str = Field(..., description="UUID of the newly created session")
+    llm_config: Optional[dict] = Field(None, description="Initial LLM configuration")
 
 
 class SessionDetailsData(BaseModel):
@@ -127,10 +129,19 @@ async def create_session(
     try:
         session_name = request.name or "New Session"
         result = await service.create_session(session_name=session_name)
+        
+        # Get details of the newly created session to return initial config
+        session_id = result["session_id"]
+        session_details = await service.get_session_details(session_id)
+        llm_config = session_details["session"].get("llm_config") if session_details else None
+        
         return ApiResponse(
             success=True,
             message="Session created successfully",
-            data=SessionCreateData(session_id=result["session_id"])
+            data=SessionCreateData(
+                session_id=session_id,
+                llm_config=llm_config
+            )
         )
     except Exception as e:
         raise InternalServerError(
@@ -157,6 +168,7 @@ async def list_sessions(
                 updated_at=s["updated_at"],
                 message_count=s.get("message_count"),
                 mode=s.get("mode"),
+                llm_config=s.get("llm_config"),
             )
             for s in sessions
         ]

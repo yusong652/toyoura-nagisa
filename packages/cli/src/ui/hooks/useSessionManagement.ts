@@ -228,9 +228,19 @@ export function useSessionManagement({
 
   const createSession = useCallback(async (name?: string) => {
     const sessionId = await sessionManager.createSession(name);
+    
+    // Update local state with new session's config
+    if (setLlmConfig) {
+      const sessions = sessionManager.getSessions();
+      const newSession = sessions.find(s => s.id === sessionId);
+      if (newSession) {
+        setLlmConfig(newSession.llm_config || null);
+      }
+    }
+    
     await switchSession(sessionId);
     return sessionId;
-  }, [sessionManager, switchSession]);
+  }, [sessionManager, switchSession, setLlmConfig]);
 
   return {
     switchSession,

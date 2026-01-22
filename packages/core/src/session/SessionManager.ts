@@ -179,7 +179,8 @@ export class SessionManager extends EventEmitter {
         id: sessionId,
         name: name || `Session ${sessionId.slice(0, 8)}`,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        llm_config: data.llm_config
       }
 
       // Emit event
