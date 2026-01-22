@@ -33,6 +33,15 @@ class PFCSettings(BaseSettings):
         validation_alias="PFC_WORKSPACE",
     )
 
+    # PFC Server Connection Control
+    # Set to False to disable all attempts to connect to PFC server (e.g. for pure development/testing)
+    # This avoids timeouts and retries when you know PFC server is not running.
+    server_enabled: bool = Field(
+        default=True,
+        description="Enable/disable PFC server connection attempts",
+        validation_alias="PFC_SERVER_ENABLED",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_nested_delimiter="__",
