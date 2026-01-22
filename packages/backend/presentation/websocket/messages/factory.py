@@ -22,6 +22,7 @@ from backend.presentation.websocket.messages.system import (
     StatusUpdate,
     TitleUpdateMessage,
     SessionModeUpdateMessage,
+    SessionLlmConfigUpdateMessage,
 )
 from backend.presentation.websocket.messages.queue import (
     QueueUpdateMessage,

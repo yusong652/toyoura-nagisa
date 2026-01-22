@@ -158,6 +158,10 @@ export class ConnectionManager extends WebSocketManager {
         this.emit('session_mode_update', message);
         break;
 
+      case 'SESSION_LLM_CONFIG_UPDATE':
+        this.emit('session_llm_config_update', message);
+        break;
+
       case 'TODO_UPDATE':
         this.emit('todo_update', {
           todo: message.todo
