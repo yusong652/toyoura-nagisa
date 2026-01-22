@@ -8,7 +8,7 @@
  * - Uses ref + version counter pattern for synchronous access with React re-renders
  */
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   MessageType,
   type HistoryItemWithoutId,
@@ -75,6 +75,20 @@ export function usePendingItems({
 
   // Debounce ref to avoid too frequent re-renders (Ink rendering issue)
   const rerenderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Throttle ref for assistant content updates
+  const contentUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (rerenderTimeoutRef.current) {
+        clearTimeout(rerenderTimeoutRef.current);
+      }
+      if (contentUpdateTimeoutRef.current) {
+        clearTimeout(contentUpdateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Trigger re-render when tool pairs change (debounced to avoid Ink artifacts)
   const triggerRerender = useCallback(() => {
@@ -100,39 +114,53 @@ export function usePendingItems({
     setPendingAssistantItem(newItem);
   }, []);
 
-  // Update assistant content
+  // Update assistant content (throttled to avoid flickering)
   const updateAssistantContent = useCallback(
     (content: ContentBlock[], isStreaming = true) => {
-      setPendingAssistantItem((prev) => {
-        let newItem: AssistantHistoryItemWithoutId | null;
-        if (!prev) {
-          // Don't create new assistant item if there's no content
-          if (content.length === 0) {
-            newItem = null;
-          } else {
-            newItem = {
-              type: MessageType.ASSISTANT,
-              content,
-              isStreaming,
-            };
-          }
+      // 1. Update the ref immediately (source of truth for logic)
+      const prev = pendingAssistantItemRef.current;
+      let newItem: AssistantHistoryItemWithoutId | null;
+
+      if (!prev) {
+        // Don't create new assistant item if there's no content
+        if (content.length === 0) {
+          newItem = null;
         } else {
           newItem = {
-            ...prev,
+            type: MessageType.ASSISTANT,
             content,
             isStreaming,
           };
         }
-        // Sync ref with state
-        pendingAssistantItemRef.current = newItem;
-        return newItem;
-      });
+      } else {
+        newItem = {
+          ...prev,
+          content,
+          isStreaming,
+        };
+      }
+      pendingAssistantItemRef.current = newItem;
+
+      // 2. Throttle the state update (trigger re-render)
+      // Only schedule if not already scheduled
+      if (!contentUpdateTimeoutRef.current) {
+        contentUpdateTimeoutRef.current = setTimeout(() => {
+          setPendingAssistantItem(pendingAssistantItemRef.current);
+          contentUpdateTimeoutRef.current = null;
+        }, 50); // 50ms throttle (approx 20fps)
+      }
     },
     []
   );
 
   // Stop streaming indicator on assistant message
   const stopAssistantStreaming = useCallback(() => {
+    // Clear any pending throttled updates to ensure immediate state consistency
+    if (contentUpdateTimeoutRef.current) {
+      clearTimeout(contentUpdateTimeoutRef.current);
+      contentUpdateTimeoutRef.current = null;
+    }
+
     setPendingAssistantItem((prev) => {
       const newItem = prev ? { ...prev, isStreaming: false } : prev;
       pendingAssistantItemRef.current = newItem;

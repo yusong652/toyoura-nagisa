@@ -33,7 +33,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ item, terminalWidth })
             </Text>
           </Box>
           <Box flexGrow={1}>
-            <MarkdownText baseColor={userColor}>{item.text}</MarkdownText>
+            <MarkdownText baseColor={userColor}>{item.text.trim()}</MarkdownText>
           </Box>
         </Box>
       </PanelSection>
