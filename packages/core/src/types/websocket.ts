@@ -3,6 +3,8 @@
  * Mirrors the Python backend WebSocket message models for type consistency
  */
 
+import { ChatSession } from './session';
+
 export enum MessageType {
   // System messages
   CONNECTION_ESTABLISHED = "CONNECTION_ESTABLISHED",
@@ -26,6 +28,7 @@ export enum MessageType {
   // Title updates
   TITLE_UPDATE = "TITLE_UPDATE",
   SESSION_MODE_UPDATE = "SESSION_MODE_UPDATE",
+  SESSION_LLM_CONFIG_UPDATE = "SESSION_LLM_CONFIG_UPDATE",
   
   // Location related
   LOCATION_REQUEST = "LOCATION_REQUEST", 
@@ -88,6 +91,14 @@ export interface SessionModeUpdateMessage extends BaseWebSocketMessage {
   };
 }
 
+export interface SessionLlmConfigUpdateMessage extends BaseWebSocketMessage {
+  type: MessageType.SESSION_LLM_CONFIG_UPDATE;
+  payload: {
+    session_id: string;
+    llm_config: ChatSession['llm_config'];
+  };
+}
+
 export interface LocationRequestMessage extends BaseWebSocketMessage {
   type: MessageType.LOCATION_REQUEST;
   reason?: string;
@@ -138,6 +149,7 @@ export type WebSocketMessage =
   | StatusMessage
   | TitleUpdateMessage
   | SessionModeUpdateMessage
+  | SessionLlmConfigUpdateMessage
   | LocationRequestMessage
   | LocationResponseMessage
   | MessageCreateMessage

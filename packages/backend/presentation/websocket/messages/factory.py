@@ -73,6 +73,7 @@ OUTGOING_MESSAGE_SCHEMAS = {
     MessageType.STATUS_UPDATE: StatusUpdate,
     MessageType.TITLE_UPDATE: TitleUpdateMessage,
     MessageType.SESSION_MODE_UPDATE: SessionModeUpdateMessage,
+    MessageType.SESSION_LLM_CONFIG_UPDATE: SessionLlmConfigUpdateMessage,
     MessageType.STREAMING_UPDATE: StreamingUpdateMessage,  # Real-time content update (accumulated)
     # Used via specialized creation functions
     MessageType.TOOL_CONFIRMATION_REQUEST: ToolConfirmationRequestMessage,

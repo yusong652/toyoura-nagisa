@@ -275,6 +275,15 @@ async def update_llm_config(
             if not success:
                 raise BadRequestError(message=f"Session not found: {session_id}")
 
+            # Notify frontend about the change
+            from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+            llm_config = {
+                "provider": request.provider,
+                "model": request.model,
+                "secondary_model": request.secondary_model,
+            }
+            await WebSocketNotificationService.send_session_llm_config_update(session_id, llm_config)
+
             return ApiResponse(
                 success=True,
                 message=f"Updated session LLM to {request.provider}/{request.model}",
@@ -329,6 +338,10 @@ async def clear_llm_config(
             success = clear_session_llm_config(session_id)
             if not success:
                 raise BadRequestError(message=f"Session not found: {session_id}")
+
+            # Notify frontend about the change
+            from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+            await WebSocketNotificationService.send_session_llm_config_update(session_id, {})
 
             return ApiResponse(
                 success=True,

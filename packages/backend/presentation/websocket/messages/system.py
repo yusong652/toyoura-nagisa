@@ -67,3 +67,14 @@ class SessionModeUpdateMessage(BaseWebSocketMessage):
     """
     type: MessageType = MessageType.SESSION_MODE_UPDATE
     payload: Dict[str, Any]  # Contains session_id and mode
+
+
+class SessionLlmConfigUpdateMessage(BaseWebSocketMessage):
+    """
+    Session LLM config update message schema.
+
+    Attributes:
+        payload: Update payload containing session_id and llm_config
+    """
+    type: MessageType = MessageType.SESSION_LLM_CONFIG_UPDATE
+    payload: Dict[str, Any]  # Contains session_id and llm_config

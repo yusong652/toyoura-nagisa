@@ -26,6 +26,7 @@ import {
   apiClient,
   type TokenUsage,
   type ChatSession,
+  type SessionLlmConfigUpdateMessage,
 } from '@toyoura-nagisa/core';
 import { App } from './App.js';
 import {
@@ -443,8 +444,18 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
     connectionManager.on('session_mode_update', handleSessionModeUpdate);
 
+    const handleLlmConfigUpdate = (message: SessionLlmConfigUpdateMessage) => {
+      const payload = message?.payload;
+      if (!payload?.session_id || !payload?.llm_config) return;
+      if (payload.session_id !== currentSessionId) return;
+      setLlmConfig(payload.llm_config);
+    };
+
+    connectionManager.on('session_llm_config_update', handleLlmConfigUpdate);
+
     return () => {
       connectionManager.off('session_mode_update', handleSessionModeUpdate);
+      connectionManager.off('session_llm_config_update', handleLlmConfigUpdate);
     };
   }, [connectionManager, currentSessionId]);
 

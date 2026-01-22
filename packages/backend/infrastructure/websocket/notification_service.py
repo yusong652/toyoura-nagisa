@@ -243,6 +243,40 @@ class WebSocketNotificationService:
             logger.error(f"Failed to send session mode update notification: {e}")
 
     @staticmethod
+    async def send_session_llm_config_update(
+        session_id: str,
+        llm_config: Dict[str, Any]
+    ) -> None:
+        """Send session LLM config update notification to frontend."""
+        try:
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+            connection_manager = get_connection_manager()
+
+            if not connection_manager:
+                logger.warning("No connection manager available for session LLM config update")
+                return
+
+            from backend.presentation.websocket.message_types import MessageType, create_message
+
+            config_update_msg = create_message(
+                MessageType.SESSION_LLM_CONFIG_UPDATE,
+                session_id=session_id,
+                payload={
+                    "session_id": session_id,
+                    "llm_config": llm_config,
+                }
+            )
+
+            await connection_manager.send_json(
+                session_id,
+                config_update_msg.model_dump()
+            )
+
+            logger.info(f"Session LLM config update notification sent for session {session_id}")
+        except Exception as e:
+            logger.error(f"Failed to send session LLM config update notification: {e}")
+
+    @staticmethod
     async def send_todo_update(
         session_id: str,
         todo: Optional[Dict[str, Any]]

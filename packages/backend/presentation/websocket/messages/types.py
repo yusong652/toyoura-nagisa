@@ -42,6 +42,7 @@ class MessageType(str, Enum):
     # Session management
     TITLE_UPDATE = "TITLE_UPDATE"
     SESSION_MODE_UPDATE = "SESSION_MODE_UPDATE"
+    SESSION_LLM_CONFIG_UPDATE = "SESSION_LLM_CONFIG_UPDATE"
 
     # Tool confirmation (bash, edit, write, etc.)
     TOOL_CONFIRMATION_REQUEST = "TOOL_CONFIRMATION_REQUEST"

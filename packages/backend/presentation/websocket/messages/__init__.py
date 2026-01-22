@@ -34,6 +34,7 @@ from backend.presentation.websocket.messages.system import (
     StatusUpdate,
     TitleUpdateMessage,
     SessionModeUpdateMessage,
+    SessionLlmConfigUpdateMessage,
 )
 
 # Message queue management
@@ -100,6 +101,7 @@ __all__ = [
     "StatusUpdate",
     "TitleUpdateMessage",
     "SessionModeUpdateMessage",
+    "SessionLlmConfigUpdateMessage",
     # Message queue management
     "QueueUpdateMessage",
     "ProcessingStartMessage",
