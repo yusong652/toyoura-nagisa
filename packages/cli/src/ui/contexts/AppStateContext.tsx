@@ -8,7 +8,7 @@
  */
 
 import { createContext, useContext } from 'react';
-import type { TokenUsage } from '@toyoura-nagisa/core';
+import type { TokenUsage, ChatSession } from '@toyoura-nagisa/core';
 import type {
   HistoryItem,
   HistoryItemWithoutId,
@@ -38,6 +38,7 @@ export interface AppState {
   // Session
   currentSessionId: string | null;
   sessionMode: SessionMode;
+  llmConfig: ChatSession['llm_config'] | null;
 
   // Agent profile
   currentProfile: AgentProfileType;
@@ -133,6 +134,7 @@ const defaultState: AppState = {
   error: null,
   currentSessionId: null,
   sessionMode: 'build',
+  llmConfig: null,
   currentProfile: 'pfc_expert',
   availableProfiles: [],
   isProfileLoading: false,

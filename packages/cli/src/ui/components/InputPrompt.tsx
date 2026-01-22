@@ -31,6 +31,7 @@ import { replaceMention } from '@toyoura-nagisa/core/utils';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { useSlashCompletion } from '../hooks/useSlashCompletion.js';
 import { useFileMentionDetection } from '../hooks/useFileMentionDetection.js';
+import { useAppState } from '../contexts/AppStateContext.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { theme, colors } from '../colors.js';
 import { PanelSection } from './shared/PanelSection.js';
@@ -447,6 +448,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Check if empty
   const isEmpty = buffer.lines.length === 1 && buffer.lines[0] === '';
 
+  const { llmConfig } = useAppState();
+
   // Use visual cursor for correct cursor positioning in wrapped lines
   const [visualCursorRow, visualCursorCol] = buffer.visualCursor;
   const totalVisualLines = buffer.visualLines.length;
@@ -536,14 +539,29 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     );
   };
 
-  const renderModeLine = () => (
-    <Box flexDirection="row">
-      <Box width={prefixWidth} flexShrink={0}>
-        <Text color={theme.text.muted}>{continuationPrefix}</Text>
+  const renderModeLine = () => {
+    const provider = llmConfig?.provider || '';
+    const model = llmConfig?.model || '';
+    const llmInfo = provider && model ? `${provider} / ${model}` : '';
+
+    return (
+      <Box flexDirection="row" justifyContent="space-between">
+        <Box flexDirection="row">
+          <Box width={prefixWidth} flexShrink={0}>
+            <Text color={theme.text.muted}>{continuationPrefix}</Text>
+          </Box>
+          <Text color={modeColor} bold>{modeLabel}</Text>
+        </Box>
+        {llmInfo && (
+          <Box paddingRight={1}>
+            <Text color={theme.text.muted} dimColor>
+              {llmInfo}
+            </Text>
+          </Box>
+        )}
       </Box>
-      <Text color={modeColor} bold>{modeLabel}</Text>
-    </Box>
-  );
+    );
+  };
 
   const renderSpacerLine = (key: string) => (
     <Box key={key} flexDirection="row">

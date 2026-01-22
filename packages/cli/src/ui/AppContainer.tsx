@@ -25,6 +25,7 @@ import {
   sessionService,
   apiClient,
   type TokenUsage,
+  type ChatSession,
 } from '@toyoura-nagisa/core';
 import { App } from './App.js';
 import {
@@ -96,6 +97,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   // ========== Local State ==========
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
   const [sessionMode, setSessionMode] = useState<SessionMode>('build');
+  const [llmConfig, setLlmConfig] = useState<ChatSession['llm_config'] | null>(null);
   const [isQuitting, setIsQuitting] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(false);
   const [sessionTokenUsage, setSessionTokenUsage] = useState<TokenUsage | null>(null);
@@ -167,6 +169,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     historyManager,
     setCurrentSessionId,
     setSessionMode,
+    setLlmConfig,
   });
 
   // Todo status (current in-progress task)
@@ -455,6 +458,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     error,
     currentSessionId,
     sessionMode,
+    llmConfig,
     currentProfile,
     availableProfiles,
     isProfileLoading,
@@ -483,6 +487,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     error,
     currentSessionId,
     sessionMode,
+    llmConfig,
     currentProfile,
     availableProfiles,
     isProfileLoading,

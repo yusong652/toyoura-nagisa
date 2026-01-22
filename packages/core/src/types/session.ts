@@ -9,6 +9,11 @@ export interface ChatSession {
   created_at: string;
   updated_at: string;
   mode?: SessionMode;
+  llm_config?: {
+    provider: string;
+    model: string;
+    secondary_model?: string;
+  };
 }
 
 export type SessionMode = 'build' | 'plan';

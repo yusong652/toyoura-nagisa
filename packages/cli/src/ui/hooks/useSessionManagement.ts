@@ -6,7 +6,7 @@
  */
 
 import { useCallback } from 'react';
-import { sessionService, type ConnectionManager, type SessionManager } from '@toyoura-nagisa/core';
+import { sessionService, type ConnectionManager, type SessionManager, type ChatSession } from '@toyoura-nagisa/core';
 import { MessageType, type ContentBlock, type SessionMode } from '../types.js';
 import type { useHistoryManager } from './useHistoryManager.js';
 
@@ -16,6 +16,7 @@ interface UseSessionManagementParams {
   historyManager: ReturnType<typeof useHistoryManager>;
   setCurrentSessionId: (sessionId: string) => void;
   setSessionMode?: (mode: SessionMode) => void;
+  setLlmConfig?: (config: ChatSession['llm_config'] | null) => void;
 }
 
 interface UseSessionManagementReturn {
@@ -185,6 +186,7 @@ export function useSessionManagement({
   historyManager,
   setCurrentSessionId,
   setSessionMode,
+  setLlmConfig,
 }: UseSessionManagementParams): UseSessionManagementReturn {
 
   // Load history for a session (reusable, doesn't manage connection)
@@ -195,13 +197,16 @@ export function useSessionManagement({
         const mode = historyResponse.session?.mode || 'build';
         setSessionMode(mode);
       }
+      if (setLlmConfig) {
+        setLlmConfig(historyResponse.session?.llm_config || null);
+      }
       if (historyResponse.history && historyResponse.history.length > 0) {
         convertBackendHistory(historyResponse.history, historyManager);
       }
     } catch (err) {
       console.error('[useSessionManagement] Failed to load session history:', err);
     }
-  }, [historyManager, setSessionMode]);
+  }, [historyManager, setSessionMode, setLlmConfig]);
 
   const switchSession = useCallback(async (sessionId: string) => {
     connectionManager.disconnect();
