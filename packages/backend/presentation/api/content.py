@@ -59,14 +59,18 @@ def get_llm_client() -> LLMClientBase:
 async def generate_title(
     request: GenerateTitleRequest,
     http_request: Request,
-    service: TitleService = Depends(get_title_service),
-    llm_client: LLMClientBase = Depends(get_llm_client)
+    service: TitleService = Depends(get_title_service)
 ) -> ApiResponse[TitleGenerateData]:
     """Generate a descriptive title for a chat session.
 
     Analyzes conversation history and uses LLM to generate a contextual title.
     """
     try:
+        from backend.infrastructure.llm.session_client import get_session_llm_client
+        
+        # Get correct client for this session (with fallback)
+        llm_client = get_session_llm_client(request.session_id)
+
         result = await service.generate_title_for_session(
             session_id=request.session_id,
             llm_client=llm_client
@@ -100,8 +104,7 @@ async def generate_title(
 @router.post("/history/generate-title", response_model=ApiResponse[TitleGenerateData], deprecated=True)
 async def generate_title_legacy(
     http_request: Request,
-    service: TitleService = Depends(get_title_service),
-    llm_client: LLMClientBase = Depends(get_llm_client)
+    service: TitleService = Depends(get_title_service)
 ) -> ApiResponse[TitleGenerateData]:
     """[DEPRECATED] Use POST /content/title instead."""
     data = await http_request.json()
@@ -109,4 +112,4 @@ async def generate_title_legacy(
     if not session_id:
         raise BadRequestError(message="session_id not provided in request")
     request = GenerateTitleRequest(session_id=session_id)
-    return await generate_title(request, http_request, service, llm_client)
+    return await generate_title(request, http_request, service)

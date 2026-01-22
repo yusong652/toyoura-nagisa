@@ -38,9 +38,11 @@ def get_llm_client():
     """
     Get default LLM client using cached factory and default configuration.
 
-    This method no longer relies on app.state.llm_client.
-    It retrieves the default configuration and requests a client from the factory,
-    which handles caching and connection pooling internally.
+    This function should be used ONLY when session context is not available
+    (e.g., app initialization, system checks). 
+    
+    For session-specific operations, use factory.create_client_with_config 
+    with session_llm_config.
 
     Returns:
         LLMClientBase: Configured LLM client instance

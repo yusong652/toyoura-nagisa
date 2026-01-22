@@ -241,8 +241,8 @@ async def get_session_details(
 @router.post("/history/switch", response_model=ApiResponse[SessionSwitchData])
 async def switch_session(
     request: SwitchSessionRequest,
-    service: SessionService = Depends(get_session_service),
-    llm_client: LLMClientBase = Depends(get_llm_client)
+    http_request: Request,
+    service: SessionService = Depends(get_session_service)
 ) -> ApiResponse[SessionSwitchData]:
     """Switch to a different chat session.
 
@@ -250,6 +250,11 @@ async def switch_session(
     loads session history, and returns recent messages for context.
     """
     try:
+        from backend.infrastructure.llm.session_client import get_session_llm_client
+        
+        # Get correct client for this session (for cache cleanup)
+        llm_client = get_session_llm_client(request.session_id)
+
         result = await service.switch_session(
             session_id=request.session_id,
             llm_client=llm_client
@@ -277,8 +282,8 @@ async def switch_session(
 @router.delete("/history/{session_id}", response_model=ApiResponse[SessionDeleteData])
 async def delete_session(
     session_id: str,
-    service: SessionService = Depends(get_session_service),
-    llm_client: LLMClientBase = Depends(get_llm_client)
+    http_request: Request,
+    service: SessionService = Depends(get_session_service)
 ) -> ApiResponse[SessionDeleteData]:
     """Delete a chat session and all associated data.
 
@@ -286,6 +291,16 @@ async def delete_session(
     and removes related memories from vector DB.
     """
     try:
+        from backend.infrastructure.llm.session_client import get_session_llm_client
+        
+        # Get correct client for this session (for cache cleanup)
+        # Note: Even if session is about to be deleted, we need the client to clear its cache
+        try:
+            llm_client = get_session_llm_client(session_id)
+        except Exception:
+            # If client creation fails (e.g. config missing), use global client for best-effort cleanup
+            llm_client = get_global_llm_client()
+
         result = await service.delete_session(
             session_id=session_id,
             llm_client=llm_client
