@@ -82,12 +82,18 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isShellExec
 
   // Calculate token usage display
   const usage = appState.tokenUsage;
-  const tokensLeft = usage?.tokens_left ?? 128000;  // Default 128k
+  const contextWindow = appState.contextWindow ?? 128000;
   const promptTokens = usage?.prompt_tokens ?? 0;
-  const totalCapacity = promptTokens + tokensLeft;
-  const remainingPercent = totalCapacity > 0
-    ? Math.round((tokensLeft / totalCapacity) * 100)
-    : 100;
+  const completionTokens = usage?.completion_tokens ?? 0;
+  
+  // Use tokens_left if provided, otherwise estimate from context window
+  const tokensLeft = usage?.tokens_left ?? Math.max(0, contextWindow - promptTokens);
+  
+  // Usage is usually defined as (used / total)
+  const usedTokens = promptTokens + completionTokens;
+  const usedPercent = contextWindow > 0 
+    ? Math.min(100, Math.round((usedTokens / contextWindow) * 100))
+    : 0;
 
   // Format cwd for display
   const displayCwd = formatCwd(cwd);
@@ -144,7 +150,7 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isShellExec
       </Box>
       <Box>
         <Text color={theme.text.muted}>
-          usage: {remainingPercent}% ({formatTokensK(tokensLeft)})
+          usage: {usedPercent}% ({formatTokensK(usedTokens)}/{formatTokensK(contextWindow)})
         </Text>
         {separator}
         <Text color={statusColor}>{statusText}</Text>

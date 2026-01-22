@@ -30,6 +30,7 @@ from backend.infrastructure.storage.session_manager import (
 )
 from backend.infrastructure.llm.shared.models_registry import (
     get_all_providers,
+    get_model_info,
     ModelInfo as RegistryModelInfo,
     ProviderInfo as RegistryProviderInfo,
 )
@@ -392,4 +393,35 @@ async def get_available_providers_endpoint() -> ApiResponse[ProviderListData]:
     except Exception as e:
         raise InternalServerError(
             message=f"Failed to get providers: {str(e)}"
+        )
+
+
+@router.get("/model-details", response_model=ApiResponse[ModelInfo])
+async def get_model_details_endpoint(
+    provider: str,
+    model: str
+) -> ApiResponse[ModelInfo]:
+    """
+    Get detailed information for a specific model, including context window.
+    """
+    try:
+        info = get_model_info(provider, model)
+        if not info:
+            raise BadRequestError(message=f"Model {model} not found for provider {provider}")
+
+        return ApiResponse(
+            success=True,
+            message="Model details retrieved",
+            data=ModelInfo(
+                id=info.id,
+                name=info.name,
+                description=info.description,
+                context_window=info.context_window
+            )
+        )
+    except BadRequestError:
+        raise
+    except Exception as e:
+        raise InternalServerError(
+            message=f"Failed to get model details: {str(e)}"
         )

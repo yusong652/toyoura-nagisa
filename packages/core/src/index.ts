@@ -24,5 +24,8 @@ export * from './messaging';
 // Export session management
 export * from './session';
 
+// Export LLM config service
+export * from './services/LlmConfigService';
+
 // Export utilities
 export * from './utils';

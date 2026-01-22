@@ -34,3 +34,12 @@ export type {
 
 // Agent Service
 export { AgentService, agentService } from './AgentService';
+
+// LLM Config Service
+export { LlmConfigService, llmConfigService } from './LlmConfigService';
+export type {
+  ModelDetails,
+  ProviderInfo,
+  ProviderListResponse,
+  LlmConfigUpdateData,
+} from './LlmConfigService';

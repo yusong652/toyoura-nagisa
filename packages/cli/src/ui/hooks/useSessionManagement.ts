@@ -6,7 +6,7 @@
  */
 
 import { useCallback } from 'react';
-import { sessionService, type ConnectionManager, type SessionManager, type ChatSession } from '@toyoura-nagisa/core';
+import { sessionService, llmConfigService, type ConnectionManager, type SessionManager, type ChatSession } from '@toyoura-nagisa/core';
 import { MessageType, type ContentBlock, type SessionMode } from '../types.js';
 import type { useHistoryManager } from './useHistoryManager.js';
 

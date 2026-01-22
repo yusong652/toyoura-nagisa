@@ -39,6 +39,7 @@ export interface AppState {
   currentSessionId: string | null;
   sessionMode: SessionMode;
   llmConfig: ChatSession['llm_config'] | null;
+  contextWindow: number | null;
 
   // Agent profile
   currentProfile: AgentProfileType;
@@ -135,6 +136,7 @@ const defaultState: AppState = {
   currentSessionId: null,
   sessionMode: 'build',
   llmConfig: null,
+  contextWindow: null,
   currentProfile: 'pfc_expert',
   availableProfiles: [],
   isProfileLoading: false,

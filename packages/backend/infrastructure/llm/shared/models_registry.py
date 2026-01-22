@@ -224,6 +224,26 @@ def is_model_valid_for_provider(provider: str, model: str) -> bool:
     return any(m.id == model for m in models)
 
 
+def get_model_info(provider: str, model: str) -> Optional[ModelInfo]:
+    """
+    Get information about a specific model.
+
+    Args:
+        provider: Provider identifier
+        model: Model identifier
+
+    Returns:
+        Optional[ModelInfo]: Model info, None if not found
+    """
+    models = get_provider_models(provider)
+    if not models:
+        return None
+    for m in models:
+        if m.id == model:
+            return m
+    return None
+
+
 def get_supported_provider_ids() -> List[str]:
     """
     Get list of all supported provider identifiers.

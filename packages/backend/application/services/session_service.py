@@ -18,6 +18,7 @@ from backend.infrastructure.storage.session_manager import (
 )
 from backend.domain.models.message_factory import message_factory
 from backend.domain.utils import filter_message_content
+from backend.infrastructure.llm.shared.models_registry import get_model_info
 
 
 class SessionService:
@@ -253,4 +254,26 @@ class SessionService:
             "session_id": session_id,
             "mode": updated_metadata.get("mode", mode) if updated_metadata else mode,
             "success": True,
+        }
+
+    async def get_model_details(self, provider: str, model: str) -> Optional[Dict[str, Any]]:
+        """
+        Get details for a specific model.
+
+        Args:
+            provider: Provider identifier
+            model: Model identifier
+
+        Returns:
+            Optional[Dict[str, Any]]: Model details (name, context_window, etc.)
+        """
+        info = get_model_info(provider, model)
+        if not info:
+            return None
+            
+        return {
+            "id": info.id,
+            "name": info.name,
+            "description": info.description,
+            "context_window": info.context_window,
         }

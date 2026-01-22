@@ -24,6 +24,7 @@ import {
   SessionService,
   sessionService,
   apiClient,
+  llmConfigService,
   type TokenUsage,
   type ChatSession,
   type SessionLlmConfigUpdateMessage,
@@ -99,6 +100,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
   const [sessionMode, setSessionMode] = useState<SessionMode>('build');
   const [llmConfig, setLlmConfig] = useState<ChatSession['llm_config'] | null>(null);
+  const [contextWindow, setContextWindow] = useState<number | null>(null);
   const [isQuitting, setIsQuitting] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(false);
   const [sessionTokenUsage, setSessionTokenUsage] = useState<TokenUsage | null>(null);
@@ -459,6 +461,30 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     };
   }, [connectionManager, currentSessionId]);
 
+  // Sync context window when model changes
+  useEffect(() => {
+    if (!llmConfig?.provider || !llmConfig?.model) {
+      setContextWindow(null);
+      return;
+    }
+
+    const fetchModelDetails = async () => {
+      try {
+        const details = await llmConfigService.getModelDetails(llmConfig.provider, llmConfig.model);
+        if (details && details.context_window) {
+          setContextWindow(details.context_window);
+        } else {
+          setContextWindow(null);
+        }
+      } catch (err) {
+        console.error('[AppContainer] Failed to fetch model details:', err);
+        setContextWindow(null);
+      }
+    };
+
+    fetchModelDetails();
+  }, [llmConfig]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -476,6 +502,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     currentSessionId,
     sessionMode,
     llmConfig,
+    contextWindow,
     currentProfile,
     availableProfiles,
     isProfileLoading,
@@ -505,6 +532,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     currentSessionId,
     sessionMode,
     llmConfig,
+    contextWindow,
     currentProfile,
     availableProfiles,
     isProfileLoading,
