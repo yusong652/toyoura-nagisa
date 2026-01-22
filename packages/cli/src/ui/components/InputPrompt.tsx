@@ -545,16 +545,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     const llmInfo = provider && model ? `${provider} / ${model}` : '';
 
     return (
-      <Box flexDirection="row" justifyContent="space-between">
-        <Box flexDirection="row">
-          <Box width={prefixWidth} flexShrink={0}>
-            <Text color={theme.text.muted}>{continuationPrefix}</Text>
-          </Box>
-          <Text color={modeColor} bold>{modeLabel}</Text>
+      <Box flexDirection="row">
+        <Box width={prefixWidth} flexShrink={0}>
+          <Text color={theme.text.muted}>{continuationPrefix}</Text>
         </Box>
+        <Text color={modeColor} bold>{modeLabel}</Text>
         {llmInfo && (
-          <Box paddingRight={1}>
-            <Text color={theme.text.muted} dimColor>
+          <Box marginLeft={1}>
+            <Text color={theme.text.muted}>│ </Text>
+            <Text color={theme.text.secondary} dimColor>
               {llmInfo}
             </Text>
           </Box>
