@@ -36,49 +36,66 @@ def set_app(app: FastAPI) -> None:
 
 def get_llm_client():
     """
-    Get LLM client from app state.
+    Get default LLM client using cached factory and default configuration.
+
+    This method no longer relies on app.state.llm_client.
+    It retrieves the default configuration and requests a client from the factory,
+    which handles caching and connection pooling internally.
 
     Returns:
-        LLMClientBase: LLM client instance from app state
+        LLMClientBase: Configured LLM client instance
 
     Raises:
         RuntimeError: If app is not initialized or LLM client not configured
     """
-    app = get_app()
-    if not app:
-        raise RuntimeError("FastAPI app not initialized")
-
-    if not hasattr(app.state, 'llm_client') or app.state.llm_client is None:
+    factory = get_llm_factory()
+    
+    # Import here to avoid circular dependencies
+    from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+    
+    default_config = get_default_llm_config()
+    if not default_config:
         raise RuntimeError(
             "Primary LLM client not configured. "
             "Please configure your API key in the settings page or .env file."
         )
-
-    return app.state.llm_client
+        
+    return factory.create_client_with_config(
+        provider=default_config["provider"],
+        model=default_config["model"],
+        app=get_app()
+    )
 
 
 def get_secondary_llm_client():
     """
-    Get secondary LLM client from app state (for SubAgents).
+    Get secondary LLM client using cached factory and default configuration.
     
     Falls back to primary client if secondary is not configured.
 
     Returns:
-        LLMClientBase: Secondary LLM client instance from app state
+        LLMClientBase: Secondary LLM client instance
 
     Raises:
         RuntimeError: If app is not initialized or no LLM client is configured
     """
-    app = get_app()
-    if not app:
-        raise RuntimeError("FastAPI app not initialized")
-
-    # Try secondary first
-    if hasattr(app.state, 'secondary_llm_client') and app.state.secondary_llm_client is not None:
-        return app.state.secondary_llm_client
+    factory = get_llm_factory()
     
-    # Fall back to primary
-    return get_llm_client()
+    # Import here to avoid circular dependencies
+    from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+    
+    default_config = get_default_llm_config()
+    if not default_config:
+        raise RuntimeError("No default LLM configuration found")
+        
+    # Use secondary_model if specified, otherwise use primary model
+    model = default_config.get("secondary_model") or default_config["model"]
+    
+    return factory.create_client_with_config(
+        provider=default_config["provider"],
+        model=model,
+        app=get_app()
+    )
 
 
 def get_mcp_client():

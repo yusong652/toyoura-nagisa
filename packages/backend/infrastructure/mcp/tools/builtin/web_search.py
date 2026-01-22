@@ -22,11 +22,13 @@ async def web_search(
     from the web with source citations and comprehensive response text.
     """
     try:
-        # Get LLM client from FastAPI app state via MCP context
-        fastapi_app = getattr(getattr(context, "fastmcp", None), "app", None)
-        llm_client = None
-        if fastapi_app is not None and hasattr(fastapi_app.state, "llm_client"):
-            llm_client = fastapi_app.state.llm_client
+        # Get LLM client from global app context
+        from backend.shared.utils.app_context import get_llm_client
+        
+        try:
+            llm_client = get_llm_client()
+        except RuntimeError:
+            llm_client = None
         
         if not llm_client:
             return error_response(

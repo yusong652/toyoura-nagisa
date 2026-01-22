@@ -28,8 +28,18 @@ async def initialize_backend():
 
     # Initialize LLM Factory and Client
     llm_factory = initialize_factory()
-    llm_client = llm_factory.create_client()
-    app.state.llm_client = llm_client
+    
+    from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+    default_config = get_default_llm_config()
+    if not default_config:
+        # Fallback for tests if no default config
+        default_config = {"provider": "google", "model": "gemini-2.0-flash-exp"}
+        
+    llm_client = llm_factory.create_client_with_config(
+        provider=default_config["provider"],
+        model=default_config["model"]
+    )
+    # app.state.llm_client = llm_client  # No longer used
     app.state.llm_factory = llm_factory
     print(f"[INIT] LLM Client initialized: {type(llm_client).__name__}")
 
@@ -69,12 +79,12 @@ TEST_AGENT_NO_TOOLS = SubAgentConfig(
 )
 
 # Test agent with coding tools
-from backend.domain.models.agent_profiles import CODING_TOOLS
+from backend.domain.models.agent_profiles import PFC_TOOLS
 TEST_AGENT_WITH_TOOLS = SubAgentConfig(
     name="test_with_tools",
     display_name="Test Agent (With Tools)",
     description="Test agent that can use coding tools",
-    tools=tuple(CODING_TOOLS),
+    tools=tuple(PFC_TOOLS),
     max_iterations=5,
     streaming_enabled=False,
     enable_memory=False,

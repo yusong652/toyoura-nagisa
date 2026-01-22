@@ -42,22 +42,6 @@ async def lifespan(app: FastAPI):
         llm_factory = initialize_factory()
         app.state.llm_factory = llm_factory
 
-        # Initialize LLM Client from default config (config/models.yaml or data/default_llm.json)
-        try:
-            llm_client = llm_factory.create_client_from_default_config(app=app)
-            app.state.llm_client = llm_client
-        except Exception as e:
-            log_warning(f"Default LLM client could not be initialized: {e}")
-            app.state.llm_client = None
-
-        # Initialize Secondary LLM Client for SubAgents (lighter model to reduce RPM)
-        try:
-            secondary_llm_client = llm_factory.create_secondary_client_from_default_config(app=app)
-            app.state.secondary_llm_client = secondary_llm_client
-        except Exception as e:
-            log_warning(f"Secondary LLM client could not be initialized: {e}")
-            app.state.secondary_llm_client = None
-
         # Initialize MCP server and client
         app.state.mcp = mcp
         mcp.app = app  # type: ignore # Set app reference for MCP tools to access FastAPI state

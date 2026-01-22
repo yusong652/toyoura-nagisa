@@ -17,6 +17,7 @@ from backend.presentation.exceptions import (
 )
 from backend.application.services.contents import TitleService
 from backend.infrastructure.llm.base.client import LLMClientBase
+from backend.shared.utils.app_context import get_llm_client as get_global_llm_client
 
 router = APIRouter(tags=["content"])
 
@@ -46,9 +47,9 @@ def get_title_service() -> TitleService:
     return TitleService()
 
 
-def get_llm_client(request: Request) -> LLMClientBase:
-    """Get LLM client from app state."""
-    return request.app.state.llm_client
+def get_llm_client() -> LLMClientBase:
+    """Get LLM client from app context."""
+    return get_global_llm_client()
 
 
 # =====================

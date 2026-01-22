@@ -25,6 +25,7 @@ from backend.presentation.exceptions import (
 )
 from backend.application.services.session_service import SessionService
 from backend.infrastructure.llm.base.client import LLMClientBase
+from backend.shared.utils.app_context import get_llm_client as get_global_llm_client
 
 router = APIRouter(tags=["sessions"])
 
@@ -108,9 +109,9 @@ def get_session_service() -> SessionService:
     return SessionService()
 
 
-def get_llm_client(request: Request) -> LLMClientBase:
-    """Get LLM client from app state."""
-    return request.app.state.llm_client
+def get_llm_client() -> LLMClientBase:
+    """Get LLM client from app context."""
+    return get_global_llm_client()
 
 
 # =====================
