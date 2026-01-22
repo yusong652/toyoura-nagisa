@@ -17,6 +17,7 @@ class LLMFactory:
 
     def __init__(self):
         self._clients: Dict[str, Type[LLMClientBase]] = {}
+        self._client_cache: Dict[str, LLMClientBase] = {}
         self._register_default_clients()
 
     def _register_default_clients(self):
@@ -145,9 +146,20 @@ class LLMFactory:
                 f"Supported: {list(self._clients.keys())}"
             )
 
+        # Check cache for existing client instance
+        # Include app ID in cache key to distinguish clients with/without app context
+        cache_key = f"{provider}:{model}:{id(app) if app else 'None'}"
+        if cache_key in self._client_cache:
+            # logger.debug(f"Reusing cached {provider} client for model: {model}")
+            return self._client_cache[cache_key]
+
         config = self._build_config(provider, model, app)
         logger.info(f"Creating {provider} client with model: {model}")
-        return self._clients[provider](**config)
+        client = self._clients[provider](**config)
+        
+        # Store in cache
+        self._client_cache[cache_key] = client
+        return client
 
     def _build_config(
         self,
