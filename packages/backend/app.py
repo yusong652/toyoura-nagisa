@@ -1,6 +1,6 @@
-from contextlib import asynccontextmanager
 import os
 import threading
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,15 +9,17 @@ from fastmcp import Client
 from backend.config.cors import get_cors_config, get_cors_middleware_kwargs
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.mcp.mcp_server import mcp
-from backend.presentation.api import content
-from backend.presentation.api import file_search
-from backend.presentation.api import llm_config
-from backend.presentation.api import messages
-from backend.presentation.api import pfc_console
-from backend.presentation.api import profiles
-from backend.presentation.api import sessions
-from backend.presentation.api import shell
-from backend.presentation.api import todos
+from backend.presentation.api import (
+    content,
+    file_search,
+    llm_config,
+    messages,
+    pfc_console,
+    profiles,
+    sessions,
+    shell,
+    todos,
+)
 from backend.presentation.exceptions import register_exception_handlers
 from backend.presentation.websocket.routes import register_websocket_routes
 from backend.presentation.websocket.websocket_handler import create_websocket_handler
