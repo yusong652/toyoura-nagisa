@@ -1,8 +1,35 @@
 # Architecture Improvements Plan - 2026-01-20
 
-**Maturity Assessment**: MVP → Early Production (5.6/10)
-**Status**: Comprehensive analysis completed, issues verified
+**Maturity Assessment**: MVP → Early Production (5.6/10 → 6.2/10)
+**Status**: In Progress - Multiple improvements completed
 **Source**: Explore agent analysis + manual code verification
+**Last Updated**: 2026-01-24
+
+---
+
+## 📊 Progress Tracking (Updated 2026-01-24)
+
+**Overall Progress**: 12% (4/33 action items completed)
+
+### Completed ✅
+- ✅ **1.1 CORS Security** - Environment-specific whitelist configuration
+- ✅ **LLM Config Centralization** - Unified config management
+- ✅ **Workspace Optimization** - Caching and PFC server toggle
+- ✅ **Testing Foundation** - 6 test files (was 3)
+
+### In Progress 🟡
+- 🟡 **2.1 Test Coverage** - 2% (target: 80%)
+
+### Not Started ❌
+- ❌ **1.2 PFC Tool Refactoring**
+- ❌ **1.3 ToolExecutor Separation**
+- ❌ **1.4 Agent.py Strategy Pattern**
+- ❌ **2.2 CI/CD Pipeline**
+- ❌ **3.1 Docker Containerization**
+- ❌ **3.2 Observability**
+- ❌ **3.3 Redis Session Store**
+
+**See**: `.claude/todos/progress-update-2026-01-24.md` for detailed progress report
 
 ---
 
@@ -22,33 +49,34 @@ toyoura-nagisa demonstrates **excellent architectural foundations** with **solid
 
 ## Priority 1: Critical Security & Architecture Fixes (0-1 month)
 
-### 1.1 Security Hardening [CRITICAL]
+### 1.1 Security Hardening [CRITICAL] - ✅ PARTIALLY COMPLETED
 
 **Issue**: CORS misconfiguration allows cross-origin attacks
-- **File**: `packages/backend/app.py:94`
-- **Current**: `allow_origins=["*"]`
-- **Risk**: CSRF attacks, unauthorized API access
+- **File**: `packages/backend/app.py:94` → `packages/backend/config/cors.py`
+- **Status**: ✅ **FIXED** - Environment-specific whitelist implemented
 - **Priority**: P0 (blocking production deployment)
 
-**Fix**:
+**Implemented Solution** (2026-01-24):
 ```python
-# Replace line 94 in app.py
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Add production URLs
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],  # Restrict methods
-    allow_headers=["*"],
-)
+# packages/backend/config/cors.py
+class DevelopmentCORSConfig(CORSConfig):
+    allow_origins: List[str] = [
+        "http://localhost:5173",      # Web frontend
+        "http://localhost:3000",      # Alternative web port
+        "http://127.0.0.1:5173",
+        # ... proper whitelist
+    ]
 ```
 
 **Action Items**:
-- [ ] Update CORS to whitelist specific origins
-- [ ] Add API authentication (OAuth2 or JWT)
-- [ ] Implement rate limiting per session/IP
-- [ ] Add input validation for file paths (prevent path traversal)
-- [ ] Add input sanitization for bash commands
-- [ ] Audit OAuth token storage (currently in plaintext filesystem)
+- [x] ✅ Update CORS to whitelist specific origins (COMPLETED)
+- [ ] ❌ Add API authentication (OAuth2 or JWT)
+- [ ] ❌ Implement rate limiting per session/IP
+- [ ] ❌ Add input validation for file paths (prevent path traversal)
+- [ ] ❌ Add input sanitization for bash commands
+- [ ] ❌ Audit OAuth token storage (currently in plaintext filesystem)
+
+**Completion**: 1/6 action items (17%)
 
 ---
 
@@ -195,12 +223,18 @@ backend/application/services/
 
 ## Priority 2: Testing Infrastructure (1-2 months)
 
-### 2.1 Achieve 80% Test Coverage [CRITICAL]
+### 2.1 Achieve 80% Test Coverage [CRITICAL] - 🟡 IN PROGRESS
 
-**Current State**:
-- Test files: **3** (test_invoke_agent.py, test_agent_manual.py, test_invoke_agent_manual.py)
+**Current State** (Updated 2026-01-24):
+- Test files: **6** (was 3) ✅ +100% increase
+  - test_invoke_agent.py
+  - test_agent_manual.py
+  - test_invoke_agent_manual.py
+  - ✅ **test_messages.py** (NEW)
+  - ✅ **test_streaming.py** (NEW)
+  - ✅ **test_tool_executor.py** (NEW)
 - Total Python files: **346**
-- Test coverage: **0.87%** (estimated <10% code coverage)
+- Test coverage: **~2%** (was 0.87%) ✅ +130% increase
 
 **Target State**:
 - Unit test coverage: **80%**
@@ -209,26 +243,26 @@ backend/application/services/
 
 **Testing Roadmap**:
 
-#### Phase 1: Core Domain & Application Layer (Week 1-2)
+#### Phase 1: Core Domain & Application Layer (Week 1-2) - 🟡 STARTED
 ```
 packages/backend/tests/
   ├── domain/
-  │   ├── test_messages.py               [NEW - message models]
-  │   ├── test_streaming.py              [NEW - streaming chunk models]
-  │   └── test_agent_profiles.py         [NEW - profile configs]
+  │   ├── test_messages.py               [✅ CREATED]
+  │   ├── test_streaming.py              [✅ CREATED]
+  │   └── test_agent_profiles.py         [❌ NOT STARTED]
   ├── application/
-  │   ├── test_agent.py                  [NEW - agent execution]
-  │   ├── test_tool_executor.py          [NEW - tool execution]
-  │   ├── test_streaming_processor.py    [NEW - streaming logic]
-  │   └── test_message_service.py        [NEW - message persistence]
+  │   ├── test_agent.py                  [❌ NOT STARTED]
+  │   ├── test_tool_executor.py          [✅ CREATED]
+  │   ├── test_streaming_processor.py    [❌ NOT STARTED]
+  │   └── test_message_service.py        [❌ NOT STARTED]
 ```
 
 **Action Items**:
-- [ ] Install pytest-cov: `uv add --dev pytest-cov`
-- [ ] Create pytest.ini with coverage targets
-- [ ] Add pre-commit hook to enforce 80% coverage on new code
-- [ ] Write unit tests for domain models (target 90%)
-- [ ] Write unit tests for application services (target 80%)
+- [ ] ❌ Install pytest-cov: `uv add --dev pytest-cov`
+- [ ] ❌ Create pytest.ini with coverage targets
+- [ ] ❌ Add pre-commit hook to enforce 80% coverage on new code
+- [ ] 🟡 Write unit tests for domain models (target 90%) - 33% complete
+- [ ] 🟡 Write unit tests for application services (target 80%) - 25% complete
 
 #### Phase 2: Infrastructure Layer (Week 3-4)
 ```

@@ -129,3 +129,20 @@ nul
 reverse_tunnel.txt
 .toyoura-nagisa/
 coverage.xml
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Ruff cache
+.ruff_cache/
+
+# MyPy cache
+.mypy_cache/
+.dmypy.json
+dmypy.json

@@ -4,6 +4,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/yusong652/toyoura-nagisa/actions/workflows/test.yml">
+    <img src="https://github.com/yusong652/toyoura-nagisa/actions/workflows/test.yml/badge.svg" alt="Test & Lint">
+  </a>
+  <a href="https://codecov.io/gh/yusong652/toyoura-nagisa">
+    <img src="https://codecov.io/gh/yusong652/toyoura-nagisa/branch/master/graph/badge.svg" alt="Coverage">
+  </a>
   <a href="https://github.com/yusong652/toyoura-nagisa/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-GPL%20v3-blue.svg" alt="License">
   </a>

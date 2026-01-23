@@ -83,6 +83,8 @@ dev-dependencies = [
     "pytest",
     "pytest-cov",
     "tiktoken>=0.9.0",
+    "ruff>=0.8.0",
+    "mypy>=1.14.0",
 ]
 
 [tool.uv.workspace]
@@ -96,4 +98,82 @@ members = [
 [project.optional-dependencies]
 dev = [
     "github-cli",  # GitHub CLI for managing issues and PRs
-] 
+]
+
+# Ruff configuration
+[tool.ruff]
+# Python version
+target-version = "py310"
+
+# Line length
+line-length = 120
+
+# Directories to exclude
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "*.egg-info",
+    "build",
+    "dist",
+    "node_modules",
+    "_third_party",
+    "services/pfc-server",  # Separate service with different deps
+]
+
+[tool.ruff.lint]
+# Enable pycodestyle (E), pyflakes (F), and isort (I)
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+
+# Ignore specific rules
+ignore = [
+    "E501",  # Line too long (handled by formatter)
+    "B008",  # Do not perform function call in argument defaults
+    "C901",  # Function is too complex
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Indent with spaces
+indent-style = "space"
+
+# Use \n line endings
+line-ending = "lf"
+
+# Mypy configuration
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Gradual typing - set to true later
+check_untyped_defs = true
+ignore_missing_imports = true
+no_implicit_optional = true
+show_error_codes = true
+strict_optional = true
+
+# Per-module options (stricter for domain layer)
+[[tool.mypy.overrides]]
+module = "backend.domain.*"
+disallow_untyped_defs = true
+disallow_any_explicit = false
+
+[[tool.mypy.overrides]]
+module = "backend.tests.*"
+ignore_errors = true
+
