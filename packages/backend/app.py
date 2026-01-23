@@ -1,4 +1,3 @@
-from fastapi import FastAPI
 import os
 import threading
 from contextlib import asynccontextmanager

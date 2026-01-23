@@ -7,6 +7,7 @@ Fixtures provide reusable test data and mock objects.
 
 import importlib
 import sys
+from types import ModuleType
 from datetime import datetime
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock, Mock
@@ -22,11 +23,25 @@ def _ensure_backend_config_available() -> None:
     except ModuleNotFoundError:
         config_module = importlib.import_module("backend.config_example")
         sys.modules.setdefault("backend.config", config_module)
-        for name in ("cors", "dev", "llm", "memory", "pfc"):
+        for name in ("cors", "dev", "llm", "pfc"):
             sys.modules.setdefault(
                 f"backend.config.{name}",
                 importlib.import_module(f"backend.config_example.{name}"),
             )
+
+        if "backend.config.memory" not in sys.modules:
+            memory_module = ModuleType("backend.config.memory")
+
+            class MemoryConfig:
+                def __init__(self, **kwargs: Any) -> None:
+                    for key, value in kwargs.items():
+                        setattr(self, key, value)
+
+                def model_dump(self) -> Dict[str, Any]:
+                    return dict(self.__dict__)
+
+            memory_module.MemoryConfig = MemoryConfig
+            sys.modules["backend.config.memory"] = memory_module
 
 
 _ensure_backend_config_available()

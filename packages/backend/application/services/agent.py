@@ -12,22 +12,22 @@ Execution modes (controlled by is_main_agent):
 import asyncio
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, cast
 
+from backend.application.services.contents.title_service import TitleService
+from backend.application.services.message_service import MessageService
+from backend.application.services.streaming_models import StreamingState
+from backend.application.services.streaming_processor import StreamingProcessor
+from backend.application.services.tool_executor import ToolExecutor
 from backend.domain.models.agent import AgentResult
 from backend.domain.models.agent_profiles import ProfileConfig, SubAgentConfig
 from backend.domain.models.messages import AssistantMessage, UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
-from backend.application.services.tool_executor import ToolExecutor
-from backend.application.services.streaming_models import StreamingState
-from backend.application.services.streaming_processor import StreamingProcessor
-from backend.application.services.message_service import MessageService
-from backend.application.services.contents.title_service import TitleService
 from backend.infrastructure.storage.session_manager import save_token_usage
 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
 # Type alias for agent configuration
-AgentConfig = Union[ProfileConfig, SubAgentConfig]
+AgentConfig = ProfileConfig | SubAgentConfig
 
 
 class Agent:
@@ -56,10 +56,10 @@ class Agent:
         self,
         config: AgentConfig,
         llm_client: LLMClientBase,
-        session_id: Optional[str] = None,
-        enable_memory: Optional[bool] = None,
-        notification_session_id: Optional[str] = None,
-        parent_tool_call_id: Optional[str] = None,
+        session_id: str | None = None,
+        enable_memory: bool | None = None,
+        notification_session_id: str | None = None,
+        parent_tool_call_id: str | None = None,
     ):
         """
         Initialize Agent.
@@ -107,6 +107,7 @@ class Agent:
         in TodoMonitor.get_reminders(), not at construction time.
         """
         from backend.infrastructure.monitoring import get_status_monitor
+
         return get_status_monitor(self.session_id)
 
     @property
@@ -158,6 +159,7 @@ class Agent:
             # Tools use get_llm_client() to find agent_profile, so SubAgent must be visible there
             if not self.is_main_agent:
                 from backend.infrastructure.llm.session_client import get_session_llm_client
+
                 try:
                     # Resolve primary session LLM client
                     primary_client = get_session_llm_client(self.session_id)
@@ -182,10 +184,10 @@ class Agent:
             if self.is_main_agent:
                 timestamp_ms = int(instruction.timestamp.timestamp() * 1000) if instruction.timestamp else None
                 message_service.save_user_message(
-                    content=cast(List[Dict[str, Any]], instruction.content),
+                    content=cast(list[dict[str, Any]], instruction.content),
                     session_id=self.session_id,
                     timestamp=timestamp_ms,
-                    message_id=instruction.id
+                    message_id=instruction.id,
                 )
 
             # Execute unified loop
@@ -203,7 +205,7 @@ class Agent:
             if self.is_main_agent:
                 # MainAgent: use processor for storage format
                 final_message = processor.format_response_for_storage(final_response)
-                streaming_message_id = getattr(self.context_manager, 'streaming_message_id', None)
+                streaming_message_id = getattr(self.context_manager, "streaming_message_id", None)
             else:
                 # SubAgent: check for special markers first
                 if isinstance(final_response, dict):
@@ -215,7 +217,7 @@ class Agent:
                             status="user_rejected",
                             message=AssistantMessage(
                                 role="assistant",
-                                content=[{"type": "text", "text": "SubAgent operation was rejected by user."}]
+                                content=[{"type": "text", "text": "SubAgent operation was rejected by user."}],
                             ),
                             execution_time_seconds=time.time() - start_time,
                         )
@@ -227,8 +229,7 @@ class Agent:
                         return AgentResult(
                             status="max_iterations",
                             message=AssistantMessage(
-                                role="assistant",
-                                content=[{"type": "text", "text": response_text}]
+                                role="assistant", content=[{"type": "text", "text": response_text}]
                             ),
                             iterations_used=self.config.max_iterations,
                             execution_time_seconds=time.time() - start_time,
@@ -236,10 +237,7 @@ class Agent:
 
                 # SubAgent: extract text content from LLM response
                 response_text = processor.extract_text_content(final_response)
-                final_message = AssistantMessage(
-                    role="assistant",
-                    content=[{"type": "text", "text": response_text}]
-                )
+                final_message = AssistantMessage(role="assistant", content=[{"type": "text", "text": response_text}])
                 streaming_message_id = None
 
                 # SubAgent: check for empty response (domain-level validation)
@@ -267,10 +265,11 @@ class Agent:
             if self.is_main_agent:
                 # MainAgent: clean up placeholder message on error
                 import traceback
+
                 print(f"[Agent] Exception: {e}")
                 print(f"[Agent] Traceback: {traceback.format_exc()}")
 
-                streaming_message_id = getattr(self.context_manager, 'streaming_message_id', None)
+                streaming_message_id = getattr(self.context_manager, "streaming_message_id", None)
                 if streaming_message_id:
                     try:
                         message_service = MessageService()
@@ -282,8 +281,7 @@ class Agent:
             else:
                 # SubAgent: return error result
                 error_message = AssistantMessage(
-                    role="assistant",
-                    content=[{"type": "text", "text": f"Error: {str(e)}"}]
+                    role="assistant", content=[{"type": "text", "text": f"Error: {str(e)}"}]
                 )
                 return AgentResult(
                     status="error",
@@ -294,7 +292,6 @@ class Agent:
         finally:
             # Reset iteration context to prevent stale warnings in next conversation turn
             self.status_monitor.reset_iteration_context()
-
 
     async def _execute_loop(self) -> Any:
         """
@@ -392,21 +389,15 @@ class Agent:
             if self.is_main_agent:
                 # MainAgent: Full tool execution with persistence
                 tool_executor = ToolExecutor(
-                    self.llm_client.tool_manager,
-                    self.session_id,
-                    notification_session_id=self._notification_session_id
+                    self.llm_client.tool_manager, self.session_id, notification_session_id=self._notification_session_id
                 )
                 execution_result = await tool_executor.execute_all(
                     tool_calls, self._message_id, self.config.tool_profile
                 )
 
                 # Save to context and database
-                await tool_executor.save_results_to_context(
-                    tool_calls, execution_result.results, self.context_manager
-                )
-                await tool_executor.save_results_to_database(
-                    tool_calls, execution_result.results
-                )
+                await tool_executor.save_results_to_context(tool_calls, execution_result.results, self.context_manager)
+                await tool_executor.save_results_to_database(tool_calls, execution_result.results)
 
                 # Handle rejection based on outcome type
                 if execution_result.rejected_tools:
@@ -414,21 +405,22 @@ class Agent:
                         # reject: Stop execution, user wants to provide input via main input
                         # Save rejection context for next message injection
                         await self._save_rejection_context(
-                            execution_result.rejected_tools,
-                            execution_result.rejection_message
+                            execution_result.rejected_tools, execution_result.rejection_message
                         )
                         await WebSocketNotificationService.send_streaming_update(
                             session_id=self.session_id,
                             message_id=self._message_id,
                             content=self._state.get_content_blocks(),
                             streaming=False,
-                            interrupted=False
+                            interrupted=False,
                         )
                         raise UserRejectionInterruption(self.session_id, execution_result.rejected_tools)
                     elif execution_result.rejection_outcome == "reject_and_tell":
                         # reject_and_tell: Continue execution with user's instruction
                         # Results already saved to context, just continue to next iteration
-                        print(f"[Agent] Tool rejected with instruction, continuing: {execution_result.rejection_message}")
+                        print(
+                            f"[Agent] Tool rejected with instruction, continuing: {execution_result.rejection_message}"
+                        )
                         # Don't raise exception, continue to next iteration
 
                 # Check for user interrupt
@@ -439,7 +431,7 @@ class Agent:
                         message_id=self._state.message_id,
                         content=self._state.get_content_blocks(),
                         streaming=False,
-                        interrupted=True
+                        interrupted=True,
                     )
                     return response
             else:
@@ -485,9 +477,7 @@ class Agent:
                         # reject: Stop SubAgent, return rejection marker to MainAgent
                         # Save rejection context for MainAgent's next message injection
                         await self._save_rejection_context(
-                            execution_result.rejected_tools,
-                            execution_result.rejection_message,
-                            is_subagent=True
+                            execution_result.rejected_tools, execution_result.rejection_message, is_subagent=True
                         )
                         # Return simple marker - details already in rejection context
                         return {"_subagent_rejected": True}
@@ -496,13 +486,13 @@ class Agent:
                 # Save results to context only (no database persistence for SubAgent)
                 # inject_reminders=True to include iteration warnings in last tool result
                 await tool_executor.save_results_to_context(
-                    tool_calls, execution_result.results, self.context_manager,
-                    inject_reminders=True
+                    tool_calls, execution_result.results, self.context_manager, inject_reminders=True
                 )
 
                 # Check for user interrupt (use notification_session_id for MainAgent's interrupt flag)
                 # SubAgent uses a temporary session_id, so we must check the parent's session
                 from backend.infrastructure.monitoring import get_status_monitor
+
                 parent_monitor = get_status_monitor(self._notification_session_id)
                 if parent_monitor.is_user_interrupted():
                     print(f"[SubAgent] Interrupted by user at iteration {iteration}")
@@ -518,10 +508,7 @@ class Agent:
             iteration += 1
 
     async def _save_rejection_context(
-        self,
-        rejected_tools: list,
-        rejection_message: Optional[str],
-        is_subagent: bool = False
+        self, rejected_tools: list, rejection_message: str | None, is_subagent: bool = False
     ) -> None:
         """
         Save rejection context for next message injection.
@@ -567,13 +554,11 @@ class Agent:
             message_id=self._state.message_id,
             content=self._state.get_content_blocks(),
             streaming=False,
-            interrupted=True
+            interrupted=True,
         )
 
         # Trigger title generation
-        asyncio.create_task(
-            TitleService().try_generate_title_if_needed_async(self.session_id, self.llm_client)
-        )
+        asyncio.create_task(TitleService().try_generate_title_if_needed_async(self.session_id, self.llm_client))
         return None
 
     async def _finalize_stream_response(self, response: Any) -> Any:
@@ -590,11 +575,7 @@ class Agent:
 
         # Send final update
         await WebSocketNotificationService.send_streaming_update(
-            session_id=self.session_id,
-            message_id=self._message_id,
-            content=content,
-            streaming=False,
-            usage=usage
+            session_id=self.session_id, message_id=self._message_id, content=content, streaming=False, usage=usage
         )
 
         # Save usage
@@ -602,9 +583,7 @@ class Agent:
             save_token_usage(self.session_id, usage)
 
         # Trigger title generation
-        asyncio.create_task(
-            TitleService().try_generate_title_if_needed_async(self.session_id, self.llm_client)
-        )
+        asyncio.create_task(TitleService().try_generate_title_if_needed_async(self.session_id, self.llm_client))
 
         return response
 
@@ -619,20 +598,14 @@ class Agent:
 
             # Send streaming update and WAIT for completion
             await WebSocketNotificationService.send_streaming_update(
-                session_id=self.session_id,
-                message_id=self._message_id,
-                content=content,
-                streaming=True,
-                usage=usage
+                session_id=self.session_id, message_id=self._message_id, content=content, streaming=True, usage=usage
             )
 
             if usage:
                 save_token_usage(self.session_id, usage)
 
             # Trigger title generation
-            asyncio.create_task(
-                TitleService().try_generate_title_if_needed_async(self.session_id, self.llm_client)
-            )
+            asyncio.create_task(TitleService().try_generate_title_if_needed_async(self.session_id, self.llm_client))
 
         except Exception as e:
             print(f"[Agent.stream] Failed to update streaming message: {e}")
@@ -648,34 +621,28 @@ class Agent:
 
         message_service = MessageService()
         for i, tool_call in enumerate(tool_calls):
-            is_last_tool = (i == len(tool_calls) - 1)
+            is_last_tool = i == len(tool_calls) - 1
 
-            limit_result = error_response(
-                stop_message,
-                llm_content={"parts": [{"type": "text", "text": stop_message}]}
-            )
+            limit_result = error_response(stop_message, llm_content={"parts": [{"type": "text", "text": stop_message}]})
 
             await self.context_manager.add_tool_result(
-                tool_call['id'],
-                tool_call['name'],
-                limit_result,
-                inject_reminders=is_last_tool
+                tool_call["id"], tool_call["name"], limit_result, inject_reminders=is_last_tool
             )
 
             try:
                 result_message_id = message_service.save_tool_result_message(
-                    tool_call_id=tool_call['id'],
-                    tool_name=tool_call['name'],
+                    tool_call_id=tool_call["id"],
+                    tool_name=tool_call["name"],
                     tool_result=limit_result,
-                    session_id=self.session_id
+                    session_id=self.session_id,
                 )
 
                 await WebSocketNotificationService.send_tool_result_update(
                     session_id=self.session_id,
                     message_id=result_message_id,
-                    tool_call_id=tool_call['id'],
-                    tool_name=tool_call['name'],
-                    tool_result=limit_result
+                    tool_call_id=tool_call["id"],
+                    tool_name=tool_call["name"],
+                    tool_result=limit_result,
                 )
             except Exception as e:
                 print(f"[Agent.stream] Failed to save iteration limit result: {e}")
@@ -687,8 +654,10 @@ class Agent:
         if it still tries to call tools, we just return immediately without
         executing them. No point in executing tools we won't use.
         """
-        print(f"[SubAgent] Reached iteration limit ({self.config.max_iterations}), "
-              f"skipping {len(tool_calls)} pending tool calls")
+        print(
+            f"[SubAgent] Reached iteration limit ({self.config.max_iterations}), "
+            f"skipping {len(tool_calls)} pending tool calls"
+        )
 
         # List the tools that were NOT executed
         pending_tools = [tc.get("name", "unknown") for tc in tool_calls]
