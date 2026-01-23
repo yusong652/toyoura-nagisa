@@ -1,4 +1,4 @@
-# CLAUDE.md
+# WARP.md
 
 This file provides guidance to WARP when working with code in this repository.
 
