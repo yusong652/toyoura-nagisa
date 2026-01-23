@@ -469,5 +469,5 @@ class TestToolExecutorEdgeCases:
         # Assert
         assert "cascade_blocked" in result
         assert result["cascade_blocked"] is True
-        assert "bash was rejected" in result["error"]
-        assert "write" in result["error"]
+        assert "bash was rejected" in result["message"]
+        assert "write" in result["message"]

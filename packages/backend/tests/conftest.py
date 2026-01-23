@@ -122,6 +122,20 @@ def mock_tool_manager():
         "status": "success",
         "result": "Tool executed successfully"
     })
+
+    # Mock confirmation check - only bash, edit, write, pfc_execute_task, invoke_agent require confirmation
+    def mock_requires_confirmation(tool_name: str, tool_args: dict) -> bool:
+        CONFIRMATION_REQUIRED_TOOLS = {
+            "bash", "edit", "write", "pfc_execute_task", "invoke_agent"
+        }
+        return tool_name in CONFIRMATION_REQUIRED_TOOLS
+
+    manager._requires_user_confirmation = Mock(side_effect=mock_requires_confirmation)
+
+    # Mock diff generation methods (for confirmation info building)
+    manager._generate_edit_diff = AsyncMock(return_value=None)
+    manager._generate_write_diff = AsyncMock(return_value=None)
+
     return manager
 
 
