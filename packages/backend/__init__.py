@@ -1,3 +1,3 @@
 """
 toyoura-nagisa backend package
-""" 
+"""

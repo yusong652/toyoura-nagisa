@@ -1,34 +1,36 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+import os
+import threading
 from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastmcp import Client
+
+from backend.config.cors import get_cors_config, get_cors_middleware_kwargs
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.mcp.mcp_server import mcp
-from fastmcp import Client
-from backend.presentation.api import sessions
-from backend.presentation.api import messages
 from backend.presentation.api import content
-# from backend.presentation.api import chat  # Deprecated: Moved to WebSocket
-from backend.presentation.api import profiles
 from backend.presentation.api import file_search
-from backend.presentation.api import todos
-from backend.presentation.api import shell
-from backend.presentation.api import pfc_console
 from backend.presentation.api import llm_config
-from backend.presentation.websocket.websocket_handler import create_websocket_handler
-from backend.presentation.websocket.routes import register_websocket_routes
+from backend.presentation.api import messages
+from backend.presentation.api import pfc_console
+from backend.presentation.api import profiles
+from backend.presentation.api import sessions
+from backend.presentation.api import shell
+from backend.presentation.api import todos
 from backend.presentation.exceptions import register_exception_handlers
+from backend.presentation.websocket.routes import register_websocket_routes
+from backend.presentation.websocket.websocket_handler import create_websocket_handler
 from backend.shared.utils.app_context import set_app
 from backend.shared.utils.process_utils import kill_process_on_port
 from backend.shared.utils.startup_banner import (
-    print_banner,
-    print_shutdown_message,
-    print_shutdown_complete,
     log_error,
     log_warning,
+    print_banner,
+    print_shutdown_complete,
+    print_shutdown_message,
 )
-from backend.config.cors import get_cors_middleware_kwargs, get_cors_config
-import threading
-import os
 
 
 @asynccontextmanager
@@ -57,10 +59,12 @@ async def lifespan(app: FastAPI):
 
         # Validate LLM configuration
         from backend.shared.utils.config_validator import validate_llm_configuration
+
         await validate_llm_configuration()
 
         # Get configuration for banner
         from backend.config.dev import DevelopmentConfig
+
         dev_config = DevelopmentConfig()
         cors_config = get_cors_config()
         environment = os.getenv("ENVIRONMENT", "development")
@@ -72,7 +76,7 @@ async def lifespan(app: FastAPI):
             port=dev_config.port,
             cors_origins=cors_config.allow_origins,
             mcp_port=9000,
-            version="0.1.0"
+            version="0.1.0",
         )
 
         yield
@@ -88,6 +92,7 @@ async def lifespan(app: FastAPI):
             # Cleanup background processes
             try:
                 from backend.infrastructure.shell.background_process_manager import shutdown_all_processes
+
                 shutdown_all_processes()
             except Exception as e:
                 log_warning(f"Background process cleanup error: {e}")
@@ -97,16 +102,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             log_error(f"Shutdown error: {e}")
 
+
 app = FastAPI(lifespan=lifespan)
 
 # Set global app instance for context access
 set_app(app)
 
 # CORS middleware configuration - environment-aware security settings
-app.add_middleware(
-    CORSMiddleware,
-    **get_cors_middleware_kwargs()
-)
+app.add_middleware(CORSMiddleware, **get_cors_middleware_kwargs())
 
 app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")

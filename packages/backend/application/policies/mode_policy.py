@@ -9,10 +9,10 @@ when the session is in plan mode.
 from __future__ import annotations
 
 import shlex
-from typing import Any, Dict, Set
+from typing import Any
 
 
-READ_ONLY_TOOLS: Set[str] = {
+READ_ONLY_TOOLS: set[str] = {
     "read",
     "glob",
     "grep",
@@ -33,7 +33,7 @@ READ_ONLY_TOOLS: Set[str] = {
     "invoke_agent",  # SubAgents (pfc_explorer, pfc_diagnostic) are read-only
 }
 
-READ_ONLY_BASH_COMMANDS: Set[str] = {
+READ_ONLY_BASH_COMMANDS: set[str] = {
     "ls",
     "pwd",
     "whoami",
@@ -48,7 +48,7 @@ READ_ONLY_BASH_COMMANDS: Set[str] = {
     "rg",
 }
 
-READ_ONLY_GIT_SUBCOMMANDS: Set[str] = {
+READ_ONLY_GIT_SUBCOMMANDS: set[str] = {
     "status",
     "diff",
     "log",
@@ -95,7 +95,7 @@ def is_bash_command_read_only(command: str) -> bool:
     return False
 
 
-def is_read_only_tool(tool_name: str, tool_args: Dict[str, Any]) -> bool:
+def is_read_only_tool(tool_name: str, tool_args: dict[str, Any]) -> bool:
     """Return True if a tool call is considered read-only."""
     if tool_name == "bash":
         return is_bash_command_read_only(str(tool_args.get("command", "")))
@@ -103,7 +103,7 @@ def is_read_only_tool(tool_name: str, tool_args: Dict[str, Any]) -> bool:
     return tool_name in READ_ONLY_TOOLS
 
 
-def is_tool_allowed_in_mode(mode: str, tool_name: str, tool_args: Dict[str, Any]) -> bool:
+def is_tool_allowed_in_mode(mode: str, tool_name: str, tool_args: dict[str, Any]) -> bool:
     """Return True if a tool is allowed in the given session mode."""
     normalized_mode = (mode or "build").lower()
     if normalized_mode != "plan":
