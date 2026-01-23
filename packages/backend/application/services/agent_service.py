@@ -12,7 +12,7 @@ Responsibilities:
 - Separation of concerns: presentation layer doesn't know Agent internals
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from backend.application.services.agent import Agent
 from backend.domain.models.agent import AgentResult
@@ -59,11 +59,7 @@ class AgentService:
         )
     """
 
-    def __init__(
-        self,
-        llm_client: LLMClientBase,
-        llm_factory: Optional[LLMFactory] = None
-    ):
+    def __init__(self, llm_client: LLMClientBase, llm_factory: LLMFactory | None = None):
         """
         Initialize AgentService.
 
@@ -81,7 +77,7 @@ class AgentService:
         instruction: UserMessage,
         agent_profile: str = "pfc_expert",
         enable_memory: bool = True,
-        llm_config: Optional[Dict[str, Any]] = None,
+        llm_config: dict[str, Any] | None = None,
     ) -> AgentResult:
         """
         Process a chat request using MainAgent.
@@ -114,20 +110,15 @@ class AgentService:
 
         if llm_config:
             if not self._llm_factory:
-                raise ValueError(
-                    "Cannot use custom LLM config: LLMFactory not provided during initialization"
-                )
+                raise ValueError("Cannot use custom LLM config: LLMFactory not provided during initialization")
 
             # Validate config structure
             if "provider" not in llm_config or "model" not in llm_config:
-                raise ValueError(
-                    "Invalid LLM config: must contain 'provider' and 'model' keys"
-                )
+                raise ValueError("Invalid LLM config: must contain 'provider' and 'model' keys")
 
             # Create custom client based on provided config
             llm_client = self._llm_factory.create_client_with_config(
-                provider=llm_config["provider"],
-                model=llm_config["model"]
+                provider=llm_config["provider"], model=llm_config["model"]
             )
 
         config = get_profile_config(agent_profile)
@@ -143,9 +134,9 @@ class AgentService:
         self,
         config: SubAgentConfig,
         instruction: str,
-        context: Optional[str] = None,
-        notification_session_id: Optional[str] = None,
-        parent_tool_call_id: Optional[str] = None,
+        context: str | None = None,
+        notification_session_id: str | None = None,
+        parent_tool_call_id: str | None = None,
     ) -> AgentResult:
         """
         Execute a SubAgent task.

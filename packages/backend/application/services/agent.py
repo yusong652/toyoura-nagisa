@@ -277,7 +277,7 @@ class Agent:
                     except Exception as cleanup_error:
                         print(f"[Agent] Failed to clean up placeholder: {cleanup_error}")
 
-                raise Exception(f"Agent execution failed: {e}")
+                raise Exception(f"Agent execution failed: {e}") from e
             else:
                 # SubAgent: return error result
                 error_message = AssistantMessage(
@@ -461,7 +461,11 @@ class Agent:
 
                 # Send SUBAGENT_TOOL_RESULT notifications to frontend (stop blinking)
                 if self._parent_tool_call_id:
-                    for tool_call, result in zip(tool_calls, execution_result.results):
+                    for tool_call, result in zip(
+                        tool_calls,
+                        execution_result.results,
+                        strict=False,
+                    ):
                         is_error = result.get("status") == "error" if result else True
                         await WebSocketNotificationService.send_subagent_tool_result(
                             session_id=self._notification_session_id,
@@ -543,7 +547,7 @@ class Agent:
 
         # Construct partial response
         processor = self.llm_client._get_response_processor()
-        partial_response = processor.construct_response_from_chunks(self._state.collected_chunks)
+        processor.construct_response_from_chunks(self._state.collected_chunks)
 
         # Delete placeholder message
         await MessageService().delete_message_async(self.session_id, self._state.message_id)
