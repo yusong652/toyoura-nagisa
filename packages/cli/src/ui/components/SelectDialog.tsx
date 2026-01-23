@@ -122,8 +122,26 @@ export function SelectDialog<T>({
     );
   }
 
-  // Check if any option has a description
-  const hasDescriptions = showDescriptions && options.some((o) => o.description);
+  // Calculate max label width for alignment if showing descriptions inline
+  const maxLabelWidth = showDescriptions
+    ? Math.max(...options.map((o) => o.label.length))
+    : 0;
+
+  // Transform options to include description in label if enabled
+  const displayOptions = options.map((option) => {
+    if (showDescriptions && option.description) {
+      // Pad label for alignment (add 2 spaces padding)
+      const paddedLabel = option.label.padEnd(maxLabelWidth + 2, ' ');
+      // Use dim color for description (handled by RadioButtonSelect via special separator or manual formatting?
+      // Since RadioButtonSelect just renders label string, we can't easily style parts differently.
+      // But we can just append text. The truncation will handle overflow.
+      return {
+        ...option,
+        label: `${paddedLabel}${option.description}`,
+      };
+    }
+    return option;
+  });
 
   return (
     <PanelSection
@@ -138,28 +156,13 @@ export function SelectDialog<T>({
     >
       {/* Options list */}
       <RadioButtonSelect
-        items={options as SelectOption<T>[]}
+        items={displayOptions as SelectOption<T>[]}
         initialIndex={initialIndex >= 0 ? initialIndex : 0}
         onSelect={handleSelect}
         onHighlight={onHighlight}
         showNumbers={showNumbers}
         maxItemsToShow={maxItemsToShow ?? options.length}
       />
-
-      {/* Option descriptions (only if showDescriptions and options have descriptions) */}
-      {hasDescriptions && (
-        <Box marginTop={1} flexDirection="column">
-          {options.map((option) => (
-            option.description && (
-              <Box key={option.key}>
-                <Text color={theme.text.muted}>
-                  {option.label}: {option.description}
-                </Text>
-              </Box>
-            )
-          ))}
-        </Box>
-      )}
 
       {/* Help text */}
       <Box marginTop={1}>

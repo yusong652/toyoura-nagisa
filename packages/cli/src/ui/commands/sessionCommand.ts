@@ -13,6 +13,7 @@ export const sessionCommand: SlashCommand = {
   name: 'session',
   altNames: ['s'],
   description: 'Manage chat sessions',
+  usage: 'Use /session to open the session manager.\n\nCommands:\n  create   Create a new chat session\n  restore  Switch to an existing session\n  delete   Remove an old session',
   kind: CommandKind.BUILT_IN,
 
   action: (): SlashCommandActionReturn => {

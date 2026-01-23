@@ -187,4 +187,7 @@ export interface SlashCommand {
 
   /** Sub-commands */
   subCommands?: SlashCommand[];
+
+  /** Detailed usage documentation */
+  usage?: string;
 }

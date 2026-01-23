@@ -50,6 +50,8 @@ const MemoizedAppHeader = memo(AppHeader);
 
 // Dialog types
 type ActiveDialog =
+  | 'help'
+  | 'help_detail'
   | 'profile'
   | 'memory'
   | 'session'
@@ -59,6 +61,7 @@ type ActiveDialog =
   | 'pfc_reset'
   | 'pfc_reset_confirm'
   | 'pfc_tasks'
+  | 'pfc_task_details'
   | 'models_provider'
   | 'models_primary'
   | 'models_secondary'
@@ -107,7 +110,7 @@ const FALLBACK_PROFILE_OPTIONS: SelectOption<AgentProfileType>[] = [
 // Memory options for SelectDialog
 const MEMORY_OPTIONS: SelectOption<boolean>[] = [
   { key: 'on', value: true, label: 'On', description: 'AI can recall previous conversations' },
-  { key: 'off', value: false, label: 'Off', description: 'No long-term memory, fresh context each time' },
+  { key: 'off', value: false, label: 'Off', description: 'No long-term memory' },
 ];
 
 // Session action options for SelectDialog
@@ -162,6 +165,7 @@ export const MainLayout: React.FC = () => {
 
   // Active dialog state
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
+  const [selectedHelpCommand, setSelectedHelpCommand] = useState<string | null>(null);
   const [themePreviewBase, setThemePreviewBase] = useState<ThemeName | null>(null);
 
   // Calculate input width (terminal width minus border and padding)
@@ -221,6 +225,9 @@ export const MainLayout: React.FC = () => {
     elapsed_time: number | null;
   }>>([]);
   const [isPfcTasksLoading, setIsPfcTasksLoading] = useState(false);
+  const [selectedTaskDetails, setSelectedTaskDetails] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [isTaskDetailsLoading, setIsTaskDetailsLoading] = useState(false);
 
   // LLM model selection state
   const [llmProviders, setLlmProviders] = useState<LlmProviderInfo[]>([]);
@@ -350,6 +357,17 @@ export const MainLayout: React.FC = () => {
     context: commandProcessorContext,
   });
 
+  const helpOptions = useMemo<SelectOption<string>[]>(() => {
+    return commands
+      .filter((cmd) => !cmd.hidden && cmd.name !== 'help')
+      .map((cmd) => ({
+        key: cmd.name,
+        value: cmd.name,
+        label: `/${cmd.name}`,
+        description: cmd.description,
+      }));
+  }, [commands]);
+
   useEffect(() => {
     if (activeDialog !== 'models_provider') {
       return;
@@ -413,6 +431,12 @@ export const MainLayout: React.FC = () => {
   useEffect(() => {
     buffer.setViewportWidth(inputWidth);
   }, [inputWidth, buffer]);
+
+  // Handle help command selection
+  const handleHelpSelect = useCallback((cmdName: string) => {
+    setSelectedHelpCommand(cmdName);
+    setActiveDialog('help_detail');
+  }, []);
 
   // Handle profile selection from dialog
   const handleProfileSelect = useCallback((profile: AgentProfileType) => {
@@ -697,7 +721,9 @@ export const MainLayout: React.FC = () => {
 
   // Handle PFC task selection - fetch details and display
   const handlePfcTaskSelect = useCallback(async (taskId: string) => {
-    setActiveDialog(null);
+    setSelectedTaskId(taskId);
+    setIsTaskDetailsLoading(true);
+    setActiveDialog('pfc_task_details');
 
     try {
       /** Response data from task status (unwrapped from ApiResponse) */
@@ -729,7 +755,6 @@ export const MainLayout: React.FC = () => {
 
       // Build output message
       const lines: string[] = [
-        `Task: ${response.task_id}`,
         `Status: ${response.status}`,
         `Script: ${response.entry_script || 'n/a'}`,
         `Description: ${response.description || 'n/a'}`,
@@ -744,20 +769,38 @@ export const MainLayout: React.FC = () => {
         lines.push('', '--- Error ---', response.error);
       }
 
-      lines.push('', '--- Output ---', response.output || '(no output)');
+      const output = response.output || '(no output)';
+      const truncatedOutput = output.length > 500 ? output.slice(0, 500) + '... (truncated)' : output;
+      lines.push('', '--- Output ---', truncatedOutput);
 
-      appActions.addHistoryItem({
-        type: MessageType.INFO,
-        message: lines.join('\n'),
-      });
+      setSelectedTaskDetails(lines.join('\n'));
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch task details';
-      appActions.addHistoryItem({
-        type: MessageType.ERROR,
-        message: errorMessage,
-      });
+      setSelectedTaskDetails(`Error: ${errorMessage}`);
+    } finally {
+      setIsTaskDetailsLoading(false);
     }
-  }, [appActions, appState.currentSessionId]);
+  }, [appState.currentSessionId]);
+
+  // Handle PFC task details actions
+  const handlePfcTaskDetailAction = useCallback((action: string) => {
+    if (action === 'back') {
+      setActiveDialog('pfc_tasks');
+      loadPfcTasks();
+    } else if (action === 'chat') {
+      if (selectedTaskDetails) {
+        // Just add to history for user reference
+        // Backend UserPfcTaskMonitor already captured the context via the API call
+        appActions.addHistoryItem({
+          type: MessageType.INFO,
+          message: `Task ${selectedTaskId} Details:\n\n${selectedTaskDetails}`,
+        });
+      }
+      setActiveDialog(null);
+    } else {
+      setActiveDialog(null);
+    }
+  }, [selectedTaskDetails, selectedTaskId, loadPfcTasks, appActions]);
 
   // Build PFC task options for SelectDialog (single-line format)
   const pfcTaskOptions = useMemo(() => {
@@ -891,7 +934,9 @@ export const MainLayout: React.FC = () => {
 
       case 'dialog':
         // Open the appropriate dialog
-        if (result.dialog === 'profile') {
+        if (result.dialog === 'help') {
+          setActiveDialog('help');
+        } else if (result.dialog === 'profile') {
           setActiveDialog('profile');
         } else if (result.dialog === 'memory') {
           setActiveDialog('memory');
@@ -1006,6 +1051,56 @@ export const MainLayout: React.FC = () => {
           />
         )}
 
+        {/* Help dialog */}
+        {activeDialog === 'help' && (
+          <SelectDialog
+            title="Nagisa CLI Help"
+            description="Select a command to populate the input:"
+            options={helpOptions}
+            onSelect={handleHelpSelect}
+            onCancel={handleDialogCancel}
+            showNumbers={false}
+            showDescriptions={true}
+            maxItemsToShow={12}
+          />
+        )}
+
+        {/* Help detail dialog */}
+        {activeDialog === 'help_detail' && selectedHelpCommand && (
+          <SelectDialog
+            title={`Help: /${selectedHelpCommand}`}
+            description={(() => {
+              const cmd = commands.find(c => c.name === selectedHelpCommand);
+              if (!cmd) return 'Command not found.';
+              
+              const parts = [cmd.description];
+              if (cmd.usage) {
+                parts.push('', 'Usage:', cmd.usage);
+              }
+              if (cmd.altNames?.length) {
+                parts.push('', `Aliases: ${cmd.altNames.map(a => '/' + a).join(', ')}`);
+              }
+              if (cmd.subCommands?.length) {
+                parts.push('', `Subcommands: ${cmd.subCommands.map(s => s.name).join(', ')}`);
+              }
+              return parts.join('\n');
+            })()}
+            options={[
+              { key: 'back', value: 'back', label: 'Back', description: 'Return to command list' },
+              { key: 'close', value: 'close', label: 'Close', description: 'Exit help' },
+            ]}
+            onSelect={(value) => {
+              if (value === 'back') {
+                setActiveDialog('help');
+              } else {
+                setActiveDialog(null);
+              }
+            }}
+            onCancel={() => setActiveDialog('help')}
+            showNumbers={false}
+          />
+        )}
+
         {/* Profile selection dialog */}
         {activeDialog === 'profile' && (
           <SelectDialog
@@ -1028,6 +1123,7 @@ export const MainLayout: React.FC = () => {
             currentValue={appState.memoryEnabled}
             onSelect={handleMemorySelect}
             onCancel={handleDialogCancel}
+            showDescriptions={true}
           />
         )}
 
@@ -1167,6 +1263,27 @@ export const MainLayout: React.FC = () => {
             showNumbers={false}
             showDescriptions={false}
             maxItemsToShow={10}
+          />
+        )}
+
+        {/* PFC task details dialog */}
+        {activeDialog === 'pfc_task_details' && (
+          <SelectDialog
+            title={`Task: ${selectedTaskId}`}
+            description={selectedTaskDetails || ''}
+            options={[
+              { key: 'back', value: 'back', label: 'Back', description: 'Return to task list' },
+              { key: 'chat', value: 'chat', label: 'Post to Chat', description: 'Add details to history' },
+              { key: 'close', value: 'close', label: 'Close', description: 'Exit dialog' },
+            ]}
+            isLoading={isTaskDetailsLoading}
+            loadingMessage="Loading task details..."
+            onSelect={handlePfcTaskDetailAction}
+            onCancel={() => {
+              setActiveDialog('pfc_tasks');
+              loadPfcTasks();
+            }}
+            showNumbers={false}
           />
         )}
 

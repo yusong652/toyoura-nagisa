@@ -14,6 +14,7 @@ export const profileCommand: SlashCommand = {
   name: 'profile',
   altNames: ['p'],
   description: 'Select agent profile',
+  usage: 'Use /profile to switch between different agent profiles.\n\nProfiles optimize the agent\'s toolset for specific tasks (e.g., PFC simulation, General coding).',
   kind: CommandKind.BUILT_IN,
 
   action: (): SlashCommandActionReturn => {

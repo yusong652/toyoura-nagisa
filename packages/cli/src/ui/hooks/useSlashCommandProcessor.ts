@@ -15,26 +15,8 @@ import type {
   CommandContext,
   SlashCommandActionReturn,
 } from '../commands/types.js';
+import * as commandExports from '../commands/index.js';
 import { helpCommand, setHelpCommands } from '../commands/helpCommand.js';
-import { profileCommand } from '../commands/profileCommand.js';
-import { memoryCommand } from '../commands/memoryCommand.js';
-import { sessionCommand } from '../commands/sessionCommand.js';
-import { themeCommand } from '../commands/themeCommand.js';
-import { pfcResetCommand } from '../commands/pfcResetCommand.js';
-import { pfcTasksCommand } from '../commands/pfcTasksCommand.js';
-import { modelsCommand } from '../commands/modelsCommand.js';
-
-// Built-in commands (help first for visibility)
-const BUILT_IN_COMMANDS: SlashCommand[] = [
-  helpCommand,
-  profileCommand,
-  memoryCommand,
-  sessionCommand,
-  modelsCommand,
-  themeCommand,
-  pfcResetCommand,
-  pfcTasksCommand,
-];
 
 export interface UseSlashCommandProcessorProps {
   /** Command context to pass to command actions */
@@ -51,6 +33,19 @@ export interface UseSlashCommandProcessorReturn {
   ) => Promise<SlashCommandActionReturn | null>;
   /** Get command context for completion */
   commandContext: CommandContext;
+}
+
+/**
+ * Type guard for SlashCommand
+ */
+function isSlashCommand(obj: unknown): obj is SlashCommand {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'name' in obj &&
+    'description' in obj &&
+    'kind' in obj
+  );
 }
 
 /**
@@ -117,9 +112,23 @@ function navigateToCommand(
 export function useSlashCommandProcessor({
   context,
 }: UseSlashCommandProcessorProps): UseSlashCommandProcessorReturn {
-  // Combine built-in commands (could add extension loading later)
+  // Dynamically load all commands from exports
   const commands = useMemo(() => {
-    return BUILT_IN_COMMANDS;
+    const allCommands: SlashCommand[] = [];
+    
+    // Extract commands from exports
+    Object.values(commandExports).forEach((exported) => {
+      if (isSlashCommand(exported)) {
+        // Skip duplicates if any (though export names are unique)
+        if (!allCommands.some(c => c.name === exported.name)) {
+          allCommands.push(exported);
+        }
+      }
+    });
+
+    // Ensure help command is first
+    const withoutHelp = allCommands.filter(c => c.name !== helpCommand.name);
+    return [helpCommand, ...withoutHelp];
   }, []);
 
   // Register commands with help command for display

@@ -10,6 +10,7 @@ import { CommandKind, type SlashCommand, type SlashCommandActionReturn } from '.
 export const modelsCommand: SlashCommand = {
   name: 'models',
   description: 'Select LLM provider and models for this session',
+  usage: 'Use /models to configure LLM settings for the current session.\n\nYou can select:\n  1. Provider (Google, Anthropic, OpenAI, etc.)\n  2. Primary Model (for main chat)\n  3. Secondary Model (for sub-agents)',
   kind: CommandKind.BUILT_IN,
 
   action: (context): SlashCommandActionReturn => {

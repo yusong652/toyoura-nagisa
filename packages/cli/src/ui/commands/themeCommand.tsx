@@ -18,6 +18,7 @@ export const themeCommand: SlashCommand = {
   name: 'theme',
   altNames: ['t'],
   description: 'Switch color theme',
+  usage: 'Use /theme to open the theme selector, or provide a name directly:\n  /theme dark\n  /theme light\n  /theme dracula',
   kind: CommandKind.BUILT_IN,
 
   action: (_context, args): SlashCommandActionReturn | void => {

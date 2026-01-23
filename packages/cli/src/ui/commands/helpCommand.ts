@@ -15,6 +15,13 @@ export function setHelpCommands(commands: readonly SlashCommand[]): void {
 }
 
 /**
+ * Get the currently registered commands
+ */
+export function getHelpCommands(): readonly SlashCommand[] {
+  return registeredCommands;
+}
+
+/**
  * Format the help message
  */
 function formatHelpMessage(): string {
@@ -78,13 +85,13 @@ export const helpCommand: SlashCommand = {
   name: 'help',
   altNames: ['h', '?'],
   description: 'Show available commands and keyboard shortcuts',
+  usage: 'Use /help (or /?) to browse the list of available commands.\n\nSelect a command from the list to view its detailed usage and options.',
   kind: CommandKind.BUILT_IN,
 
   action: (): SlashCommandActionReturn => {
     return {
-      type: 'message',
-      messageType: 'info',
-      content: formatHelpMessage(),
+      type: 'dialog',
+      dialog: 'help',
     };
   },
 };
