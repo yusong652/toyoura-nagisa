@@ -322,25 +322,12 @@ function parseTableRow(line: string): string[] {
 
 /**
  * Strip markdown formatting to get plain text for width calculation
- * Returns the text AS IT WILL BE RENDERED (including markers that are visible)
+ * Returns the text AS IT WILL BE RENDERED (without hidden markers)
  * so that column width calculations match visual display.
  */
 function stripMarkdownForWidth(text: string): string {
   const segments = parseInline(text);
-  return segments.map(seg => {
-    switch (seg.type) {
-      case 'code':
-        return `\`${seg.content}\``;
-      case 'kbd':
-        return `[${seg.content}]`;
-      case 'math':
-        return `$${seg.content}$`;
-      case 'link':
-        return `${seg.content} (${seg.url})`;
-      default:
-        return seg.content;
-    }
-  }).join('');
+  return segments.map(seg => seg.content).join('');
 }
 
 /**
