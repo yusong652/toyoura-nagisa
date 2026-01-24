@@ -15,7 +15,6 @@ from backend.presentation.api import (
     llm_config,
     messages,
     pfc_console,
-    profiles,
     sessions,
     shell,
     todos,
@@ -116,7 +115,6 @@ app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
 # app.include_router(chat.router, prefix="/api")  # Deprecated: Moved to WebSocket
-app.include_router(profiles.router)
 app.include_router(file_search.router, prefix="/api")
 app.include_router(todos.router)
 app.include_router(shell.router)

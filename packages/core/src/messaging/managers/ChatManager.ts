@@ -73,7 +73,6 @@ export interface ErrorPayload {
  */
 export interface SendMessageOptions {
   sessionId: string
-  profile?: string
   memoryEnabled?: boolean
   mentionedFiles?: string[]
 }
@@ -161,7 +160,6 @@ export class ChatManager extends EventEmitter {
         files,
         options.sessionId,
         userMessageId,
-        options.profile || 'general',
         options.memoryEnabled !== false,
         options.mentionedFiles || []
       )

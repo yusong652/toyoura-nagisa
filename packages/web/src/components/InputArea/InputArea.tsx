@@ -71,8 +71,7 @@ const InputArea: React.FC<InputAreaProps> = ({
   maxFiles = DEFAULT_INPUT_CONFIG.maxFiles,
   acceptedFileTypes = DEFAULT_INPUT_CONFIG.allowedFileTypes,
 }) => {
-  // Use fixed agent profile and session ID from context
-  const currentProfile = 'pfc'
+  // Use fixed session ID from context
   const { currentSessionId } = useSession()
 
   // Core state management hook
@@ -137,7 +136,6 @@ const InputArea: React.FC<InputAreaProps> = ({
   } = useFileMentionDetection(
     message,
     cursorPosition,
-    currentProfile,
     currentSessionId || undefined  // Use actual session ID
   )
   

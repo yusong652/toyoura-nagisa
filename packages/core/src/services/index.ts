@@ -32,9 +32,6 @@ export type {
   UpdateSessionModeResponse,
 } from './SessionService';
 
-// Agent Service
-export { AgentService, agentService } from './AgentService';
-
 // LLM Config Service
 export { LlmConfigService, llmConfigService } from './LlmConfigService';
 export type {

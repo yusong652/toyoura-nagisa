@@ -36,7 +36,6 @@ export interface UseFileSearchReturn {
 }
 
 export function useFileSearch(
-  agentProfile: string = 'pfc_expert',
   sessionId?: string
 ): UseFileSearchReturn {
   const [results, setResults] = useState<FileSearchResult[]>([]);
@@ -69,7 +68,6 @@ export function useFileSearch(
         // Build query parameters
         const params = new URLSearchParams({
           query: query.trim(),
-          agent_profile: agentProfile,
           limit: '20',
         });
 
@@ -95,7 +93,7 @@ export function useFileSearch(
         setIsSearching(false);
       }
     },
-    [agentProfile, sessionId]
+    [sessionId]
   );
 
   const clearResults = useCallback(() => {

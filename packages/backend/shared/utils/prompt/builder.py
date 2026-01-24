@@ -34,6 +34,7 @@ async def _get_workspace_root(agent_profile: str, session_id: Optional[str] = No
         Absolute workspace root path as string
     """
     from backend.shared.utils.workspace import get_workspace_for_profile
+
     workspace_path = await get_workspace_for_profile(agent_profile, session_id)
     return str(workspace_path)
 
@@ -55,15 +56,16 @@ def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> st
     workspace = workspace_root
 
     # Get nagisa_path (toyoura-nagisa project root)
-    nagisa_path = normalize_path_separators(str(PROJECT_ROOT), target_platform='linux')
+    nagisa_path = normalize_path_separators(str(PROJECT_ROOT), target_platform="linux")
 
     # Get pfc_path from config (if available)
     pfc_path_str = ""
     try:
         from backend.config.pfc import get_pfc_settings
+
         pfc_settings = get_pfc_settings()
         if pfc_settings.pfc_path:
-            pfc_path_str = normalize_path_separators(str(pfc_settings.pfc_path), target_platform='linux')
+            pfc_path_str = normalize_path_separators(str(pfc_settings.pfc_path), target_platform="linux")
     except ImportError:
         pass
     except Exception as e:
@@ -80,7 +82,7 @@ def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> st
     current_date = datetime.now().strftime("%Y-%m-%d")
 
     # Truncate session_id to 8 characters for readability (consistent with task_id format)
-    session_id_display = session_id[:8] if session_id else 'unknown'
+    session_id_display = session_id[:8] if session_id else "unknown"
 
     # Build env lines
     env_lines = [
@@ -89,13 +91,15 @@ def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> st
     ]
     if pfc_path_str:
         env_lines.append(f"pfc_path: {pfc_path_str}")
-    env_lines.extend([
-        f"Is directory a git repo: {'Yes' if is_git_repo else 'No'}",
-        f"Platform: {platform_name}",
-        f"OS Version: {os_version}",
-        f"Today's date: {current_date}",
-        f"session_id: {session_id_display}",
-    ])
+    env_lines.extend(
+        [
+            f"Is directory a git repo: {'Yes' if is_git_repo else 'No'}",
+            f"Platform: {platform_name}",
+            f"OS Version: {os_version}",
+            f"Today's date: {current_date}",
+            f"session_id: {session_id_display}",
+        ]
+    )
 
     # Format environment information (Claude Code style)
     env_info = "<env>\n" + "\n".join(env_lines) + "\n</env>"
@@ -122,7 +126,7 @@ def _get_available_skills_xml(allowed_skills: List[str]) -> str:
 
 
 async def build_system_prompt(
-    agent_profile = "pfc_expert",
+    agent_profile="pfc_expert",
     session_id: Optional[str] = None,
     include_expression: bool = True,
 ) -> str:
@@ -163,7 +167,7 @@ async def build_system_prompt(
 
     # Normalize workspace_root to forward slashes for LLM consistency
     # This ensures LLM always sees paths in the same format (like Claude Code)
-    workspace_root = normalize_path_separators(workspace_root, target_platform='linux')
+    workspace_root = normalize_path_separators(workspace_root, target_platform="linux")
 
     # 4. Build environment information with session context and dynamic workspace
     env_info = _build_env_info(workspace_root=workspace_root, session_id=session_id)
@@ -176,8 +180,9 @@ async def build_system_prompt(
     # 6. Replace {available_skills} placeholder if present
     if SKILLS_PLACEHOLDER in base:
         # Get allowed skills for this profile
-        from backend.domain.models.agent_profiles import get_skills_for_profile
-        allowed_skills = get_skills_for_profile(agent_profile)
+        from backend.domain.models.agent_profiles import get_skills_for_agent
+
+        allowed_skills = get_skills_for_agent(agent_profile)
         skills_xml = _get_available_skills_xml(allowed_skills)
         base = base.replace(SKILLS_PLACEHOLDER, skills_xml)
 
@@ -193,7 +198,3 @@ async def build_system_prompt(
 
     # Join all components with separators
     return "\n\n---\n\n".join(filter(None, components))
-
-
-
-

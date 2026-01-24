@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["invoke_agent", "register_invoke_agent_tool"]
 
 
-# Available SubAgent types (matches SubAgentConfig names in agent_profiles.py)
+# Available SubAgent types (matches AgentConfig names in agent_profiles.py)
 AVAILABLE_SUBAGENTS = {
     "pfc_explorer": "Tama - PFC documentation query agent (read-only)",
     "pfc_diagnostic": "Hoshi - PFC multimodal diagnostic agent (visual analysis)",
@@ -32,38 +32,31 @@ AVAILABLE_SUBAGENTS = {
 async def invoke_agent(
     context: Context,
     subagent_type: Literal["pfc_explorer", "pfc_diagnostic"] = Field(
-        ...,
-        description="The type of specialized agent to use for this task"
+        ..., description="The type of specialized agent to use for this task"
     ),
-    description: str = Field(
-        ...,
-        description="A short (3-5 word) description of the task"
-    ),
-    prompt: str = Field(
-        ...,
-        description="The task for the agent to perform"
-    ),
+    description: str = Field(..., description="A short (3-5 word) description of the task"),
+    prompt: str = Field(..., description="The task for the agent to perform"),
 ) -> Dict[str, Any]:
     """Launch a new agent to handle complex, multi-step tasks autonomously.
 
-The invoke_agent tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
+    The invoke_agent tool launches specialized agents (subprocesses) that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
 
-Available agent types:
-- pfc_explorer: PFC documentation query agent (read-only). Use for multi-step doc exploration, finding command syntax, Python API usage, or searching workspace files. Prompt tip: specify if you need command syntax, Python API, or both. (Tools: read, glob, grep, bash, bash_output, pfc_browse_commands, pfc_browse_python_api, pfc_query_command, pfc_query_python_api, pfc_browse_reference, web_search, todo_write)
-- pfc_diagnostic: PFC multimodal diagnostic agent. Use for visual diagnosis of simulation issues by capturing and analyzing screenshots from multiple angles and coloring modes. Prompt tip: include paths to existing images or specify output directory. (Tools: pfc_capture_plot, read, pfc_check_task_status, pfc_list_tasks, pfc_query_command, pfc_query_python_api, glob, grep, bash, bash_output, todo_write)
+    Available agent types:
+    - pfc_explorer: PFC documentation query agent (read-only). Use for multi-step doc exploration, finding command syntax, Python API usage, or searching workspace files. Prompt tip: specify if you need command syntax, Python API, or both. (Tools: read, glob, grep, bash, bash_output, pfc_browse_commands, pfc_browse_python_api, pfc_query_command, pfc_query_python_api, pfc_browse_reference, web_search, todo_write)
+    - pfc_diagnostic: PFC multimodal diagnostic agent. Use for visual diagnosis of simulation issues by capturing and analyzing screenshots from multiple angles and coloring modes. Prompt tip: include paths to existing images or specify output directory. (Tools: pfc_capture_plot, read, pfc_check_task_status, pfc_list_tasks, pfc_query_command, pfc_query_python_api, glob, grep, bash, bash_output, todo_write)
 
-When NOT to use:
-- Single doc query with known path: use pfc_browse_commands or pfc_browse_python_api directly
-- Quick visual capture with known settings: use pfc_capture_plot directly
-- Simple file reading: use read tool directly
+    When NOT to use:
+    - Single doc query with known path: use pfc_browse_commands or pfc_browse_python_api directly
+    - Quick visual capture with known settings: use pfc_capture_plot directly
+    - Simple file reading: use read tool directly
 
-Usage notes:
-- Launch agents when the task requires multi-step exploration or specialized diagnosis
-- The agent's outputs should generally be trusted
-- Each invocation is stateless and returns a single final report
-- The result returned by the agent is not visible to the user. Summarize the result in your response.
-- Be specific about what information to return (syntax, examples, limitations, alternatives)
-- Include context: what you observed, what you suspect, what needs investigation
+    Usage notes:
+    - Launch agents when the task requires multi-step exploration or specialized diagnosis
+    - The agent's outputs should generally be trusted
+    - Each invocation is stateless and returns a single final report
+    - The result returned by the agent is not visible to the user. Summarize the result in your response.
+    - Be specific about what information to return (syntax, examples, limitations, alternatives)
+    - Include context: what you observed, what you suspect, what needs investigation
     """
     # Architecture guarantee: tool_manager.py always injects _meta.client_id
     session_id = context.client_id
@@ -72,7 +65,7 @@ Usage notes:
     if subagent_type not in AVAILABLE_SUBAGENTS:
         return error_response(
             f"Unknown subagent type: {subagent_type}. Available: {', '.join(AVAILABLE_SUBAGENTS.keys())}",
-            available_subagents=list(AVAILABLE_SUBAGENTS.keys())
+            available_subagents=list(AVAILABLE_SUBAGENTS.keys()),
         )
 
     try:
@@ -104,21 +97,27 @@ Usage notes:
         if provider and not secondary_model:
             if provider == "google":
                 from backend.infrastructure.llm.providers.google.config import GoogleConfig
+
                 secondary_model = GoogleConfig().secondary_model
             elif provider == "anthropic":
                 from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
+
                 secondary_model = AnthropicConfig().secondary_model
             elif provider in ("openai", "gpt"):
                 from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
+
                 secondary_model = OpenAIConfig().secondary_model
             elif provider == "moonshot":
                 from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
+
                 secondary_model = MoonshotConfig().secondary_model
             elif provider == "zhipu":
                 from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
+
                 secondary_model = ZhipuConfig().secondary_model
             elif provider == "openrouter":
                 from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
+
                 secondary_model = OpenRouterConfig().secondary_model
 
         if provider and secondary_model:
@@ -135,8 +134,8 @@ Usage notes:
         # This is the LLM-generated tool_call_id for frontend association
         parent_tool_call_id = ""
         req_ctx = context.request_context
-        if req_ctx and hasattr(req_ctx, 'meta') and req_ctx.meta:
-            parent_tool_call_id = getattr(req_ctx.meta, 'tool_call_id', "") or ""
+        if req_ctx and hasattr(req_ctx, "meta") and req_ctx.meta:
+            parent_tool_call_id = getattr(req_ctx.meta, "tool_call_id", "") or ""
 
         result = await agent_service.run_subagent(
             config=config,
@@ -149,12 +148,7 @@ Usage notes:
         if result.status == "success":
             return success_response(
                 message=f"SubAgent '{config.display_name}' completed successfully",
-                llm_content={
-                    "parts": [{
-                        "type": "text",
-                        "text": result.text
-                    }]
-                },
+                llm_content={"parts": [{"type": "text", "text": result.text}]},
                 subagent_type=subagent_type,
                 iterations_used=result.iterations_used,
                 execution_time_seconds=result.execution_time_seconds,
@@ -204,14 +198,11 @@ Usage notes:
         logger.error(f"SubAgent configuration not found: {e}")
         return error_response(
             f"SubAgent '{subagent_type}' is not configured. Please check SUBAGENT_CONFIGS in agent_profiles.py",
-            subagent_type=subagent_type
+            subagent_type=subagent_type,
         )
     except Exception as e:
         logger.error(f"SubAgent execution failed: {e}", exc_info=True)
-        return error_response(
-            f"SubAgent execution failed: {str(e)}",
-            subagent_type=subagent_type
-        )
+        return error_response(f"SubAgent execution failed: {str(e)}", subagent_type=subagent_type)
 
 
 def register_invoke_agent_tool(mcp: FastMCP):
@@ -223,5 +214,5 @@ def register_invoke_agent_tool(mcp: FastMCP):
             "tags": ["agent", "subagent", "delegation", "task"],
             "primary_use": "Delegate specialized tasks to SubAgents",
             "prompt_optimization": "Claude Code Task tool compatible interface",
-        }
+        },
     )(invoke_agent)

@@ -21,7 +21,6 @@ import { StreamingState } from '../contexts/StreamingContext.js';
 import {
   MessageType,
   type HistoryItemWithoutId,
-  type AgentProfileType,
 } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { usePendingItems } from './usePendingItems.js';
@@ -32,7 +31,6 @@ export interface UseChatStreamOptions {
   connectionManager: ConnectionManager;
   historyManager: UseHistoryManagerReturn;
   currentSessionId: string | null;
-  currentProfile: AgentProfileType;
   memoryEnabled: boolean;
 }
 
@@ -65,7 +63,6 @@ export function useChatStream({
   connectionManager,
   historyManager,
   currentSessionId,
-  currentProfile,
   memoryEnabled,
 }: UseChatStreamOptions): UseChatStreamReturn {
   // Core state
@@ -166,7 +163,6 @@ export function useChatStream({
         session_id: currentSessionId,
         timestamp: new Date().toISOString(),
         stream_response: true,
-        agent_profile: currentProfile,
         enable_memory: memoryEnabled,
         files: [],
         mentioned_files: mentionedFiles || [],
@@ -188,7 +184,6 @@ export function useChatStream({
     },
     [
       currentSessionId,
-      currentProfile,
       memoryEnabled,
       historyManager,
       isStreaming,

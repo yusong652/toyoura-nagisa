@@ -1,24 +1,16 @@
 """
-Agent Profile Configuration - Unified profile definitions.
+Agent Configuration - Unified agent definitions.
 
-This module provides the single source of truth for all agent profile
-configurations, including tool assignments, runtime behavior, and display metadata.
+This module provides the single source of truth for main agent and SubAgent
+configuration, including tool assignments and runtime behavior.
 
 Architecture note:
-- Lives in Domain layer (business rules for agent configuration)
-- Infrastructure layer (tool_manager) reads from here
-- This is configuration/strategy, not infrastructure implementation
+- Domain layer configuration (business rules)
+- Infrastructure layer reads from here for tool selection
 """
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import Dict, List
-
-
-class AgentProfile(Enum):
-    """Agent profile types."""
-    PFC_EXPERT = "pfc_expert"
-    DISABLED = "disabled"
 
 
 # =============================================================================
@@ -61,7 +53,6 @@ PFC_TOOLS: List[str] = [
 ]
 
 # SubAgent-specific tool list for PFC Explorer (read-only exploration)
-# Following Claude Code's Explore agent design: lightweight, read-only, fast
 SUBAGENT_PFC_EXPLORER_TOOLS: List[str] = [
     # File operations (read-only)
     "read",
@@ -83,20 +74,16 @@ SUBAGENT_PFC_EXPLORER_TOOLS: List[str] = [
     "web_search",
     # Task tracking (consistent with Claude Code Explore agent)
     "todo_write",
-    # NOTE: No write, no edit, no pfc_execute_task
-    # Explorer uses bash only for read-only operations (ls, find, git)
-    # Complex execution logic should be handled by MainAgent
 ]
 
 # SubAgent-specific tool list for PFC Diagnostic Expert (multimodal visual analysis)
-# Pure visual analysis + task status inspection - MainAgent handles script execution
 SUBAGENT_PFC_DIAGNOSTIC_TOOLS: List[str] = [
     # Core diagnostic tools (multimodal)
-    "pfc_capture_plot",  # Visual capture from multiple angles/coloring modes
-    "read",              # Image analysis (multimodal LLM capability)
+    "pfc_capture_plot",
+    "read",
     # Task status inspection (read MainAgent's executed tasks)
-    "pfc_check_task_status",  # Query task progress and output
-    "pfc_list_tasks",         # List all tracked tasks with status
+    "pfc_check_task_status",
+    "pfc_list_tasks",
     # Support tools (workspace navigation, read-only)
     "glob",
     "grep",
@@ -104,9 +91,6 @@ SUBAGENT_PFC_DIAGNOSTIC_TOOLS: List[str] = [
     "bash_output",
     # Workflow tracking
     "todo_write",
-    # NOTE: No pfc_execute_task - MainAgent handles all script execution
-    # NOTE: No write, no edit - diagnostic agent reports issues, MainAgent fixes
-    # NOTE: No invoke_agent - prevents recursive SubAgent spawning
 ]
 
 
@@ -114,52 +98,53 @@ SUBAGENT_PFC_DIAGNOSTIC_TOOLS: List[str] = [
 # Skills Configuration (on-demand workflow instructions)
 # =============================================================================
 
-# PFC-specific skills for simulation workflows
-# Note: Basic capabilities (error resolution, script creation, doc navigation,
-# subagent delegation, task execution) are now in system prompt.
-# Skills are reserved for special workflows that need on-demand detailed guidance.
 PFC_SKILLS: List[str] = [
-    "pfc-package-management",  # PFC Python package install/uninstall
-    "pfc-server-setup",        # pfc-server setup and connection guide
+    "pfc-package-management",
+    "pfc-server-setup",
 ]
 
 
 # =============================================================================
-# Profile Configuration
+# Unified Agent Configuration
 # =============================================================================
 
-@dataclass(frozen=True)
-class ProfileConfig:
-    """
-    Complete agent profile configuration.
 
-    Combines runtime behavior settings with tool assignments and display metadata.
-    Immutable (frozen) to ensure configuration consistency.
+@dataclass(frozen=True)
+class AgentConfig:
     """
+    Unified agent configuration for both main agent and SubAgents.
+
+    Use is_main_agent to differentiate runtime behavior.
+    """
+
     # Identity
     name: str
     display_name: str
     description: str
 
-    # Runtime behavior
-    max_iterations: int
-    streaming_enabled: bool
-    enable_memory: bool
-
     # Tool configuration
-    tools: tuple  # Immutable tuple of tool names
+    tools: tuple
+
+    # Runtime behavior
+    max_iterations: int = 32
+    streaming_enabled: bool = False
+    enable_memory: bool = False
+    is_main_agent: bool = False
 
     # Display metadata (for frontend)
-    color: str
-    icon: str
+    color: str = "#9E9E9E"
+    icon: str = "🤖"
 
     # Skills configuration (on-demand workflow instructions)
-    # Placed after required fields due to dataclass ordering requirements
-    skills: tuple = ()  # Immutable tuple of skill names available for this profile
+    skills: tuple = ()
+
+    def __post_init__(self) -> None:
+        if not self.is_main_agent and "invoke_agent" in self.tools:
+            raise ValueError("SubAgent config must not include invoke_agent")
 
     @property
     def tool_profile(self) -> str:
-        """Tool profile name (same as name for ProfileConfig)."""
+        """Tool profile name (same as name for AgentConfig)."""
         return self.name
 
     @property
@@ -172,87 +157,49 @@ class ProfileConfig:
         return len(self.tools) * 282
 
 
-# =============================================================================
-# Profile Registry (single source of truth)
-# =============================================================================
-
-PROFILE_CONFIGS: Dict[AgentProfile, ProfileConfig] = {
-    AgentProfile.PFC_EXPERT: ProfileConfig(
-        name="pfc_expert",
-        display_name="PFC Expert",
-        description="ITASCA PFC simulation with script-based workflow",
-        max_iterations=64,
-        streaming_enabled=True,
-        enable_memory=True,
-        tools=tuple(PFC_TOOLS),
-        color="#9C27B0",
-        icon="⚛️",
-        skills=tuple(PFC_SKILLS),
-    ),
-
-    AgentProfile.DISABLED: ProfileConfig(
-        name="disabled",
-        display_name="Chat Agent",
-        description="Pure conversation mode without tools",
-        max_iterations=64,
-        streaming_enabled=True,
-        enable_memory=True,
-        tools=(),
-        color="#F44336",
-        icon="🚫",
-    ),
-}
+MAIN_AGENT_CONFIG = AgentConfig(
+    name="pfc_expert",
+    display_name="PFC Expert",
+    description="ITASCA PFC simulation with script-based workflow",
+    tools=tuple(PFC_TOOLS),
+    max_iterations=64,
+    streaming_enabled=True,
+    enable_memory=True,
+    is_main_agent=True,
+    color="#9C27B0",
+    icon="⚛️",
+    skills=tuple(PFC_SKILLS),
+)
 
 
 # =============================================================================
 # SubAgent Definitions
 # =============================================================================
-# SubAgents have independent names (for prompt loading) but reuse tool profiles.
-
-@dataclass(frozen=True)
-class SubAgentConfig:
-    """
-    SubAgent configuration.
-
-    SubAgents have their own prompt file (config/prompts/{name}.md)
-    and an explicit tool list that MUST NOT include invoke_agent
-    to prevent recursive SubAgent spawning.
-    """
-    name: str                    # Unique name, also prompt file name
-    display_name: str
-    description: str
-    tools: tuple                 # Explicit tool list (no invoke_agent!)
-    max_iterations: int = 32  # Default for SubAgents (higher than before to handle complex tasks)
-    streaming_enabled: bool = False
-    enable_memory: bool = False
-
-    @property
-    def tool_profile(self) -> str:
-        """Tool profile name (same as name for SubAgentConfig)."""
-        return self.name
 
 
-PFC_EXPLORER = SubAgentConfig(
+PFC_EXPLORER = AgentConfig(
     name="pfc_explorer",
     display_name="Tama (PFC Explorer)",
     description="Tama - PFC documentation query agent (read-only)",
     tools=tuple(SUBAGENT_PFC_EXPLORER_TOOLS),
-    max_iterations=64,  # Reduced: read-only exploration tasks are simpler
+    max_iterations=64,
     streaming_enabled=False,
     enable_memory=False,
+    is_main_agent=False,
 )
 
-PFC_DIAGNOSTIC = SubAgentConfig(
+PFC_DIAGNOSTIC = AgentConfig(
     name="pfc_diagnostic",
     display_name="Hoshi (PFC Diagnostic)",
     description="Hoshi - Multimodal visual analysis agent for PFC simulation diagnostics",
     tools=tuple(SUBAGENT_PFC_DIAGNOSTIC_TOOLS),
-    max_iterations=64,  # Multi-angle analysis may require many capture+read cycles
+    max_iterations=64,
     streaming_enabled=False,
     enable_memory=False,
+    is_main_agent=False,
 )
 
-SUBAGENT_CONFIGS: Dict[str, SubAgentConfig] = {
+SUBAGENT_CONFIGS: Dict[str, AgentConfig] = {
     "pfc_explorer": PFC_EXPLORER,
     "pfc_diagnostic": PFC_DIAGNOSTIC,
 }
@@ -262,81 +209,46 @@ SUBAGENT_CONFIGS: Dict[str, SubAgentConfig] = {
 # Accessor Functions
 # =============================================================================
 
-def get_profile_config(profile: str | AgentProfile) -> ProfileConfig:
-    """
-    Get profile configuration by name or enum.
 
-    Args:
-        profile: Profile name string or AgentProfile enum
-
-    Returns:
-        ProfileConfig for the specified profile
-
-    Raises:
-        KeyError: If profile not found
-    """
-    if isinstance(profile, str):
-        profile = AgentProfile(profile)
-    return PROFILE_CONFIGS[profile]
+def get_agent_config() -> AgentConfig:
+    """Get the single main agent configuration."""
+    return MAIN_AGENT_CONFIG
 
 
-def get_tools_for_profile(profile: str | AgentProfile) -> List[str]:
-    """
-    Get tool list for a profile or SubAgent.
-
-    Args:
-        profile: Profile name string, AgentProfile enum, or SubAgent name
-
-    Returns:
-        List of tool names for the profile/SubAgent
-    """
-    # First check if it's a SubAgent name
-    if isinstance(profile, str) and profile in SUBAGENT_CONFIGS:
-        return list(SUBAGENT_CONFIGS[profile].tools)
-
-    # Otherwise, look up in PROFILE_CONFIGS
-    config = get_profile_config(profile)
-    return list(config.tools)
-
-
-def get_all_profiles() -> Dict[str, dict]:
-    """
-    Get all profile configurations for frontend display.
-
-    Returns:
-        Dict mapping profile name to display info
-    """
-    return {
-        profile.value: {
-            "name": config.display_name,
-            "description": config.description,
-            "estimated_tokens": config.estimated_tokens,
-            "tool_count": config.tool_count,
-            "color": config.color,
-            "icon": config.icon,
-        }
-        for profile, config in PROFILE_CONFIGS.items()
-    }
-
-
-def get_subagent_config(name: str) -> SubAgentConfig:
+def get_subagent_config(name: str) -> AgentConfig:
     """Get SubAgent configuration by name."""
     return SUBAGENT_CONFIGS[name]
 
 
-def get_skills_for_profile(profile: str | AgentProfile) -> List[str]:
+def get_tools_for_agent(agent_name: str) -> List[str]:
     """
-    Get available skills for a profile.
+    Get tool list for the main agent or a SubAgent.
 
     Args:
-        profile: Profile name string or AgentProfile enum
+        agent_name: Main agent name or SubAgent name
 
     Returns:
-        List of skill names available for the profile
+        List of tool names
     """
-    # SubAgents don't have skills (they're task-focused)
-    if isinstance(profile, str) and profile in SUBAGENT_CONFIGS:
-        return []
+    if agent_name in SUBAGENT_CONFIGS:
+        return list(SUBAGENT_CONFIGS[agent_name].tools)
+    if agent_name == MAIN_AGENT_CONFIG.name:
+        return list(MAIN_AGENT_CONFIG.tools)
+    raise KeyError(f"Unknown agent name: {agent_name}")
 
-    config = get_profile_config(profile)
-    return list(config.skills)
+
+def get_skills_for_agent(agent_name: str) -> List[str]:
+    """
+    Get available skills for an agent.
+
+    Args:
+        agent_name: Main agent name or SubAgent name
+
+    Returns:
+        List of skill names available for the agent
+    """
+    if agent_name in SUBAGENT_CONFIGS:
+        return list(SUBAGENT_CONFIGS[agent_name].skills)
+    if agent_name == MAIN_AGENT_CONFIG.name:
+        return list(MAIN_AGENT_CONFIG.skills)
+    raise KeyError(f"Unknown agent name: {agent_name}")

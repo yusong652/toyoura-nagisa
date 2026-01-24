@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
-from backend.domain.models.agent_profiles import get_tools_for_profile
+from backend.domain.models.agent_profiles import get_tools_for_agent
 from backend.config.dev import get_dev_config
 # Security imports removed - all tools now require session ID
 
@@ -21,7 +21,7 @@ from backend.config.dev import get_dev_config
 class BaseToolManager(ABC):
     """
     Abstract base class for LLM client tool managers.
-    
+
     Defines unified interface specifications supporting:
     - MCP client management and session isolation
     - Tool schema retrieval and caching
@@ -29,7 +29,7 @@ class BaseToolManager(ABC):
     - Tool execution and result formatting
     - Client-specific schema formatting
     """
-    
+
     def __init__(self):
         """Initialize base state."""
 
@@ -39,7 +39,7 @@ class BaseToolManager(ABC):
         # Track files read per session (for edit prerequisite validation)
         # Not affected by context window truncation - real-time tracking
         self._session_read_files: Dict[str, set] = {}  # {session_id: {normalized_paths}}
-    
+
     def get_mcp_client(self) -> MCPClient:
         """
         Return the shared MCP client from app state. FastMCP handles session isolation per request
@@ -50,6 +50,7 @@ class BaseToolManager(ABC):
         """
         if self._mcp_client is None:
             from backend.shared.utils.app_context import get_mcp_client
+
             self._mcp_client = get_mcp_client()
         return self._mcp_client
 
@@ -66,6 +67,7 @@ class BaseToolManager(ABC):
             str: Normalized absolute path
         """
         from pathlib import Path
+
         try:
             # Resolve to absolute path for consistent comparison
             return str(Path(file_path).resolve())
@@ -127,7 +129,7 @@ class BaseToolManager(ABC):
             if get_dev_config().debug_mode:
                 print(f"[BaseToolManager] Cleared read file tracking for session {session_id}")
 
-    async def get_standardized_tools(self, session_id: str, agent_profile = 'pfc_expert') -> Dict[str, ToolSchema]:
+    async def get_standardized_tools(self, session_id: str, agent_profile="pfc_expert") -> Dict[str, ToolSchema]:
         """
         Get standardized ToolSchema objects based on agent profile.
 
@@ -148,9 +150,8 @@ class BaseToolManager(ABC):
                 # Get all MCP tools - list_tools() always returns a list
                 mcp_tools = await mcp_async_client.list_tools()
 
-                # Get tools for the specified profile (or SubAgent)
-                # get_tools_for_profile handles both AgentProfile names and SubAgent names
-                allowed_tools = set(get_tools_for_profile(agent_profile))
+                # Get tools for the specified agent name (main agent or SubAgent)
+                allowed_tools = set(get_tools_for_agent(agent_profile))
 
                 # Add tools to dictionary
                 for mcp_tool in mcp_tools:
@@ -169,7 +170,7 @@ class BaseToolManager(ABC):
             return {}
 
     @abstractmethod
-    async def get_function_call_schemas(self, session_id: str, agent_profile = 'pfc_expert') -> Any:
+    async def get_function_call_schemas(self, session_id: str, agent_profile="pfc_expert") -> Any:
         """
         Get tool schemas formatted for the specific LLM provider.
         Uses get_standardized_tools() internally, then converts to provider format.
@@ -195,13 +196,15 @@ class BaseToolManager(ABC):
         """
         try:
             from backend.infrastructure.monitoring import get_status_monitor
+
             status_monitor = get_status_monitor(session_id)
             return status_monitor.is_user_interrupted()
         except Exception:
             return False
 
-    async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any],
-                               session_id: str, tool_call_id: str = "") -> CallToolResult:
+    async def _execute_mcp_tool(
+        self, tool_name: str, tool_args: Dict[str, Any], session_id: str, tool_call_id: str = ""
+    ) -> CallToolResult:
         """
         Unified method for executing MCP tool calls with mandatory session injection.
         Pure tool execution logic - confirmation should be handled by caller.
@@ -217,7 +220,6 @@ class BaseToolManager(ABC):
         """
         # All tools now require session ID for dependency injection
 
-
         mcp_client = self.get_mcp_client()
         async with mcp_client as mcp_async_client:
             # Session isolation is handled by FastMCP per request via _meta.client_id
@@ -226,16 +228,13 @@ class BaseToolManager(ABC):
             params = CallToolRequestParams(
                 name=tool_name,
                 arguments=tool_args,
-                _meta={"client_id": session_id, "tool_call_id": tool_call_id}  # type: ignore
+                _meta={"client_id": session_id, "tool_call_id": tool_call_id},  # type: ignore
             )
             call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
             return await mcp_async_client.session.send_request(call_req, CallToolResult)
 
     async def _execute_tool_with_interrupt_check(
-        self,
-        function_call: dict,
-        session_id: str,
-        message_id: str
+        self, function_call: dict, session_id: str, message_id: str
     ) -> Dict[str, Any]:
         """
         Execute a tool with periodic interrupt checking.
@@ -256,9 +255,7 @@ class BaseToolManager(ABC):
         tool_name = function_call.get("name", "unknown")
 
         # Create task for tool execution
-        tool_task = asyncio.create_task(
-            self.handle_function_call(function_call, session_id, message_id)
-        )
+        tool_task = asyncio.create_task(self.handle_function_call(function_call, session_id, message_id))
 
         # Poll for interrupt every 100ms while tool is executing
         while not tool_task.done():
@@ -275,12 +272,10 @@ class BaseToolManager(ABC):
 
                 # Return interrupt error (matches Claude Code behavior)
                 from backend.infrastructure.mcp.utils.tool_result import error_response
+
                 interrupt_message = "[Request interrupted by user for tool use]"
                 interrupt_result = error_response(
-                    interrupt_message,
-                    llm_content={
-                        "parts": [{"type": "text", "text": interrupt_message}]
-                    }
+                    interrupt_message, llm_content={"parts": [{"type": "text", "text": interrupt_message}]}
                 )
                 interrupt_result["user_interrupted"] = True
                 return interrupt_result
@@ -346,13 +341,7 @@ class BaseToolManager(ABC):
                             print(f"[BaseToolManager] Edit blocked: {file_path} not read yet in session {session_id}")
 
                         return error_response(
-                            error_message,
-                            llm_content={
-                                "parts": [{
-                                    "type": "text",
-                                    "text": error_message
-                                }]
-                            }
+                            error_message, llm_content={"parts": [{"type": "text", "text": error_message}]}
                         )
 
             # Note: User confirmation is now handled by Agent (application layer)
@@ -394,21 +383,13 @@ class BaseToolManager(ABC):
 
                 # Format based on error type
                 if error_type == "unexpected_keyword_argument":
-                    error_details.append(
-                        f"  • Parameter '{field}': Not defined in tool schema (unexpected argument)"
-                    )
+                    error_details.append(f"  • Parameter '{field}': Not defined in tool schema (unexpected argument)")
                 elif error_type == "missing":
-                    error_details.append(
-                        f"  • Parameter '{field}': Required but not provided"
-                    )
+                    error_details.append(f"  • Parameter '{field}': Required but not provided")
                 elif error_type in ["type_error", "value_error"]:
-                    error_details.append(
-                        f"  • Parameter '{field}': {message}"
-                    )
+                    error_details.append(f"  • Parameter '{field}': {message}")
                 else:
-                    error_details.append(
-                        f"  • Parameter '{field}': {message} (type: {error_type})"
-                    )
+                    error_details.append(f"  • Parameter '{field}': {message} (type: {error_type})")
 
             formatted_errors = "\n".join(error_details)
             error_message = (
@@ -418,20 +399,14 @@ class BaseToolManager(ABC):
             )
 
             from backend.infrastructure.mcp.utils.tool_result import error_response
-            return error_response(
-                error_message,
-                llm_content={
-                    "parts": [{
-                        "type": "text",
-                        "text": error_message
-                    }]
-                }
-            )
+
+            return error_response(error_message, llm_content={"parts": [{"type": "text", "text": error_message}]})
 
         except Exception as e:
             # Let UserRejectionInterruption propagate directly
             # This ensures SubAgent rejection stops MainAgent execution
             from backend.shared.exceptions import UserRejectionInterruption
+
             if isinstance(e, UserRejectionInterruption):
                 raise
 
@@ -454,11 +429,11 @@ class BaseToolManager(ABC):
         _ = tool_args  # Reserved for future command filtering
         # Define tools that require user confirmation
         CONFIRMATION_REQUIRED_TOOLS = {
-            "bash": True,              # All bash commands require confirmation
-            "edit": True,              # All file edits require confirmation
-            "write": True,             # All file writes require confirmation
+            "bash": True,  # All bash commands require confirmation
+            "edit": True,  # All file edits require confirmation
+            "write": True,  # All file writes require confirmation
             "pfc_execute_task": True,  # PFC task execution requires confirmation
-            "invoke_agent": True,      # SubAgent invocation - prevents blocking other confirmations
+            "invoke_agent": True,  # SubAgent invocation - prevents blocking other confirmations
             # Add other tools here as needed
             # "system_command": True,  # Example: other system commands
         }
@@ -496,7 +471,7 @@ class BaseToolManager(ABC):
             # Read current file content
             abs_path = Path(file_path)
             if abs_path.exists():
-                original_content = abs_path.read_text(encoding='utf-8')
+                original_content = abs_path.read_text(encoding="utf-8")
             else:
                 original_content = ""
 
@@ -517,15 +492,11 @@ class BaseToolManager(ABC):
                 fromfile=f"a/{file_name}",
                 tofile=f"b/{file_name}",
                 n=3,  # Context lines
-                lineterm=''  # Don't add line terminators, we'll join with \n
+                lineterm="",  # Don't add line terminators, we'll join with \n
             )
-            file_diff = '\n'.join(diff_lines)
+            file_diff = "\n".join(diff_lines)
 
-            return {
-                "diff": file_diff,
-                "original": original_content,
-                "new": new_content
-            }
+            return {"diff": file_diff, "original": original_content, "new": new_content}
         except Exception as e:
             if get_dev_config().debug_mode:
                 print(f"[BaseToolManager] Error generating edit diff: {e}")
@@ -551,7 +522,7 @@ class BaseToolManager(ABC):
             # Read current file content if exists
             abs_path = Path(file_path)
             if abs_path.exists():
-                original_content = abs_path.read_text(encoding='utf-8')
+                original_content = abs_path.read_text(encoding="utf-8")
             else:
                 original_content = ""
 
@@ -565,15 +536,11 @@ class BaseToolManager(ABC):
                 fromfile=f"a/{file_name}",
                 tofile=f"b/{file_name}",
                 n=3,  # Context lines
-                lineterm=''  # Don't add line terminators, we'll join with \n
+                lineterm="",  # Don't add line terminators, we'll join with \n
             )
-            file_diff = '\n'.join(diff_lines)
+            file_diff = "\n".join(diff_lines)
 
-            return {
-                "diff": file_diff,
-                "original": original_content,
-                "new": new_content
-            }
+            return {"diff": file_diff, "original": original_content, "new": new_content}
         except Exception as e:
             if get_dev_config().debug_mode:
                 print(f"[BaseToolManager] Error generating write diff: {e}")

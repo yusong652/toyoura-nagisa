@@ -62,8 +62,7 @@ export interface UsePfcConsoleCommandReturn {
 }
 
 export function usePfcConsoleCommand(
-  sessionId: string | null,
-  agentProfile: string = 'pfc_expert'
+  sessionId: string | null
 ): UsePfcConsoleCommandReturn {
   const connectionManager = useConnectionManager();
   const [isExecuting, setIsExecuting] = useState(false);
@@ -153,11 +152,10 @@ export function usePfcConsoleCommand(
           type: 'USER_PFC_CONSOLE_EXECUTE',
           session_id: sessionId,
           code,
-          agent_profile: agentProfile,
         });
       });
     },
-    [sessionId, agentProfile, connectionManager]
+    [sessionId, connectionManager]
   );
 
   return {

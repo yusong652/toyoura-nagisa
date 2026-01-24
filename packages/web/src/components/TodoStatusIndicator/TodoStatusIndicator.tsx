@@ -65,7 +65,6 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
   const [currentTodo, setCurrentTodo] = useState<TodoItem | null>(null)
   const { currentSessionId } = useSession()
   const { pendingToolConfirmation } = useConnection()
-  const agentProfile = 'pfc'
   const [glowPosition, setGlowPosition] = useState(0)
   const [thinkingVerb, setThinkingVerb] = useState(() =>
     THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)]
@@ -434,8 +433,7 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
   useEffect(() => {
     const fetchCurrentTodo = async () => {
       try {
-        // agent_profile is required, session_id is optional (for PFC workspace sync)
-        const params = new URLSearchParams({ agent_profile: agentProfile })
+        const params = new URLSearchParams()
         if (currentSessionId) {
           params.append('session_id', currentSessionId)
         }
@@ -463,7 +461,7 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
     }
 
     fetchCurrentTodo()
-  }, [currentSessionId, agentProfile])
+  }, [currentSessionId])
 
   // Listen for todo update events from WebSocket
   useEffect(() => {

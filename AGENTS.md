@@ -68,13 +68,13 @@ MainAgent can delegate specialized tasks to lightweight SubAgents via the `invok
 - **Context Separation**: SubAgent exploration doesn't consume MainAgent's context window
 - **Read-Only**: SubAgents cannot execute simulations or modify files (no `pfc_execute_task`, `write`, `edit`)
 
-**Storage Mode** (determined by `agent_profile`):
+**Storage Mode** (determined by agent type):
 - MainAgent (`pfc_expert`): `persistent=True` → local file (`workspace/todos.json`)
 - SubAgent (`pfc_explorer`, `pfc_diagnostic`): `persistent=False` → in-memory storage
 
 **Implementation**:
 - Tool: `backend/infrastructure/mcp/tools/agent/invoke_agent.py`
-- Config: `backend/domain/models/agent_profiles.py` (`PFC_EXPLORER`, `PFC_DIAGNOSTIC`, `SUBAGENT_*_TOOLS`)
+- Config: `backend/domain/models/agent_profiles.py` (`MAIN_AGENT_CONFIG`, `PFC_EXPLORER`, `PFC_DIAGNOSTIC`)
 - Prompts: `backend/config/prompts/pfc_explorer.md`, `backend/config/prompts/pfc_diagnostic.md`
 
 ### MCP Tool System
@@ -213,7 +213,6 @@ toyoura-nagisa/
 │   │   ├── app.py                      # Main FastAPI application
 │   │   ├── presentation/               # API routes and WebSocket handlers
 │   │   ├── api/
-│   │   │   ├── profiles.py        # Agent profile API
 │   │   │   └── file_search.py     # File mention search API
 │   │   ├── websocket/             # WebSocket connection management
 │   │   ├── handlers/              # Request handlers
@@ -295,7 +294,7 @@ toyoura-nagisa/
 │   ├── cli/                        # Terminal CLI frontend (React/Ink)
 │   │   └── src/
 │   │       └── ui/
-│   │           ├── hooks/             # Hook-driven architecture (chat, session, profile)
+│   │           ├── hooks/             # Hook-driven architecture (chat, session, agent)
 │   │           ├── components/        # Terminal UI components
 │   │           └── commands/          # Slash command system
 │   └── core/                       # Shared TypeScript core
@@ -368,8 +367,8 @@ uv run python examples/pfc_integration/DEMo.py
 - Local models supported via vLLM and Ollama
 
 ### Tool Loading
-- Tools are loaded dynamically based on agent profile
-- Profile selection is per-request (stateless)
+- Tools are loaded dynamically based on agent name (main agent or SubAgent)
+- Main agent uses a single configuration; SubAgents are invoked explicitly
 - MCP server runs on port 9000 for tool communication
 
 ### Memory Management

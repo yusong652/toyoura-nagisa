@@ -68,8 +68,6 @@ interface InputPromptProps {
   /** Whether LLM is currently streaming (blocks shell/PFC commands) */
   isStreaming?: boolean;
   placeholder?: string;
-  /** Agent profile for file search */
-  agentProfile?: string;
   /** Session ID for file search */
   sessionId?: string;
   /** Terminal width for half-grid rendering */
@@ -92,7 +90,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   disabled = false,
   isStreaming = false,
   placeholder = 'Type your message...',
-  agentProfile = 'pfc_expert',
   sessionId,
   sessionMode = 'build',
   terminalWidth = 80,
@@ -119,7 +116,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const fileMention = useFileMentionDetection(
     buffer.text,
     buffer.absoluteCursor,
-    agentProfile,
     sessionId
   );
 

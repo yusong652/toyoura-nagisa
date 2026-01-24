@@ -41,12 +41,11 @@ import { useHistoryManager } from './hooks/useHistoryManager.js';
 import { useChatStream } from './hooks/useChatStream.js';
 import { useConnectionState } from './hooks/useConnectionState.js';
 import { useSessionManagement } from './hooks/useSessionManagement.js';
-import { useProfileManager } from './hooks/useProfileManager.js';
 import { useTodoStatus } from './hooks/useTodoStatus.js';
 import { useBackgroundProcesses } from './hooks/useBackgroundProcesses.js';
 import { usePfcTasks } from './hooks/usePfcTasks.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
-import { MessageType, type AgentProfileType, type SessionMode } from './types.js';
+import { MessageType, type SessionMode } from './types.js';
 import type { Config } from '../config/settings.js';
 
 interface AppContainerProps {
@@ -112,9 +111,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   // Full context mode (Ctrl+O toggle)
   const [isFullContextMode, setIsFullContextMode] = useState(false);
 
-  const normalizedDefaultProfile: AgentProfileType =
-    config.agent.defaultProfile === 'disabled' ? 'disabled' : 'pfc_expert';
-
   // User shell execution state (for Ctrl+B backgrounding)
   const [isShellExecuting, setShellExecuting] = useState(false);
 
@@ -135,15 +131,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   // History management
   const historyManager = useHistoryManager();
 
-  // Profile management
-  const {
-    currentProfile,
-    availableProfiles,
-    isProfileLoading,
-    setProfile,
-    refreshProfiles,
-  } = useProfileManager({ defaultProfile: normalizedDefaultProfile });
-
   // Chat stream (message handling, streaming state)
   const {
     streamingState: streamingStateEnum,
@@ -161,7 +148,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     connectionManager,
     historyManager,
     currentSessionId,
-    currentProfile,
     memoryEnabled,
   });
 
@@ -282,35 +268,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
         try {
           await connectionManager.connectToSession(sessionId);
         } catch (err) {
-          // Initial connection failed, WebSocketManager will auto-reconnect
-          // Listen for successful reconnection
-          console.log('[AppContainer] Initial connection failed, waiting for reconnection...');
-
-          await new Promise<void>((resolve, reject) => {
-            const onConnected = () => {
-              cleanup();
-              resolve();
-            };
-
-            const onMaxRetries = () => {
-              cleanup();
-              reject(new Error('Max reconnection attempts reached'));
-            };
-
-            const cleanup = () => {
-              connectionManager.off('connected', onConnected);
-              connectionManager.off('maxReconnectAttemptsReached', onMaxRetries);
-            };
-
-            connectionManager.once('connected', onConnected);
-            connectionManager.once('maxReconnectAttemptsReached', onMaxRetries);
-          });
-
-          console.log('[AppContainer] Reconnected successfully');
+          console.error('[AppContainer] WebSocket connection error:', err);
         }
-
-        // Fetch available profiles
-        refreshProfiles();
       } catch (err) {
         console.error('[AppContainer] Session initialization error:', err);
       }
@@ -534,9 +493,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     sessionMode,
     llmConfig,
     contextWindow,
-    currentProfile,
-    availableProfiles,
-    isProfileLoading,
     memoryEnabled,
     history: historyManager.history,
     pendingHistoryItems,
@@ -565,9 +521,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     sessionMode,
     llmConfig,
     contextWindow,
-    currentProfile,
-    availableProfiles,
-    isProfileLoading,
     memoryEnabled,
     historyManager.history,
     pendingHistoryItems,
@@ -596,8 +549,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     createSession,
     setSessionMode: updateSessionMode,
     cycleSessionMode,
-    setProfile,
-    refreshProfiles,
     setMemoryEnabled,
     sendMessage,
     cancelRequest,
@@ -618,8 +569,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     createSession,
     updateSessionMode,
     cycleSessionMode,
-    setProfile,
-    refreshProfiles,
     setMemoryEnabled,
     sendMessage,
     cancelRequest,

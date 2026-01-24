@@ -401,7 +401,7 @@ This task tests the agent's ability to implement complex boundary conditions (co
 ## Notes for Experiment Execution
 
 ### Baseline Configuration (No Documentation)
-For -Doc ablation: Remove `pfc_query_*` and `pfc_browse_*` tools from agent profile. LLM must rely on training knowledge only.
+For -Doc ablation: Remove `pfc_query_*` and `pfc_browse_*` tools from the main agent tool list. LLM must rely on training knowledge only.
 
 ### Execution Protocol
 1. Each task run with fresh session (no memory carryover)

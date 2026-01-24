@@ -49,7 +49,6 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
 
     # Use elegant request context manager for automatic lifecycle management
     async with request_manager.request_context(session_id, request_id, user_message_id):
-
         # ========== PHASE 1.5: Status notifications ==========
         status_service = get_message_status_service()
         if status_service and user_message_id:
@@ -61,11 +60,12 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
             from backend.infrastructure.llm.session_client import get_session_llm_client
 
             llm_factory = get_llm_factory()
-            
+
             # Get correct client for this session
             current_llm_client = get_session_llm_client(session_id)
 
             from backend.application.services.agent_service import AgentService
+
             agent_service = AgentService(current_llm_client, llm_factory)
 
             # Send WebSocket read status just before LLM processing starts
@@ -77,16 +77,13 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
             result = await agent_service.process_chat(
                 session_id=session_id,
                 instruction=prepared_message.instruction,
-                agent_profile=prepared_message.agent_profile,
                 enable_memory=prepared_message.enable_memory,
                 llm_config=None,  # Client is already configured correctly
             )
 
             # ========== PHASE 3: Content processing pipeline ==========
             if result.status == "success" and result.message:
-                await process_content_pipeline(
-                    result.message, session_id, message_id=result.message_id
-                )
+                await process_content_pipeline(result.message, session_id, message_id=result.message_id)
 
             # ========== PHASE 4: Memory persistence ==========
             # Note: Title generation happens in Agent.execute() (Application layer)
@@ -95,12 +92,15 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
 
         except UserRejectionInterruption as interruption:
             # User rejected tool execution - this is NOT an error
-            print(f"[INFO] Request interrupted by user rejection in session {session_id}: {interruption.rejected_tools}")
+            print(
+                f"[INFO] Request interrupted by user rejection in session {session_id}: {interruption.rejected_tools}"
+            )
             return
 
         except Exception as e:
             print(f"[ERROR] Streaming request {request_id} failed: {e}")
             import traceback
+
             traceback.print_exc()
 
             if user_message_id and status_service:

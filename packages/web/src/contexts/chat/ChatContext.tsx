@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { FileData, ChatContextType} from '@toyoura-nagisa/core'
 import { useSession } from '../session/SessionContext'
 import { useMemory } from '../MemoryContext'
@@ -24,7 +24,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false)
   const [isLLMThinking, setIsLLMThinking] = useState(false)  // Global LLM thinking status
   const { memoryEnabled } = useMemory()
-  const currentProfile = 'pfc'
   
   // 从SessionContext获取会话相关状态和方法
   const {
@@ -40,13 +39,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     deleteMessage,
     clearChat,
     sendMessage: createAndSendMessage,
-    addVideoMessage,
-    updateMessageStatus
+    addVideoMessage
   } = useChatMessage({
     currentSessionId,
     sessionRefreshSessions,
     sessionSwitchSession,
-    currentProfile,
     memoryEnabled,
     setIsLLMThinking  // Pass LLM thinking status setter
   })

@@ -27,7 +27,6 @@ class PreparedUserMessage:
     session_id: str
     message_id: str
     instruction: UserMessage
-    agent_profile: str
     enable_memory: bool
 
 
@@ -125,7 +124,6 @@ class ChatService:
             request_data: Dictionary containing WebSocket message data with structure:
                 - message: str - The chat message content
                 - session_id: str - Session identifier
-                - agent_profile: str - Agent profile type
                 - enable_memory: bool - Memory injection setting
                 - files: List - Attached files (if any)
 
@@ -134,7 +132,6 @@ class ChatService:
                 - session_id: Session identifier
                 - message_id: Message unique identifier
                 - instruction: UserMessage object ready for Agent
-                - agent_profile: Agent profile configuration
                 - enable_memory: Memory persistence setting
 
         Raises:
@@ -181,7 +178,6 @@ class ChatService:
             session_id=session_id,
             message_id=message_id,
             instruction=instruction,
-            agent_profile="pfc_expert",
             enable_memory=parsed_data.get("enable_memory", True),
         )
 
@@ -198,7 +194,9 @@ class ChatService:
         try:
             from backend.application.services.reminder import ReminderInjector
 
-            agent_profile = "pfc_expert"
+            from backend.domain.models.agent_profiles import get_agent_config
+
+            agent_profile = get_agent_config().name
             mentioned_files = parsed_data.get("mentioned_files", [])
             content = parsed_data.get("content", [])
             enable_memory = parsed_data.get("enable_memory", False)

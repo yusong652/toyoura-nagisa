@@ -25,7 +25,6 @@ export interface MessageRequest {
 export interface ChatStreamRequest {
   messageData: string
   session_id: string
-  agent_profile: string
   enable_memory?: boolean
   mentioned_files?: string[]  // File paths from @ mentions (frontend-confirmed)
 }
@@ -61,7 +60,6 @@ export class ChatService {
     files: FileData[] = [],
     sessionId: string,
     userMessageId: string,
-    agentProfile: string,
     memoryEnabled: boolean = true,
     mentionedFiles: string[] = []
   ): Promise<Response> {
@@ -83,7 +81,6 @@ export class ChatService {
       session_id: sessionId,
       message_id: userMessageId,
       message: text,
-      agent_profile: agentProfile,
       enable_memory: memoryEnabled,
       files: files.map(file => ({
         name: file.name,

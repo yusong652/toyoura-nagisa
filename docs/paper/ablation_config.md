@@ -8,7 +8,7 @@ This document defines the ablation configurations for evaluating each component'
 
 ## Configuration Summary
 
-| Config | Documentation | Lifecycle | Diagnostic | SubAgent | Profile Name |
+| Config | Documentation | Lifecycle | Diagnostic | SubAgent | Config Name |
 |--------|---------------|-----------|------------|----------|--------------|
 | Full System | ✓ | ✓ | ✓ | ✓ | `pfc` |
 | -Doc | ✗ | ✓ | ✓ | ✓ (Explorer disabled) | `pfc_ablation_no_doc` |
@@ -20,7 +20,7 @@ This document defines the ablation configurations for evaluating each component'
 
 ## Detailed Tool Lists
 
-### Full System (`pfc` profile - current)
+### Full System (`pfc_expert` main agent config)
 
 ```python
 PFC_TOOLS = [
@@ -137,9 +137,9 @@ PFC_ABLATION_NO_LIFECYCLE_TOOLS = [
 
 **Implementation Options**:
 
-1. **Profile Setting** (Recommended):
+1. **AgentConfig Setting** (Recommended):
    ```python
-   ProfileConfig(
+   AgentConfig(
        ...
        enable_background_execution=False,  # New field
    )
@@ -203,27 +203,25 @@ PFC_ABLATION_NO_LIFECYCLE_TOOLS: List[str] = [...]  # Same as PFC_TOOLS
 PFC_ABLATION_BASELINE_TOOLS: List[str] = [...]
 ```
 
-### Phase 2: Profile Configurations
+### Phase 2: Agent Config Variants
 
-Add new profiles to `PROFILE_CONFIGS`:
+Add new agent config variants in `agent_profiles.py`:
 
 ```python
-# Add to AgentProfile enum
-class AgentProfile(Enum):
+PFC_ABLATION_NO_DOC_CONFIG = AgentConfig(
+    name="pfc_ablation_no_doc",
     ...
-    PFC_ABLATION_NO_DOC = "pfc_ablation_no_doc"
-    PFC_ABLATION_NO_DIAGNOSTIC = "pfc_ablation_no_diagnostic"
-    PFC_ABLATION_NO_LIFECYCLE = "pfc_ablation_no_lifecycle"
-    PFC_ABLATION_BASELINE = "pfc_ablation_baseline"
+    tools=tuple(PFC_ABLATION_NO_DOC_TOOLS),
+)
 ```
 
 ### Phase 3: SubAgent Access Control
 
-Add `allowed_subagents` field to ProfileConfig:
+Add `allowed_subagents` field to AgentConfig:
 
 ```python
 @dataclass(frozen=True)
-class ProfileConfig:
+class AgentConfig:
     ...
     allowed_subagents: tuple = ("pfc_explorer", "pfc_diagnostic")  # Default: all
 ```
@@ -241,7 +239,7 @@ Add `enable_background_execution` field:
 
 ```python
 @dataclass(frozen=True)
-class ProfileConfig:
+class AgentConfig:
     ...
     enable_background_execution: bool = True  # Default: enabled
 ```
@@ -296,7 +294,7 @@ For each experiment run, record:
 ## Next Steps
 
 1. [ ] Implement tool list definitions in `agent_profiles.py`
-2. [ ] Add ablation profile configurations
+2. [ ] Add ablation config variants
 3. [ ] Implement SubAgent access control (`allowed_subagents`)
 4. [ ] Implement lifecycle control (`enable_background_execution`)
 5. [ ] Create experiment runner script

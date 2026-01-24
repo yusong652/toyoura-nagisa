@@ -50,12 +50,11 @@ import {
 const useFileMentionDetection = (
   message: string,
   cursorPosition: number,
-  agentProfile: string = 'pfc',
   sessionId?: string
 ): FileMentionDetectionHookReturn => {
 
   // File search hook
-  const { searchFiles, results, isSearching, clearResults } = useFileSearch(agentProfile, sessionId)
+  const { searchFiles, results, isSearching, clearResults } = useFileSearch(sessionId)
 
   // Activation state management
   const [isActivated, setIsActivated] = useState<boolean>(false)

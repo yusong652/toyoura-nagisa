@@ -16,10 +16,7 @@ from typing import Any
 
 from backend.application.services.agent import Agent
 from backend.domain.models.agent import AgentResult
-from backend.domain.models.agent_profiles import (
-    SubAgentConfig,
-    get_profile_config,
-)
+from backend.domain.models.agent_profiles import AgentConfig, get_agent_config
 from backend.domain.models.messages import UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.llm.base.factory import LLMFactory
@@ -40,14 +37,12 @@ class AgentService:
         result = await service.process_chat(
             session_id=session_id,
             instruction=user_message,
-            agent_profile="pfc_expert"
         )
 
         # With custom configuration (from global default_llm.json)
         result = await service.process_chat(
             session_id=session_id,
             instruction=user_message,
-            agent_profile="pfc_expert",
             llm_config={"provider": "anthropic", "model": "claude-sonnet-4-5"}
         )
 
@@ -75,15 +70,14 @@ class AgentService:
         self,
         session_id: str,
         instruction: UserMessage,
-        agent_profile: str = "pfc_expert",
         enable_memory: bool = True,
         llm_config: dict[str, Any] | None = None,
     ) -> AgentResult:
         """
         Process a chat request using MainAgent.
 
-        Creates a MainAgent with the appropriate configuration based on profile
-        and executes the conversation turn with full streaming support.
+        Creates a MainAgent with the standard configuration and executes
+        the conversation turn with full streaming support.
 
         If llm_config is provided, creates a custom LLM client using the specified
         provider and model. Otherwise, uses the default LLM client.
@@ -91,7 +85,6 @@ class AgentService:
         Args:
             session_id: Session ID for the conversation
             instruction: UserMessage object containing user input
-            agent_profile: Agent profile for tool selection (default: "pfc_expert")
             enable_memory: Whether to enable memory persistence (default: True)
             llm_config: Optional LLM configuration with keys:
                        - provider: LLM provider name (e.g., "google", "anthropic")
@@ -121,7 +114,7 @@ class AgentService:
                 provider=llm_config["provider"], model=llm_config["model"]
             )
 
-        config = get_profile_config(agent_profile)
+        config = get_agent_config()
         agent = Agent(
             config=config,
             llm_client=llm_client,
@@ -132,7 +125,7 @@ class AgentService:
 
     async def run_subagent(
         self,
-        config: SubAgentConfig,
+        config: AgentConfig,
         instruction: str,
         context: str | None = None,
         notification_session_id: str | None = None,
@@ -145,7 +138,7 @@ class AgentService:
         the given instruction in non-streaming mode.
 
         Args:
-            config: SubAgentConfig for the SubAgent
+            config: AgentConfig for the SubAgent
             instruction: Task instruction to execute (string)
             context: Optional additional context to prepend
             notification_session_id: Session ID for WebSocket notifications.

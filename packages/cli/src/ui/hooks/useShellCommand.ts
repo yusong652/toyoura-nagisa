@@ -50,8 +50,7 @@ export interface UseShellCommandReturn {
 }
 
 export function useShellCommand(
-  sessionId: string | null,
-  agentProfile: string = 'pfc_expert'
+  sessionId: string | null
 ): UseShellCommandReturn {
   const connectionManager = useConnectionManager();
   const [isExecuting, setIsExecuting] = useState(false);
@@ -71,7 +70,7 @@ export function useShellCommand(
     const fetchCwd = async () => {
       try {
         const response = await apiClient.get<CwdData>(
-          `/api/shell/cwd?session_id=${encodeURIComponent(sessionId)}&agent_profile=${encodeURIComponent(agentProfile)}`
+          `/api/shell/cwd?session_id=${encodeURIComponent(sessionId)}`
         );
         if (response.cwd) {
           setCwd(response.cwd);
@@ -82,7 +81,7 @@ export function useShellCommand(
     };
 
     fetchCwd();
-  }, [sessionId, agentProfile]);
+  }, [sessionId]);
 
   // Handle WebSocket result
   useEffect(() => {
@@ -139,11 +138,10 @@ export function useShellCommand(
           type: 'USER_SHELL_EXECUTE',
           session_id: sessionId,
           command,
-          agent_profile: agentProfile,
         });
       });
     },
-    [sessionId, agentProfile, connectionManager]
+    [sessionId, connectionManager]
   );
 
   return {

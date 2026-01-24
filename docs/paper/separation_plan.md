@@ -122,20 +122,12 @@ infrastructure/
 
 ## Code Changes Required
 
-### 1. Agent Profiles (`packages/backend/domain/models/agent_profiles.py`)
+### 1. Agent Configuration (`packages/backend/domain/models/agent_profiles.py`)
 
-**Remove profiles:**
-- `LIFESTYLE` profile
-- `GENERAL` profile (contains lifestyle tools)
-
-**Keep profiles:**
-- `CODING` - Development tasks
-- `PFC` - Main PFC expert profile
-- `DISABLED` - Pure chat mode
+**Current state**:
+- Single main agent config: `MAIN_AGENT_CONFIG` (PFC Expert)
 - SubAgents: `pfc_explorer`, `pfc_diagnostic`
-
-**Add profiles:**
-- Ablation profiles (as designed in ablation_config.md)
+- Legacy profiles removed (no lifestyle/general/disabled)
 
 ### 2. Tool Manager
 
@@ -188,8 +180,7 @@ rm -rf packages/backend/infrastructure/mcp/tools/lifestyle
 # 2. Remove auth infrastructure (Google OAuth for lifestyle)
 rm -rf packages/backend/infrastructure/auth
 
-# 3. Clean agent_profiles.py
-# (Edit to remove LIFESTYLE and GENERAL profiles)
+# 3. Confirm agent_profiles.py uses main config + SubAgents only
 
 # 4. Update CLAUDE.md to reflect PFC-only focus
 ```
@@ -203,8 +194,8 @@ uv run pytest
 # 2. Start backend
 npm run dev:backend
 
-# 3. Test PFC profile
-# Send test message with pfc profile
+# 3. Test main agent config
+# Send a test message with the PFC Expert agent
 ```
 
 ---

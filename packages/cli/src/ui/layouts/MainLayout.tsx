@@ -40,7 +40,7 @@ import { useShellCommand } from '../hooks/useShellCommand.js';
 import { usePfcConsoleCommand } from '../hooks/usePfcConsoleCommand.js';
 import { useTheme } from '../hooks/useTheme.js';
 import { useTextBuffer } from '../utils/text-buffer.js';
-import { MessageType, type AgentProfileType } from '../types.js';
+import { MessageType } from '../types.js';
 import { colors, theme, themeManager } from '../colors.js';
 import { themes, type ThemeName } from '../themes/index.js';
 import { apiClient } from '@toyoura-nagisa/core';
@@ -53,7 +53,6 @@ const MemoizedAppHeader = memo(AppHeader);
 type ActiveDialog =
   | 'help'
   | 'help_detail'
-  | 'profile'
   | 'memory'
   | 'session'
   | 'session_restore'
@@ -91,22 +90,6 @@ interface SessionLlmConfig {
   model: string;
   secondary_model?: string | null;
 }
-
-// Profile options fallback (used if profile list is unavailable)
-const FALLBACK_PROFILE_OPTIONS: SelectOption<AgentProfileType>[] = [
-  {
-    key: 'pfc_expert',
-    value: 'pfc_expert',
-    label: 'PFC Expert',
-    description: 'ITASCA PFC simulation with script-based workflow',
-  },
-  {
-    key: 'disabled',
-    value: 'disabled',
-    label: 'Chat Agent',
-    description: 'Pure conversation mode without tools',
-  },
-];
 
 // Memory options for SelectDialog
 const MEMORY_OPTIONS: SelectOption<boolean>[] = [
@@ -182,14 +165,12 @@ export const MainLayout: React.FC = () => {
 
   // Shell command execution
   const { executeCommand: executeShellCommand, isExecuting: isShellExecuting, cwd: shellCwd } = useShellCommand(
-    appState.currentSessionId,
-    appState.currentProfile
+    appState.currentSessionId
   );
 
   // PFC console command execution
   const { executeCode: executePfcCode, isExecuting: isPfcExecuting } = usePfcConsoleCommand(
-    appState.currentSessionId,
-    appState.currentProfile
+    appState.currentSessionId
   );
 
   // Sync shell execution state to AppState for Ctrl+B handling
@@ -238,19 +219,6 @@ export const MainLayout: React.FC = () => {
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [selectedPrimaryModelId, setSelectedPrimaryModelId] = useState<string | null>(null);
   const [currentLlmConfig, setCurrentLlmConfig] = useState<SessionLlmConfig | null>(null);
-
-  const profileOptions = useMemo<SelectOption<AgentProfileType>[]>(() => {
-    if (appState.availableProfiles.length === 0) {
-      return FALLBACK_PROFILE_OPTIONS;
-    }
-
-    return appState.availableProfiles.map((profile) => ({
-      key: profile.profile_type,
-      value: profile.profile_type as AgentProfileType,
-      label: profile.name,
-      description: profile.description,
-    }));
-  }, [appState.availableProfiles]);
 
   const loadLlmProviders = useCallback(async (sessionId: string) => {
     setIsLlmProvidersLoading(true);
@@ -439,12 +407,6 @@ export const MainLayout: React.FC = () => {
     setSelectedHelpCommand(cmdName);
     setActiveDialog('help_detail');
   }, []);
-
-  // Handle profile selection from dialog
-  const handleProfileSelect = useCallback((profile: AgentProfileType) => {
-    appActions.setProfile(profile);
-    setActiveDialog(null);
-  }, [appActions, profileOptions]);
 
   // Handle memory selection from dialog
   const handleMemorySelect = useCallback((enabled: boolean) => {
@@ -649,7 +611,6 @@ export const MainLayout: React.FC = () => {
 
       const response = await apiClient.post<PfcResetData>('/api/pfc/console/reset', {
         session_id: appState.currentSessionId || 'unknown',
-        agent_profile: appState.currentProfile,
       });
 
       const parts: string[] = [];
@@ -674,7 +635,7 @@ export const MainLayout: React.FC = () => {
     }
 
     setActiveDialog(null);
-  }, [appActions, appState.currentSessionId, appState.currentProfile]);
+  }, [appActions, appState.currentSessionId]);
 
   // Load PFC tasks when dialog opens
   const loadPfcTasks = useCallback(async () => {
@@ -945,8 +906,6 @@ export const MainLayout: React.FC = () => {
         // Open the appropriate dialog
         if (result.dialog === 'help') {
           setActiveDialog('help');
-        } else if (result.dialog === 'profile') {
-          setActiveDialog('profile');
         } else if (result.dialog === 'memory') {
           setActiveDialog('memory');
         } else if (result.dialog === 'session') {
@@ -1107,19 +1066,6 @@ export const MainLayout: React.FC = () => {
             }}
             onCancel={() => setActiveDialog('help')}
             showNumbers={false}
-          />
-        )}
-
-        {/* Profile selection dialog */}
-        {activeDialog === 'profile' && (
-          <SelectDialog
-            title="Select Agent Profile"
-            description="Choose a profile to optimize tool loading for your task:"
-            options={profileOptions}
-            currentValue={appState.currentProfile}
-            onSelect={handleProfileSelect}
-            onCancel={handleDialogCancel}
-            showNumbers={true}
           />
         )}
 
@@ -1344,7 +1290,6 @@ export const MainLayout: React.FC = () => {
             terminalWidth={terminalWidth}
             slashCommands={commands}
             commandContext={commandContext}
-            agentProfile={appState.currentProfile}
             sessionId={appState.currentSessionId || undefined}
             disabled={isShellExecuting || isPfcExecuting}
             isStreaming={appState.isStreaming}

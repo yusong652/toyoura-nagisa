@@ -28,16 +28,16 @@ async def initialize_backend():
 
     # Initialize LLM Factory and Client
     llm_factory = initialize_factory()
-    
+
     from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
+
     default_config = get_default_llm_config()
     if not default_config:
         # Fallback for tests if no default config
         default_config = {"provider": "google", "model": "gemini-2.0-flash-exp"}
-        
+
     llm_client = llm_factory.create_client_with_config(
-        provider=default_config["provider"],
-        model=default_config["model"]
+        provider=default_config["provider"], model=default_config["model"]
     )
     # app.state.llm_client = llm_client  # No longer used
     app.state.llm_factory = llm_factory
@@ -59,8 +59,7 @@ async def initialize_backend():
 
 # Import after path setup
 from backend.domain.models.agent_profiles import (
-    SubAgentConfig,
-    AgentProfile,
+    AgentConfig,
     PFC_EXPLORER,
 )
 from backend.domain.models.messages import UserMessage
@@ -68,7 +67,7 @@ from backend.application.services.agent import Agent
 
 
 # Simple test agent definition (no tools, just text response)
-TEST_AGENT_NO_TOOLS = SubAgentConfig(
+TEST_AGENT_NO_TOOLS = AgentConfig(
     name="test_no_tools",
     display_name="Test Agent (No Tools)",
     description="Simple test agent that responds without using tools",
@@ -76,18 +75,21 @@ TEST_AGENT_NO_TOOLS = SubAgentConfig(
     max_iterations=3,
     streaming_enabled=False,
     enable_memory=False,
+    is_main_agent=False,
 )
 
 # Test agent with coding tools
 from backend.domain.models.agent_profiles import PFC_TOOLS
-TEST_AGENT_WITH_TOOLS = SubAgentConfig(
+
+TEST_AGENT_WITH_TOOLS = AgentConfig(
     name="test_with_tools",
     display_name="Test Agent (With Tools)",
     description="Test agent that can use coding tools",
-    tools=tuple(PFC_TOOLS),
+    tools=tuple(tool for tool in PFC_TOOLS if tool != "invoke_agent"),
     max_iterations=5,
     streaming_enabled=False,
     enable_memory=False,
+    is_main_agent=False,
 )
 
 
@@ -131,9 +133,11 @@ async def test_with_tools(llm_client):
     print(f"\nRunning agent: {agent.display_name}")
     print(f"Input: Read the first 10 lines of pyproject.toml")
 
-    result = await agent.execute(UserMessage(
-        content="Read the first 10 lines of the file pyproject.toml in the current directory and summarize what you see."
-    ))
+    result = await agent.execute(
+        UserMessage(
+            content="Read the first 10 lines of the file pyproject.toml in the current directory and summarize what you see."
+        )
+    )
 
     print(f"\n--- Result ---")
     print(f"Status: {result.status}")
@@ -159,10 +163,12 @@ async def test_pfc_explorer(llm_client):
     print(f"\nRunning agent: {agent.display_name}")
     print(f"Input: Query ball create command syntax")
 
-    result = await agent.execute(UserMessage(
-        content="Find the syntax for creating balls in PFC using pfc_query_command. "
-        "Context: I need to understand how to create particles in a DEM simulation."
-    ))
+    result = await agent.execute(
+        UserMessage(
+            content="Find the syntax for creating balls in PFC using pfc_query_command. "
+            "Context: I need to understand how to create particles in a DEM simulation."
+        )
+    )
 
     print(f"\n--- Result ---")
     print(f"Status: {result.status}")
@@ -191,6 +197,7 @@ async def main():
     except Exception as e:
         print(f"\n[ERROR] Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         results["no_tools"] = False
 
@@ -200,6 +207,7 @@ async def main():
     except Exception as e:
         print(f"\n[ERROR] Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         results["with_tools"] = False
 

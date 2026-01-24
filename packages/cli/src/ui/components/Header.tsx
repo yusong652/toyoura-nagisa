@@ -7,7 +7,6 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { useAppState } from '../contexts/AppStateContext.js';
 import { theme } from '../colors.js';
-import type { AgentProfileType } from '../types.js';
 
 interface HeaderProps {
   /** Whether shell mode is active (! prefix detected) */
@@ -28,15 +27,7 @@ const formatTokensK = (tokens: number): string => {
   return `${k}k`;
 };
 
-// Profile display info fallback (GitHub-inspired colors)
-const PROFILE_DISPLAY: Record<AgentProfileType, { color: string; name: string }> = {
-  pfc_expert: { color: '#a371f7', name: 'PFC Expert' }, // GitHub purple
-  disabled: { color: '#f85149', name: 'Disabled' },     // GitHub red
-};
-
-/**
- * Format cwd for display, showing only the last part or truncating if too long
- */
+// Cwd formatter
 const formatCwd = (cwd: string | null | undefined, maxLength: number = 30): string => {
   if (!cwd) return '~';
 
@@ -71,15 +62,6 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isShellExec
         ? 'Connecting...'
         : 'Disconnected';
 
-  // Get profile display info
-  const backendProfile = appState.availableProfiles.find(
-    (profile) => profile.profile_type === appState.currentProfile
-  );
-  const profileInfo = {
-    name: backendProfile?.name ?? PROFILE_DISPLAY[appState.currentProfile]?.name ?? appState.currentProfile,
-    color: backendProfile?.color ?? PROFILE_DISPLAY[appState.currentProfile]?.color ?? theme.text.primary,
-  };
-
   // Calculate token usage display
   const usage = appState.tokenUsage;
   const contextWindow = appState.contextWindow ?? 128000;
@@ -112,10 +94,6 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isShellExec
             </Text>
           </>
         )}
-        {separator}
-        <Text color={profileInfo.color}>
-          {profileInfo.name}
-        </Text>
         {separator}
         <Text color={appState.memoryEnabled ? '#3fb950' : theme.text.muted}>
           {appState.memoryEnabled ? 'Memory ON' : 'Memory OFF'}

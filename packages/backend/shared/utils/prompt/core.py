@@ -18,10 +18,10 @@ def _load_prompt_file(filename: str) -> str:
 
 def get_base_prompt(profile: str = "pfc_expert") -> str:
     """
-    Load base system prompt based on agent profile.
+    Load base system prompt based on agent name.
 
     Args:
-        profile: Agent profile type (e.g., "pfc_expert", "disabled")
+        profile: Agent name (e.g., "pfc_expert", "pfc_explorer")
 
     Returns:
         Base system prompt string
@@ -37,10 +37,9 @@ def get_base_prompt(profile: str = "pfc_expert") -> str:
 
     # Profile-specific prompt mapping
     profile_prompts = {
-        "pfc_expert": "pfc_expert_prompt.md",  # Maps to AgentProfile.PFC_EXPERT
-        "pfc_explorer": "pfc_explorer.md",  # PFC documentation SubAgent
-        "pfc_diagnostic": "pfc_diagnostic.md",  # PFC multimodal diagnostic SubAgent
-        "disabled": "base_prompt.md",  # Chat-only mode
+        "pfc_expert": "pfc_expert_prompt.md",
+        "pfc_explorer": "pfc_explorer.md",
+        "pfc_diagnostic": "pfc_diagnostic.md",
     }
 
     # Get profile-specific prompt file, fallback to base_prompt.md
@@ -48,7 +47,7 @@ def get_base_prompt(profile: str = "pfc_expert") -> str:
     prompt = _load_prompt_file(prompt_file)
 
     # If profile-specific file doesn't exist, fallback to base
-    if not prompt and profile != "disabled":
+    if not prompt:
         prompt = _load_prompt_file("base_prompt.md")
 
     return prompt
@@ -57,4 +56,3 @@ def get_base_prompt(profile: str = "pfc_expert") -> str:
 def get_expression_prompt() -> str:
     """Load expression/keyword instruction prompt"""
     return _load_prompt_file("expression_prompt.md")
-

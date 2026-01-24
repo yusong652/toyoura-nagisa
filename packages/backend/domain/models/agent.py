@@ -7,7 +7,7 @@ Key models:
     - AgentResult: Execution result with status and data
 
 Note: Agent configuration is now defined in agent_profiles.py
-(ProfileConfig for MainAgent, SubAgentConfig for SubAgent).
+(AgentConfig with is_main_agent to differentiate main vs SubAgent).
 """
 
 from typing import Any, Literal, Optional
@@ -54,27 +54,15 @@ class AgentResult(BaseModel):
         description="Execution outcome status"
     )
 
-    message: Optional[Any] = Field(
-        default=None,
-        description="Structured response message (BaseMessage)"
-    )
+    message: Optional[Any] = Field(default=None, description="Structured response message (BaseMessage)")
 
     message_id: Optional[str] = Field(
-        default=None,
-        description="Streaming message ID for WebSocket updates (MainAgent only)"
+        default=None, description="Streaming message ID for WebSocket updates (MainAgent only)"
     )
 
-    iterations_used: int = Field(
-        default=0,
-        ge=0,
-        description="Number of tool call iterations used"
-    )
+    iterations_used: int = Field(default=0, ge=0, description="Number of tool call iterations used")
 
-    execution_time_seconds: float = Field(
-        default=0.0,
-        ge=0.0,
-        description="Total execution time in seconds"
-    )
+    execution_time_seconds: float = Field(default=0.0, ge=0.0, description="Total execution time in seconds")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -89,6 +77,7 @@ class AgentResult(BaseModel):
         """
         if self.message:
             from backend.domain.models.message_factory import extract_text_from_message
+
             text = extract_text_from_message(self.message)
             # Strip whitespace - empty/whitespace-only responses have no meaning
             return text.strip() if text else ""

@@ -14,8 +14,6 @@ import type {
   HistoryItemWithoutId,
   ToolConfirmationData,
   ConnectionStatus,
-  AgentProfileType,
-  AgentProfileInfo,
   SessionMode,
 } from '../types.js';
 import type { TodoItem } from '../hooks/useTodoStatus.js';
@@ -40,11 +38,6 @@ export interface AppState {
   sessionMode: SessionMode;
   llmConfig: ChatSession['llm_config'] | null;
   contextWindow: number | null;
-
-  // Agent profile
-  currentProfile: AgentProfileType;
-  availableProfiles: AgentProfileInfo[];
-  isProfileLoading: boolean;
 
   // Memory
   memoryEnabled: boolean;
@@ -110,10 +103,6 @@ export interface AppActions {
   setSessionMode: (mode: SessionMode) => void;
   cycleSessionMode: (direction: 1 | -1) => void;
 
-  // Agent profile
-  setProfile: (profile: AgentProfileType) => void;
-  refreshProfiles: () => Promise<void>;
-
   // Memory
   setMemoryEnabled: (enabled: boolean) => void;
 
@@ -150,9 +139,6 @@ const defaultState: AppState = {
   sessionMode: 'build',
   llmConfig: null,
   contextWindow: null,
-  currentProfile: 'pfc_expert',
-  availableProfiles: [],
-  isProfileLoading: false,
   memoryEnabled: false,
   history: [],
   pendingHistoryItems: [],
@@ -183,8 +169,6 @@ const defaultActions: AppActions = {
   createSession: async () => '',
   setSessionMode: () => {},
   cycleSessionMode: () => {},
-  setProfile: () => {},
-  refreshProfiles: async () => {},
   setMemoryEnabled: () => {},
   sendMessage: () => {},
   cancelRequest: () => {},

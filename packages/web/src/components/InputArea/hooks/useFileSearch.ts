@@ -16,7 +16,6 @@ import {
  */
 
 const useFileSearch = (
-  agentProfile: string = 'pfc',
   sessionId?: string
 ): FileSearchHookReturn => {
 
@@ -43,7 +42,6 @@ const useFileSearch = (
       // Build query parameters
       const params = new URLSearchParams({
         query: query.trim(),
-        agent_profile: agentProfile,
         limit: '50'
       })
 
@@ -84,7 +82,7 @@ const useFileSearch = (
     } finally {
       setIsSearching(false)
     }
-  }, [agentProfile, sessionId])
+  }, [sessionId])
 
   /**
    * Clear search results

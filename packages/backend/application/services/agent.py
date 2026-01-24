@@ -2,9 +2,9 @@
 Agent - First-class citizen with active behavior.
 
 This module provides the Agent class that encapsulates both
-configuration (ProfileConfig/SubAgentConfig) and behavior (execute method).
+configuration (AgentConfig) and behavior (execute method).
 
-Execution modes (controlled by is_main_agent):
+Execution modes (controlled by config.is_main_agent):
 - MainAgent: streaming LLM calls, WebSocket notifications, message persistence
 - SubAgent: non-streaming calls, context-only storage
 """
@@ -20,14 +20,11 @@ from backend.application.services.streaming_models import StreamingState
 from backend.application.services.streaming_processor import StreamingProcessor
 from backend.application.services.tool_executor import ToolExecutor
 from backend.domain.models.agent import AgentResult
-from backend.domain.models.agent_profiles import ProfileConfig, SubAgentConfig
+from backend.domain.models.agent_profiles import AgentConfig
 from backend.domain.models.messages import AssistantMessage, UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.storage.session_manager import save_token_usage
 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-
-# Type alias for agent configuration
-AgentConfig = ProfileConfig | SubAgentConfig
 
 
 class Agent:
@@ -35,14 +32,14 @@ class Agent:
     Agent with active behavior - first-class citizen in the system.
 
     An Agent encapsulates:
-    - Configuration (ProfileConfig or SubAgentConfig)
+    - Configuration (AgentConfig)
     - Unified execution (execute() handles both streaming and non-streaming)
     - State management (context, execution tracking)
 
     Usage:
         # MainAgent (streaming, WebSocket, persistence)
-        from backend.domain.models.agent_profiles import get_profile_config
-        config = get_profile_config("pfc_expert")
+        from backend.domain.models.agent_profiles import get_agent_config
+        config = get_agent_config()
         agent = Agent(config, llm_client, session_id="abc123")
         result = await agent.execute(instruction=user_message)
 
@@ -65,11 +62,10 @@ class Agent:
         Initialize Agent.
 
         Args:
-            config: Agent configuration (ProfileConfig or SubAgentConfig)
+            config: Agent configuration (main or SubAgent)
             llm_client: LLM client for API calls
-            session_id: Session ID for MainAgent (persistent session).
-                       If provided, agent operates as MainAgent with streaming and persistence.
-                       If None, agent operates as SubAgent with auto-generated temporary ID.
+            session_id: Session ID for MainAgent (required for persistent sessions).
+                       SubAgents may omit this and use a temporary session ID.
             enable_memory: Whether to enable memory persistence.
                           If None, uses config.enable_memory as default.
             notification_session_id: Session ID for WebSocket notifications and confirmations.
@@ -81,8 +77,10 @@ class Agent:
         self.config = config
         self.llm_client = llm_client
 
-        # session_id is always str - auto-generate for SubAgent
-        self._is_main_agent = session_id is not None
+        # Execution mode is determined by configuration, not session_id
+        self._is_main_agent = self.config.is_main_agent
+        if self._is_main_agent and session_id is None:
+            raise ValueError("MainAgent requires a session_id")
         self.session_id: str = session_id if session_id is not None else str(uuid.uuid4())[:8]
 
         # notification_session_id: for SubAgent, route to parent's WebSocket

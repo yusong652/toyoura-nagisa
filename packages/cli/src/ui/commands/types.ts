@@ -90,17 +90,9 @@ export interface QuitActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'profile' | 'memory' | 'session' | 'settings' | 'theme' | 'pfc_reset' | 'pfc_tasks' |
+  dialog: 'help' | 'memory' | 'session' | 'settings' | 'theme' | 'pfc_reset' | 'pfc_tasks' |
     'models_provider' | 'models_primary' | 'models_secondary';
   props?: Record<string, unknown>;
-}
-
-/**
- * Return type for profile switch action
- */
-export interface ProfileSwitchActionReturn {
-  type: 'profile_switch';
-  profile: string;
 }
 
 /**
@@ -142,7 +134,6 @@ export type SlashCommandActionReturn =
   | MessageActionReturn
   | QuitActionReturn
   | OpenDialogActionReturn
-  | ProfileSwitchActionReturn
   | MemoryToggleActionReturn
   | LoadHistoryActionReturn
   | SubmitPromptActionReturn

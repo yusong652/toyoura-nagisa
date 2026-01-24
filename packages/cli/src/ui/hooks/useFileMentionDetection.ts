@@ -56,12 +56,10 @@ export interface UseFileMentionDetectionReturn {
 export function useFileMentionDetection(
   message: string,
   cursorPosition: number,
-  agentProfile: string = 'pfc_expert',
   sessionId?: string
 ): UseFileMentionDetectionReturn {
   // File search hook
   const { searchFiles, results, isSearching, clearResults } = useFileSearch(
-    agentProfile,
     sessionId
   );
 
