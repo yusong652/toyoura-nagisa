@@ -11,20 +11,25 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@toyoura-nagisa/core": "*",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.18.0",
     "@mui/material": "^5.15.12",
+    "@toyoura-nagisa/core": "*",
     "@types/dompurify": "^3.0.5",
+    "@types/katex": "^0.16.8",
     "@types/marked": "^5.0.2",
     "@types/uuid": "^10.0.0",
     "dompurify": "^3.2.6",
+    "katex": "^0.16.27",
     "marked": "^15.0.12",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "shiki": "^3.21.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

@@ -1,11 +1,11 @@
 import React from 'react'
-import ReactMarkdown from 'react-markdown'
+import MarkdownContent from './MarkdownContent'
 import { MessageTextProps } from '../types'
 
 /**
  * Simple message text display component.
  * 
- * Renders message text content using ReactMarkdown for formatting support.
+ * Renders message text content using MarkdownContent for high-quality formatting support.
  * Used for both user and bot messages when simple text rendering is needed.
  * 
  * Args:
@@ -20,7 +20,7 @@ const MessageText: React.FC<MessageTextProps> = ({ content, className = 'message
   
   return (
     <div className={className}>
-      <ReactMarkdown>{content}</ReactMarkdown>
+      <MarkdownContent content={content} />
     </div>
   )
 }

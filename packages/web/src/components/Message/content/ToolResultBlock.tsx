@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { ToolResultBlock as ToolResultBlockType } from '@toyoura-nagisa/core'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import MarkdownContent from './MarkdownContent'
 
 interface ToolResultBlockProps {
   block: ToolResultBlockType
@@ -65,26 +64,7 @@ const ToolResultBlock: React.FC<ToolResultBlockProps> = ({ block }) => {
         <div className="tool-result-content">
           <div className="tool-result-viewport">
             <div className="tool-result-scrollable">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  code({ node, inline, className, children, ...props }: any) {
-                    return inline ? (
-                      <code className={className} {...props}>
-                        {children}
-                      </code>
-                    ) : (
-                      <pre className="code-block">
-                        <code className={className} {...props}>
-                          {children}
-                        </code>
-                      </pre>
-                    )
-                  }
-                }}
-              >
-                {textContent}
-              </ReactMarkdown>
+              <MarkdownContent content={textContent} />
             </div>
           </div>
         </div>

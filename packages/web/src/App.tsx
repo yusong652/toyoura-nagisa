@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import './App.css'
+import './styles/markdown.css'
 import { ChatBox } from './components/ChatBox'
 import InputArea from './components/InputArea'
 import ChatHistorySidebar from './components/ChatHistorySidebar/ChatHistorySidebar'

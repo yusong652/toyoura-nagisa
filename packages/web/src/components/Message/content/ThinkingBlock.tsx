@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { ThinkingBlock as ThinkingBlockType } from '@toyoura-nagisa/core'
-import ReactMarkdown from 'react-markdown'
+import MarkdownContent from './MarkdownContent'
 
 interface ThinkingBlockProps {
   block: ThinkingBlockType
@@ -51,7 +51,7 @@ const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ block, streaming = false 
         <div className="thinking-content">
           <div className="thinking-viewport">
             <div className="thinking-scrollable">
-              <ReactMarkdown>{block.thinking}</ReactMarkdown>
+              <MarkdownContent content={block.thinking} />
               {streaming && <span className="streaming-cursor">▌</span>}
             </div>
           </div>

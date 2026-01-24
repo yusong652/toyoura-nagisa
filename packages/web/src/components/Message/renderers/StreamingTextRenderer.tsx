@@ -1,5 +1,5 @@
 import React from 'react'
-import ReactMarkdown from 'react-markdown'
+import MarkdownContent from '../content/MarkdownContent'
 import { StreamingTextRendererProps } from '../types'
 import { cleanTextForDisplay } from '@toyoura-nagisa/core/utils'
 
@@ -22,7 +22,6 @@ import { cleanTextForDisplay } from '@toyoura-nagisa/core/utils'
  */
 const StreamingTextRenderer: React.FC<StreamingTextRendererProps> = ({
   displayText,
-  chunks,
   streaming,
   isLoading,
   className = 'message-text'
@@ -37,7 +36,7 @@ const StreamingTextRenderer: React.FC<StreamingTextRendererProps> = ({
     if (textToDisplay) {
       return (
         <div className={className}>
-          <ReactMarkdown>{textToDisplay}</ReactMarkdown>
+          <MarkdownContent content={textToDisplay} />
         </div>
       )
     } else {
@@ -46,33 +45,20 @@ const StreamingTextRenderer: React.FC<StreamingTextRendererProps> = ({
   }
 
   // Show minimal placeholder for empty streaming text (e.g., tool calls without text)
-  // This ensures message container is rendered, but without visible content
   if (!textToDisplay && (streaming || isLoading)) {
     return (
       <div className={`${className} streaming-placeholder`} style={{ minHeight: '1px' }} />
     )
   }
   
-  // Streaming animation rendering
-  const renderedText = textToDisplay
-  const lastChunkStart = renderedText.length - (chunks[chunks.length - 1]?.length || 0)
-  
-  return renderedText ? (
+  // For streaming, we render the current accumulated text using MarkdownContent
+  // Note: Modern Markdown libraries handle partial content well enough for streaming
+  return (
     <div className={`${className} streaming-text`}>
-      {/* Render completed portion */}
-      {lastChunkStart > 0 && (
-        <div className="completed-text">
-          <ReactMarkdown>{renderedText.slice(0, lastChunkStart)}</ReactMarkdown>
-        </div>
-      )}
-      {/* Render latest chunk with animation */}
-      {chunks.length > 0 && (
-        <div key={`chunk-${chunks.length}`} className="fade-in-chunk">
-          <ReactMarkdown>{renderedText.slice(lastChunkStart)}</ReactMarkdown>
-        </div>
-      )}
+      <MarkdownContent content={textToDisplay} />
+      {streaming && <span className="streaming-cursor">▌</span>}
     </div>
-  ) : null
+  )
 }
 
 export default StreamingTextRenderer

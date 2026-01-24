@@ -116,12 +116,12 @@
   display: inline;
 }
 
-/* 确保 markdown 内容的一致性 */
+/* 确保 markdown 内容的一致性 - 已更新为支持块级流 */
 .message-text p,
 .completed-text p,
 .fade-in-chunk p {
-  margin: 0;
-  display: inline;
+  margin: 0 0 8px 0;
+  display: block;
 }
 
 .message-text code,

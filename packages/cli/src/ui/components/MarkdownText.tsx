@@ -169,49 +169,49 @@ const INLINE_PATTERNS: Array<{
   },
   // Bold italic ***text*** or ___text___
   {
-    pattern: /^(\*\*\*|___)(.+?)\1/,
+    pattern: /^(\*\*\*|___)(?=\S)([\s\S]*?\S)\1/,
     type: 'boldItalic',
     getContent: (m) => ({ content: m[2] }),
   },
   // Bold **text** or __text__
   {
-    pattern: /^(\*\*|__)(.+?)\1/,
+    pattern: /^(\*\*|__)(?=\S)([\s\S]*?\S)\1/,
     type: 'bold',
     getContent: (m) => ({ content: m[2] }),
   },
   // Strikethrough ~~text~~
   {
-    pattern: /^~~(.+?)~~/,
+    pattern: /^~~(?=\S)([\s\S]*?\S)~~/,
     type: 'strikethrough',
     getContent: (m) => ({ content: m[1] }),
   },
   // HTML underline <u>text</u>
   {
-    pattern: /^<u>(.+?)<\/u>/i,
+    pattern: /^<u>(?=\S)([\s\S]*?\S)<\/u>/i,
     type: 'underline',
     getContent: (m) => ({ content: m[1] }),
   },
   // HTML mark (highlight) <mark>text</mark>
   {
-    pattern: /^<mark>(.+?)<\/mark>/i,
+    pattern: /^<mark>(?=\S)([\s\S]*?\S)<\/mark>/i,
     type: 'mark',
     getContent: (m) => ({ content: m[1] }),
   },
   // HTML kbd (keyboard) <kbd>text</kbd>
   {
-    pattern: /^<kbd>(.+?)<\/kbd>/i,
+    pattern: /^<kbd>(?=\S)([\s\S]*?\S)<\/kbd>/i,
     type: 'kbd',
     getContent: (m) => ({ content: m[1] }),
   },
-  // Italic *text* or _text_ (but not inside words for underscore)
+  // Italic *text* or _text_
   {
-    pattern: /^(\*|_)([^*_]+?)\1/,
+    pattern: /^(\*|_)(?=\S)([\s\S]*?\S)\1/,
     type: 'italic',
     getContent: (m) => ({ content: m[2] }),
   },
   // Inline code `text`
   {
-    pattern: /^`([^`]+)`/,
+    pattern: /^`(?=\S)([\s\S]*?\S)`/,
     type: 'code',
     getContent: (m) => ({ content: m[1] }),
   },
@@ -222,6 +222,7 @@ const INLINE_PATTERNS: Array<{
     getContent: (m) => ({ content: m[1], url: m[2] }),
   },
 ];
+
 
 /**
  * Parse inline markdown within a line
@@ -235,6 +236,15 @@ function parseInline(text: string): Segment[] {
 
     // Try each pattern
     for (const { pattern, type, getContent } of INLINE_PATTERNS) {
+      // Special check for underscore italics to prevent matching inside words
+      if (type === 'italic' && remaining.startsWith('_')) {
+        // If it's an underscore, ensure it's not in the middle of a word
+        const lastSeg = segments[segments.length - 1];
+        if (lastSeg && lastSeg.type === 'text' && /\w$/.test(lastSeg.content)) {
+          continue; // Skip underscore if preceded by a word character
+        }
+      }
+
       const match = remaining.match(pattern);
       if (match) {
         const { content, url } = getContent(match);
@@ -246,14 +256,15 @@ function parseInline(text: string): Segment[] {
     }
 
     if (!matched) {
-      // Regular character - append to last text segment or create new one
+      // Regular character - handle emojis/surrogate pairs correctly
+      const char = Array.from(remaining)[0];
       const lastSeg = segments[segments.length - 1];
       if (lastSeg && lastSeg.type === 'text') {
-        lastSeg.content += remaining[0];
+        lastSeg.content += char;
       } else {
-        segments.push({ type: 'text', content: remaining[0] });
+        segments.push({ type: 'text', content: char });
       }
-      remaining = remaining.slice(1);
+      remaining = remaining.slice(char.length);
     }
   }
 
@@ -348,20 +359,19 @@ const InlineLine: React.FC<{
       {segments.map((seg, i) => {
         switch (seg.type) {
           case 'bold':
-            return <Text key={i} bold color={textColor}>{seg.content}</Text>;
+            return <Text key={i} bold color={dimColor ? textColor : theme.text.accent}>{seg.content}</Text>;
           case 'italic':
-            return <Text key={i} italic color={textColor}>{seg.content}</Text>;
+            return <Text key={i} italic color={dimColor ? textColor : theme.status.info}>{seg.content}</Text>;
           case 'boldItalic':
-            return <Text key={i} bold italic color={textColor}>{seg.content}</Text>;
+            return <Text key={i} bold italic color={dimColor ? textColor : theme.text.accent}>{seg.content}</Text>;
           case 'code':
-            // Inline code with visible markers
+            // Inline code: Hide backticks and use vibrant color
             return (
-              <Text key={i}>
-                <Text color={theme.text.muted}>`</Text>
-                <Text color={theme.status.info} bold>{seg.content}</Text>
-                <Text color={theme.text.muted}>`</Text>
+              <Text key={i} color={dimColor ? theme.text.muted : theme.status.success} bold={!dimColor}>
+                {seg.content}
               </Text>
             );
+
           case 'strikethrough':
             return <Text key={i} strikethrough color={theme.text.muted}>{seg.content}</Text>;
           case 'underline':
@@ -562,12 +572,21 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, dimColor, 
 
     // Code block delimiter
     if (line.startsWith('```')) {
+      const lang = line.slice(3).trim();
       // Flush any pending table
       if (inTable) flushTable();
 
       if (!inCodeBlock) {
         inCodeBlock = true;
         codeLines = [];
+        // Render simple language label
+        if (lang) {
+          elements.push(
+            <Box key={`lang-${i}`} marginBottom={0}>
+              <Text color={theme.text.muted} italic>-- {lang} --</Text>
+            </Box>
+          );
+        }
       } else {
         // End code block - render with syntax highlighting
         elements.push(
@@ -637,8 +656,11 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, dimColor, 
     // Heading (# text, ## text, etc.)
     const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
     if (headingMatch) {
+      const hColor = dimColor ? theme.text.muted : theme.status.info;
       elements.push(
-        <Text key={`h-${i}`} bold color={textColor} dimColor={dimColor}>{headingMatch[2]}</Text>
+        <Box key={`h-${i}`} marginTop={1} marginBottom={0}>
+          <InlineLine text={headingMatch[2]} dimColor={dimColor} baseColor={hColor} />
+        </Box>
       );
       continue;
     }
