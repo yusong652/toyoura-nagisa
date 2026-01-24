@@ -9,13 +9,15 @@
 
 ## 📊 Progress Tracking (Updated 2026-01-24)
 
-**Overall Progress**: 12% (4/33 action items completed)
+**Overall Progress**: 18% (6/33 action items completed)
 
 ### Completed ✅
 - ✅ **1.1 CORS Security** - Environment-specific whitelist configuration
 - ✅ **LLM Config Centralization** - Unified config management
 - ✅ **Workspace Optimization** - Caching and PFC server toggle
 - ✅ **Testing Foundation** - 6 test files (was 3)
+- ✅ **1.4 Agent Executor Split** - Main/Sub execution loops extracted
+- ✅ **2.2 CI/CD Pipeline** - GitHub Actions workflow added
 
 ### In Progress 🟡
 - 🟡 **2.1 Test Coverage** - 2% (target: 80%)
@@ -23,8 +25,6 @@
 ### Not Started ❌
 - ❌ **1.2 PFC Tool Refactoring**
 - ❌ **1.3 ToolExecutor Separation**
-- ❌ **1.4 Agent.py Strategy Pattern**
-- ❌ **2.2 CI/CD Pipeline**
 - ❌ **3.1 Docker Containerization**
 - ❌ **3.2 Observability**
 - ❌ **3.3 Redis Session Store**

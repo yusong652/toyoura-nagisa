@@ -2,8 +2,8 @@
 
 **Update Period**: 2026-01-20 to 2026-01-24
 **Previous Status**: 5.6/10 (MVP → Early Production)
-**Current Status**: 6.7/10 (Improved Early Production) 🚀
-**Latest Update**: 2026-01-24 00:45 JST
+**Current Status**: 7.0/10 (Improved Early Production) 🚀
+**Latest Update**: 2026-01-24 23:20 JST
 
 ---
 
@@ -86,6 +86,25 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 **Commits**:
 - `53f17db7`: refactor: simplify workspace resolution and add pfc server toggle
+
+---
+
+#### 1.4 Agent Orchestration Split - ✅ COMPLETED (2026-01-24)
+
+**Improvements**:
+- ✅ **SPLIT**: Main/Sub execution loops into dedicated executors
+- ✅ **MOVED**: Agent core into `application/services/agent/core.py`
+- ✅ **UNIFIED**: Iteration limit handling for all agents
+- ✅ **SIMPLIFIED**: Single `AgentConfig` used for main and SubAgents
+
+**Impact**:
+- Cleaner orchestration flow with reduced nesting
+- Easier to extend execution strategies in isolation
+
+**Files Changed**:
+- `packages/backend/application/services/agent/core.py`
+- `packages/backend/application/services/agent/executors.py`
+- `packages/backend/application/services/agent/__init__.py`
 
 ---
 
@@ -194,20 +213,6 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 ---
 
-### Priority 1.4: Extract Execution Strategies from Agent.py
-
-**Status**: NOT STARTED
-**Current State**:
-- `agent.py` at 704 LOC (was 702 LOC, essentially unchanged)
-- Execution loop still monolithic
-
-**Next Steps**:
-1. Create execution strategy interface
-2. Extract StreamingExecutor for MainAgent
-3. Extract DirectExecutor for SubAgent
-
----
-
 ## Completed Today ✅
 
 ### Priority 2.2: CI/CD Pipeline - ✅ COMPLETED (2026-01-24)
@@ -252,18 +257,33 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 ---
 
+### Priority 1.4: Agent Orchestration Split - ✅ COMPLETED (2026-01-24)
+
+**Status**: ✅ **COMPLETED**
+**Impact**: HIGH
+
+**What Was Done**:
+1. ✅ Split Main/Sub execution loops into dedicated executors
+2. ✅ Moved Agent core into `application/services/agent/core.py`
+3. ✅ Unified iteration limit handling across agents
+4. ✅ Consolidated configuration into a single `AgentConfig`
+
+**Impact**:
+- Agent execution flow is flatter and easier to reason about
+- Executors now isolate streaming vs direct execution responsibilities
+
+---
+
 ## Not Started ❌
 
 ---
 
 ### Priority 3.1: Docker Containerization
 
-**Status**: NOT STARTED
-**Impact**: HIGH
+**Status**: DEFERRED (Not Required)
+**Impact**: LOW (Project decided to avoid containerization)
 **Next Steps**:
-1. Create multi-stage Dockerfile
-2. Create docker-compose.yml
-3. Add health check endpoint
+1. Revisit only if deployment scope changes
 
 ---
 
@@ -301,7 +321,7 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 | Linting | None | ✅ Ruff | Full | ✅ 100% |
 | Type Checking | None | ✅ Mypy | Full | ✅ 100% |
 | Security Scanning | None | ✅ Bandit | Full | ✅ 100% |
-| Agent.py LOC | 702 | 704 | ~200 | ❌ 0% |
+| Agent core LOC | 702 | 505 (core) / 212 (exec) | ~200 | 🟡 25% |
 | PFC Tool LOC | 291 | 291 | ~50 | ❌ 0% |
 | Config Quality | 6/10 | 8/10 | 9/10 | 🟢 67% |
 
@@ -311,14 +331,14 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 | Dimension | Previous | Current | Delta | Target (3mo) |
 |-----------|----------|---------|-------|--------------|
-| Architecture | 8/10 | 8/10 | 0 | 9/10 |
+| Architecture | 8/10 | 8.5/10 | +0.5 | 9/10 |
 | Code Quality | 6/10 | 7/10 | +1 | 8/10 |
 | Testing | 2/10 | 3/10 | +1 | 7/10 |
 | **Security** | **4/10** | **8/10** | **+4** | **8/10** ✅ |
 | **Operations** | **2/10** | **5/10** | **+3** 🚀 | **7/10** |
 | Observability | 5/10 | 5/10 | 0 | 8/10 |
 | **Configuration** | **6/10** | **8/10** | **+2** | **9/10** |
-| **Overall** | **5.6/10** | **6.7/10** | **+1.1** 🎉 | **7.8/10** |
+| **Overall** | **5.6/10** | **7.0/10** | **+1.4** 🎉 | **7.8/10** |
 
 ---
 
@@ -332,6 +352,7 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 6. ✅ **User Experience**: CLI improvements with real-time config sync
 7. ✅ **Code Quality Tools**: Ruff linter/formatter + mypy type checker integrated
 8. ✅ **Documentation**: Comprehensive CONTRIBUTING.md for contributors
+9. ✅ **Agent Orchestration**: Main/Sub executors split and config simplified
 
 ---
 
@@ -354,23 +375,25 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 ### High Priority (Next Work Session)
 
-1. **Create Dockerfile** (Priority 3.1) ⭐ RECOMMENDED NEXT
-   - Impact: Deployment consistency
-   - Effort: 2-3 hours
-   - Completes infrastructure foundation (CI/CD ✅ + Docker)
-   - Enables containerized development and production deployment
+1. **Split ToolExecutor Concerns** (Priority 1.3) ⭐ RECOMMENDED NEXT
+   - Impact: Simplifies orchestration dependencies
+   - Effort: 3-4 hours
+   - Unblocks cleaner executor pipeline composition
 
-2. **Increase Test Coverage** (Priority 2.1)
+2. **Refactor PFC Tool Business Logic** (Priority 1.2)
+   - Impact: Architecture compliance
+   - Effort: 4-6 hours
+   - Enables testable PFC orchestration
+
+3. **Increase Test Coverage** (Priority 2.1)
    - Impact: Code confidence + CI/CD validation
    - Effort: 2-3 hours to reach 20% coverage
-   - Now CI/CD will automatically validate coverage increases!
    - **Good first step**: Add tests for LLM providers
 
-3. **Fix Linting Issues** (Quick Win)
+4. **Fix Linting Issues** (Quick Win)
    - Impact: Clean CI/CD pipeline
    - Effort: 30 minutes
    - Command: `uv run ruff check packages/backend --fix && uv run ruff format packages/backend`
-   - Makes CI/CD green on first run
 
 ### Medium Priority (This Week)
 
@@ -389,21 +412,18 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 ## Updated Priority Recommendation
 
-**Now that CI/CD is complete**, the natural next step is:
+**Now that agent orchestration is split**, the natural next step is:
 
-**Option A: Docker Containerization** (Priority 3.1)
-- ✅ Completes infrastructure foundation
-- ✅ Enables consistent deployment
-- ✅ Integrates with existing CI/CD
-- ✅ Relatively quick (2-3 hours)
+**Option A: Split ToolExecutor Concerns (Priority 1.3)**
+- ✅ Reduces coupling between execution, notifications, and persistence
+- ✅ Aligns with the new executor split
+- ✅ Quick architectural win with clear test seams
 
-**Option B: Increase Test Coverage + Fix Linting**
-- ✅ Leverages new CI/CD infrastructure
-- ✅ Immediate feedback loop
-- ✅ Quick wins for code quality
-- ✅ Combined effort: ~3 hours to reach 20% coverage
+**Option B: Refactor PFC Tool Business Logic (Priority 1.2)**
+- ✅ Brings PFC tooling into Clean Architecture
+- ✅ Unlocks better testing and reuse
 
-**Recommendation**: **Option A (Docker)** to complete infrastructure foundation, OR **Option B** to leverage the CI/CD we just built and see green checks immediately!
+**Recommendation**: **Option A (ToolExecutor separation)** to stabilize the orchestration core, then Option B.
 
 ---
 
