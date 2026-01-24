@@ -150,6 +150,9 @@ class AgentService:
         Returns:
             AgentResult with execution outcome
         """
+        if config.is_main_agent:
+            raise ValueError("SubAgent execution requires is_main_agent=False")
+
         # Build full instruction with context
         full_instruction = instruction
         if context:
