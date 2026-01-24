@@ -27,6 +27,7 @@ import { Header } from '../components/Header.js';
 import { AppHeader } from '../components/AppHeader.js';
 import { LoadingIndicator } from '../components/LoadingIndicator.js';
 import { TodoStatusIndicator } from '../components/TodoStatusIndicator.js';
+import { NotificationBanner } from '../components/NotificationBanner.js';
 import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js';
 import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
 import { FullContextView } from '../components/FullContextView.js';
@@ -228,6 +229,7 @@ export const MainLayout: React.FC = () => {
   const [selectedTaskDetails, setSelectedTaskDetails] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isTaskDetailsLoading, setIsTaskDetailsLoading] = useState(false);
+  const [pfcConnectionError, setPfcConnectionError] = useState<string | null>(null);
 
   // LLM model selection state
   const [llmProviders, setLlmProviders] = useState<LlmProviderInfo[]>([]);
@@ -447,10 +449,10 @@ export const MainLayout: React.FC = () => {
   // Handle memory selection from dialog
   const handleMemorySelect = useCallback((enabled: boolean) => {
     appActions.setMemoryEnabled(enabled);
-    appActions.addHistoryItem({
-      type: MessageType.INFO,
-      message: `Memory ${enabled ? 'enabled' : 'disabled'}`,
-    });
+    appActions.showNotification(
+      `Memory ${enabled ? 'enabled' : 'disabled'}`,
+      'info'
+    );
     setActiveDialog(null);
   }, []);
 
@@ -481,15 +483,15 @@ export const MainLayout: React.FC = () => {
       case 'create': {
         try {
           const sessionId = await appActions.createSession();
-          appActions.addHistoryItem({
-            type: MessageType.INFO,
-            message: `Created new session: ${sessionId.slice(0, 8)}...`,
-          });
+          appActions.showNotification(
+            `Created new session: ${sessionId.slice(0, 8)}...`,
+            'success'
+          );
         } catch (e) {
-          appActions.addHistoryItem({
-            type: MessageType.ERROR,
-            message: e instanceof Error ? e.message : 'Failed to create session',
-          });
+          appActions.showNotification(
+            e instanceof Error ? e.message : 'Failed to create session',
+            'error'
+          );
         }
         setActiveDialog(null);
         break;
@@ -517,10 +519,10 @@ export const MainLayout: React.FC = () => {
     try {
       await appActions.switchSession(sessionId);
     } catch (e) {
-      appActions.addHistoryItem({
-        type: MessageType.ERROR,
-        message: e instanceof Error ? e.message : 'Failed to restore session',
-      });
+      appActions.showNotification(
+        e instanceof Error ? e.message : 'Failed to restore session',
+        'error'
+      );
     }
     setActiveDialog(null);
   }, [sessionManager, appActions, appState.currentSessionId]);
@@ -530,15 +532,15 @@ export const MainLayout: React.FC = () => {
     const session = sessionManager.sessions.find(s => s.id === sessionId);
     const success = await sessionManager.deleteSession(sessionId);
     if (success) {
-      appActions.addHistoryItem({
-        type: MessageType.INFO,
-        message: `Deleted session: ${session?.name || sessionId}`,
-      });
+      appActions.showNotification(
+        `Deleted session: ${session?.name || sessionId}`,
+        'success'
+      );
     } else {
-      appActions.addHistoryItem({
-        type: MessageType.ERROR,
-        message: sessionManager.error || 'Failed to delete session',
-      });
+      appActions.showNotification(
+        sessionManager.error || 'Failed to delete session',
+        'error'
+      );
     }
     setActiveDialog(null);
   }, [sessionManager, appActions]);
@@ -568,23 +570,23 @@ export const MainLayout: React.FC = () => {
   }, []);
 
   const handleModelsSecondarySelect = useCallback(async (secondaryModelId: string) => {
-    if (!appState.currentSessionId) {
-      appActions.addHistoryItem({
-        type: MessageType.ERROR,
-        message: 'No active session. Create or restore a session first.',
-      });
-      setActiveDialog(null);
-      return;
-    }
+      if (!appState.currentSessionId) {
+        appActions.showNotification(
+          'No active session. Create or restore a session first.',
+          'error'
+        );
+        setActiveDialog(null);
+        return;
+      }
 
-    if (!selectedProviderId || !selectedPrimaryModelId) {
-      appActions.addHistoryItem({
-        type: MessageType.ERROR,
-        message: 'Please select a provider and primary model first.',
-      });
-      setActiveDialog(null);
-      return;
-    }
+      if (!selectedProviderId || !selectedPrimaryModelId) {
+        appActions.showNotification(
+          'Please select a provider and primary model first.',
+          'error'
+        );
+        setActiveDialog(null);
+        return;
+      }
 
     try {
       await apiClient.post(`/api/llm-config?session_id=${appState.currentSessionId}`, {
@@ -600,16 +602,13 @@ export const MainLayout: React.FC = () => {
       };
       setCurrentLlmConfig(updatedConfig);
 
-      appActions.addHistoryItem({
-        type: MessageType.INFO,
-        message: `Session LLM updated: ${selectedProviderId}/${selectedPrimaryModelId}`,
-      });
+      appActions.showNotification(
+        `Session LLM updated: ${selectedProviderId}/${selectedPrimaryModelId}`,
+        'success'
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update session LLM config';
-      appActions.addHistoryItem({
-        type: MessageType.ERROR,
-        message,
-      });
+      appActions.showNotification(message, 'error');
     }
 
     setActiveDialog(null);
@@ -631,20 +630,14 @@ export const MainLayout: React.FC = () => {
   // Handle PFC reset confirmation
   const handlePfcResetConfirm = useCallback(async (confirmed: boolean) => {
     if (!confirmed) {
-      appActions.addHistoryItem({
-        type: MessageType.INFO,
-        message: 'PFC workspace reset cancelled',
-      });
+      appActions.showNotification('PFC workspace reset cancelled', 'info');
       setActiveDialog(null);
       return;
     }
 
     // Execute reset
     try {
-      appActions.addHistoryItem({
-        type: MessageType.INFO,
-        message: 'Resetting PFC workspace...',
-      });
+      appActions.showNotification('Resetting PFC workspace...', 'info');
 
       /** Response data from reset (unwrapped from ApiResponse) */
       interface PfcResetData {
@@ -671,16 +664,13 @@ export const MainLayout: React.FC = () => {
       }
 
       const summary = parts.length > 0 ? ` (cleared: ${parts.join(', ')})` : '';
-      appActions.addHistoryItem({
-        type: MessageType.INFO,
-        message: `PFC workspace reset complete${summary}`,
-      });
+      appActions.showNotification(
+        `PFC workspace reset complete${summary}`,
+        'success'
+      );
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'PFC reset failed';
-      appActions.addHistoryItem({
-        type: MessageType.ERROR,
-        message: errorMessage,
-      });
+      appActions.showNotification(errorMessage, 'error');
     }
 
     setActiveDialog(null);
@@ -689,6 +679,7 @@ export const MainLayout: React.FC = () => {
   // Load PFC tasks when dialog opens
   const loadPfcTasks = useCallback(async () => {
     setIsPfcTasksLoading(true);
+    setPfcConnectionError(null);
     try {
       /** Response data from tasks list (unwrapped from ApiResponse) */
       interface TasksListData {
@@ -706,21 +697,30 @@ export const MainLayout: React.FC = () => {
         connected: boolean;
       }
       const response = await apiClient.get<TasksListData>('/api/pfc/console/tasks?limit=20&offset=0');
-      setPfcTasks(response.tasks);
+      
+      if (!response.connected) {
+        setPfcConnectionError('PFC Server is not connected.');
+        setPfcTasks([]);
+      } else {
+        setPfcTasks(response.tasks);
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load PFC tasks';
-      appActions.addHistoryItem({
-        type: MessageType.ERROR,
-        message: errorMessage,
-      });
-      setActiveDialog(null);
+      // Do not close dialog, show error state instead
+      setPfcConnectionError(errorMessage);
+      setPfcTasks([]);
     } finally {
       setIsPfcTasksLoading(false);
     }
-  }, [appActions]);
+  }, []);
 
   // Handle PFC task selection - fetch details and display
   const handlePfcTaskSelect = useCallback(async (taskId: string) => {
+    if (taskId === 'retry') {
+      void loadPfcTasks();
+      return;
+    }
+
     setSelectedTaskId(taskId);
     setIsTaskDetailsLoading(true);
     setActiveDialog('pfc_task_details');
@@ -804,6 +804,15 @@ export const MainLayout: React.FC = () => {
 
   // Build PFC task options for SelectDialog (single-line format)
   const pfcTaskOptions = useMemo(() => {
+    if (pfcConnectionError) {
+      return [{
+        key: 'retry',
+        value: 'retry',
+        label: 'Connection Failed (Retry)',
+        description: 'PFC Server is not reachable. Ensure it is running in PFC GUI and try again.',
+      }];
+    }
+
     const statusEmoji: Record<string, string> = {
       running: '...',
       completed: 'OK',
@@ -822,22 +831,22 @@ export const MainLayout: React.FC = () => {
         label: `[${emoji}] ${task.task_id} | ${elapsed} | ${desc}`,
       };
     });
-  }, [pfcTasks]);
+  }, [pfcTasks, pfcConnectionError]);
 
   // Handle shell command blocked during streaming
   const handleShellBlocked = useCallback(() => {
-    appActions.addHistoryItem({
-      type: MessageType.ERROR,
-      message: 'Shell commands are disabled while AI is responding. Please wait.',
-    });
+    appActions.showNotification(
+      'Shell commands are disabled while AI is responding. Please wait.',
+      'error'
+    );
   }, [appActions]);
 
   // Handle PFC console command blocked during streaming
   const handlePfcConsoleBlocked = useCallback(() => {
-    appActions.addHistoryItem({
-      type: MessageType.ERROR,
-      message: 'PFC console commands are disabled while AI is responding. Please wait.',
-    });
+    appActions.showNotification(
+      'PFC console commands are disabled while AI is responding. Please wait.',
+      'error'
+    );
   }, [appActions]);
 
   // Handle PFC console command execution (> prefix)
@@ -922,10 +931,10 @@ export const MainLayout: React.FC = () => {
 
       case 'memory_toggle':
         appActions.setMemoryEnabled(result.enabled);
-        appActions.addHistoryItem({
-          type: MessageType.INFO,
-          message: `Memory ${result.enabled ? 'enabled' : 'disabled'}`,
-        });
+        appActions.showNotification(
+          `Memory ${result.enabled ? 'enabled' : 'disabled'}`,
+          'info'
+        );
         break;
 
       case 'quit':
@@ -1253,7 +1262,7 @@ export const MainLayout: React.FC = () => {
         {activeDialog === 'pfc_tasks' && !appState.pendingConfirmation && (
           <SelectDialog
             title="PFC Tasks"
-            description="Select a task to view details:"
+            description={pfcConnectionError ? `Error: ${pfcConnectionError}` : "Select a task to view details:"}
             options={pfcTaskOptions}
             isLoading={isPfcTasksLoading}
             loadingMessage="Loading tasks..."
@@ -1308,10 +1317,14 @@ export const MainLayout: React.FC = () => {
 
         {/* Todo status indicator - above input */}
         {appState.isInputActive && !appState.pendingConfirmation && !isDialogActive && (
-          <TodoStatusIndicator
-            todo={appState.currentTodo}
-            isStreaming={appState.isStreaming}
-          />
+          <Box flexDirection="column">
+            <TodoStatusIndicator
+              todo={appState.currentTodo}
+              isStreaming={appState.isStreaming}
+            />
+            {/* System Notification Banner - renders only when active */}
+            <NotificationBanner />
+          </Box>
         )}
 
         {/* Input area with slash command, shell command and PFC console support */}

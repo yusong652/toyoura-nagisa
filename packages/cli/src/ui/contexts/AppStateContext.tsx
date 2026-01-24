@@ -87,6 +87,15 @@ export interface AppState {
 
   // PFC task (single task - PFC only supports one)
   pfcTask: PfcTask | null;
+
+  // System Notification (Toast)
+  notification: AppNotification | null;
+}
+
+export interface AppNotification {
+  id: string;
+  message: string;
+  type: 'info' | 'success' | 'error';
 }
 
 export interface AppActions {
@@ -128,6 +137,10 @@ export interface AppActions {
 
   // Error
   clearError: () => void;
+
+  // System Notification
+  showNotification: (message: string, type?: 'info' | 'success' | 'error', duration?: number) => void;
+  clearNotification: () => void;
 }
 
 const defaultState: AppState = {
@@ -159,6 +172,7 @@ const defaultState: AppState = {
   backgroundTasks: [],
   activeBackgroundTaskCount: 0,
   pfcTask: null,
+  notification: null,
 };
 
 const defaultActions: AppActions = {
@@ -181,6 +195,8 @@ const defaultActions: AppActions = {
   setShellExecuting: () => {},
   setPfcExecuting: () => {},
   clearError: () => {},
+  showNotification: () => {},
+  clearNotification: () => {},
 };
 
 export const AppStateContext = createContext<AppState>(defaultState);

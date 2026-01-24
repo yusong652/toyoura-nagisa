@@ -121,6 +121,10 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   // User PFC console execution state (for Ctrl+B backgrounding)
   const [isPfcExecuting, setPfcExecuting] = useState(false);
 
+  // System Notification
+  const [notification, setNotification] = useState<AppState['notification']>(null);
+  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // ========== Hooks ==========
 
   // Connection state management
@@ -494,6 +498,33 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     };
   }, []);
 
+  // Notification actions
+  const showNotification = useCallback((message: string, type: 'info' | 'success' | 'error' = 'info', duration = 3000) => {
+    // Clear existing timeout
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+
+    setNotification({
+      id: Date.now().toString(),
+      message,
+      type,
+    });
+
+    notificationTimeoutRef.current = setTimeout(() => {
+      setNotification(null);
+      notificationTimeoutRef.current = null;
+    }, duration);
+  }, []);
+
+  const clearNotification = useCallback(() => {
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+      notificationTimeoutRef.current = null;
+    }
+    setNotification(null);
+  }, []);
+
   // ========== Context Values ==========
 
   const appState: AppState = useMemo(() => ({
@@ -526,6 +557,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     backgroundTasks,
     activeBackgroundTaskCount,
     pfcTask,
+    notification,
   }), [
     connectionStatus,
     error,
@@ -553,6 +585,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     backgroundTasks,
     activeBackgroundTaskCount,
     pfcTask,
+    notification,
   ]);
 
   const appActions: AppActions = useMemo(() => ({
@@ -575,6 +608,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     setShellExecuting,
     setPfcExecuting,
     clearError,
+    showNotification,
+    clearNotification,
   }), [
     historyManager.addItem,
     historyManager.updateItem,
@@ -595,6 +630,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     setShellExecuting,
     setPfcExecuting,
     clearError,
+    showNotification,
+    clearNotification,
   ]);
 
   return (
