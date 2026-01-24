@@ -60,6 +60,9 @@ async def invoke_agent(
     """
     # Architecture guarantee: tool_manager.py always injects _meta.client_id
     session_id = context.client_id
+    if session_id is None:
+        return error_response("Missing session ID for invoke_agent")
+    session_id_value: str = str(session_id)
 
     # Validate agent type
     if subagent_type not in AVAILABLE_SUBAGENTS:
@@ -71,7 +74,7 @@ async def invoke_agent(
     try:
         # Import here to avoid circular dependencies
         from backend.domain.models.agent_profiles import get_subagent_config
-        from backend.application.services.agent_service import AgentService
+        from backend.application.services.agent.service import AgentService
         from backend.shared.utils.app_context import get_secondary_llm_client, get_llm_factory
         from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
         from backend.infrastructure.storage.session_manager import get_session_llm_config
@@ -81,7 +84,7 @@ async def invoke_agent(
 
         # Create AgentService with secondary LLM client (lighter model to reduce RPM)
         llm_client = None
-        session_llm_config = get_session_llm_config(session_id)
+        session_llm_config = get_session_llm_config(session_id_value)
         default_llm_config = get_default_llm_config()
 
         provider = None
@@ -140,7 +143,7 @@ async def invoke_agent(
         result = await agent_service.run_subagent(
             config=config,
             instruction=prompt,
-            notification_session_id=session_id,  # Route confirmations to MainAgent's WebSocket
+            notification_session_id=session_id_value,  # Route confirmations to MainAgent's WebSocket
             parent_tool_call_id=parent_tool_call_id,  # For frontend to associate SubAgent tools
         )
 

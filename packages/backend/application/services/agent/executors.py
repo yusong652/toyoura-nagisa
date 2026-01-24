@@ -12,7 +12,7 @@ from typing import Any, TYPE_CHECKING
 from backend.application.services.message_service import MessageService
 from backend.application.services.streaming_models import StreamingState
 from backend.application.services.streaming_processor import StreamingProcessor
-from backend.application.services.tool_executor import ToolExecutor
+from backend.application.services.tool import ToolExecutor
 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
 if TYPE_CHECKING:

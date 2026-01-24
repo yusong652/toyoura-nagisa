@@ -10,9 +10,13 @@ Confirmation outcomes:
 - reject: Stop execution, user wants to provide input via main input
 - reject_and_tell: Don't execute but continue with user's instruction injected
 """
+
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
+
 from backend.application.services.confirmation_strategy import ConfirmationStrategy
+from backend.application.services.tool.notification import ToolNotificationService
+from backend.application.services.tool.persistence import ToolResultPersistence
 
 
 # Rejection outcome types (subset of ConfirmationOutcome, excluding "approve")
@@ -22,7 +26,8 @@ RejectionOutcome = Literal["reject", "reject_and_tell"]
 @dataclass
 class ToolExecutionResult:
     """Result of tool execution batch."""
-    results: List[Optional[Dict]]  # Results indexed by original order
+
+    results: List[Dict[str, Any]]  # Results indexed by original order
     rejected_tools: List[str]  # Names of rejected tools
     user_rejected: bool  # Whether any tool was user-rejected (reject or reject_and_tell)
     rejection_outcome: Optional[RejectionOutcome] = None  # The type of rejection
@@ -32,6 +37,7 @@ class ToolExecutionResult:
 @dataclass
 class ClassifiedTools:
     """Tools classified by confirmation requirement."""
+
     non_confirm: List[Tuple[int, Dict]] = field(default_factory=list)  # (index, tool_call)
     confirm: List[Tuple[int, Dict]] = field(default_factory=list)  # (index, tool_call)
 
@@ -44,8 +50,8 @@ class ToolExecutor:
     - Classify tools by confirmation requirement
     - Execute non-confirmation tools in parallel (conceptually)
     - Execute confirmation tools serially with cascade blocking
-    - Notify results via WebSocket
-    - Persist results to database
+    - Delegate notifications to ToolNotificationService
+    - Delegate persistence to ToolResultPersistence
     """
 
     def __init__(
@@ -53,7 +59,9 @@ class ToolExecutor:
         tool_manager: Any,
         session_id: str,
         notification_session_id: Optional[str] = None,
-        send_tool_result_notifications: bool = True
+        send_tool_result_notifications: bool = True,
+        notification_service: ToolNotificationService | None = None,
+        result_persistence: ToolResultPersistence | None = None,
     ):
         """
         Initialize ToolExecutor.
@@ -67,12 +75,18 @@ class ToolExecutor:
             send_tool_result_notifications: Whether to send TOOL_RESULT_UPDATE notifications.
                                            Set to False for SubAgents to avoid polluting
                                            MainAgent's message stream with internal tool results.
+            notification_service: Optional ToolNotificationService override.
+            result_persistence: Optional ToolResultPersistence override.
         """
         self.tool_manager = tool_manager
         self.session_id = session_id
         self.notification_session_id = notification_session_id or session_id
         self.send_tool_result_notifications = send_tool_result_notifications
         self.confirmation_strategy = ConfirmationStrategy(tool_manager)
+        self.notification_service = notification_service or ToolNotificationService(
+            self.notification_session_id, send_tool_result_notifications
+        )
+        self.result_persistence = result_persistence or ToolResultPersistence(self.session_id)
 
     def classify_tools(self, tool_calls: List[Dict], tool_indices: Optional[List[int]] = None) -> ClassifiedTools:
         """
@@ -88,8 +102,8 @@ class ToolExecutor:
 
         for i, tool_call in enumerate(tool_calls):
             original_index = tool_indices[i] if tool_indices else i
-            tool_name = tool_call.get('name', 'unknown')
-            tool_args = tool_call.get('arguments', {})
+            tool_name = tool_call.get("name", "unknown")
+            tool_args = tool_call.get("arguments", {})
 
             if self.confirmation_strategy.requires_confirmation(tool_name, tool_args):
                 classified.confirm.append((original_index, tool_call))
@@ -99,10 +113,7 @@ class ToolExecutor:
         return classified
 
     async def execute_all(
-        self,
-        tool_calls: List[Dict],
-        message_id: str,
-        agent_profile = "pfc_expert"
+        self, tool_calls: List[Dict], message_id: str, agent_profile="pfc_expert"
     ) -> ToolExecutionResult:
         """
         Execute all tool calls with proper ordering and cascade blocking.
@@ -120,7 +131,7 @@ class ToolExecutor:
             - reject_and_tell: Cascade blocks remaining tools, but agent continues with instruction
         """
         # Prepare results storage
-        results: List[Optional[Dict]] = [None] * len(tool_calls)
+        results: List[Dict[str, Any]] = [{} for _ in tool_calls]
         rejected_tools: List[str] = []
         rejection_outcome: Optional[RejectionOutcome] = None
         rejection_message: Optional[str] = None
@@ -138,8 +149,8 @@ class ToolExecutor:
         allowed_indices: List[int] = []
 
         for i, tool_call in enumerate(tool_calls):
-            tool_name = tool_call.get('name', 'unknown')
-            tool_args = tool_call.get('arguments', {})
+            tool_name = tool_call.get("name", "unknown")
+            tool_args = tool_call.get("arguments", {})
 
             if not is_tool_allowed_in_mode(session_mode, tool_name, tool_args):
                 blocked_message = build_mode_blocked_message(session_mode, tool_name)
@@ -150,7 +161,7 @@ class ToolExecutor:
                 )
                 results[i] = result
                 rejected_tools.append(tool_name)
-                await self._notify_result(tool_call, result, agent_profile)
+                await self.notification_service.notify_result(tool_call, result, agent_profile)
                 continue
 
             allowed_calls.append(tool_call)
@@ -163,14 +174,14 @@ class ToolExecutor:
         for original_index, tool_call in classified.non_confirm:
             result = await self._execute_single_tool(tool_call, message_id)
             results[original_index] = result
-            await self._notify_result(tool_call, result, agent_profile)
+            await self.notification_service.notify_result(tool_call, result, agent_profile)
 
         # Execute confirmation tools serially with cascade blocking
         user_rejected = False
         rejected_tool_name: Optional[str] = None
 
         for original_index, tool_call in classified.confirm:
-            tool_name = tool_call.get('name', 'unknown')
+            tool_name = tool_call.get("name", "unknown")
 
             if user_rejected:
                 # Cascade block
@@ -178,9 +189,7 @@ class ToolExecutor:
                 rejected_tools.append(tool_name)
             else:
                 # Request confirmation and execute
-                result, outcome, user_message = await self._execute_with_confirmation(
-                    tool_call, message_id
-                )
+                result, outcome, user_message = await self._execute_with_confirmation(tool_call, message_id)
                 if outcome in ("reject", "reject_and_tell"):
                     user_rejected = True
                     rejected_tool_name = tool_name
@@ -189,7 +198,7 @@ class ToolExecutor:
                     rejection_message = user_message
 
             results[original_index] = result
-            await self._notify_result(tool_call, result, agent_profile)
+            await self.notification_service.notify_result(tool_call, result, agent_profile)
 
         return ToolExecutionResult(
             results=results,
@@ -199,21 +208,18 @@ class ToolExecutor:
             rejection_message=rejection_message,
         )
 
-    async def _execute_single_tool(
-        self,
-        tool_call: Dict,
-        message_id: str
-    ) -> Dict:
+    async def _execute_single_tool(self, tool_call: Dict, message_id: str) -> Dict[str, Any]:
         """Execute a single tool without confirmation."""
-        return await self.tool_manager.handle_function_call(
-            tool_call, self.session_id, message_id
-        )
+        result = await self.tool_manager.handle_function_call(tool_call, self.session_id, message_id)
+        if result is None:
+            from backend.infrastructure.mcp.utils.tool_result import error_response
+
+            return error_response("Tool execution returned no result")
+        return result
 
     async def _execute_with_confirmation(
-        self,
-        tool_call: Dict,
-        message_id: str
-    ) -> Tuple[Dict, Optional[str], Optional[str]]:
+        self, tool_call: Dict, message_id: str
+    ) -> Tuple[Dict[str, Any], Optional[str], Optional[str]]:
         """
         Execute tool with user confirmation.
 
@@ -258,11 +264,7 @@ class ToolExecutor:
             result["rejection_outcome"] = "reject"
             return (result, "reject", confirmation_result.user_message)
 
-    def _create_cascade_blocked_result(
-        self,
-        tool_name: str,
-        rejected_tool_name: Optional[str]
-    ) -> Dict:
+    def _create_cascade_blocked_result(self, tool_name: str, rejected_tool_name: Optional[str]) -> Dict:
         """Create result for cascade-blocked tool."""
         from backend.infrastructure.mcp.utils.tool_result import error_response
 
@@ -275,63 +277,12 @@ class ToolExecutor:
         result["cascade_blocked"] = True
         return result
 
-    async def _notify_result(
-        self,
-        tool_call: Dict,
-        result: Dict,
-        agent_profile: str
-    ) -> None:
-        """Send WebSocket notification for tool result."""
-        # Skip notification if disabled (e.g., for SubAgent internal tools)
-        if not self.send_tool_result_notifications:
-            return
-
-        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-
-        tool_name = tool_call.get('name', 'unknown')
-
-        try:
-            await WebSocketNotificationService.send_tool_result_update(
-                session_id=self.notification_session_id,
-                message_id=tool_call['id'],
-                tool_call_id=tool_call['id'],
-                tool_name=tool_name,
-                tool_result=result
-            )
-        except Exception as e:
-            print(f"[ToolExecutor] Failed to send notification: {e}")
-
-        # Send todo update if todo_write was called
-        if tool_name == 'todo_write':
-            try:
-                from backend.application.services.todo_service import get_todo_service
-                todo_service = get_todo_service()
-                current_todo = await todo_service.get_current_todo(agent_profile, self.notification_session_id)
-                await WebSocketNotificationService.send_todo_update(self.notification_session_id, current_todo)
-            except Exception as e:
-                print(f"[ToolExecutor] Failed to send todo update: {e}")
-
-        # Start PFC task polling if background task submitted
-        if tool_name == 'pfc_execute_task':
-            tool_args = tool_call.get('arguments', {})
-            run_in_background = tool_args.get('run_in_background', True)
-            if run_in_background and result.get('status') == 'success':
-                try:
-                    from backend.application.services.notifications.pfc_task_notification_service import (
-                        get_pfc_task_notification_service
-                    )
-                    service = get_pfc_task_notification_service()
-                    if service:
-                        await service.start_polling(self.notification_session_id)
-                except Exception as e:
-                    print(f"[ToolExecutor] Failed to start PFC task polling: {e}")
-
     async def save_results_to_context(
         self,
         tool_calls: List[Dict],
-        results: List[Optional[Dict]],
+        results: Sequence[Dict[str, Any]],
         context_manager: Any,
-        inject_reminders: bool = True
+        inject_reminders: bool = True,
     ) -> None:
         """
         Save tool results to context manager in original order.
@@ -345,40 +296,11 @@ class ToolExecutor:
         """
         for i, tool_call in enumerate(tool_calls):
             result = results[i]
-            if result is None:
-                continue
-            is_last_tool = (i == len(tool_calls) - 1)
+            is_last_tool = i == len(tool_calls) - 1
             await context_manager.add_tool_result(
-                tool_call['id'],
-                tool_call['name'],
-                result,
-                inject_reminders=inject_reminders and is_last_tool
+                tool_call["id"], tool_call["name"], result, inject_reminders=inject_reminders and is_last_tool
             )
 
-    async def save_results_to_database(
-        self,
-        tool_calls: List[Dict],
-        results: List[Optional[Dict]]
-    ) -> None:
-        """
-        Save tool results to database in original order.
-
-        Args:
-            tool_calls: Original tool calls list
-            results: Results indexed by original order
-        """
-        from backend.application.services.message_service import MessageService
-
-        message_service = MessageService()
-        for i, tool_call in enumerate(tool_calls):
-            result = results[i]
-            if result is not None:
-                try:
-                    message_service.save_tool_result_message(
-                        tool_call_id=tool_call['id'],
-                        tool_name=tool_call['name'],
-                        tool_result=result,
-                        session_id=self.session_id
-                    )
-                except Exception as e:
-                    print(f"[ToolExecutor] Failed to save result: {e}")
+    async def save_results_to_database(self, tool_calls: List[Dict], results: Sequence[Dict[str, Any]]) -> None:
+        """Save tool results to database in original order."""
+        await self.result_persistence.save_results(tool_calls, results)

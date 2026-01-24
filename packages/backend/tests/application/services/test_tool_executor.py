@@ -8,11 +8,14 @@ Demonstrates:
 4. Testing business logic without infrastructure
 """
 
+# pyright: reportOptionalSubscript=false
+# pyright: reportArgumentType=false
+
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
-from typing import List, Dict, Any
+from typing import Any, Dict, List, cast
 
-from backend.application.services.tool_executor import (
+from backend.application.services.tool.executor import (
     ToolExecutor,
     ToolExecutionResult,
     ClassifiedTools,
@@ -23,16 +26,14 @@ from backend.application.services.tool_executor import (
 # ToolExecutor Basic Tests
 # =====================
 
+
 class TestToolExecutorInitialization:
     """Test ToolExecutor initialization and configuration."""
 
     def test_create_tool_executor_with_default_settings(self, mock_tool_manager, sample_session_id):
         """Test creating executor with default settings."""
         # Arrange & Act
-        executor = ToolExecutor(
-            tool_manager=mock_tool_manager,
-            session_id=sample_session_id
-        )
+        executor = ToolExecutor(tool_manager=mock_tool_manager, session_id=sample_session_id)
 
         # Assert
         assert executor.tool_manager == mock_tool_manager
@@ -40,33 +41,25 @@ class TestToolExecutorInitialization:
         assert executor.notification_session_id == sample_session_id  # Same as session_id
         assert executor.send_tool_result_notifications is True  # Default
 
-    def test_create_tool_executor_with_different_notification_session(
-        self, mock_tool_manager, sample_session_id
-    ):
+    def test_create_tool_executor_with_different_notification_session(self, mock_tool_manager, sample_session_id):
         """Test creating executor with different notification session (SubAgent case)."""
         # Arrange
         parent_session_id = "parent_session_123"
 
         # Act
         executor = ToolExecutor(
-            tool_manager=mock_tool_manager,
-            session_id=sample_session_id,
-            notification_session_id=parent_session_id
+            tool_manager=mock_tool_manager, session_id=sample_session_id, notification_session_id=parent_session_id
         )
 
         # Assert
         assert executor.session_id == sample_session_id
         assert executor.notification_session_id == parent_session_id
 
-    def test_create_tool_executor_with_notifications_disabled(
-        self, mock_tool_manager, sample_session_id
-    ):
+    def test_create_tool_executor_with_notifications_disabled(self, mock_tool_manager, sample_session_id):
         """Test creating executor with notifications disabled (SubAgent case)."""
         # Arrange & Act
         executor = ToolExecutor(
-            tool_manager=mock_tool_manager,
-            session_id=sample_session_id,
-            send_tool_result_notifications=False
+            tool_manager=mock_tool_manager, session_id=sample_session_id, send_tool_result_notifications=False
         )
 
         # Assert
@@ -76,6 +69,7 @@ class TestToolExecutorInitialization:
 # =====================
 # Tool Classification Tests
 # =====================
+
 
 class TestToolClassification:
     """Test tool classification by confirmation requirement."""
@@ -95,9 +89,7 @@ class TestToolClassification:
         assert classified.non_confirm[0][0] == 0  # Index
         assert classified.non_confirm[0][1] == sample_tool_call  # Tool call
 
-    def test_classify_confirmation_tool(
-        self, mock_tool_manager, sample_session_id, sample_bash_tool_call
-    ):
+    def test_classify_confirmation_tool(self, mock_tool_manager, sample_session_id, sample_bash_tool_call):
         """Test classifying a tool that requires confirmation."""
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
@@ -112,9 +104,7 @@ class TestToolClassification:
         assert classified.confirm[0][0] == 0  # Index
         assert classified.confirm[0][1] == sample_bash_tool_call
 
-    def test_classify_mixed_tools(
-        self, mock_tool_manager, sample_session_id, sample_tool_call, sample_bash_tool_call
-    ):
+    def test_classify_mixed_tools(self, mock_tool_manager, sample_session_id, sample_tool_call, sample_bash_tool_call):
         """Test classifying a mix of confirmation and non-confirmation tools."""
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
@@ -129,9 +119,7 @@ class TestToolClassification:
         assert classified.non_confirm[0][1]["name"] == "read"
         assert classified.confirm[0][1]["name"] == "bash"
 
-    def test_classify_preserves_original_order(
-        self, mock_tool_manager, sample_session_id
-    ):
+    def test_classify_preserves_original_order(self, mock_tool_manager, sample_session_id):
         """Test that classification preserves original tool order indices."""
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
@@ -155,6 +143,7 @@ class TestToolClassification:
 # Tool Execution Tests (with mocking)
 # =====================
 
+
 class TestToolExecution:
     """Test tool execution with mocked dependencies."""
 
@@ -165,18 +154,16 @@ class TestToolExecution:
         """Test executing a single tool that doesn't require confirmation."""
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
-        mock_tool_manager.handle_function_call.return_value = {
-            "status": "success",
-            "result": "File content here"
-        }
+        mock_tool_manager.handle_function_call.return_value = {"status": "success", "result": "File content here"}
 
         # Act
-        result = await executor.execute_all([sample_tool_call], sample_message_id)
+        result = cast(Any, await executor.execute_all([sample_tool_call], sample_message_id))
 
         # Assert
         assert isinstance(result, ToolExecutionResult)
         assert len(result.results) == 1
-        assert result.results[0]["status"] == "success"
+        first_result: Dict[str, Any] = result.results[0]
+        assert first_result["status"] == "success"
         assert result.user_rejected is False
         assert len(result.rejected_tools) == 0
 
@@ -197,11 +184,13 @@ class TestToolExecution:
         mock_tool_manager.handle_function_call.return_value = {"status": "success"}
 
         # Act
-        result = await executor.execute_all(tool_calls, sample_message_id)
+        result = cast(Any, await executor.execute_all(tool_calls, sample_message_id))
 
         # Assert
         assert len(result.results) == 2
-        assert all(r["status"] == "success" for r in result.results)
+        non_null_results: List[Dict[str, Any]] = result.results
+        assert len(non_null_results) == 2
+        assert all(item["status"] == "success" for item in non_null_results)
         assert result.user_rejected is False
 
         # Verify both tools were executed
@@ -214,17 +203,15 @@ class TestToolExecution:
         """Test handling tool execution errors."""
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
-        mock_tool_manager.handle_function_call.return_value = {
-            "status": "error",
-            "error": "File not found"
-        }
+        mock_tool_manager.handle_function_call.return_value = {"status": "error", "error": "File not found"}
 
         # Act
-        result = await executor.execute_all([sample_tool_call], sample_message_id)
+        result = cast(Any, await executor.execute_all([sample_tool_call], sample_message_id))
 
         # Assert
-        assert result.results[0]["status"] == "error"
-        assert result.results[0]["error"] == "File not found"
+        first_result: Dict[str, Any] = result.results[0]
+        assert first_result["status"] == "error"
+        assert first_result["error"] == "File not found"
         assert result.user_rejected is False
 
     @pytest.mark.asyncio
@@ -233,16 +220,12 @@ class TestToolExecution:
     ):
         """Test that notifications are not sent when disabled."""
         # Arrange
-        executor = ToolExecutor(
-            mock_tool_manager,
-            sample_session_id,
-            send_tool_result_notifications=False
-        )
+        executor = ToolExecutor(mock_tool_manager, sample_session_id, send_tool_result_notifications=False)
         mock_tool_manager.handle_function_call.return_value = {"status": "success"}
 
         # Act
-        with patch('backend.infrastructure.websocket.notification_service.WebSocketNotificationService') as mock_ws:
-            result = await executor.execute_all([sample_tool_call], sample_message_id)
+        with patch("backend.infrastructure.websocket.notification_service.WebSocketNotificationService") as mock_ws:
+            result = cast(Any, await executor.execute_all([sample_tool_call], sample_message_id))
 
         # Assert
         # Notification service should not be called
@@ -253,13 +236,12 @@ class TestToolExecution:
 # User Rejection Tests
 # =====================
 
+
 class TestUserRejection:
     """Test user rejection handling and cascade blocking."""
 
     @pytest.mark.asyncio
-    async def test_user_rejection_blocks_remaining_tools(
-        self, mock_tool_manager, sample_session_id, sample_message_id
-    ):
+    async def test_user_rejection_blocks_remaining_tools(self, mock_tool_manager, sample_session_id, sample_message_id):
         """Test that user rejection blocks remaining confirmation tools."""
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
@@ -272,14 +254,12 @@ class TestUserRejection:
 
         # Mock confirmation to reject first tool
         with patch.object(
-            executor.confirmation_strategy,
-            'request_confirmation',
-            new_callable=AsyncMock
+            executor.confirmation_strategy, "request_confirmation", new_callable=AsyncMock
         ) as mock_confirm:
             mock_confirm.return_value = Mock(outcome="reject", user_message="No thanks")
 
             # Act
-            result = await executor.execute_all(tool_calls, sample_message_id)
+            result = cast(Any, await executor.execute_all(tool_calls, sample_message_id))
 
         # Assert
         assert result.user_rejected is True
@@ -288,7 +268,8 @@ class TestUserRejection:
         assert result.rejection_message == "No thanks"
 
         # Second tool should be cascade blocked
-        assert "cascade_blocked" in str(result.results[1])
+        second_result: Dict[str, Any] = result.results[1]
+        assert "cascade_blocked" in str(second_result)
 
     @pytest.mark.asyncio
     async def test_reject_and_tell_continues_with_instruction(
@@ -303,17 +284,12 @@ class TestUserRejection:
 
         # Mock confirmation to reject_and_tell
         with patch.object(
-            executor.confirmation_strategy,
-            'request_confirmation',
-            new_callable=AsyncMock
+            executor.confirmation_strategy, "request_confirmation", new_callable=AsyncMock
         ) as mock_confirm:
-            mock_confirm.return_value = Mock(
-                outcome="reject_and_tell",
-                user_message="Use safer approach"
-            )
+            mock_confirm.return_value = Mock(outcome="reject_and_tell", user_message="Use safer approach")
 
             # Act
-            result = await executor.execute_all(tool_calls, sample_message_id)
+            result = cast(Any, await executor.execute_all(tool_calls, sample_message_id))
 
         # Assert
         assert result.user_rejected is True
@@ -321,34 +297,32 @@ class TestUserRejection:
         assert result.rejection_message == "Use safer approach"
 
         # Result should indicate rejection but not cascade blocking
-        assert result.results[0]["user_rejected"] is True
+        first_result: Dict[str, Any] = result.results[0]
+        assert first_result["user_rejected"] is True
 
 
 # =====================
 # Result Persistence Tests
 # =====================
 
+
 class TestResultPersistence:
     """Test saving results to context and database."""
 
     @pytest.mark.asyncio
-    async def test_save_results_to_context(
-        self, mock_tool_manager, mock_context_manager, sample_session_id
-    ):
+    async def test_save_results_to_context(self, mock_tool_manager, mock_context_manager, sample_session_id):
         """Test saving tool results to context manager."""
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
-        tool_calls = [
-            {"id": "call_1", "name": "read", "arguments": {}}
-        ]
-        results = [{"status": "success", "result": "File content"}]
+        tool_calls = [{"id": "call_1", "name": "read", "arguments": {}}]
+        results: List[Dict[str, Any]] = [{"status": "success", "result": "File content"}]
 
         # Act
-        await executor.save_results_to_context(
+        await executor.save_results_to_context(  # type: ignore[arg-type]
             tool_calls,
             results,
             mock_context_manager,
-            inject_reminders=True
+            inject_reminders=True,
         )
 
         # Assert
@@ -356,7 +330,7 @@ class TestResultPersistence:
             "call_1",
             "read",
             {"status": "success", "result": "File content"},
-            inject_reminders=True  # Last tool should inject reminders
+            inject_reminders=True,  # Last tool should inject reminders
         )
 
     @pytest.mark.asyncio
@@ -370,17 +344,14 @@ class TestResultPersistence:
             {"id": "call_1", "name": "read", "arguments": {}},
             {"id": "call_2", "name": "glob", "arguments": {}},
         ]
-        results = [
-            {"status": "success"},
-            {"status": "success"}
-        ]
+        results: List[Dict[str, Any]] = [{"status": "success"}, {"status": "success"}]
 
         # Act
-        await executor.save_results_to_context(
+        await executor.save_results_to_context(  # type: ignore[arg-type]
             tool_calls,
             results,
             mock_context_manager,
-            inject_reminders=True
+            inject_reminders=True,
         )
 
         # Assert
@@ -402,14 +373,14 @@ class TestResultPersistence:
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
         tool_calls = [{"id": "call_1", "name": "read", "arguments": {}}]
-        results = [{"status": "success"}]
+        results: List[Dict[str, Any]] = [{"status": "success"}]
 
         # Act - SubAgent sets inject_reminders=False
-        await executor.save_results_to_context(
+        await executor.save_results_to_context(  # type: ignore[arg-type]
             tool_calls,
             results,
             mock_context_manager,
-            inject_reminders=False  # SubAgent behavior
+            inject_reminders=False,  # SubAgent behavior
         )
 
         # Assert
@@ -422,19 +393,18 @@ class TestResultPersistence:
 # Edge Cases
 # =====================
 
+
 class TestToolExecutorEdgeCases:
     """Test edge cases and error scenarios."""
 
     @pytest.mark.asyncio
-    async def test_execute_empty_tool_list(
-        self, mock_tool_manager, sample_session_id, sample_message_id
-    ):
+    async def test_execute_empty_tool_list(self, mock_tool_manager, sample_session_id, sample_message_id):
         """Test executing empty tool list."""
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
 
         # Act
-        result = await executor.execute_all([], sample_message_id)
+        result = cast(Any, await executor.execute_all([], sample_message_id))
 
         # Assert
         assert result.results == []
@@ -451,14 +421,13 @@ class TestToolExecutorEdgeCases:
         mock_tool_manager.handle_function_call.return_value = None
 
         # Act
-        result = await executor.execute_all([sample_tool_call], sample_message_id)
+        result = cast(Any, await executor.execute_all([sample_tool_call], sample_message_id))
 
         # Assert
-        assert result.results[0] is None
+        first_result: Dict[str, Any] = result.results[0]
+        assert first_result["status"] == "error"
 
-    def test_create_cascade_blocked_result(
-        self, mock_tool_manager, sample_session_id
-    ):
+    def test_create_cascade_blocked_result(self, mock_tool_manager, sample_session_id):
         """Test creating cascade blocked result message."""
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)

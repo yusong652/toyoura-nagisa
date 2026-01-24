@@ -64,7 +64,7 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
             # Get correct client for this session
             current_llm_client = get_session_llm_client(session_id)
 
-            from backend.application.services.agent_service import AgentService
+            from backend.application.services.agent.service import AgentService
 
             agent_service = AgentService(current_llm_client, llm_factory)
 

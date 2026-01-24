@@ -2,8 +2,8 @@
 
 **Update Period**: 2026-01-20 to 2026-01-24
 **Previous Status**: 5.6/10 (MVP → Early Production)
-**Current Status**: 7.0/10 (Improved Early Production) 🚀
-**Latest Update**: 2026-01-24 23:20 JST
+**Current Status**: 7.1/10 (Improved Early Production) 🚀
+**Latest Update**: 2026-01-24 23:45 JST
 
 ---
 
@@ -94,6 +94,7 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 **Improvements**:
 - ✅ **SPLIT**: Main/Sub execution loops into dedicated executors
 - ✅ **MOVED**: Agent core into `application/services/agent/core.py`
+- ✅ **MOVED**: AgentService into `application/services/agent/service.py`
 - ✅ **UNIFIED**: Iteration limit handling for all agents
 - ✅ **SIMPLIFIED**: Single `AgentConfig` used for main and SubAgents
 
@@ -105,6 +106,20 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 - `packages/backend/application/services/agent/core.py`
 - `packages/backend/application/services/agent/executors.py`
 - `packages/backend/application/services/agent/__init__.py`
+
+---
+
+#### 1.3 ToolExecutor Separation - ✅ COMPLETED (2026-01-24)
+
+**Improvements**:
+- ✅ **SPLIT**: Notifications and persistence into dedicated services
+- ✅ **MOVED**: Tool services into `application/services/tool/`
+- ✅ **SIMPLIFIED**: ToolExecutor now focuses on execution orchestration
+
+**Files Changed**:
+- `packages/backend/application/services/tool/executor.py`
+- `packages/backend/application/services/tool/notification.py`
+- `packages/backend/application/services/tool/persistence.py`
 
 ---
 
@@ -201,15 +216,15 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 ### Priority 1.3: Split Mixed Concerns in ToolExecutor
 
-**Status**: NOT STARTED
+**Status**: ✅ COMPLETED (2026-01-24)
 **Current State**:
-- `tool_executor.py` still at 353 LOC with mixed concerns
-- Execution, notification, and persistence still combined
+- `tool/executor.py` now delegates notifications and persistence
+- Execution, notification, and persistence are separated into dedicated services
 
-**Next Steps**:
-1. Extract `tool_result_persistence.py`
-2. Extract `tool_notification_service.py`
-3. Update ToolExecutor to use dependency injection
+**Completed Steps**:
+1. ✅ Extracted `tool/persistence.py`
+2. ✅ Extracted `tool/notification.py`
+3. ✅ Updated ToolExecutor to use dependency injection
 
 ---
 
@@ -338,7 +353,7 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 | **Operations** | **2/10** | **5/10** | **+3** 🚀 | **7/10** |
 | Observability | 5/10 | 5/10 | 0 | 8/10 |
 | **Configuration** | **6/10** | **8/10** | **+2** | **9/10** |
-| **Overall** | **5.6/10** | **7.0/10** | **+1.4** 🎉 | **7.8/10** |
+| **Overall** | **5.6/10** | **7.1/10** | **+1.5** 🎉 | **7.8/10** |
 
 ---
 
@@ -353,6 +368,7 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 7. ✅ **Code Quality Tools**: Ruff linter/formatter + mypy type checker integrated
 8. ✅ **Documentation**: Comprehensive CONTRIBUTING.md for contributors
 9. ✅ **Agent Orchestration**: Main/Sub executors split and config simplified
+10. ✅ **ToolExecutor Separation**: Notifications and persistence extracted
 
 ---
 
@@ -375,22 +391,17 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 ### High Priority (Next Work Session)
 
-1. **Split ToolExecutor Concerns** (Priority 1.3) ⭐ RECOMMENDED NEXT
-   - Impact: Simplifies orchestration dependencies
-   - Effort: 3-4 hours
-   - Unblocks cleaner executor pipeline composition
-
-2. **Refactor PFC Tool Business Logic** (Priority 1.2)
+1. **Refactor PFC Tool Business Logic** (Priority 1.2) ⭐ RECOMMENDED NEXT
    - Impact: Architecture compliance
    - Effort: 4-6 hours
    - Enables testable PFC orchestration
 
-3. **Increase Test Coverage** (Priority 2.1)
+2. **Increase Test Coverage** (Priority 2.1)
    - Impact: Code confidence + CI/CD validation
    - Effort: 2-3 hours to reach 20% coverage
    - **Good first step**: Add tests for LLM providers
 
-4. **Fix Linting Issues** (Quick Win)
+3. **Fix Linting Issues** (Quick Win)
    - Impact: Clean CI/CD pipeline
    - Effort: 30 minutes
    - Command: `uv run ruff check packages/backend --fix && uv run ruff format packages/backend`
@@ -412,18 +423,17 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 ## Updated Priority Recommendation
 
-**Now that agent orchestration is split**, the natural next step is:
+**Now that ToolExecutor is split**, the natural next step is:
 
-**Option A: Split ToolExecutor Concerns (Priority 1.3)**
-- ✅ Reduces coupling between execution, notifications, and persistence
-- ✅ Aligns with the new executor split
-- ✅ Quick architectural win with clear test seams
-
-**Option B: Refactor PFC Tool Business Logic (Priority 1.2)**
+**Option A: Refactor PFC Tool Business Logic (Priority 1.2)**
 - ✅ Brings PFC tooling into Clean Architecture
 - ✅ Unlocks better testing and reuse
 
-**Recommendation**: **Option A (ToolExecutor separation)** to stabilize the orchestration core, then Option B.
+**Option B: Increase Test Coverage (Priority 2.1)**
+- ✅ Leverages the stabilized tool execution layer
+- ✅ Improves safety for future orchestration refactors
+
+**Recommendation**: **Option A (PFC tool refactor)**, then Option B.
 
 ---
 
