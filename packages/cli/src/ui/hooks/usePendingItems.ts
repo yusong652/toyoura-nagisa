@@ -147,7 +147,7 @@ export function usePendingItems({
         contentUpdateTimeoutRef.current = setTimeout(() => {
           setPendingAssistantItem(pendingAssistantItemRef.current);
           contentUpdateTimeoutRef.current = null;
-        }, 50); // 50ms throttle (approx 20fps)
+        }, 100); // 100ms throttle (approx 10fps)
       }
     },
     []

@@ -121,7 +121,7 @@ function tokenizeCode(code: string): CodeToken[] {
 /**
  * Render a line of code with syntax highlighting
  */
-const CodeLine: React.FC<{ code: string; dimColor?: boolean }> = ({ code, dimColor }) => {
+const CodeLine = React.memo<{ code: string; dimColor?: boolean }>(({ code, dimColor }) => {
   const tokens = tokenizeCode(code);
 
   return (
@@ -144,7 +144,7 @@ const CodeLine: React.FC<{ code: string; dimColor?: boolean }> = ({ code, dimCol
       })}
     </Text>
   );
-};
+});
 
 /**
  * Inline markdown patterns with their types
@@ -333,11 +333,11 @@ function stripMarkdownForWidth(text: string): string {
 /**
  * Render inline segments
  */
-const InlineLine: React.FC<{
+const InlineLine = React.memo<{
   text: string;
   dimColor?: boolean;
   baseColor?: string;
-}> = ({ text, dimColor, baseColor }) => {
+}>(({ text, dimColor, baseColor }) => {
   const segments = parseInline(text);
   const textColor = baseColor || theme.text.primary;
 
@@ -398,19 +398,19 @@ const InlineLine: React.FC<{
       })}
     </Text>
   );
-};
+});
 
 /**
  * Table renderer component
  * Supports inline markdown in cells: **bold**, *italic*, `code`, etc.
  */
-const TableDisplay: React.FC<{
+const TableDisplay = React.memo<{
   headers: string[];
   alignments: TableAlignment[];
   rows: string[][];
   dimColor?: boolean;
   baseColor?: string;
-}> = ({ headers, alignments, rows, dimColor, baseColor }) => {
+}>(({ headers, alignments, rows, dimColor, baseColor }) => {
   const textColor = baseColor || theme.text.primary;
 
   // Calculate column widths using display width of STRIPPED content
@@ -497,7 +497,7 @@ const TableDisplay: React.FC<{
       {renderSeparator('bottom', false, true)}
     </Box>
   );
-};
+});
 
 export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, dimColor, baseColor }) => {
   const lines = children.split('\n');
