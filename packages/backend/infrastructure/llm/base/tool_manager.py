@@ -6,15 +6,38 @@ Defines core methods that all Tool Managers must implement to ensure consistency
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
-from fastmcp import Client as MCPClient
-from mcp.types import CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
-from pydantic import ValidationError
+from dataclasses import dataclass
+from functools import lru_cache
+import inspect
+from typing import Any, Dict, Optional
 
-from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
+from fastmcp import Client as MCPClient
+from pydantic import BaseModel, ConfigDict, ValidationError, create_model
+
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
 from backend.config.dev import get_dev_config
 # Security imports removed - all tools now require session ID
+
+
+@dataclass(frozen=True)
+class ToolRequestMeta:
+    client_id: str
+    tool_call_id: str
+
+
+@dataclass(frozen=True)
+class ToolRequestContext:
+    meta: ToolRequestMeta
+
+
+@dataclass(frozen=True)
+class ToolContext:
+    client_id: str
+    request_context: ToolRequestContext
+
+
+class ToolParamsBase(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 class BaseToolManager(ABC):
@@ -52,6 +75,42 @@ class BaseToolManager(ABC):
 
             self._mcp_client = get_mcp_client()
         return self._mcp_client
+
+    @staticmethod
+    def _build_tool_context(session_id: str, tool_call_id: str) -> ToolContext:
+        meta = ToolRequestMeta(client_id=session_id, tool_call_id=tool_call_id)
+        return ToolContext(client_id=session_id, request_context=ToolRequestContext(meta=meta))
+
+    @staticmethod
+    def _is_context_param(param: inspect.Parameter) -> bool:
+        if param.name in {"context", "ctx"}:
+            return True
+        if param.annotation is inspect._empty:
+            return False
+        try:
+            from fastmcp.server.context import Context as FastMCPContext
+        except Exception:
+            return False
+        return param.annotation is FastMCPContext
+
+    @classmethod
+    @lru_cache(maxsize=512)
+    def _get_params_model(cls, handler: Any) -> type[BaseModel]:
+        signature = inspect.signature(handler)
+        fields: Dict[str, Any] = {}
+
+        for param in signature.parameters.values():
+            if cls._is_context_param(param):
+                continue
+            if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+                continue
+
+            annotation = param.annotation if param.annotation is not inspect._empty else Any
+            default = param.default if param.default is not inspect._empty else ...
+            fields[param.name] = (annotation, default)
+
+        model_name = f"{getattr(handler, '__name__', 'Tool')}Params"
+        return create_model(model_name, __base__=ToolParamsBase, **fields)
 
     def _normalize_file_path(self, file_path: str) -> str:
         """
@@ -192,36 +251,48 @@ class BaseToolManager(ABC):
         except Exception:
             return False
 
-    async def _execute_mcp_tool(
+    async def _execute_tool(
         self, tool_name: str, tool_args: Dict[str, Any], session_id: str, tool_call_id: str = ""
-    ) -> CallToolResult:
+    ) -> Dict[str, Any]:
         """
-        Unified method for executing MCP tool calls with mandatory session injection.
-        Pure tool execution logic - confirmation should be handled by caller.
+        Execute an internal tool with manual validation and context injection.
 
         Args:
             tool_name: Tool name
             tool_args: Tool arguments
-            session_id: Session ID for dependency injection (required for all tools)
-            tool_call_id: LLM-generated tool call ID (for SubAgent parent association)
+            session_id: Session ID for dependency injection
+            tool_call_id: LLM-generated tool call ID
 
         Returns:
-            CallToolResult: MCP tool execution result containing content, structuredContent, and isError fields
+            Dict[str, Any]: ToolResult dictionary
         """
-        # All tools now require session ID for dependency injection
+        from backend.application.tools.registry import TOOL_REGISTRY
+        from backend.infrastructure.mcp.utils.tool_result import error_response
 
-        mcp_client = self.get_mcp_client()
-        async with mcp_client as mcp_async_client:
-            # Session isolation is handled by FastMCP per request via _meta.client_id
-            # Create params with _meta as dict (FastMCP will handle conversion)
-            # tool_call_id is passed for SubAgent to associate with parent invoke_agent
-            params = CallToolRequestParams(
-                name=tool_name,
-                arguments=tool_args,
-                _meta={"client_id": session_id, "tool_call_id": tool_call_id},  # type: ignore
-            )
-            call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
-            return await mcp_async_client.session.send_request(call_req, CallToolResult)
+        tool_def = TOOL_REGISTRY.get(tool_name)
+        if tool_def is None or tool_def.handler is None:
+            return error_response(f"Tool not found: {tool_name}")
+
+        params_model = self._get_params_model(tool_def.handler)
+        validated = params_model.model_validate(tool_args)
+        tool_context = self._build_tool_context(session_id, tool_call_id)
+
+        signature = inspect.signature(tool_def.handler)
+        context_param = None
+        for param in signature.parameters.values():
+            if self._is_context_param(param):
+                context_param = param.name
+                break
+
+        call_args = validated.model_dump()
+        if context_param:
+            call_args[context_param] = tool_context
+
+        result = tool_def.handler(**call_args)
+        if inspect.isawaitable(result):
+            result = await result
+
+        return result
 
     async def _execute_tool_with_interrupt_check(
         self, function_call: dict, session_id: str, message_id: str
@@ -338,8 +409,7 @@ class BaseToolManager(ABC):
             # This method only handles pure tool execution
 
             # Step 1: Execute the tool
-            call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id, tool_call_id)
-            tool_result = extract_tool_result_from_mcp(call_tool_result)
+            tool_result = await self._execute_tool(tool_name, tool_args, session_id, tool_call_id)
 
             # Step 2: Track successful read operations for edit prerequisite validation
             if tool_name == "read" and tool_result.get("status") == "success":
