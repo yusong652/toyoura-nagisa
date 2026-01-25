@@ -51,8 +51,8 @@ async def lifespan(app: FastAPI):
         mcp_client = Client(mcp)
         app.state.mcp_client = mcp_client
 
-        # Populate internal tool registry using FastMCP metadata
-        await load_tool_registry(mcp)
+        # Populate internal tool registry without FastMCP
+        await load_tool_registry()
 
         # Clean up any stale MCP server process before starting
         kill_process_on_port(9000)

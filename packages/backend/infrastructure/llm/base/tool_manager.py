@@ -7,13 +7,13 @@ Defines core methods that all Tool Managers must implement to ensure consistency
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import lru_cache
 import inspect
 from typing import Any, Dict, Optional
 
 from fastmcp import Client as MCPClient
-from pydantic import BaseModel, ConfigDict, ValidationError, create_model
+from pydantic import ValidationError
 
+from backend.application.tools.schema_builder import build_params_model, get_context_param_name
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
 from backend.config.dev import get_dev_config
 # Security imports removed - all tools now require session ID
@@ -34,10 +34,6 @@ class ToolRequestContext:
 class ToolContext:
     client_id: str
     request_context: ToolRequestContext
-
-
-class ToolParamsBase(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 class BaseToolManager(ABC):
@@ -80,37 +76,6 @@ class BaseToolManager(ABC):
     def _build_tool_context(session_id: str, tool_call_id: str) -> ToolContext:
         meta = ToolRequestMeta(client_id=session_id, tool_call_id=tool_call_id)
         return ToolContext(client_id=session_id, request_context=ToolRequestContext(meta=meta))
-
-    @staticmethod
-    def _is_context_param(param: inspect.Parameter) -> bool:
-        if param.name in {"context", "ctx"}:
-            return True
-        if param.annotation is inspect._empty:
-            return False
-        try:
-            from fastmcp.server.context import Context as FastMCPContext
-        except Exception:
-            return False
-        return param.annotation is FastMCPContext
-
-    @classmethod
-    @lru_cache(maxsize=512)
-    def _get_params_model(cls, handler: Any) -> type[BaseModel]:
-        signature = inspect.signature(handler)
-        fields: Dict[str, Any] = {}
-
-        for param in signature.parameters.values():
-            if cls._is_context_param(param):
-                continue
-            if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
-                continue
-
-            annotation = param.annotation if param.annotation is not inspect._empty else Any
-            default = param.default if param.default is not inspect._empty else ...
-            fields[param.name] = (annotation, default)
-
-        model_name = f"{getattr(handler, '__name__', 'Tool')}Params"
-        return create_model(model_name, __base__=ToolParamsBase, **fields)
 
     def _normalize_file_path(self, file_path: str) -> str:
         """
@@ -273,16 +238,11 @@ class BaseToolManager(ABC):
         if tool_def is None or tool_def.handler is None:
             return error_response(f"Tool not found: {tool_name}")
 
-        params_model = self._get_params_model(tool_def.handler)
+        params_model = build_params_model(tool_def.handler)
         validated = params_model.model_validate(tool_args)
         tool_context = self._build_tool_context(session_id, tool_call_id)
 
-        signature = inspect.signature(tool_def.handler)
-        context_param = None
-        for param in signature.parameters.values():
-            if self._is_context_param(param):
-                context_param = param.name
-                break
+        context_param = get_context_param_name(tool_def.handler)
 
         call_args = validated.model_dump()
         if context_param:
