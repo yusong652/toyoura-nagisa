@@ -9,7 +9,7 @@ from fastmcp import Client
 from backend.config.cors import get_cors_config, get_cors_middleware_kwargs
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.mcp.mcp_server import mcp
-from backend.infrastructure.mcp.tool_registry_loader import load_tool_registry
+from backend.application.tools.loader import load_tool_registry
 from backend.presentation.api import (
     content,
     file_search,

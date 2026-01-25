@@ -7,7 +7,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.infrastructure.mcp.tools.agent.invoke_agent import invoke_agent, AVAILABLE_SUBAGENTS
+from backend.application.tools.agent.invoke_agent import invoke_agent, AVAILABLE_SUBAGENTS
 from backend.domain.models.agent_profiles import get_subagent_config, PFC_EXPLORER
 from backend.domain.models.agent import AgentResult
 from backend.domain.models.messages import AssistantMessage

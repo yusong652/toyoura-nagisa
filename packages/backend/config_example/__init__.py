@@ -81,7 +81,7 @@ def get_expression_prompt() -> str:
 
 def get_tool_prompt() -> str:
     """Load tool usage guide prompt with workspace root substitution"""
-    from backend.infrastructure.mcp.tools.coding.utils.path_security import WORKSPACE_ROOT
+    from backend.application.tools.coding.utils.path_security import WORKSPACE_ROOT
 
     prompt = _load_prompt_file("tool_prompt.md")
     if prompt:

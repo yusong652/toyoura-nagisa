@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any, cast
 from unittest.mock import AsyncMock, Mock, call
 
 from backend.infrastructure.file_mention.file_mention_processor import FileMentionProcessor, FileContent
-from backend.infrastructure.mcp.tools.coding.utils.file_reader import (
+from backend.application.tools.coding.utils.file_reader import (
     ProcessingResult,
     ContentFormat,
     FileType,

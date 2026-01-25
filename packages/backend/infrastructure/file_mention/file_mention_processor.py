@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import List, Set, Optional, Dict, Any, Union
 from dataclasses import dataclass
 
-from backend.infrastructure.mcp.tools.coding.utils.path_security import (
+from backend.application.tools.coding.utils.path_security import (
     validate_path_in_workspace,
     is_safe_symlink,
     check_parent_symlinks
@@ -26,7 +26,7 @@ from backend.infrastructure.mcp.utils.path_normalization import (
     normalize_path_separators,
     path_to_llm_format
 )
-from backend.infrastructure.mcp.tools.coding.utils.file_reader import (
+from backend.application.tools.coding.utils.file_reader import (
     read_file_safely,
     ProcessingResult,
     ContentFormat,

@@ -1,0 +1,307 @@
+"""
+PFC Plot Capture Tool - MCP tool for capturing PFC plot screenshots.
+
+Provides multimodal diagnostic capability by capturing PFC GUI plot windows
+for visual analysis. Engineers can visually diagnose simulation state
+(particle distribution, stress patterns, boundary conditions) through
+captured images.
+
+Philosophy: "Qualitative is radar, quantitative is microscope"
+- Visual scan (qualitative) → Trigger targeted queries (quantitative)
+
+Design:
+- Creates temporary diagnostic plot to avoid interfering with user's plots
+- Includes sensible defaults (ball, wall with transparency, axes)
+- Auto-cleanup: deletes temporary plot after export
+"""
+
+import os
+import time
+
+from backend.application.tools.registrar import ToolRegistrar
+from fastmcp.server.context import Context
+from typing import Annotated, Dict, Any, Literal, Optional, List
+from pydantic import Field
+from backend.infrastructure.pfc import get_pfc_client
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
+from .scripts import (
+    generate_plot_capture_script,
+    DEFAULT_WALL_TRANSPARENCY,
+    DEFAULT_IMAGE_SIZE,
+    BallShapeType,
+    ValidatedBallColorBy,
+    ValidatedWallColorBy,
+    ValidatedContactColorBy,
+    VectorQuantityType,
+    CutPlane,
+)
+from .utils import PlotOutputPath
+
+
+def register_pfc_capture_plot_tool(registrar: ToolRegistrar):
+    """
+    Register PFC plot capture tool with the registrar.
+
+    Args:
+        registrar: Tool registrar instance
+    """
+
+    @registrar.tool(
+        tags={"pfc", "visualization", "multimodal", "diagnostic"},
+        annotations={"category": "pfc", "tags": ["pfc", "visualization", "diagnostic"]}
+    )
+    async def pfc_capture_plot(
+        context: Context,
+        output_path: PlotOutputPath,
+        size: Annotated[List[int], Field(min_length=2, max_length=2)] = Field(
+            default=list(DEFAULT_IMAGE_SIZE),
+            description="Image size [width, height] in pixels."
+        ),
+        include_ball: bool = Field(
+            default=True,
+            description="Show particles (balls) in the plot."
+        ),
+        ball_shape: BallShapeType = Field(
+            default="sphere",
+            description=(
+                "Ball visualization shape. "
+                "'sphere': standard spheres with optional color mapping. "
+                "'arrow': directional arrows for vector attributes (velocity, displacement, etc.). "
+                "Arrow mode requires ball_color_by to be a vector attribute, otherwise falls back to sphere."
+            )
+        ),
+        ball_color_by: ValidatedBallColorBy = Field(
+            default=None,
+            description=(
+                "Ball coloring attribute. "
+                "Vector: position, velocity, displacement, spin, force-contact, force-applied, "
+                "force-unbalanced, moment-contact, moment-applied, moment-unbalanced. "
+                "Scalar: radius, damp, density, mass. "
+                "Text: id, group. "
+                "Extra: extra-1, extra-2, ... (custom attributes)."
+            )
+        ),
+        ball_color_by_quantity: Optional[VectorQuantityType] = Field(
+            default=None,
+            description="Vector component filter (ignored for scalars)."
+        ),
+        include_wall: bool = Field(
+            default=True,
+            description="Show boundary walls."
+        ),
+        wall_color_by: ValidatedWallColorBy = Field(
+            default=None,
+            description=(
+                "Wall coloring attribute. "
+                "Vector: position, velocity, displacement, force-contact. "
+                "Text: name, group. "
+                "Extra: extra-1, extra-2, ... (custom attributes)."
+            )
+        ),
+        wall_color_by_quantity: Optional[VectorQuantityType] = Field(
+            default=None,
+            description="Vector component filter for wall coloring."
+        ),
+        wall_transparency: int = Field(
+            default=DEFAULT_WALL_TRANSPARENCY,
+            ge=0,
+            le=100,
+            description="Wall transparency 0-100 (0=opaque, 100=invisible)."
+        ),
+        include_contact: bool = Field(
+            default=False,
+            description="Show contact forces between particles."
+        ),
+        contact_color_by: ValidatedContactColorBy = Field(
+            default="force",
+            description=(
+                "Contact coloring attribute. "
+                "Vector: force. "
+                "Text: id, group, contact-type, model-name. "
+                "Property: fric, kn, ks, dp_nratio, dp_sratio, emod, kratio, rr_fric, rr_kr, rr_slip. "
+                "Extra: extra-1, extra-2, ... (custom attributes)."
+            )
+        ),
+        contact_color_by_quantity: Optional[VectorQuantityType] = Field(
+            default=None,
+            description="Vector component filter for contact coloring."
+        ),
+        contact_scale_by_force: bool = Field(
+            default=True,
+            description="Scale contact cylinders by force magnitude."
+        ),
+        center: Optional[Annotated[List[float], Field(min_length=3, max_length=3)]] = Field(
+            default=None,
+            description="Camera look-at point [x, y, z]. Auto-fit if not specified."
+        ),
+        eye: Optional[Annotated[List[float], Field(min_length=3, max_length=3)]] = Field(
+            default=None,
+            description="Camera position [x, y, z]. Isometric view if not specified."
+        ),
+        roll: float = Field(
+            default=0.0,
+            description="Camera roll angle in degrees (0 = level). Only applies when eye or center is specified."
+        ),
+        magnification: float = Field(
+            default=1.0,
+            description="Zoom level (1.0 = normal, 2.0 = 2x closer)."
+        ),
+        projection: Literal["perspective", "parallel"] = Field(
+            default="perspective",
+            description="Projection mode. parallel = orthographic view."
+        ),
+        ball_cut: Optional[CutPlane] = Field(
+            default=None,
+            description="Ball cut plane. Shows only balls on front side of the plane."
+        ),
+        wall_cut: Optional[CutPlane] = Field(
+            default=None,
+            description="Wall cut plane. Shows only walls on front side of the plane."
+        ),
+        contact_cut: Optional[CutPlane] = Field(
+            default=None,
+            description="Contact cut plane. Shows only contacts on front side of the plane."
+        ),
+    ) -> Dict[str, Any]:
+        """
+        Capture a diagnostic screenshot of PFC model state.
+
+        Use this tool to visually inspect simulation state:
+        - Particle clustering or irregular distributions
+        - Boundary penetration issues
+        - Stress concentration patterns
+        - Model geometry problems
+        """
+        try:
+            # Get session ID from MCP context
+            # Architecture guarantee: tool_manager.py always injects _meta.client_id
+            session_id = context.client_id
+
+            # Parameter is pre-validated by Pydantic Annotated type (stripped and .png checked)
+            # Normalize output path for cross-platform (Linux format for PFC server)
+            normalized_output_path = normalize_path_separators(output_path, target_platform='linux')
+
+            # Build view settings dict
+            view_settings: Dict[str, Any] = {}
+            if center is not None:
+                view_settings["center"] = list(center)
+            if eye is not None:
+                view_settings["eye"] = list(eye)
+            # Include roll when custom camera position is used
+            if center is not None or eye is not None:
+                view_settings["roll"] = roll
+            # Include magnification only if not default
+            if magnification != 1.0:
+                view_settings["magnification"] = magnification
+            # Include projection when custom view settings are used
+            if view_settings:
+                view_settings["projection"] = projection
+
+            # Fixed plot name - PFC's plot create auto-clears existing items
+            # Timeout budget tracking ensures requests don't overlap incorrectly
+            plot_name = "NagisaDiag"
+
+            # Generate Python script for plot capture
+            script_content = generate_plot_capture_script(
+                output_path=normalized_output_path,
+                plot_name=plot_name,
+                size=(size[0], size[1]),
+                view_settings=view_settings,
+                include_ball=include_ball,
+                include_wall=include_wall,
+                include_contact=include_contact,
+                include_axes=True,
+                wall_transparency=wall_transparency,
+                ball_shape=ball_shape,
+                ball_color_by=ball_color_by,
+                ball_color_by_quantity=ball_color_by_quantity or "mag",
+                wall_color_by=wall_color_by,
+                wall_color_by_quantity=wall_color_by_quantity or "mag",
+                contact_color_by=contact_color_by,
+                contact_color_by_quantity=contact_color_by_quantity or "mag",
+                contact_scale_by_force=contact_scale_by_force,
+                ball_cut=ball_cut,
+                wall_cut=wall_cut,
+                contact_cut=contact_cut,
+            )
+
+            # Get PFC client and working directory
+            client = await get_pfc_client()
+            working_dir = await client.get_working_directory()
+
+            if not working_dir:
+                return error_response(
+                    "Cannot determine PFC working directory. "
+                    "Ensure PFC server is running with a project open."
+                )
+
+            # Create and execute temporary script
+            script_path = _create_temp_script(working_dir, script_content)
+            normalized_script_path = normalize_path_separators(script_path, target_platform='linux')
+
+            try:
+                result = await client.execute_diagnostic(
+                    script_path=normalized_script_path,
+                    timeout_ms=30000
+                )
+            finally:
+                _cleanup_script(script_path)
+
+            # Handle execution result
+            # File verification and plot cleanup are handled by pfc-server
+            status = result.get("status")
+
+            if status == "error":
+                error_msg = result.get("message", "Plot capture failed")
+                return error_response(f"Plot capture failed: {error_msg}")
+
+            if status == "timeout":
+                error_msg = result.get("message", "Plot capture timed out")
+                return error_response(error_msg)
+
+            # Build success response
+            return success_response(
+                message=f"Plot captured: {os.path.basename(output_path)}",
+                llm_content={
+                    "parts": [{
+                        "type": "text",
+                        "text": f"Plot captured. To analyze, use: read(\"{output_path}\")"
+                    }]
+                },
+                output_path=output_path
+            )
+
+        except ConnectionError as e:
+            return error_response(f"Cannot connect to PFC server: {str(e)}")
+
+        except Exception as e:
+            return error_response(f"Plot capture error: {str(e)}")
+
+
+def _create_temp_script(working_dir: str, content: str) -> str:
+    """
+    Create temporary script file in PFC workspace.
+
+    Args:
+        working_dir: PFC working directory
+        content: Script content to write
+
+    Returns:
+        Absolute path to created script file
+    """
+    script_dir = os.path.join(working_dir, ".nagisa", "plot_scripts")
+    os.makedirs(script_dir, exist_ok=True)
+    script_filename = f"capture_plot_{int(time.time() * 1000)}.py"
+    script_path = os.path.join(script_dir, script_filename)
+    with open(script_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    return script_path
+
+
+def _cleanup_script(script_path: str) -> None:
+    """Remove temporary script file, ignoring errors."""
+    try:
+        os.remove(script_path)
+    except OSError:
+        pass

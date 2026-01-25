@@ -64,7 +64,7 @@ async def test_invoke_agent_basic():
     print("TEST 1: invoke_agent tool - PFC Explorer")
     print("=" * 60)
 
-    from backend.infrastructure.mcp.tools.agent.invoke_agent import invoke_agent
+    from backend.application.tools.agent.invoke_agent import invoke_agent
 
     # Create mock context
     context = MagicMock()
@@ -108,7 +108,7 @@ async def test_invoke_agent_unknown_type():
     print("TEST 2: invoke_agent - Unknown agent type")
     print("=" * 60)
 
-    from backend.infrastructure.mcp.tools.agent.invoke_agent import invoke_agent
+    from backend.application.tools.agent.invoke_agent import invoke_agent
 
     context = MagicMock()
     context.client_id = "test_session_error"
