@@ -19,7 +19,7 @@ from fastmcp.server.context import Context  # type: ignore
 # from .config import get_tools_config  # Removed unused import
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
-from ..utils.path_security import (
+from .utils.path_security import (
     validate_path_in_workspace,
     get_workspace_root_async,
     is_safe_symlink,

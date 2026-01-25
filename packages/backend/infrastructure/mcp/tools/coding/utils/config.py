@@ -1,4 +1,4 @@
-"""Shared configuration for coding.tools.
+"""Shared configuration for coding tools.
 
 A *singleton-style* object holds runtime parameters (currently only
 ``root_dir`` and ``debug_mode``).  Tools can import

@@ -14,7 +14,7 @@ from pydantic import Field
 from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context  # type: ignore
 
-from ..utils.path_security import (
+from .utils.path_security import (
     validate_path_in_workspace,
     get_workspace_root_async,
     is_safe_symlink,
@@ -22,7 +22,7 @@ from ..utils.path_security import (
 )
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
-from ..utils.constants import (
+from .utils.constants import (
     TEXT_CHARSET_DEFAULT,
 )
 

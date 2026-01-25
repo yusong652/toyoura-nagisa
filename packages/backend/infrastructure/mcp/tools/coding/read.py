@@ -18,13 +18,13 @@ from fastmcp.server.context import Context  # type: ignore
 
 logger = logging.getLogger(__name__)
 
-from ..utils.path_security import (
+from .utils.path_security import (
     validate_path_in_workspace,
     get_workspace_root_async,
     is_safe_symlink,
     check_parent_symlinks
 )
-from ..utils.file_reader import (
+from .utils.file_reader import (
     read_file_safely,
     MAX_FILE_SIZE_BYTES,
     ContentFormat,

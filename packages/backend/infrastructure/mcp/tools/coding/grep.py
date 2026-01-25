@@ -8,7 +8,7 @@ from pydantic import Field
 from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context  # type: ignore
 
-from ..utils.path_security import (
+from .utils.path_security import (
     validate_path_in_workspace,
     get_workspace_root_async,
     is_safe_symlink,
