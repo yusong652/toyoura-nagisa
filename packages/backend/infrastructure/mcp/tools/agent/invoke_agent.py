@@ -12,7 +12,8 @@ Design principles:
 import logging
 from typing import Any, Dict, Literal
 from pydantic import Field
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -208,9 +209,9 @@ async def invoke_agent(
         return error_response(f"SubAgent execution failed: {str(e)}", subagent_type=subagent_type)
 
 
-def register_invoke_agent_tool(mcp: FastMCP):
+def register_invoke_agent_tool(registrar: ToolRegistrar):
     """Register the invoke_agent tool with metadata."""
-    mcp.tool(
+    registrar.tool(
         tags={"agent", "subagent", "delegation", "task"},
         annotations={
             "category": "agent",

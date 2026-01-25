@@ -4,7 +4,7 @@ PFC Interrupt Task Tool - MCP tool for interrupting running PFC tasks.
 Provides the ability to stop long-running PFC simulations gracefully.
 """
 
-from fastmcp import FastMCP
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 from typing import Dict, Any
 from backend.infrastructure.pfc import get_pfc_client
@@ -12,15 +12,15 @@ from backend.infrastructure.mcp.utils.tool_result import success_response, error
 from .utils import TaskId
 
 
-def register_pfc_interrupt_task_tool(mcp: FastMCP):
+def register_pfc_interrupt_task_tool(registrar: ToolRegistrar):
     """
-    Register PFC interrupt task tool with the MCP server.
+    Register PFC interrupt task tool with the registrar.
 
     Args:
-        mcp: FastMCP server instance
+        registrar: Tool registrar instance
     """
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"pfc", "task", "interrupt", "control"},
         annotations={"category": "pfc", "tags": ["pfc", "task", "interrupt"]}
     )

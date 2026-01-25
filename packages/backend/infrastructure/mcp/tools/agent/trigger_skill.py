@@ -13,7 +13,8 @@ import logging
 from typing import Any, Dict
 
 from pydantic import Field
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["register_trigger_skill_tool"]
 
 
-def register_trigger_skill_tool(mcp: FastMCP):
+def register_trigger_skill_tool(registrar: ToolRegistrar):
     """
     Register the trigger_skill tool with dynamic Literal type validation.
 
@@ -42,7 +43,7 @@ def register_trigger_skill_tool(mcp: FastMCP):
     SkillType = get_skill_literal_type()
     skill_description = get_skill_description()
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"skill", "workflow", "instructions", "knowledge"},
         annotations={
             "category": "agent",

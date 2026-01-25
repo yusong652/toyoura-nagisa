@@ -20,7 +20,7 @@ def register_agent_tools(mcp):
     """Register all agent-related tools.
 
     Args:
-        mcp: FastMCP server instance
+        mcp: Tool registrar instance
     """
     register_invoke_agent_tool(mcp)
     register_trigger_skill_tool(mcp)

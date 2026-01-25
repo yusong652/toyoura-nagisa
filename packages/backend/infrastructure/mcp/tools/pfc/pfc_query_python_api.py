@@ -11,7 +11,8 @@ Workflow:
 """
 
 from typing import Dict, Any
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 
 from backend.infrastructure.pfc.python_api import (
@@ -23,10 +24,10 @@ from backend.infrastructure.mcp.utils.tool_result import success_response, error
 from .utils import SearchQuery, SearchLimit
 
 
-def register_pfc_query_python_api_tool(mcp: FastMCP):
-    """Register PFC Python API query tool with the MCP server."""
+def register_pfc_query_python_api_tool(registrar: ToolRegistrar):
+    """Register PFC Python API query tool with the registrar."""
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"pfc", "python", "api", "documentation", "search"},
         annotations={"category": "pfc", "tags": ["pfc", "python", "search"]}
     )
@@ -110,4 +111,3 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
             return error_response(f"Documentation files not found: {str(e)}")
         except Exception as e:
             return error_response(f"Error querying Python API: {str(e)}")
-

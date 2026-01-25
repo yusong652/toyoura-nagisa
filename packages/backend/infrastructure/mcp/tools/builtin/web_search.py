@@ -1,7 +1,7 @@
 """Universal Web Search tool supporting multiple LLM providers."""
 
 from typing import Dict, Any, cast
-from fastmcp import FastMCP
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 from pydantic import Field
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -86,9 +86,9 @@ async def web_search(
             f"Web search error: {str(e)}"
         )
 
-def register_web_search_tool(mcp: FastMCP):
-    """Register the Web Search tool with MCP server."""
-    mcp.tool(
+def register_web_search_tool(registrar: ToolRegistrar):
+    """Register the Web Search tool with the registrar."""
+    registrar.tool(
         tags={"builtin", "web_search", "google", "search"},
         annotations={"category": "builtin", "tags": ["builtin", "web_search", "google", "search"]}
         )(web_search)

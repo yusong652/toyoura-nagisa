@@ -17,6 +17,6 @@ def register_planning_tools(mcp):
     """Aggregate registration of all planning tools.
 
     Args:
-        mcp: FastMCP server instance
+        mcp: Tool registrar instance
     """
     register_todo_write_tool(mcp)

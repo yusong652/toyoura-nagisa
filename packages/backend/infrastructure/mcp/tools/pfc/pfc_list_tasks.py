@@ -4,7 +4,7 @@ PFC List Tasks Tool - MCP tool for listing all tracked tasks.
 Provides task overview functionality for managing multiple concurrent PFC simulations.
 """
 
-from fastmcp import FastMCP
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 from typing import Annotated, Dict, Any, Optional
 from pydantic import Field
@@ -14,15 +14,15 @@ from backend.infrastructure.mcp.utils.time_utils import format_time_range
 from .utils import OutputOffset, TaskListLimit
 
 
-def register_pfc_list_tasks_tool(mcp: FastMCP):
+def register_pfc_list_tasks_tool(registrar: ToolRegistrar):
     """
-    Register PFC list tasks tool with the MCP server.
+    Register PFC list tasks tool with the registrar.
 
     Args:
-        mcp: FastMCP server instance
+        registrar: Tool registrar instance
     """
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"pfc", "task", "list", "monitoring"},
         annotations={"category": "pfc", "tags": ["pfc", "task", "monitoring"]}
     )
@@ -177,4 +177,3 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
 
         except Exception as e:
             return error_response(f"System error listing tasks: {str(e)}")
-

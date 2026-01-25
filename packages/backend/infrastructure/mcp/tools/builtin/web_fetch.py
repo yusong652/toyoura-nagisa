@@ -1,7 +1,8 @@
 """Web Fetch tool for retrieving and processing URL content."""
 
 from typing import Dict, Any
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 from pydantic import Field
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -85,9 +86,9 @@ async def web_fetch(
         )
 
 
-def register_web_fetch_tool(mcp: FastMCP):
-    """Register the Web Fetch tool with MCP server."""
-    mcp.tool(
+def register_web_fetch_tool(registrar: ToolRegistrar):
+    """Register the Web Fetch tool with the registrar."""
+    registrar.tool(
         tags={"builtin", "web_fetch", "url", "fetch"},
         annotations={"category": "builtin", "tags": ["builtin", "web_fetch", "url", "fetch"]}
     )(web_fetch)

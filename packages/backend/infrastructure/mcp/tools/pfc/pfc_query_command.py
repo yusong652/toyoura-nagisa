@@ -11,7 +11,8 @@ Workflow:
 """
 
 from typing import Dict, Any
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 
 from backend.infrastructure.pfc.commands import CommandFormatter
@@ -20,10 +21,10 @@ from backend.infrastructure.mcp.utils.tool_result import success_response, error
 from .utils import SearchQuery, SearchLimit
 
 
-def register_pfc_query_command_tool(mcp: FastMCP):
-    """Register PFC command query tool with the MCP server."""
+def register_pfc_query_command_tool(registrar: ToolRegistrar):
+    """Register PFC command query tool with the registrar."""
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"pfc", "command", "documentation", "search"},
         annotations={"category": "pfc", "tags": ["pfc", "command", "search"]}
     )
@@ -111,4 +112,3 @@ def register_pfc_query_command_tool(mcp: FastMCP):
             return error_response(f"Documentation files not found: {str(e)}")
         except Exception as e:
             return error_response(f"Error querying command documentation: {str(e)}")
-

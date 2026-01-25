@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from pydantic import Field
-from fastmcp import FastMCP  # type: ignore
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context  # type: ignore
 
 # from .config import get_tools_config  # Removed unused import
@@ -208,12 +208,12 @@ async def write(
 # Registration helper
 # -----------------------------------------------------------------------------
 
-def register_write_tool(mcp: FastMCP):
+def register_write_tool(registrar: ToolRegistrar):
     """Register the write tool with comprehensive metadata."""
     common = dict(
 
     )
-    mcp.tool(        
+    registrar.tool(        
         tags={"coding", "filesystem", "write", "file", "create"}, 
         annotations={
             "category": "coding", 

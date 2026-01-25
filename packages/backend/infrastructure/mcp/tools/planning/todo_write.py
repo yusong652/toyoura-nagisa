@@ -12,7 +12,8 @@ All sessions in the same workspace share the same todo list for better continuit
 import logging
 from typing import List, Dict, Any, Literal, cast
 from pydantic import BaseModel, Field
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 
 from backend.infrastructure.mcp.utils.tool_result import ToolResult, success_response, error_response
@@ -341,9 +342,9 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
 # Registration helper
 # -----------------------------------------------------------------------------
 
-def register_todo_write_tool(mcp: FastMCP):
+def register_todo_write_tool(registrar: ToolRegistrar):
     """Register the todo_write tool with comprehensive metadata."""
-    mcp.tool(
+    registrar.tool(
         tags={"planning", "task-management", "todo", "workflow", "cross-session"},
         annotations={
             "category": "planning",

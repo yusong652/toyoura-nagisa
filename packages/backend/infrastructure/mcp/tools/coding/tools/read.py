@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from pydantic import Field
-from fastmcp import FastMCP  # type: ignore
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context  # type: ignore
 
 logger = logging.getLogger(__name__)
@@ -232,9 +232,9 @@ Usage:
 # Registration helper
 # -----------------------------------------------------------------------------
 
-def register_read_tool(mcp: FastMCP):
+def register_read_tool(registrar: ToolRegistrar):
     """Register the read tool with proper tags synchronization."""
-    mcp.tool(
+    registrar.tool(
         tags={"coding", "filesystem", "read", "file", "content", "analysis", "metadata"}, 
         annotations={"category": "coding", "tags": ["coding", "filesystem", "read", "file", "content", "analysis", "metadata"]}
-    )(read) 
+    )(read)

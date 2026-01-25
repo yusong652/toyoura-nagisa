@@ -11,7 +11,7 @@ Task lifecycle is managed by backend's PfcTaskManager:
 - Status tracked via polling pfc-server (persistent data)
 """
 
-from fastmcp import FastMCP
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 from typing import Dict, Any, cast, Optional
 from backend.infrastructure.pfc import get_pfc_client
@@ -36,15 +36,15 @@ from .utils import (
 )
 
 
-def register_pfc_task_tool(mcp: FastMCP):
+def register_pfc_task_tool(registrar: ToolRegistrar):
     """
-    Register PFC task execution tool with the MCP server.
+    Register PFC task execution tool with the registrar.
 
     Args:
-        mcp: FastMCP server instance
+        registrar: Tool registrar instance
     """
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"pfc", "simulation", "python", "task", "sdk"},
         annotations={"category": "pfc", "tags": ["pfc", "simulation", "python", "sdk"]}
     )

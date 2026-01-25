@@ -11,7 +11,8 @@ Use this tool to understand syntax elements that modify command behavior.
 """
 
 from typing import Dict, Any, Optional, cast
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from pydantic import Field
 
 from backend.infrastructure.pfc.references import ReferenceLoader, ReferenceFormatter
@@ -19,10 +20,10 @@ from backend.infrastructure.mcp.utils.tool_result import success_response, error
 from backend.infrastructure.mcp.tools.pfc.utils import normalize_input
 
 
-def register_pfc_browse_reference_tool(mcp: FastMCP):
-    """Register PFC reference browse tool with the MCP server."""
+def register_pfc_browse_reference_tool(registrar: ToolRegistrar):
+    """Register PFC reference browse tool with the registrar."""
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"pfc", "reference", "browse", "documentation"},
         annotations={"category": "pfc", "tags": ["pfc", "reference", "browse"]}
     )

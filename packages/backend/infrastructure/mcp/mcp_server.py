@@ -9,24 +9,7 @@ _PROJECT_ROOT = _BACKEND_DIR.parent        # 项目根目录
 
 # 添加必要路径到 sys.path
 sys.path.insert(0, str(_PROJECT_ROOT))
-import asyncio
 from fastmcp import FastMCP
-from backend.infrastructure.mcp.tools.builtin import register_builtin_tools
-from backend.infrastructure.mcp.tools.coding import register_coding_tools
-from backend.infrastructure.mcp.tools.pfc import (
-    register_pfc_task_tool,
-    register_pfc_task_status_tool,
-    register_pfc_list_tasks_tool,
-    register_pfc_interrupt_task_tool,
-    register_pfc_query_python_api_tool,
-    register_pfc_query_command_tool,
-    register_pfc_browse_commands_tool,
-    register_pfc_browse_reference_tool,
-    register_pfc_browse_python_api_tool,
-    register_pfc_capture_plot_tool,
-)
-from backend.infrastructure.mcp.tools.planning import register_planning_tools
-from backend.infrastructure.mcp.tools.agent import register_agent_tools
 
 mcp = FastMCP(
     "Smart MCP Server for Nagisa",
@@ -39,26 +22,9 @@ mcp = FastMCP(
 
 print(f"[DEBUG] Smart MCP Server initialized")
 
-# 注册所有工具
-register_builtin_tools(mcp)
-register_coding_tools(mcp)
-# PFC tools - task execution with version tracking (Script is Context)
-register_pfc_task_tool(mcp)
-register_pfc_task_status_tool(mcp)
-register_pfc_list_tasks_tool(mcp)
-register_pfc_interrupt_task_tool(mcp)
-# PFC documentation tools - browse (like glob+cat) and query (like grep)
-register_pfc_browse_commands_tool(mcp)
-register_pfc_browse_reference_tool(mcp)
-register_pfc_browse_python_api_tool(mcp)
-register_pfc_query_python_api_tool(mcp)
-register_pfc_query_command_tool(mcp)
-# PFC diagnostic tools - multimodal visual analysis
-register_pfc_capture_plot_tool(mcp)
-# Planning tools - persistent todo tracking with cross-session awareness
-register_planning_tools(mcp)
-# Agent tools - SubAgent delegation
-register_agent_tools(mcp)
+
+# NOTE: Internal tools are now registered via the in-process registry loader.
+# This MCP server is reserved for future external tool exposure.
 
 # 启动服务器
 if __name__ == "__main__":

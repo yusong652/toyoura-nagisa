@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 
 from pydantic import Field
-from fastmcp import FastMCP  # type: ignore
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context  # type: ignore
 
 from ..utils.path_security import (
@@ -330,10 +330,10 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
 # Registration helper
 # -----------------------------------------------------------------------------
 
-def register_edit_tool(mcp: FastMCP):
+def register_edit_tool(registrar: ToolRegistrar):
     """Register the edit tool with proper tags synchronization."""
 
-    mcp.tool(
+    registrar.tool(
         tags={"coding", "filesystem", "edit", "replace", "modify"}, 
         annotations={"category": "coding", "tags": ["coding", "filesystem", "edit", "replace", "modify"]}
     )(edit)

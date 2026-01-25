@@ -7,17 +7,18 @@ Use pfc_query_python_api for keyword-based search when API path is unknown.
 """
 
 from typing import Dict, Any, Optional, Tuple, List
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from pydantic import Field
 
 from backend.infrastructure.pfc.python_api import APILoader, APIFormatter
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 
-def register_pfc_browse_python_api_tool(mcp: FastMCP):
-    """Register PFC Python API browse tool with the MCP server."""
+def register_pfc_browse_python_api_tool(registrar: ToolRegistrar):
+    """Register PFC Python API browse tool with the registrar."""
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"pfc", "python", "api", "browse", "documentation"},
         annotations={"category": "pfc", "tags": ["pfc", "python", "api", "browse"]}
     )

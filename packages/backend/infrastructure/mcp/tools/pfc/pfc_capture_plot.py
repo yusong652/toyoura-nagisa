@@ -17,7 +17,8 @@ Design:
 
 import os
 import time
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 from typing import Annotated, Dict, Any, Literal, Optional, List
 from pydantic import Field
@@ -38,15 +39,15 @@ from .scripts import (
 from .utils import PlotOutputPath
 
 
-def register_pfc_capture_plot_tool(mcp: FastMCP):
+def register_pfc_capture_plot_tool(registrar: ToolRegistrar):
     """
-    Register PFC plot capture tool with the MCP server.
+    Register PFC plot capture tool with the registrar.
 
     Args:
-        mcp: FastMCP server instance
+        registrar: Tool registrar instance
     """
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"pfc", "visualization", "multimodal", "diagnostic"},
         annotations={"category": "pfc", "tags": ["pfc", "visualization", "diagnostic"]}
     )

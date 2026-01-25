@@ -6,7 +6,8 @@ Uses shared task_status_formatter for consistent output format.
 """
 
 import asyncio
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 from typing import Dict, Any
 from backend.infrastructure.pfc import get_pfc_client
@@ -22,15 +23,15 @@ from .utils import (
 )
 
 
-def register_pfc_task_status_tool(mcp: FastMCP):
+def register_pfc_task_status_tool(registrar: ToolRegistrar):
     """
-    Register PFC task status tool with the MCP server.
+    Register PFC task status tool with the registrar.
 
     Args:
-        mcp: FastMCP server instance
+        registrar: Tool registrar instance
     """
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"pfc", "task", "status", "monitoring"},
         annotations={"category": "pfc", "tags": ["pfc", "task", "monitoring"]}
     )

@@ -10,6 +10,7 @@ from typing import Dict, Any
 from pydantic import Field
 from fastmcp.server.context import Context  # type: ignore
 
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.shell.background_process_manager import (
     get_process_manager,
@@ -74,14 +75,14 @@ async def kill_shell(
         return error_response(f"Failed to kill process: {e}")
 
 
-def register_kill_shell_tool(mcp):
+def register_kill_shell_tool(registrar: ToolRegistrar):
     """
-    Register the kill_shell tool with FastMCP.
+    Register the kill_shell tool with the registrar.
 
     Args:
-        mcp: FastMCP instance to register the tool with
+        registrar: Tool registrar instance to register the tool with
     """
-    mcp.tool(
+    registrar.tool(
         tags={"coding", "execution", "background", "process_control"},
         annotations={
             "category": "coding",

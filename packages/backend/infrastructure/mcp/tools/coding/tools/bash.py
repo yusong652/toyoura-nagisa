@@ -9,7 +9,7 @@ Uses the infrastructure layer ShellExecutor for actual command execution.
 from typing import Dict, Any, Optional, cast
 
 from pydantic import Field
-from fastmcp import FastMCP  # type: ignore
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context  # type: ignore
 
 from ..utils.path_security import get_workspace_root_async
@@ -210,9 +210,9 @@ Working directory:
         return error_response(f"Unexpected error: {e}")
 
 
-def register_bash_tool(mcp: FastMCP):
-    """Register the bash tool with FastMCP."""
-    mcp.tool(
+def register_bash_tool(registrar: ToolRegistrar):
+    """Register the bash tool with the registrar."""
+    registrar.tool(
         tags={"coding", "execution", "shell"},
         annotations={
             "category": "coding",

@@ -10,6 +10,8 @@ from typing import Dict, Any
 from pydantic import Field
 from fastmcp.server.context import Context  # type: ignore
 
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
+
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.shell import truncate_output
 from backend.infrastructure.shell.background_process_manager import (
@@ -107,14 +109,14 @@ async def bash_output(
         return error_response(f"Failed to retrieve process output: {e}")
 
 
-def register_bash_output_tool(mcp):
+def register_bash_output_tool(registrar: ToolRegistrar):
     """
-    Register the bash_output tool with FastMCP.
+    Register the bash_output tool with the registrar.
 
     Args:
-        mcp: FastMCP instance to register the tool with
+        registrar: Tool registrar instance to register the tool with
     """
-    mcp.tool(
+    registrar.tool(
         tags={"coding", "execution", "background", "monitoring"},
         annotations={
             "category": "coding",

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Set
 
 from pydantic import Field
-from fastmcp import FastMCP  # type: ignore
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context  # type: ignore
 
 from ..utils.path_security import (
@@ -453,9 +453,9 @@ async def grep(
 # Registration helper
 # -----------------------------------------------------------------------------
 
-def register_grep_tool(mcp: FastMCP):
+def register_grep_tool(registrar: ToolRegistrar):
     """Register the grep tool with proper tags synchronization."""
-    mcp.tool(
+    registrar.tool(
         tags={"coding", "filesystem", "search", "content", "regex", "grep"},
         annotations={"category": "coding", "tags": ["coding", "filesystem", "search", "content", "regex", "grep"]}
     )(grep)

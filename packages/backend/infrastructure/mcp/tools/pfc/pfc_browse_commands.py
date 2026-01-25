@@ -9,7 +9,8 @@ Use pfc_query_command for keyword-based search when command is unknown.
 """
 
 from typing import Dict, Any, Optional
-from fastmcp import FastMCP
+
+from backend.infrastructure.mcp.tools.registrar import ToolRegistrar
 from pydantic import Field
 
 from backend.infrastructure.pfc.commands import CommandLoader, CommandFormatter
@@ -17,10 +18,10 @@ from backend.infrastructure.mcp.utils.tool_result import success_response, error
 from backend.infrastructure.mcp.tools.pfc.utils import normalize_input
 
 
-def register_pfc_browse_commands_tool(mcp: FastMCP):
-    """Register PFC command browse tool with the MCP server."""
+def register_pfc_browse_commands_tool(registrar: ToolRegistrar):
+    """Register PFC command browse tool with the registrar."""
 
-    @mcp.tool(
+    @registrar.tool(
         tags={"pfc", "command", "browse", "documentation"},
         annotations={"category": "pfc", "tags": ["pfc", "command", "browse"]}
     )
@@ -194,5 +195,3 @@ Navigation:
             "full_command": f"{category} {command_name}"
         }
     )
-
-
