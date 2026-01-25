@@ -13,7 +13,6 @@ from pydantic import ValidationError
 
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
-from backend.domain.models.agent_profiles import get_tools_for_agent
 from backend.config.dev import get_dev_config
 # Security imports removed - all tools now require session ID
 
@@ -145,29 +144,20 @@ class BaseToolManager(ABC):
         tools_dict: Dict[str, ToolSchema] = {}
 
         try:
-            mcp_client = self.get_mcp_client()
-            async with mcp_client as mcp_async_client:
-                # Get all MCP tools - list_tools() always returns a list
-                mcp_tools = await mcp_async_client.list_tools()
+            from backend.application.tools.registry import TOOL_REGISTRY
 
-                # Get tools for the specified agent name (main agent or SubAgent)
-                allowed_tools = set(get_tools_for_agent(agent_profile))
+            tool_defs = TOOL_REGISTRY.get_by_agent_profile(agent_profile)
+            for tool_def in tool_defs.values():
+                tool_schema = ToolSchema.from_tool_definition(tool_def)
+                tools_dict[tool_schema.name] = tool_schema
 
-                # Add tools to dictionary
-                for mcp_tool in mcp_tools:
-                    # Only load permitted tools
-                    if mcp_tool.name not in allowed_tools:
-                        continue
-
-                    tool_schema = ToolSchema.from_mcp_tool(mcp_tool)
-                    tools_dict[tool_schema.name] = tool_schema
-
-                return tools_dict
+            return tools_dict
 
         except Exception as e:
             if get_dev_config().debug_mode:
-                print(f"[DEBUG] Error getting standardized tools: {e}")
-            return {}
+                print(f"[DEBUG] Error reading tool registry: {e}")
+
+        return {}
 
     @abstractmethod
     async def get_function_call_schemas(self, session_id: str, agent_profile="pfc_expert") -> Any:

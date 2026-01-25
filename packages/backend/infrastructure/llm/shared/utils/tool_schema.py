@@ -175,6 +175,22 @@ class ToolSchema(BaseModel):
             description=mcp_tool.description or "No description available",
             inputSchema=JSONSchema(**input_schema_dict)
         )
+
+    @classmethod
+    def from_tool_definition(cls, tool_def) -> "ToolSchema":
+        """Create ToolSchema from internal ToolDefinition."""
+        input_schema_dict = getattr(tool_def, "input_schema", {}) or {}
+
+        if not isinstance(input_schema_dict, dict):
+            input_schema_dict = {"type": "object", "properties": {}}
+
+        description = getattr(tool_def, "description", None) or "No description available"
+
+        return cls(
+            name=tool_def.name,
+            description=description,
+            inputSchema=JSONSchema(**input_schema_dict),
+        )
     
     @classmethod
     def from_dict(cls, tool_dict: Dict[str, Any]) -> "ToolSchema":

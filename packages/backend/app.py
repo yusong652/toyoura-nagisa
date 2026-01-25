@@ -9,6 +9,7 @@ from fastmcp import Client
 from backend.config.cors import get_cors_config, get_cors_middleware_kwargs
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.mcp.mcp_server import mcp
+from backend.infrastructure.mcp.tool_registry_loader import load_tool_registry
 from backend.presentation.api import (
     content,
     file_search,
@@ -49,6 +50,9 @@ async def lifespan(app: FastAPI):
         mcp.app = app  # type: ignore # Set app reference for MCP tools to access FastAPI state
         mcp_client = Client(mcp)
         app.state.mcp_client = mcp_client
+
+        # Populate internal tool registry using FastMCP metadata
+        await load_tool_registry(mcp)
 
         # Clean up any stale MCP server process before starting
         kill_process_on_port(9000)
