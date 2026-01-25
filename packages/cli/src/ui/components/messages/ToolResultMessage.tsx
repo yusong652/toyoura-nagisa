@@ -157,23 +157,32 @@ const DefaultToolResultDisplay: React.FC<{
       {/* Content - plain text for errors and file tools, markdown for others */}
       <Box paddingLeft={RESULT_INDENT} flexDirection="column">
         {isBashTool ? (
-          (text.length ? text.split('\n') : ['']).map((line, index) => (
-            <Box key={index} flexDirection="row">
-              {showBashPrefix && (
+          <Box flexDirection="row">
+            {showBashPrefix && (
+              <Box width={2} flexShrink={0}>
                 <Text color={theme.text.muted}>{TOOL_RESULT_PREFIX} </Text>
+              </Box>
+            )}
+            <Box flexDirection="column" flexGrow={1}>
+              {(text.length ? text.split('\n') : ['']).map((line, index) => (
+                <Text key={index} color={textColor ?? theme.text.secondary} wrap="truncate-end">
+                  {text.length === 0 ? '(no output)' : line}
+                </Text>
+              ))}
+              {truncated && (
+                <Text color={theme.text.muted}>
+                  ... +{hiddenLines} lines (ctrl+o to expand)
+                </Text>
               )}
-              <Text color={textColor ?? theme.text.secondary} wrap="truncate-end">
-                {text.length === 0 ? '(no output)' : line}
-              </Text>
             </Box>
-          ))
+          </Box>
         ) : usePlainText ? (
           <Text color={textColor}>{text}</Text>
         ) : (
           <MarkdownText>{text}</MarkdownText>
         )}
       </Box>
-      {truncated && (
+      {truncated && !isBashTool && (
         <Box paddingLeft={RESULT_INDENT}>
           <Text color={theme.text.muted}>
             ... +{hiddenLines} lines (ctrl+o to expand)

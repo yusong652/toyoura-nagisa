@@ -32,25 +32,22 @@ export const ShellResultMessage: React.FC<ShellResultMessageProps> = ({ item, te
   }
 
   return (
-    <Box flexDirection="column" marginBottom={1} width={terminalWidth}>
-      {/* stdout */}
-      {hasStdout && (
-        <Box flexDirection="row">
-          <Text color={colors.primary}>{symbolPrefix}</Text>
+    <Box flexDirection="row" marginBottom={1} width={terminalWidth}>
+      <Text color={colors.primary}>{symbolPrefix}</Text>
+      <Box flexDirection="column">
+        {/* stdout */}
+        {hasStdout && (
           <Text color={theme.text.secondary} wrap="wrap">
             {item.stdout.trim()}
           </Text>
-        </Box>
-      )}
-      {/* stderr (if present, shown after stdout) */}
-      {hasStderr && (
-        <Box flexDirection="row">
-          <Text color={colors.primary}>{symbolPrefix}</Text>
+        )}
+        {/* stderr (if present, shown after stdout) */}
+        {hasStderr && (
           <Text color={theme.status.error} wrap="wrap">
             {item.stderr.trim()}
           </Text>
-        </Box>
-      )}
+        )}
+      </Box>
     </Box>
   );
 };
