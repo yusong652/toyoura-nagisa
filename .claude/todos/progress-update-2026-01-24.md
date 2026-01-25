@@ -372,7 +372,35 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 ---
 
-## Recommended Next Steps (Updated: 2026-01-24 00:45 JST)
+## Recommended Next Steps (Updated: 2026-01-25 09:30 JST)
+
+### 🔴 P0: FastMCP解耦与工具系统重构 (NEW - CRITICAL)
+
+**Status**: Planning → Implementation (Starting Today)
+**Priority**: **P0 - Foundation Architecture Change**
+**Impact**: Resolves circular dependency, improves performance 10x, enables proper testing
+**Effort**: 2-3 weeks (phased implementation)
+
+**Why P0**:
+1. ❌ **Architectural Violation**: Current MCP Server creates circular dependency (Server imports toyoura-nagisa, toyoura-nagisa calls Server)
+2. ❌ **Performance Issue**: Unnecessary IPC overhead (~10ms per tool call) for in-process functions
+3. ❌ **Wrong MCP Usage**: MCP designed for external tools, not internal infrastructure
+4. ❌ **Testing Blocker**: Cannot unit test tools without starting full MCP Server
+
+**See**: `.claude/todos/p0-fastmcp-decoupling-2026-01-25.md` for complete plan
+
+**Phase 1 (Week 1)** - Starting TODAY:
+- [ ] Implement `application/tools/base.py` (tool decorator system)
+- [ ] Implement `application/tools/registry.py` (global registry)
+- [ ] Migrate 3 tools as POC: read, glob, bash
+- [ ] Update ToolManager for direct calling
+- [ ] Validate: Performance > 5x, unit tests work without MCP
+
+**Next Priority After P0**:
+- Option A: Complete tool migration (Phase 2-3)
+- Option B: Increase test coverage with new testable architecture
+
+---
 
 ### ✅ Just Completed: CI/CD Infrastructure!
 
@@ -389,51 +417,38 @@ As of today (2026-01-24), we've successfully established a comprehensive CI/CD p
 
 ---
 
-### High Priority (Next Work Session)
+### Medium Priority (After P0 Completes)
 
-1. **Refactor PFC Tool Business Logic** (Priority 1.2) ⭐ RECOMMENDED NEXT
-   - Impact: Architecture compliance
-   - Effort: 4-6 hours
-   - Enables testable PFC orchestration
-
-2. **Increase Test Coverage** (Priority 2.1)
+1. **Increase Test Coverage** (Priority 2.1)
    - Impact: Code confidence + CI/CD validation
    - Effort: 2-3 hours to reach 20% coverage
-   - **Good first step**: Add tests for LLM providers
+   - **Blocked by**: P0 (new architecture enables better testing)
 
-3. **Fix Linting Issues** (Quick Win)
+2. **Fix Linting Issues** (Quick Win)
    - Impact: Clean CI/CD pipeline
    - Effort: 30 minutes
    - Command: `uv run ruff check packages/backend --fix && uv run ruff format packages/backend`
-
-### Medium Priority (This Week)
-
-4. **Refactor PFC Tool Business Logic** (Priority 1.2)
-   - Impact: Architecture compliance
-   - Effort: 4-6 hours
-   - Creates foundation for testable business logic
-   - **Deferred** as agreed (too large a change for now)
-
-5. **Split ToolExecutor Concerns** (Priority 1.3)
-   - Impact: Code maintainability
-   - Effort: 3-4 hours
-   - Can be done incrementally
 
 ---
 
 ## Updated Priority Recommendation
 
-**Now that ToolExecutor is split**, the natural next step is:
+**CRITICAL PIVOT**: P0 FastMCP解耦 supersedes all previous priorities
 
-**Option A: Refactor PFC Tool Business Logic (Priority 1.2)**
-- ✅ Brings PFC tooling into Clean Architecture
-- ✅ Unlocks better testing and reuse
+**Rationale**:
+1. Fixes fundamental architecture violation (circular dependency)
+2. Unblocks testing infrastructure improvements
+3. Performance improvement (10x faster tool calls)
+4. Proper Clean Architecture compliance
 
-**Option B: Increase Test Coverage (Priority 2.1)**
-- ✅ Leverages the stabilized tool execution layer
-- ✅ Improves safety for future orchestration refactors
+**Old Priority 1.2** (Refactor PFC Tool Business Logic):
+- ✅ **Absorbed into P0**: Tool business logic extraction is part of Phase 2
+- ✅ **Better approach**: Fix tool infrastructure first, then extract business logic
 
-**Recommendation**: **Option A (PFC tool refactor)**, then Option B.
+**Execution Plan**:
+1. **This Week**: P0 Phase 1 (POC + 3 core tools)
+2. **Next Week**: P0 Phase 2 (All tools + Service extraction)
+3. **Week 3**: P0 Phase 3 (Cleanup + Documentation)
 
 ---
 
