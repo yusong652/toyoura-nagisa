@@ -21,7 +21,7 @@ This file provides guidance to GEMINI when working with code in this repository.
 ```
 Presentation Layer (API, WebSocket, Handlers)
     ↓ depends on
-Application Layer (Services, Orchestration, Tools)
+Application Layer (Use Cases, Tooling, Orchestration)
     ↓ depends on
 Domain Layer (Models, Business Rules)
     ↓ depends on
@@ -222,15 +222,18 @@ toyoura-nagisa/
 │   │   ├── handlers/              # Request handlers
 │   │   │   ├── chat_request_handler.py  # Chat request processing
 │   │   └── streaming/             # Response streaming handlers
-│   ├── application/                # Business logic orchestration
-│   │   └── services/              # Business services
-│   │       ├── agent.py           # Main Agent class
-│   │       ├── chat_service.py    # Chat message processing
-│   │       ├── streaming_models.py # StreamingState and models
-│   │       ├── contents/          # Content processing
-│   │       ├── notifications/     # Tool confirmation, notifications
-│   │       ├── pfc/               # PFC console service
-│   │       └── shell/             # Shell execution service
+│   ├── application/                # Application use cases and orchestration
+│   │   ├── agent/                 # Agent orchestration and streaming
+│   │   ├── chat/                  # Chat request preparation
+│   │   ├── contents/              # Content processing + web fetch/search
+│   │   ├── memory/                # Memory persistence helpers
+│   │   ├── notifications/         # WebSocket status notifications
+│   │   ├── pfc/                   # PFC execution services
+│   │   ├── reminder/              # Reminder injection
+│   │   ├── session/               # Session + message services
+│   │   ├── shell/                 # Shell execution services
+│   │   ├── todo/                  # Todo service
+│   │   └── tools/                 # Tool registry, runtime, implementations
 │   ├── domain/                     # Core business logic
 │   │   └── models/                # Domain models
 │   │       ├── streaming.py       # StreamingChunk unified format
@@ -251,16 +254,7 @@ toyoura-nagisa/
 │   │   │   │   └── local/
 │   │   │   └── shared/
 │   │   ├── mcp/                   # Optional MCP gateway (external tools)
-│   │   │   ├── mcp_server.py            # Main MCP server
-│   │   │   ├── tools/             # Tool implementations
-│   │   │   │   ├── builtin/
-│   │   │   │   ├── coding/
-│   │   │   │   ├── lifestyle/
-│   │   │   │   ├── pfc/           # PFC simulation tools
-│   │   │   │   ├── planning/      # Task planning (todo_write)
-│   │   │   │   └── agent/         # SubAgent invocation (invoke_agent)
-│   │   │   └── utils/
-│   │   │       └── tool_result.py # Unified tool response format
+│   │   │   └── mcp_server.py      # Main MCP server
 │   │   ├── monitoring/            # Status monitoring system
 │   │   │   ├── status_monitor.py  # Unified coordinator
 │   │   │   └── monitors/          # Specialized monitors
@@ -287,8 +281,9 @@ toyoura-nagisa/
 │   │       ├── pfc_explorer.md    # PFC Explorer SubAgent prompt
 │   │       └── pfc_diagnostic.md  # PFC Diagnostic SubAgent prompt
 │   ├── shared/                     # Common utilities and exceptions
-│   │   ├── memory_db/                  # ChromaDB persistence
-│   │   └── workspace/                  # Development workspace
+│   │   ├── utils/                  # Tool result, path normalization, shell helpers
+│   │   ├── memory_db/              # ChromaDB persistence
+│   │   └── workspace/              # Development workspace
 │   ├── web/                        # React Web frontend
 │   │   ├── src/
 │   │   │   ├── components/            # React components
