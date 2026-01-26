@@ -329,7 +329,14 @@ export function getToolLayoutConfig(toolName: string): ToolLayoutConfig {
     case 'edit':
       return { marginBottom: 0 };
 
-    // Default: standard margin
+    // PFC Documentation browse tools: result starts with markdown header (which has marginTop: 1)
+    // We use marginBottom: 0 here to ensure only ONE empty line between call and result.
+    case 'pfc_browse_commands':
+    case 'pfc_browse_python_api':
+    case 'pfc_browse_reference':
+      return { marginBottom: 0 };
+
+    // Default: standard margin (1)
     default:
       return DEFAULT_LAYOUT;
   }
