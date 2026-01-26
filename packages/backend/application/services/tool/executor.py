@@ -141,7 +141,7 @@ class ToolExecutor:
             is_tool_allowed_in_mode,
             build_mode_blocked_message,
         )
-        from backend.infrastructure.mcp.utils.tool_result import error_response
+        from backend.shared.utils.tool_result import error_response
         from backend.infrastructure.storage.session_manager import get_session_mode
 
         session_mode = get_session_mode(self.session_id)
@@ -212,7 +212,7 @@ class ToolExecutor:
         """Execute a single tool without confirmation."""
         result = await self.tool_manager.handle_function_call(tool_call, self.session_id, message_id)
         if result is None:
-            from backend.infrastructure.mcp.utils.tool_result import error_response
+            from backend.shared.utils.tool_result import error_response
 
             return error_response("Tool execution returned no result")
         return result
@@ -227,7 +227,7 @@ class ToolExecutor:
             Tuple[Dict, Optional[str], Optional[str]]: (result, outcome, user_message)
             - outcome is None if approved, "reject" or "reject_and_tell" if rejected
         """
-        from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
+        from backend.shared.utils.tool_result import user_rejected_response
 
         # Build confirmation info
         info = await self.confirmation_strategy.build_confirmation_info(tool_call)
@@ -266,7 +266,7 @@ class ToolExecutor:
 
     def _create_cascade_blocked_result(self, tool_name: str, rejected_tool_name: Optional[str]) -> Dict:
         """Create result for cascade-blocked tool."""
-        from backend.infrastructure.mcp.utils.tool_result import error_response
+        from backend.shared.utils.tool_result import error_response
 
         cascade_message = (
             f"The user doesn't want to take this action right now. "

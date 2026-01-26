@@ -69,7 +69,7 @@ def process_shell_output(
 
     # Normalize Windows paths if requested
     if normalize_paths and combined:
-        from backend.infrastructure.mcp.utils.path_normalization import (
+        from backend.shared.utils.path_normalization import (
             normalize_output_paths_to_llm_format
         )
         combined = normalize_output_paths_to_llm_format(combined)

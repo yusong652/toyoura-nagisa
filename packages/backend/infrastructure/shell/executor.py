@@ -25,8 +25,8 @@ if TYPE_CHECKING:
     from .executor import ShellExecutor
 
 from .shell_config import get_shell_config
-from backend.infrastructure.mcp.utils.path_normalization import normalize_windows_paths
-from backend.infrastructure.mcp.utils.shell import (
+from backend.shared.utils.path_normalization import normalize_windows_paths
+from backend.shared.utils.shell import (
     ShellExecutionResult,
     process_shell_output,
     DEFAULT_MAX_OUTPUT_CHARS,

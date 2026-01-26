@@ -45,7 +45,7 @@ class PfcMonitor(BaseMonitor):
 
         try:
             from backend.infrastructure.pfc import get_pfc_client
-            from backend.infrastructure.mcp.utils.time_utils import format_time_range
+            from backend.shared.utils.time_utils import format_time_range
 
             # Get WebSocket client (auto-connects if needed)
             client = await get_pfc_client()

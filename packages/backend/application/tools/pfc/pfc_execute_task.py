@@ -22,8 +22,8 @@ from backend.infrastructure.pfc.foreground_handle import (
     PfcForegroundExecutionResult,
 )
 from backend.infrastructure.pfc.foreground_registry import get_pfc_foreground_registry
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
+from backend.shared.utils.tool_result import success_response, error_response
+from backend.shared.utils.path_normalization import normalize_path_separators
 from .utils import (
     create_task_status_data,
     format_task_status_for_llm,

@@ -20,7 +20,7 @@ from backend.infrastructure.pfc.python_api import (
     APIDocFormatter
 )
 from backend.infrastructure.pfc.shared.query import APISearch
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.shared.utils.tool_result import success_response, error_response
 from .utils import SearchQuery, SearchLimit
 
 

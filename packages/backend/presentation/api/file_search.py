@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import InternalServerError
 from backend.shared.utils.workspace import get_workspace_for_profile
-from backend.infrastructure.mcp.utils.path_normalization import path_to_llm_format
+from backend.shared.utils.path_normalization import path_to_llm_format
 
 logger = logging.getLogger(__name__)
 

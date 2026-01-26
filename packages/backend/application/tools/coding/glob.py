@@ -18,8 +18,8 @@ from .utils.path_security import (
     is_safe_symlink,
     check_parent_symlinks
 )
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
+from backend.shared.utils.tool_result import success_response, error_response
+from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
 __all__ = ["glob", "register_glob_tool"]
 

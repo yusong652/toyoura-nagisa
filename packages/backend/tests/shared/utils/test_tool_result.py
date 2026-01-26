@@ -1,11 +1,11 @@
 """
-Tests for ToolResult - MCP tool response utilities.
+Tests for ToolResult - tool response utilities.
 
 Tests ANSI code cleaning, success/error response helpers.
 """
 
 import pytest
-from backend.infrastructure.mcp.utils.tool_result import (
+from backend.shared.utils.tool_result import (
     ToolResult,
     success_response,
     error_response,

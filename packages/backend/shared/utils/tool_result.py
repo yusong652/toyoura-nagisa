@@ -195,7 +195,7 @@ class ToolResult(BaseModel):
 # -----------------------------------------------------------------------------
 
 def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict[str, Any]:
-    """Create a standardized success response for all MCP tools.
+    """Create a standardized success response for all tools.
 
     This function provides a unified way for all tools to return success responses,
     ensuring consistent structure across coding, lifestyle, communication, and other tool categories.
@@ -246,7 +246,7 @@ def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict
 
 
 def error_response(message: str, llm_content: Any = None, **data) -> Dict[str, Any]:
-    """Create a standardized error response for all MCP tools.
+    """Create a standardized error response for all tools.
 
     This function provides a unified way for all tools to return error responses,
     ensuring consistent error handling across coding, lifestyle, communication, and other tool categories.
@@ -313,7 +313,7 @@ def user_rejected_response(
     user_message: Optional[str] = None,
     include_stop_instruction: bool = True
 ) -> Dict[str, Any]:
-    """Create a standardized user rejection response for all MCP tools.
+    """Create a standardized user rejection response for all tools.
 
     This function provides a unified way for tools to return user rejection responses,
     indicating that the user chose not to proceed with the operation.

@@ -4,7 +4,7 @@ from typing import Dict, Any, cast
 from backend.application.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 from pydantic import Field
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.shared.utils.tool_result import success_response, error_response
 from .web_search_factory import WebSearchToolFactory
 
 __all__ = ["web_search", "register_web_search_tool"]

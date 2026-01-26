@@ -17,7 +17,7 @@ from pydantic import Field
 from backend.application.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.shared.utils.tool_result import success_response, error_response
 from backend.infrastructure.skills import get_skills_loader
 from .utils import get_skill_literal_type, get_skill_description
 

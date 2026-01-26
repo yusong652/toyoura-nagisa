@@ -13,8 +13,8 @@ from backend.application.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context  # type: ignore
 
 from .utils.path_security import get_workspace_root_async
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-from backend.infrastructure.mcp.utils.shell import process_shell_output
+from backend.shared.utils.tool_result import success_response, error_response
+from backend.shared.utils.shell import process_shell_output
 from backend.infrastructure.shell import ShellExecutor
 from backend.infrastructure.shell.executor import (
     ShellExecutorError,

@@ -5,7 +5,7 @@ from typing import Dict, Any
 from backend.application.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 from pydantic import Field
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.shared.utils.tool_result import success_response, error_response
 
 __all__ = ["web_fetch", "register_web_fetch_tool"]
 

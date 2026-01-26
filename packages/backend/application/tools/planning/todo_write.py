@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from backend.application.tools.registrar import ToolRegistrar
 from fastmcp.server.context import Context
 
-from backend.infrastructure.mcp.utils.tool_result import ToolResult, success_response, error_response
+from backend.shared.utils.tool_result import ToolResult, success_response, error_response
 from backend.infrastructure.storage.todo_storage import get_todo_storage
 from backend.shared.utils.workspace import get_workspace_for_profile
 

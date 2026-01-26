@@ -30,8 +30,8 @@ from .utils.file_reader import (
     ContentFormat,
     get_multimodal_support_for_session
 )
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
+from backend.shared.utils.tool_result import success_response, error_response
+from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
 __all__ = ["read", "register_read_tool"]
 

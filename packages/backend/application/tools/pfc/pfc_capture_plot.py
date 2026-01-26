@@ -23,8 +23,8 @@ from fastmcp.server.context import Context
 from typing import Annotated, Dict, Any, Literal, Optional, List
 from pydantic import Field
 from backend.infrastructure.pfc import get_pfc_client
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
+from backend.shared.utils.tool_result import success_response, error_response
+from backend.shared.utils.path_normalization import normalize_path_separators
 from .scripts import (
     generate_plot_capture_script,
     DEFAULT_WALL_TRANSPARENCY,

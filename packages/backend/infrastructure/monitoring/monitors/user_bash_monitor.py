@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional
 from .base_monitor import BaseMonitor
-from backend.infrastructure.mcp.utils.shell import truncate_output
+from backend.shared.utils.shell import truncate_output
 
 logger = logging.getLogger(__name__)
 

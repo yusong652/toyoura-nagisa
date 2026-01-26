@@ -19,7 +19,7 @@ from backend.infrastructure.shell.executor import (
     ForegroundExecutionHandle,
     MoveToBackgroundRequest,
 )
-from backend.infrastructure.mcp.utils.shell import (
+from backend.shared.utils.shell import (
     ShellExecutionResult,
     format_with_caveat,
 )

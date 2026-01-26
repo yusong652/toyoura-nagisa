@@ -1,5 +1,5 @@
 """
-Time utility functions for MCP tools.
+Time utility functions for tools.
 """
 
 from datetime import datetime

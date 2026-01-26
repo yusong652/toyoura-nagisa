@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from .core import get_base_prompt, get_expression_prompt
-from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
+from backend.shared.utils.path_normalization import normalize_path_separators
 from backend.infrastructure.skills import get_skills_loader
 
 logger = logging.getLogger(__name__)

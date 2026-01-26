@@ -450,7 +450,7 @@ class Agent:
     async def _handle_iteration_limit(self, tool_calls: list) -> Any:
         """Handle iteration limit for both MainAgent and SubAgent."""
         if self.is_main_agent:
-            from backend.infrastructure.mcp.utils.tool_result import error_response
+            from backend.shared.utils.tool_result import error_response
             from backend.infrastructure.monitoring.status_monitor import StatusMonitor
 
             print(f"[Agent.stream] Reached iteration limit ({self.config.max_iterations})")

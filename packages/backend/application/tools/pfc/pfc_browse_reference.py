@@ -16,7 +16,7 @@ from backend.application.tools.registrar import ToolRegistrar
 from pydantic import Field
 
 from backend.infrastructure.pfc.references import ReferenceLoader, ReferenceFormatter
-from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.shared.utils.tool_result import success_response, error_response
 from backend.application.tools.pfc.utils import normalize_input
 
 

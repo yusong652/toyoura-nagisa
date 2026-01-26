@@ -232,7 +232,7 @@ class BaseToolManager(ABC):
             Dict[str, Any]: ToolResult dictionary
         """
         from backend.application.tools.registry import TOOL_REGISTRY
-        from backend.infrastructure.mcp.utils.tool_result import error_response
+        from backend.shared.utils.tool_result import error_response
 
         tool_def = TOOL_REGISTRY.get(tool_name)
         if tool_def is None or tool_def.handler is None:
@@ -292,7 +292,7 @@ class BaseToolManager(ABC):
                     print(f"[BaseToolManager] Tool {tool_name} interrupted by user")
 
                 # Return interrupt error (matches Claude Code behavior)
-                from backend.infrastructure.mcp.utils.tool_result import error_response
+                from backend.shared.utils.tool_result import error_response
 
                 interrupt_message = "[Request interrupted by user for tool use]"
                 interrupt_result = error_response(
@@ -345,7 +345,7 @@ class BaseToolManager(ABC):
             if tool_name == "edit":
                 file_path = tool_args.get("file_path", "")
                 if file_path:
-                    from backend.infrastructure.mcp.utils.tool_result import error_response
+                    from backend.shared.utils.tool_result import error_response
 
                     # Note: Path security check is handled by edit tool itself using dynamic workspace
                     # We only check the read policy here
@@ -418,7 +418,7 @@ class BaseToolManager(ABC):
                 f"Please check the tool schema and correct the parameters."
             )
 
-            from backend.infrastructure.mcp.utils.tool_result import error_response
+            from backend.shared.utils.tool_result import error_response
 
             return error_response(error_message, llm_content={"parts": [{"type": "text", "text": error_message}]})
 

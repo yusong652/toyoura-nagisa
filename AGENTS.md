@@ -8,9 +8,9 @@ This file provides guidance to Agent when working with code in this repository.
 
 ### Technology Stack
 
-- **Backend**: Python 3.10+, FastAPI, uvicorn, ChromaDB, FastMCP
+- **Backend**: Python 3.10+, FastAPI, uvicorn, ChromaDB
 - **Frontend**: React 19, TypeScript, Material-UI, Vite, Live2D (PIXI.js)
-- **AI Infrastructure**: Multi-provider LLM support, real-time streaming, tool orchestration
+- **AI Infrastructure**: Multi-provider LLM support, real-time streaming, in-process tool orchestration (optional MCP gateway)
 - **Scientific Computing**: WebSocket integration with ITASCA PFC Python SDK
 - **Communication**: WebSocket for real-time updates, RESTful API for state management
 
@@ -21,11 +21,11 @@ This file provides guidance to Agent when working with code in this repository.
 ```
 Presentation Layer (API, WebSocket, Handlers)
     ↓ depends on
-Application Layer (Services, Orchestration)
+Application Layer (Services, Orchestration, Tools)
     ↓ depends on
 Domain Layer (Models, Business Rules)
     ↓ depends on
-Infrastructure Layer (LLM, MCP, Memory, PFC, Storage)
+Infrastructure Layer (LLM, External MCP Gateway, Memory, PFC, Storage)
 ```
 
 **Key Principles**:
@@ -35,9 +35,9 @@ Infrastructure Layer (LLM, MCP, Memory, PFC, Storage)
 
 **Layer Responsibilities**:
 - **Presentation**: API routes, WebSocket handlers, request/response formatting
-- **Application**: Business logic orchestration (ChatOrchestrator, content processing)
+- **Application**: Business logic orchestration (ChatOrchestrator, content processing, tool execution)
 - **Domain**: Core models and business rules (StreamingChunk, BaseMessage)
-- **Infrastructure**: External integrations (LLM providers, MCP tool registration, storage). Note: MCP tools currently contain business logic; planned refactor to move tool logic to Application layer
+- **Infrastructure**: External integrations (LLM providers, optional MCP gateway, storage)
 
 **Example**: Swapping LLM providers requires zero application/domain layer changes (`backend/infrastructure/llm/base/client.py`)
 
@@ -73,18 +73,22 @@ MainAgent can delegate specialized tasks to lightweight SubAgents via the `invok
 - SubAgent (`pfc_explorer`, `pfc_diagnostic`): `persistent=False` → in-memory storage
 
 **Implementation**:
-- Tool: `backend/infrastructure/mcp/tools/agent/invoke_agent.py`
+- Tool: `backend/application/tools/agent/invoke_agent.py`
 - Config: `backend/domain/models/agent_profiles.py` (`MAIN_AGENT_CONFIG`, `PFC_EXPLORER`, `PFC_DIAGNOSTIC`)
 - Prompts: `backend/config/prompts/pfc_explorer.md`, `backend/config/prompts/pfc_diagnostic.md`
 
-### MCP Tool System
+### Tool System
 
-**Tool Categories** (`backend/infrastructure/mcp/tools/`):
+**In-process Tool Categories** (`backend/application/tools/`):
 - `coding/`: write, read, edit, bash, glob, grep
 - `pfc/`: pfc_execute_task, pfc_check_task_status, pfc_list_tasks, pfc_capture_plot, pfc_query_*, pfc_browse_*
 - `planning/`: todo_write
 - `agent/`: invoke_agent
-- `builtin/`: web_search
+- `builtin/`: web_search, web_fetch
+
+**Optional MCP Gateway**:
+- `backend/infrastructure/mcp/` can expose internal tools to external MCP clients
+- Internal tool execution does not require an MCP server
 
 ### PFC Integration Overview
 
@@ -126,7 +130,7 @@ Query Tools      Small-Scale Test   Full Simulation
 
 **Detailed Documentation**: See `services/pfc-server/README.md` for implementation details, thread-safety architecture, and usage examples.
 
-**Backend Integration**: `backend/infrastructure/mcp/tools/pfc/` + `backend/infrastructure/pfc/websocket_client.py`
+**Backend Integration**: `backend/application/tools/pfc/` + `backend/infrastructure/pfc/websocket_client.py`
 
 ## Development Commands
 
@@ -153,7 +157,7 @@ npm run dev:backend
 # OR manually:
 cd packages/backend && uv run python run.py
 
-# Run the MCP server directly
+# Optional: run MCP gateway for external MCP clients
 uv run python packages/backend/infrastructure/mcp/mcp_server.py
 
 # Run tests
@@ -246,7 +250,7 @@ toyoura-nagisa/
 │   │   │   │   ├── openrouter/
 │   │   │   │   └── local/
 │   │   │   └── shared/
-│   │   ├── mcp/                   # Model Context Protocol system
+│   │   ├── mcp/                   # Optional MCP gateway (external tools)
 │   │   │   ├── mcp_server.py            # Main MCP server
 │   │   │   ├── tools/             # Tool implementations
 │   │   │   │   ├── builtin/
@@ -369,7 +373,7 @@ uv run python examples/pfc_integration/DEMo.py
 ### Tool Loading
 - Tools are loaded dynamically based on agent name (main agent or SubAgent)
 - Main agent uses a single configuration; SubAgents are invoked explicitly
-- MCP server runs on port 9000 for tool communication
+- Internal tools run in-process; MCP gateway is optional for external MCP clients (port 9000 if enabled)
 
 ### Memory Management
 - ChromaDB handles conversation memory and long-term context

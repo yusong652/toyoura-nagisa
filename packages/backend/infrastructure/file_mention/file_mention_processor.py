@@ -22,7 +22,7 @@ from backend.application.tools.coding.utils.path_security import (
     check_parent_symlinks
 )
 from backend.shared.utils.workspace import get_workspace_for_profile
-from backend.infrastructure.mcp.utils.path_normalization import (
+from backend.shared.utils.path_normalization import (
     normalize_path_separators,
     path_to_llm_format
 )
