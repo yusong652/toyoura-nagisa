@@ -45,7 +45,7 @@ Infrastructure Layer (LLM, External MCP Gateway, Memory, PFC, Storage)
 
 Located in `backend/infrastructure/llm/providers/`: google (primary), anthropic, openai, moonshot, zhipu, openrouter, local (vLLM/Ollama).
 
-**Configuration**: `backend/config/llm.py`
+**Configuration**: `backend/infrastructure/storage/llm_config_manager.py` (runtime provider/model selection)
 
 ### SubAgent System
 
@@ -321,8 +321,13 @@ toyoura-nagisa/
 ## Configuration
 
 ### Environment Setup
-- Copy configuration examples from `packages/backend/config_example/` to `packages/backend/config/`
-- Main config files: `base.py`, `llm.py`
+- Configuration system entry: `packages/backend/config/__init__.py`
+- Main config modules:
+  - `config/memory.py` - ChromaDB memory system configuration
+  - `config/dev.py` - Development environment settings
+  - `config/cors.py` - CORS policies
+  - `config/pfc.py` - PFC WebSocket integration
+  - `infrastructure/storage/llm_config_manager.py` - LLM provider/model selection (runtime)
 - Database locations:
   - Memory DB: `memory_db/` (root level)
   - Session data: `data/` (root level)

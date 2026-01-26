@@ -37,8 +37,9 @@ CORS_ALLOWED_ORIGINS=
 
 ### 3. Validate Configuration
 ```bash
-cd backend
-python -c "from config import get_llm_config; print('✅ Configuration validation successful')"
+# Test backend startup (will validate all configs)
+cd packages/backend
+uv run python -c "from config import get_dev_config; print('✅ Configuration loaded successfully')"
 ```
 
 ## ⚠️ Security Considerations
@@ -83,7 +84,7 @@ allow_credentials=True
 ## 📁 File Descriptions
 
 - `__init__.py` - Main configuration entry point, provides backward compatible interface
-- `llm.py` - LLM provider configurations (Google Gemini, OpenAI, Anthropic, etc.)
+- `llm.py` - **DEPRECATED** - LLM configuration moved to `.env` and `infrastructure/storage/llm_config_manager.py`
 - `cors.py` - CORS (Cross-Origin Resource Sharing) security settings
 - `dev.py` - Development environment settings
 - `memory.py` - Memory and ChromaDB configurations

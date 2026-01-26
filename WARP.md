@@ -45,7 +45,7 @@ Infrastructure Layer (LLM, External MCP Gateway, Memory, PFC, Storage)
 
 Located in `backend/infrastructure/llm/providers/`: google (primary), anthropic, openai, moonshot, zhipu, openrouter, local (vLLM/Ollama).
 
-**Configuration**: `backend/config/llm.py`
+**Configuration**: `backend/infrastructure/storage/llm_config_manager.py` (runtime provider/model selection)
 
 ### SubAgent System
 
@@ -361,7 +361,8 @@ uv run python examples/pfc_integration/DEMo.py
 ## Common Issues & Quick Fixes
 
 ### LLM Provider Selection
-- Configure preferred provider in `packages/backend/config/llm.py`
+- Configure API keys in `.env` file (see `packages/backend/config_example/README.md`)
+- Runtime provider/model selection managed by `backend/infrastructure/storage/llm_config_manager.py`
 - All providers support tool calling and streaming
 - Local models supported via vLLM and Ollama
 
