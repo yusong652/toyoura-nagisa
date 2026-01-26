@@ -2,7 +2,7 @@
 
 from typing import Dict, Any, Optional
 from backend.infrastructure.llm.base.client import LLMClientBase
-from backend.application.services.contents.web_search_service import perform_web_search
+from backend.application.contents.web_search_service import perform_web_search
 
 
 class WebSearchToolFactory:

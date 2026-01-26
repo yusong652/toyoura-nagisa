@@ -14,7 +14,7 @@ separation of concerns.
 
 from typing import Dict, Any, Optional, List
 from backend.domain.models.messages import BaseMessage
-from backend.application.services.message_service import MessageService
+from backend.application.session.message_service import MessageService
 from backend.presentation.websocket.message_sender import send_message_create
 
 
@@ -74,7 +74,7 @@ async def process_content_pipeline(
     
     # Send emotional keywords via WebSocket if available
     if extracted_keyword:
-        from backend.application.services.notifications import get_emotion_notification_service
+        from backend.application.notifications import get_emotion_notification_service
         emotion_service = get_emotion_notification_service()
         if emotion_service:
             await emotion_service.notify_emotion_keyword(session_id, extracted_keyword, ai_msg_id)

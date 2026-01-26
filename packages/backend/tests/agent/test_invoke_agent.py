@@ -77,7 +77,7 @@ class TestInvokeAgentExecution:
         with (
             patch("backend.shared.utils.app_context.get_secondary_llm_client") as mock_get_client,
             patch("backend.shared.utils.app_context.get_llm_factory") as mock_get_factory,
-            patch("backend.application.services.agent.service.AgentService") as mock_service_class,
+            patch("backend.application.agent.service.AgentService") as mock_service_class,
             patch(
                 "backend.infrastructure.storage.llm_config_manager.get_default_llm_config"
             ) as mock_get_default_config,
@@ -122,7 +122,7 @@ class TestInvokeAgentExecution:
 
         with (
             patch("backend.shared.utils.app_context.get_secondary_llm_client") as mock_get_client,
-            patch("backend.application.services.agent.service.AgentService") as mock_service_class,
+            patch("backend.application.agent.service.AgentService") as mock_service_class,
             patch(
                 "backend.infrastructure.storage.llm_config_manager.get_default_llm_config"
             ) as mock_get_default_config,
@@ -185,7 +185,7 @@ class TestActivityTracking:
 
         with (
             patch("backend.shared.utils.app_context.get_secondary_llm_client") as mock_get_client,
-            patch("backend.application.services.agent.service.AgentService") as mock_service_class,
+            patch("backend.application.agent.service.AgentService") as mock_service_class,
             patch(
                 "backend.infrastructure.storage.llm_config_manager.get_default_llm_config"
             ) as mock_get_default_config,

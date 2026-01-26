@@ -30,7 +30,7 @@ from backend.infrastructure.pfc.task_manager import (
 )
 
 if TYPE_CHECKING:
-    from backend.application.services.notifications.pfc_task_notification_service import (
+    from backend.application.notifications.pfc_task_notification_service import (
         PfcTaskNotificationService,
     )
 

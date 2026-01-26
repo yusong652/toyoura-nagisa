@@ -42,7 +42,7 @@ async def web_fetch(
                 f"Gemini API not configured. web_fetch requires GOOGLE_API_KEY: {e}"
             )
 
-        from backend.application.services.contents.web_fetch_service import fetch_url_content
+        from backend.application.contents.web_fetch_service import fetch_url_content
 
         result = await fetch_url_content(google_client, url=url, prompt=prompt)
 

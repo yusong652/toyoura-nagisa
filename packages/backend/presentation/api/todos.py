@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import InternalServerError
-from backend.application.services.todo_service import get_todo_service
+from backend.application.todo.service import get_todo_service
 
 router = APIRouter(prefix="/api/todos", tags=["todos"])
 

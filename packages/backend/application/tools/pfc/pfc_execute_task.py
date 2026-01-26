@@ -117,7 +117,7 @@ def register_pfc_task_tool(registrar: ToolRegistrar):
                 task.git_commit = git_commit
 
             # Get notification service for frontend updates
-            from backend.application.services.notifications.pfc_task_notification_service import (
+            from backend.application.notifications.pfc_task_notification_service import (
                 get_pfc_task_notification_service
             )
             notification_service = get_pfc_task_notification_service()

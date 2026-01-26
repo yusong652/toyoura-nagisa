@@ -14,11 +14,11 @@ As a presentation layer component, it bridges WebSocket-specific concerns
 
 import uuid
 import logging
-from backend.application.services.chat_service import PreparedUserMessage
-from backend.application.services.contents.content_processor import process_content_pipeline
-from backend.application.services.memory_service import save_session_conversation_memory
-from backend.application.services.notifications import get_message_status_service
-from backend.application.services.request_manager import request_manager
+from backend.application.chat.service import PreparedUserMessage
+from backend.application.contents.content_processor import process_content_pipeline
+from backend.application.memory.service import save_session_conversation_memory
+from backend.application.notifications import get_message_status_service
+from backend.application.session.request_manager import request_manager
 from backend.shared.exceptions import UserRejectionInterruption
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
             # Get correct client for this session
             current_llm_client = get_session_llm_client(session_id)
 
-            from backend.application.services.agent.service import AgentService
+            from backend.application.agent.service import AgentService
 
             agent_service = AgentService(current_llm_client, llm_factory)
 

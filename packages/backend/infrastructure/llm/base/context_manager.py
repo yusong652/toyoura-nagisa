@@ -348,7 +348,7 @@ class BaseContextManager(ABC):
         Args:
             result: Tool result dict containing llm_content with parts format
         """
-        from backend.application.services.reminder import ReminderInjector
+        from backend.application.reminder import ReminderInjector
 
         injector = ReminderInjector(self.session_id, self.agent_profile)
         await injector.inject_to_tool_result(result)
@@ -443,5 +443,4 @@ class BaseContextManager(ABC):
         # Clear status monitor for this session
         from backend.infrastructure.monitoring import clear_status_monitor
         clear_status_monitor(self.session_id)
-
 

@@ -6,7 +6,7 @@ Handles database persistence for tool results.
 
 from typing import Dict, Sequence
 
-from backend.application.services.message_service import MessageService
+from backend.application.session.message_service import MessageService
 
 
 class ToolResultPersistence:

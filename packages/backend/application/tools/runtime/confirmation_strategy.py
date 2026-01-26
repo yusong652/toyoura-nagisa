@@ -249,7 +249,7 @@ class ConfirmationStrategy:
         Returns:
             ConfirmationResult with outcome and optional user_message
         """
-        from backend.application.services.notifications.tool_confirmation_service import (
+        from backend.application.notifications.tool_confirmation_service import (
             get_tool_confirmation_service,
             ConfirmationResult,
         )

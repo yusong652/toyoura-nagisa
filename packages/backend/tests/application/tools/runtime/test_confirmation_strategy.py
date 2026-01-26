@@ -6,7 +6,7 @@ Tests confirmation requirement checks and confirmation info building.
 
 import pytest
 from unittest.mock import Mock, AsyncMock
-from backend.application.services.confirmation_strategy import (
+from backend.application.tools.runtime.confirmation_strategy import (
     ConfirmationStrategy,
     ConfirmationInfo,
 )

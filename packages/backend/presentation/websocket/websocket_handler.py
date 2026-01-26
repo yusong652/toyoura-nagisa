@@ -58,11 +58,11 @@ class WebSocketHandler:
         self.message_processor = WebSocketMessageProcessor(self.connection_manager)  # Presentation layer
 
         # Initialize application services
-        from backend.application.services.notifications.message_status_service import MessageStatusService
-        from backend.application.services.notifications.tool_confirmation_service import ToolConfirmationService
-        from backend.application.services.notifications.emotion_notification_service import EmotionNotificationService
-        from backend.application.services.notifications.background_process_notification_service import BackgroundProcessNotificationService
-        from backend.application.services.notifications.pfc_task_notification_service import PfcTaskNotificationService
+        from backend.application.notifications.message_status_service import MessageStatusService
+        from backend.application.notifications.tool_confirmation_service import ToolConfirmationService
+        from backend.application.notifications.emotion_notification_service import EmotionNotificationService
+        from backend.application.notifications.background_process_notification_service import BackgroundProcessNotificationService
+        from backend.application.notifications.pfc_task_notification_service import PfcTaskNotificationService
         self.status_service = MessageStatusService(self.connection_manager)
         self.tool_confirmation_service = ToolConfirmationService(self.connection_manager)
         self.emotion_service = EmotionNotificationService(self.connection_manager)

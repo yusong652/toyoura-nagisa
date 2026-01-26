@@ -14,7 +14,7 @@ Confirmation outcomes:
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
 
-from backend.application.services.confirmation_strategy import ConfirmationStrategy
+from backend.application.tools.runtime.confirmation_strategy import ConfirmationStrategy
 from backend.application.tools.runtime.notification import ToolNotificationService
 from backend.application.tools.runtime.persistence import ToolResultPersistence
 

@@ -5,7 +5,7 @@ Tests StreamingState and ConversationResult models used by Agent.
 """
 
 import pytest
-from backend.application.services.streaming_models import (
+from backend.application.agent.streaming_models import (
     StreamingState,
     ConversationResult,
 )

@@ -6,7 +6,7 @@ Used by Agent for real-time response processing.
 """
 from typing import Any, Optional, AsyncGenerator
 from backend.domain.models.streaming import StreamingChunk
-from backend.application.services.streaming_models import StreamingState
+from backend.application.agent.streaming_models import StreamingState
 
 
 class StreamingProcessor:

@@ -23,7 +23,7 @@ from backend.presentation.exceptions import (
     SessionNotFoundError,
     InternalServerError,
 )
-from backend.application.services.session_service import SessionService
+from backend.application.session.session_service import SessionService
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.shared.utils.app_context import get_llm_client as get_global_llm_client
 
@@ -376,4 +376,3 @@ async def update_session_mode(
         raise InternalServerError(
             message=f"Failed to update session mode: {str(e)}"
         )
-

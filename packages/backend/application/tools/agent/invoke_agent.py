@@ -75,7 +75,7 @@ async def invoke_agent(
     try:
         # Import here to avoid circular dependencies
         from backend.domain.models.agent_profiles import get_subagent_config
-        from backend.application.services.agent.service import AgentService
+        from backend.application.agent.service import AgentService
         from backend.shared.utils.app_context import get_secondary_llm_client, get_llm_factory
         from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
         from backend.infrastructure.storage.session_manager import get_session_llm_config

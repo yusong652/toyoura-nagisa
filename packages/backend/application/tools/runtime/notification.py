@@ -36,7 +36,7 @@ class ToolNotificationService:
 
         if tool_name == "todo_write":
             try:
-                from backend.application.services.todo_service import get_todo_service
+                from backend.application.todo.service import get_todo_service
 
                 todo_service = get_todo_service()
                 current_todo = await todo_service.get_current_todo(agent_profile, self.notification_session_id)
@@ -49,7 +49,7 @@ class ToolNotificationService:
             run_in_background = tool_args.get("run_in_background", True)
             if run_in_background and result.get("status") == "success":
                 try:
-                    from backend.application.services.notifications.pfc_task_notification_service import (
+                    from backend.application.notifications.pfc_task_notification_service import (
                         get_pfc_task_notification_service,
                     )
 

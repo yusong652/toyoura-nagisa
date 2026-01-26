@@ -9,14 +9,14 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 
-from backend.application.services.message_service import MessageService
-from backend.application.services.streaming_models import StreamingState
-from backend.application.services.streaming_processor import StreamingProcessor
+from backend.application.session.message_service import MessageService
+from backend.application.agent.streaming_models import StreamingState
+from backend.application.agent.streaming_processor import StreamingProcessor
 from backend.application.tools.runtime import ToolExecutor
 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
 if TYPE_CHECKING:
-    from backend.application.services.agent.core import Agent
+    from backend.application.agent.core import Agent
 
 
 class BaseAgentExecutor:

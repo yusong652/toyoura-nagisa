@@ -27,9 +27,9 @@ from backend.presentation.websocket.message_types import (
 )
 from backend.presentation.websocket.messages.user_shell import UserShellResultMessage
 from backend.presentation.websocket.messages.user_pfc_console import UserPfcConsoleResultMessage
-from backend.application.services.shell import get_bash_execution_service
-from backend.application.services.pfc import get_pfc_execution_service
-from backend.application.services.pfc.pfc_console_service import (
+from backend.application.shell import get_bash_execution_service
+from backend.application.pfc import get_pfc_execution_service
+from backend.application.pfc.pfc_console_service import (
     get_pfc_console_service,
     PfcConsoleExecutionResult,
     PfcConsoleMoveToBackgroundRequest,
@@ -219,7 +219,7 @@ class ChatHandler(MessageHandler):
     def __init__(self, connection_manager: ConnectionManager):
         super().__init__(connection_manager)
         # Import chat service for LLM processing
-        from backend.application.services.chat_service import get_chat_service
+        from backend.application.chat.service import get_chat_service
         from backend.infrastructure.messaging import get_queue_manager
         self.chat_service = get_chat_service()
         self.queue_manager = get_queue_manager()
@@ -378,7 +378,7 @@ class ToolConfirmationHandler(MessageHandler):
                     return
 
                 # Get confirmation service and handle response
-                from backend.application.services.notifications.tool_confirmation_service import get_tool_confirmation_service
+                from backend.application.notifications.tool_confirmation_service import get_tool_confirmation_service
                 confirmation_service = get_tool_confirmation_service()
 
                 if confirmation_service:
@@ -489,7 +489,7 @@ class UserShellHandler(MessageHandler):
 
     async def _get_shell_service(self, session_id: str, agent_profile: str):
         """Get or create ShellService for a session and profile."""
-        from backend.application.services.shell.shell_service import ShellService
+        from backend.application.shell.shell_service import ShellService
         from backend.shared.utils.workspace import get_workspace_for_profile
 
         cache_key = (session_id, agent_profile)

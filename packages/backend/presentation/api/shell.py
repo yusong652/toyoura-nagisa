@@ -13,7 +13,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from backend.presentation.models.api_models import ApiResponse
-from backend.application.services.shell.shell_service import ShellService
+from backend.application.shell.shell_service import ShellService
 from backend.shared.utils.workspace import get_workspace_for_profile
 
 router = APIRouter(prefix="/api/shell", tags=["shell"])

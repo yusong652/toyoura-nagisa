@@ -216,7 +216,7 @@ class BackgroundProcessManager:
             description: Optional command description
         """
         try:
-            from backend.application.services.notifications.background_process_notification_service import (
+            from backend.application.notifications.background_process_notification_service import (
                 get_background_process_notification_service
             )
 

@@ -192,7 +192,7 @@ class ChatService:
             parsed_data: Parsed message data (modified in-place)
         """
         try:
-            from backend.application.services.reminder import ReminderInjector
+            from backend.application.reminder import ReminderInjector
 
             from backend.domain.models.agent_profiles import get_agent_config
 

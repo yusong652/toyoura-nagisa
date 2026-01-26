@@ -16,9 +16,9 @@ import time
 import uuid
 from typing import Any, Optional, cast, TYPE_CHECKING
 
-from backend.application.services.agent.executors import MainAgentExecutor, SubAgentExecutor
-from backend.application.services.contents.title_service import TitleService
-from backend.application.services.message_service import MessageService
+from backend.application.agent.executors import MainAgentExecutor, SubAgentExecutor
+from backend.application.contents.title_service import TitleService
+from backend.application.session.message_service import MessageService
 from backend.domain.models.agent import AgentResult
 from backend.domain.models.agent_profiles import AgentConfig
 from backend.domain.models.messages import AssistantMessage, UserMessage
@@ -27,8 +27,8 @@ from backend.infrastructure.storage.session_manager import save_token_usage
 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
 if TYPE_CHECKING:
-    from backend.application.services.streaming_models import StreamingState
-    from backend.application.services.streaming_processor import StreamingProcessor
+    from backend.application.agent.streaming_models import StreamingState
+    from backend.application.agent.streaming_processor import StreamingProcessor
 
 
 class Agent:

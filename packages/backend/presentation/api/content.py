@@ -15,7 +15,7 @@ from backend.presentation.exceptions import (
     SessionNotFoundError,
     InternalServerError,
 )
-from backend.application.services.contents import TitleService
+from backend.application.contents import TitleService
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.shared.utils.app_context import get_llm_client as get_global_llm_client
 

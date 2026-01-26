@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import MessageNotFoundError, InternalServerError
-from backend.application.services.message_service import MessageService
+from backend.application.session.message_service import MessageService
 
 router = APIRouter(tags=["messages"])
 

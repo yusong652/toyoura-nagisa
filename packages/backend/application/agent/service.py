@@ -14,7 +14,7 @@ Responsibilities:
 
 from typing import Any
 
-from backend.application.services.agent.core import Agent
+from backend.application.agent.core import Agent
 from backend.domain.models.agent import AgentResult
 from backend.domain.models.agent_profiles import AgentConfig, get_agent_config
 from backend.domain.models.messages import UserMessage

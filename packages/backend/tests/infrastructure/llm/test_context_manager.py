@@ -9,7 +9,7 @@ import backend.infrastructure.llm.base.context_manager as context_module
 import backend.infrastructure.storage.session_manager as session_manager
 import backend.domain.models.message_factory as message_factory_module
 import backend.infrastructure.monitoring as monitoring_module
-import backend.application.services.reminder as reminder_module
+import backend.application.reminder as reminder_module
 
 
 class DummyTodoMonitor:

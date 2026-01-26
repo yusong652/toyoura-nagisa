@@ -276,7 +276,7 @@ class PfcConsoleService:
 
         # Send PFC task notification to frontend for monitoring
         # User console tasks are just PFC tasks with source="user_console"
-        from backend.application.services.notifications.pfc_task_notification_service import (
+        from backend.application.notifications.pfc_task_notification_service import (
             get_pfc_task_notification_service,
         )
         notification_service = get_pfc_task_notification_service()
