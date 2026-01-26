@@ -1,5 +1,5 @@
 """
-Tests for ToolExecutor - Application layer service.
+Tests for ToolExecutor - tool runtime workflow.
 
 Demonstrates:
 1. Mocking external dependencies (tool_manager, WebSocket)
@@ -15,7 +15,7 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from typing import Any, Dict, List, cast
 
-from backend.application.services.tool.executor import (
+from backend.application.tools.runtime.executor import (
     ToolExecutor,
     ToolExecutionResult,
     ClassifiedTools,
