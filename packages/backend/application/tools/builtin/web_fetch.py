@@ -3,7 +3,8 @@
 from typing import Dict, Any
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 from pydantic import Field
 from backend.shared.utils.tool_result import success_response, error_response
 
@@ -11,7 +12,7 @@ __all__ = ["web_fetch", "register_web_fetch_tool"]
 
 
 async def web_fetch(
-    context: Context,
+    context: ToolContext,
     url: str = Field(..., description="The URL to fetch content from"),
     prompt: str = Field(..., description="The prompt to run on the fetched content"),
 ) -> Dict[str, Any]:

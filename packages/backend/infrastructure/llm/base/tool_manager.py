@@ -10,30 +10,13 @@ from dataclasses import dataclass
 import inspect
 from typing import Any, Dict, Optional
 
-from fastmcp import Client as MCPClient
 from pydantic import ValidationError
 
 from backend.application.tools.schema_builder import build_params_model, get_context_param_name
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
 from backend.config.dev import get_dev_config
 # Security imports removed - all tools now require session ID
-
-
-@dataclass(frozen=True)
-class ToolRequestMeta:
-    client_id: str
-    tool_call_id: str
-
-
-@dataclass(frozen=True)
-class ToolRequestContext:
-    meta: ToolRequestMeta
-
-
-@dataclass(frozen=True)
-class ToolContext:
-    client_id: str
-    request_context: ToolRequestContext
+from backend.application.tools.context import ToolContext, ToolRequestMeta, ToolRequestContext
 
 
 class BaseToolManager(ABC):
@@ -51,26 +34,9 @@ class BaseToolManager(ABC):
     def __init__(self):
         """Initialize base state."""
 
-        # MCP client will be retrieved from app state when needed
-        self._mcp_client = None
-
         # Track files read per session (for edit prerequisite validation)
         # Not affected by context window truncation - real-time tracking
         self._session_read_files: Dict[str, set] = {}  # {session_id: {normalized_paths}}
-
-    def get_mcp_client(self) -> MCPClient:
-        """
-        Return the shared MCP client from app state. FastMCP handles session isolation per request
-        through the _meta.client_id parameter in tool calls.
-
-        Returns:
-            MCPClient: Shared client instance from app state
-        """
-        if self._mcp_client is None:
-            from backend.shared.utils.app_context import get_mcp_client
-
-            self._mcp_client = get_mcp_client()
-        return self._mcp_client
 
     @staticmethod
     def _build_tool_context(session_id: str, tool_call_id: str) -> ToolContext:

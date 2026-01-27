@@ -10,7 +10,8 @@ from typing import Dict, Any, Optional, cast
 
 from pydantic import Field
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context  # type: ignore
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context  # type: ignore
 
 from .utils.path_security import get_workspace_root_async
 from backend.shared.utils.tool_result import success_response, error_response
@@ -41,7 +42,7 @@ def _get_executor() -> ShellExecutor:
 
 
 async def bash(
-    context: Context,
+    context: ToolContext,
     command: str = Field(
         ...,
         min_length=1,
@@ -106,7 +107,7 @@ Working directory:
             process_manager = get_process_manager()
             # Architecture guarantee: tool_manager.py always injects _meta.client_id
             result: StartProcessResult = process_manager.start_process(
-                session_id=cast(str, context.client_id),
+                session_id=cast(str, context.session_id),
                 command=command,
                 cwd=str(work_dir),
                 description=description,
@@ -133,7 +134,7 @@ Working directory:
 
     # Foreground execution with ctrl+b support
     executor = _get_executor()
-    session_id = cast(str, context.client_id)
+    session_id = cast(str, context.session_id)
     registry = get_foreground_task_registry()
 
     try:

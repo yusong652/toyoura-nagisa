@@ -5,7 +5,8 @@ Provides task overview functionality for managing multiple concurrent PFC simula
 """
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 from typing import Annotated, Dict, Any, Optional
 from pydantic import Field
 from backend.infrastructure.pfc import get_pfc_client
@@ -27,7 +28,7 @@ def register_pfc_list_tasks_tool(registrar: ToolRegistrar):
         annotations={"category": "pfc", "tags": ["pfc", "task", "monitoring"]}
     )
     async def pfc_list_tasks(
-        context: Context,
+        context: ToolContext,
         session_id: Annotated[Optional[str], Field(
             default=None,
             description="Filter by session ID (None = all sessions)"
@@ -54,7 +55,7 @@ def register_pfc_list_tasks_tool(registrar: ToolRegistrar):
         try:
             # Get caller's session ID from context (truncate to 8 chars for display)
             # Architecture guarantee: tool_manager.py always injects _meta.client_id
-            caller_session_id = context.client_id
+            caller_session_id = context.session_id
             caller_session_id_display = caller_session_id[:8] if caller_session_id else 'unknown'
 
             # Get WebSocket client (auto-connects if needed)

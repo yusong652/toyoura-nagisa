@@ -29,14 +29,14 @@ async def get_workspace_root_async(context=None) -> Path:
     Uses unified workspace resolution based on agent profile from context_manager.
 
     Args:
-        context: Optional FastMCP Context object
+        context: Optional ToolContext object
 
     Returns:
         Path object for the workspace root directory
     """
     try:
         # Architecture guarantee: tool_manager.py always injects _meta.client_id
-        session_id = context.client_id if context else None
+        session_id = context.session_id if context else None
         if session_id:
             # Get agent profile from session's context manager
             # (set by chat_service before tool execution)

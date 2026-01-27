@@ -8,7 +8,8 @@ designed to match Claude Code's BashOutput tool behavior.
 from datetime import datetime
 from typing import Dict, Any
 from pydantic import Field
-from fastmcp.server.context import Context  # type: ignore
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context  # type: ignore
 
 from backend.application.tools.registrar import ToolRegistrar
 
@@ -53,7 +54,7 @@ def _build_llm_content(result: ProcessOutputResult) -> str:
 
 
 async def bash_output(
-    context: Context,
+    context: ToolContext,
     bash_id: str = Field(
         ...,
         min_length=1,
@@ -69,7 +70,7 @@ async def bash_output(
     try:
         # Get session ID from MCP context for session isolation
         # Architecture guarantee: tool_manager.py always injects _meta.client_id
-        session_id = context.client_id
+        session_id = context.session_id
 
         # Get the background process manager
         process_manager = get_process_manager()

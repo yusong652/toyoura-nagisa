@@ -12,7 +12,8 @@ from typing import Dict, Any, Optional, Tuple
 
 from pydantic import Field
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context  # type: ignore
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context  # type: ignore
 
 from .utils.path_security import (
     validate_path_in_workspace,
@@ -128,7 +129,7 @@ def _validate_uniqueness(content: str, old_string: str, replace_all: bool) -> Tu
 # -----------------------------------------------------------------------------
 
 async def edit(
-    context: Context,
+    context: ToolContext,
     file_path: str = Field(
         ...,
         min_length=1,

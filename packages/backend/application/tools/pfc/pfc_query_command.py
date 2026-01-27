@@ -13,7 +13,8 @@ Workflow:
 from typing import Dict, Any
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 
 from backend.infrastructure.pfc.commands import CommandFormatter
 from backend.infrastructure.pfc.shared.query import CommandSearch
@@ -29,7 +30,7 @@ def register_pfc_query_command_tool(registrar: ToolRegistrar):
         annotations={"category": "pfc", "tags": ["pfc", "command", "search"]}
     )
     async def pfc_query_command(
-        context: Context,
+        context: ToolContext,
         query: SearchQuery,
         limit: SearchLimit = 10,
     ) -> Dict[str, Any]:

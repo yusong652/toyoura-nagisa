@@ -14,7 +14,8 @@ from datetime import datetime
 
 from pydantic import Field
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context  # type: ignore
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context  # type: ignore
 
 # from .config import get_tools_config  # Removed unused import
 from backend.shared.utils.tool_result import success_response, error_response
@@ -34,7 +35,7 @@ MAX_CONTENT_SIZE_CHARS = MAX_CONTENT_SIZE_BYTES // 2  # Conservative estimate fo
 
 
 async def write(
-    context: Context,
+    context: ToolContext,
     file_path: str = Field(
         ...,
         description="The absolute path to the file to write"

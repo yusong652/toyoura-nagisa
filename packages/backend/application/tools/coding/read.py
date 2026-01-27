@@ -14,7 +14,8 @@ from typing import Dict, Any, Optional
 
 from pydantic import Field
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context  # type: ignore
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ __all__ = ["read", "register_read_tool"]
 # -----------------------------------------------------------------------------
 
 async def read(
-    context: Context,
+    context: ToolContext,
     path: str = Field(
         ...,
         min_length=1,
@@ -178,7 +179,7 @@ Usage:
                 inline_data = processing_result.content["inline_data"]
 
                 # Check if current LLM provider supports multimodal
-                supports_multimodal = get_multimodal_support_for_session(context.client_id or "")
+                supports_multimodal = get_multimodal_support_for_session(context.session_id or "")
 
                 if not supports_multimodal:
                     # Graceful degradation: return simple error for LLM

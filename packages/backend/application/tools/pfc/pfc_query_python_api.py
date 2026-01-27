@@ -13,7 +13,8 @@ Workflow:
 from typing import Dict, Any
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 
 from backend.infrastructure.pfc.python_api import (
     DocumentationLoader,
@@ -32,7 +33,7 @@ def register_pfc_query_python_api_tool(registrar: ToolRegistrar):
         annotations={"category": "pfc", "tags": ["pfc", "python", "search"]}
     )
     async def pfc_query_python_api(
-        context: Context,
+        context: ToolContext,
         query: SearchQuery,
         limit: SearchLimit = 10,
     ) -> Dict[str, Any]:

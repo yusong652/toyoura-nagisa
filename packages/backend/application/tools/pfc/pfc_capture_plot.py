@@ -19,7 +19,8 @@ import os
 import time
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 from typing import Annotated, Dict, Any, Literal, Optional, List
 from pydantic import Field
 from backend.infrastructure.pfc import get_pfc_client
@@ -52,7 +53,7 @@ def register_pfc_capture_plot_tool(registrar: ToolRegistrar):
         annotations={"category": "pfc", "tags": ["pfc", "visualization", "diagnostic"]}
     )
     async def pfc_capture_plot(
-        context: Context,
+        context: ToolContext,
         output_path: PlotOutputPath,
         size: Annotated[List[int], Field(min_length=2, max_length=2)] = Field(
             default=list(DEFAULT_IMAGE_SIZE),
@@ -176,7 +177,7 @@ def register_pfc_capture_plot_tool(registrar: ToolRegistrar):
         try:
             # Get session ID from MCP context
             # Architecture guarantee: tool_manager.py always injects _meta.client_id
-            session_id = context.client_id
+            session_id = context.session_id
 
             # Parameter is pre-validated by Pydantic Annotated type (stripped and .png checked)
             # Normalize output path for cross-platform (Linux format for PFC server)

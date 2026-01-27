@@ -2,7 +2,8 @@
 
 from typing import Dict, Any, cast
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 from pydantic import Field
 from backend.shared.utils.tool_result import success_response, error_response
 from .web_search_factory import WebSearchToolFactory
@@ -10,7 +11,7 @@ from .web_search_factory import WebSearchToolFactory
 __all__ = ["web_search", "register_web_search_tool"]
 
 async def web_search(
-    context: Context,
+    context: ToolContext,
     query: str = Field(..., description="Search query to find current information on the web (e.g., 'latest AI developments', 'Python 3.12 features', 'current news about climate change')"),
     max_uses: int = Field(5, description="Maximum number of search tool uses (ignored for Gemini due to API limitations)"),
 ) -> Dict[str, Any]:
@@ -25,7 +26,7 @@ async def web_search(
         # Get LLM client from session context or fallback to global
         from backend.infrastructure.llm.session_client import get_session_llm_client
         
-        session_id = cast(str, context.client_id)
+        session_id = cast(str, context.session_id)
         
         try:
             llm_client = get_session_llm_client(session_id)

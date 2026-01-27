@@ -15,7 +15,8 @@ from typing import Any, Dict
 from pydantic import Field
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.infrastructure.skills import get_skills_loader
@@ -52,7 +53,7 @@ def register_trigger_skill_tool(registrar: ToolRegistrar):
         }
     )
     async def trigger_skill(
-        context: Context,
+        context: ToolContext,
         skill: SkillType = Field(..., description=skill_description),  # type: ignore
         args: str = Field(default="", description="Optional arguments for the skill"),
     ) -> Dict[str, Any]:

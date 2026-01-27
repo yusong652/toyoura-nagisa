@@ -6,7 +6,8 @@ from typing import List, Dict, Any, Optional, Set
 
 from pydantic import Field
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context  # type: ignore
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context  # type: ignore
 
 from .utils.path_security import (
     validate_path_in_workspace,
@@ -227,7 +228,7 @@ def _search_file(
 # -----------------------------------------------------------------------------
 
 async def grep(
-    context: Context,
+    context: ToolContext,
     pattern: str = Field(
         ...,
         description="The regular expression pattern to search for in file contents",

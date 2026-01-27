@@ -14,7 +14,8 @@ from typing import Any, Dict, Literal
 from pydantic import Field
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 
 from backend.shared.utils.tool_result import success_response, error_response
 
@@ -31,7 +32,7 @@ AVAILABLE_SUBAGENTS = {
 
 
 async def invoke_agent(
-    context: Context,
+    context: ToolContext,
     subagent_type: Literal["pfc_explorer", "pfc_diagnostic"] = Field(
         ..., description="The type of specialized agent to use for this task"
     ),
@@ -60,7 +61,7 @@ async def invoke_agent(
     - Include context: what you observed, what you suspect, what needs investigation
     """
     # Architecture guarantee: tool_manager.py always injects _meta.client_id
-    session_id = context.client_id
+    session_id = context.session_id
     if session_id is None:
         return error_response("Missing session ID for invoke_agent")
     session_id_value: str = str(session_id)

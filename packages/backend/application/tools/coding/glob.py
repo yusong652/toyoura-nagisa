@@ -10,7 +10,8 @@ from typing import List, Dict, Any, Optional
 
 from pydantic import Field
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context  # type: ignore
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context  # type: ignore
 
 from .utils.path_security import (
     validate_path_in_workspace,
@@ -78,7 +79,7 @@ def _expand_braces(pattern: str) -> List[str]:
 # -----------------------------------------------------------------------------
 
 async def glob(
-    context: Context,
+    context: ToolContext,
     pattern: str = Field(
         ...,
         min_length=1,

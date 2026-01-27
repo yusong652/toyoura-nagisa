@@ -19,10 +19,10 @@ def is_context_param(param: inspect.Parameter) -> bool:
     if param.annotation is inspect._empty:
         return False
     try:
-        from fastmcp.server.context import Context as FastMCPContext
+        from backend.application.tools.context import ToolContext
     except Exception:
         return False
-    return param.annotation is FastMCPContext
+    return param.annotation is ToolContext
 
 
 def get_context_param_name(handler: Callable[..., Any]) -> Optional[str]:

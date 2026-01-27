@@ -5,7 +5,8 @@ Provides the ability to stop long-running PFC simulations gracefully.
 """
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 from typing import Dict, Any
 from backend.infrastructure.pfc import get_pfc_client
 from backend.shared.utils.tool_result import success_response, error_response
@@ -25,7 +26,7 @@ def register_pfc_interrupt_task_tool(registrar: ToolRegistrar):
         annotations={"category": "pfc", "tags": ["pfc", "task", "interrupt"]}
     )
     async def pfc_interrupt_task(
-        context: Context,
+        context: ToolContext,
         task_id: TaskId,
     ) -> Dict[str, Any]:
         """

@@ -8,7 +8,8 @@ Uses shared task_status_formatter for consistent output format.
 import asyncio
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 from typing import Dict, Any
 from backend.infrastructure.pfc import get_pfc_client
 from backend.shared.utils.tool_result import success_response, error_response
@@ -36,7 +37,7 @@ def register_pfc_task_status_tool(registrar: ToolRegistrar):
         annotations={"category": "pfc", "tags": ["pfc", "task", "monitoring"]}
     )
     async def pfc_check_task_status(
-        context: Context,
+        context: ToolContext,
         task_id: TaskId,
         offset: OutputOffset = 0,
         limit: OutputLimit = 20,

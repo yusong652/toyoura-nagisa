@@ -12,7 +12,8 @@ Task lifecycle is managed by backend's PfcTaskManager:
 """
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 from typing import Dict, Any, cast, Optional
 from backend.infrastructure.pfc import get_pfc_client
 from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
@@ -49,7 +50,7 @@ def register_pfc_task_tool(registrar: ToolRegistrar):
         annotations={"category": "pfc", "tags": ["pfc", "simulation", "python", "sdk"]}
     )
     async def pfc_execute_task(
-        context: Context,
+        context: ToolContext,
         entry_script: ScriptPath,
         description: TaskDescription,
         timeout: TimeoutMs = None,
@@ -66,7 +67,7 @@ def register_pfc_task_tool(registrar: ToolRegistrar):
         try:
             # Get session ID from MCP context for task isolation
             # Architecture guarantee: tool_manager.py always injects _meta.client_id
-            session_id = cast(str, context.client_id)
+            session_id = cast(str, context.session_id)
 
             # Parameters are pre-validated by Pydantic Annotated types
             # Normalize path separators for cross-platform compatibility

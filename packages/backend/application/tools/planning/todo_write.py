@@ -14,7 +14,8 @@ from typing import List, Dict, Any, Literal, cast
 from pydantic import BaseModel, Field
 
 from backend.application.tools.registrar import ToolRegistrar
-from fastmcp.server.context import Context
+from backend.application.tools.context import ToolContext
+# from fastmcp.server.context import Context
 
 from backend.shared.utils.tool_result import ToolResult, success_response, error_response
 from backend.infrastructure.storage.todo_storage import get_todo_storage
@@ -49,7 +50,7 @@ class TodoItem(BaseModel):
 
 
 async def todo_write(
-    context: Context,
+    context: ToolContext,
     todos: List[TodoItem] = Field(
         ...,
         description="Array of todo objects. Each object MUST have: content (imperative form, e.g. 'Run tests'), activeForm (present continuous, e.g. 'Running tests'), status ('pending'|'in_progress'|'completed')"
@@ -249,7 +250,7 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
     """
     # Extract session ID from context (client_id is the session ID in MCP)
     # Architecture guarantee: tool_manager.py always injects _meta.client_id
-    session_id = cast(str, context.client_id)
+    session_id = cast(str, context.session_id)
 
     try:
         # Get agent_profile from context_manager (set by Agent before tool execution)
