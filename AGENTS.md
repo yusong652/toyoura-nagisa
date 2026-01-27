@@ -216,12 +216,15 @@ toyoura-nagisa/
 │   ├── backend/
 │   │   ├── app.py                      # Main FastAPI application
 │   │   ├── presentation/               # API routes and WebSocket handlers
-│   │   ├── api/
-│   │   │   └── file_search.py     # File mention search API
-│   │   ├── websocket/             # WebSocket connection management
+│   │   ├── api/                   # RESTful API endpoints
+│   │   │   ├── file_search.py     # File mention search API
+│   │   │   ├── pfc_console.py     # PFC console API
+│   │   │   └── shell.py           # Shell execution API
+│   │   ├── websocket/             # WebSocket endpoints & message handling
+│   │   │   ├── message_handler.py # Message routing (Chat, Heartbeat, etc.)
+│   │   │   └── routes.py          # WebSocket route definitions
 │   │   ├── handlers/              # Request handlers
 │   │   │   ├── chat_request_handler.py  # Chat request processing
-│   │   └── streaming/             # Response streaming handlers
 │   ├── application/                # Application use cases and orchestration
 │   │   ├── agent/                 # Agent orchestration and streaming
 │   │   ├── chat/                  # Chat request preparation
@@ -234,6 +237,9 @@ toyoura-nagisa/
 │   │   ├── shell/                 # Shell execution services
 │   │   ├── todo/                  # Todo service
 │   │   └── tools/                 # Tool registry, runtime, implementations
+│   │       └── pfc/
+│   │           ├── scripts/           # Script generation templates
+│   │           └── utils/             # Tool utilities
 │   ├── domain/                     # Core business logic
 │   │   └── models/                # Domain models
 │   │       ├── streaming.py       # StreamingChunk unified format
