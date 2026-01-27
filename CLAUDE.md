@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Agent when working with code in this repository.
 
 ## Project Overview
 
@@ -216,74 +216,80 @@ toyoura-nagisa/
 │   ├── backend/
 │   │   ├── app.py                      # Main FastAPI application
 │   │   ├── presentation/               # API routes and WebSocket handlers
-│   │   ├── api/
-│   │   │   └── file_search.py     # File mention search API
-│   │   ├── websocket/             # WebSocket connection management
-│   │   ├── handlers/              # Request handlers
-│   │   │   ├── chat_request_handler.py  # Chat request processing
-│   │   └── streaming/             # Response streaming handlers
-│   ├── application/                # Application use cases and orchestration
-│   │   ├── agent/                 # Agent orchestration and streaming
-│   │   ├── chat/                  # Chat request preparation
-│   │   ├── contents/              # Content processing + web fetch/search
-│   │   ├── memory/                # Memory persistence helpers
-│   │   ├── notifications/         # WebSocket status notifications
-│   │   ├── pfc/                   # PFC execution services
-│   │   ├── reminder/              # Reminder injection
-│   │   ├── session/               # Session + message services
-│   │   ├── shell/                 # Shell execution services
-│   │   ├── todo/                  # Todo service
-│   │   └── tools/                 # Tool registry, runtime, implementations
-│   ├── domain/                     # Core business logic
-│   │   └── models/                # Domain models
-│   │       ├── streaming.py       # StreamingChunk unified format
-│   │       ├── messages.py        # BaseMessage, AssistantMessage
-│   │       └── message_factory.py # Message factory functions
-│   ├── infrastructure/             # External system integrations
-│   │   ├── llm/                   # LLM provider integrations
-│   │   │   ├── base/              # Common abstractions
-│   │   │   │   ├── client.py      # LLMClientBase ABC
-│   │   │   │   └── response_processor.py  # BaseStreamingProcessor
-│   │   │   ├── providers/         # Provider implementations
-│   │   │   │   ├── google/
-│   │   │   │   ├── anthropic/
-│   │   │   │   ├── openai/
-│   │   │   │   ├── moonshot/
-│   │   │   │   ├── zhipu/
-│   │   │   │   ├── openrouter/
-│   │   │   │   └── local/
-│   │   │   └── shared/
-│   │   ├── mcp/                   # Optional MCP gateway (external tools)
-│   │   │   └── mcp_server.py      # Main MCP server
-│   │   ├── monitoring/            # Status monitoring system
-│   │   │   ├── status_monitor.py  # Unified coordinator
-│   │   │   └── monitors/          # Specialized monitors
-│   │   │       ├── iteration_monitor.py  # Iteration limit warnings
-│   │   │       ├── todo_monitor.py       # Todo reminders
-│   │   │       ├── bash_monitor.py       # Background bash processes
-│   │   │       └── pfc_monitor.py        # PFC task tracking
-│   │   ├── file_mention/          # File mention processing
-│   │   │   └── file_mention_processor.py  # Safe file reading and injection
-│   │   ├── pfc/
-│   │   │   └── websocket_client.py # PFC WebSocket client
-│   │   ├── memory/                # ChromaDB memory system
-│   │   ├── storage/               # File and session storage
-│   │   ├── websocket/             # WebSocket infrastructure
-│   │   │   ├── connection_manager.py     # Connection management
-│   │   │   └── notification_service.py   # WebSocket notifications
-│   │   ├── shell/                 # Shell execution infrastructure
-│   │   │   ├── executor.py        # ShellExecutor (foreground/background)
-│   │   │   ├── shell_config.py    # Cross-platform shell detection
-│   │   │   └── background_process_manager.py  # Background process lifecycle
-│   │   ├── messaging/             # Message queue management
-│   ├── config/                     # Configuration management
-│   │   └── prompts/               # Agent system prompts
-│   │       ├── pfc_explorer.md    # PFC Explorer SubAgent prompt
-│   │       └── pfc_diagnostic.md  # PFC Diagnostic SubAgent prompt
-│   ├── shared/                     # Common utilities and exceptions
-│   │   ├── utils/                  # Tool result, path normalization, shell helpers
-│   │   ├── memory_db/              # ChromaDB persistence
-│   │   └── workspace/              # Development workspace
+│   │   │   ├── api/                   # RESTful API endpoints
+│   │   │   │   ├── file_search.py     # File mention search API
+│   │   │   │   ├── pfc_console.py     # PFC console API
+│   │   │   │   └── shell.py           # Shell execution API
+│   │   │   ├── websocket/             # WebSocket endpoints & message handling
+│   │   │   │   ├── message_handler.py # Message routing (Chat, Heartbeat, etc.)
+│   │   │   │   └── routes.py          # WebSocket route definitions
+│   │   │   └── handlers/              # Request handlers
+│   │   │       └── chat_request_handler.py  # Chat request processing
+│   │   ├── application/                # Application use cases and orchestration
+│   │   │   ├── agent/                 # Agent orchestration and streaming
+│   │   │   ├── chat/                  # Chat request preparation
+│   │   │   ├── contents/              # Content processing + web fetch/search
+│   │   │   ├── memory/                # Memory persistence helpers
+│   │   │   ├── notifications/         # WebSocket status notifications
+│   │   │   ├── pfc/                   # PFC execution services
+│   │   │   ├── reminder/              # Reminder injection
+│   │   │   ├── session/               # Session + message services
+│   │   │   ├── shell/                 # Shell execution services
+│   │   │   ├── todo/                  # Todo service
+│   │   │   └── tools/                 # Tool registry, runtime, implementations
+│   │   │       └── pfc/
+│   │   │           ├── scripts/           # Script generation templates
+│   │   │           └── utils/             # Tool utilities
+│   │   ├── domain/                     # Core business logic
+│   │   │   └── models/                # Domain models
+│   │   │       ├── streaming.py       # StreamingChunk unified format
+│   │   │       ├── messages.py        # BaseMessage, AssistantMessage
+│   │   │       └── message_factory.py # Message factory functions
+│   │   ├── infrastructure/             # External system integrations
+│   │   │   ├── llm/                   # LLM provider integrations
+│   │   │   │   ├── base/              # Common abstractions
+│   │   │   │   │   ├── client.py      # LLMClientBase ABC
+│   │   │   │   │   └── response_processor.py  # BaseStreamingProcessor
+│   │   │   │   ├── providers/         # Provider implementations
+│   │   │   │   │   ├── google/
+│   │   │   │   │   ├── anthropic/
+│   │   │   │   │   ├── openai/
+│   │   │   │   │   ├── moonshot/
+│   │   │   │   │   ├── zhipu/
+│   │   │   │   │   ├── openrouter/
+│   │   │   │   │   └── local/
+│   │   │   │   └── shared/
+│   │   │   ├── mcp/                   # Optional MCP gateway (external tools)
+│   │   │   │   └── mcp_server.py      # Main MCP server
+│   │   │   ├── monitoring/            # Status monitoring system
+│   │   │   │   ├── status_monitor.py  # Unified coordinator
+│   │   │   │   └── monitors/          # Specialized monitors
+│   │   │   │       ├── iteration_monitor.py  # Iteration limit warnings
+│   │   │   │       ├── todo_monitor.py       # Todo reminders
+│   │   │   │       ├── bash_monitor.py       # Background bash processes
+│   │   │   │       └── pfc_monitor.py        # PFC task tracking
+│   │   │   ├── file_mention/          # File mention processing
+│   │   │   │   └── file_mention_processor.py  # Safe file reading and injection
+│   │   │   ├── pfc/
+│   │   │   │   └── websocket_client.py # PFC WebSocket client
+│   │   │   ├── memory/                # ChromaDB memory system
+│   │   │   ├── storage/               # File and session storage
+│   │   │   ├── websocket/             # WebSocket infrastructure
+│   │   │   │   ├── connection_manager.py     # Connection management
+│   │   │   │   └── notification_service.py   # WebSocket notifications
+│   │   │   ├── shell/                 # Shell execution infrastructure
+│   │   │   │   ├── executor.py        # ShellExecutor (foreground/background)
+│   │   │   │   ├── shell_config.py    # Cross-platform shell detection
+│   │   │   │   └── background_process_manager.py  # Background process lifecycle
+│   │   │   ├── messaging/             # Message queue management
+│   │   ├── config/                     # Configuration management
+│   │   │   └── prompts/               # Agent system prompts
+│   │   │       ├── pfc_explorer.md    # PFC Explorer SubAgent prompt
+│   │   │       └── pfc_diagnostic.md  # PFC Diagnostic SubAgent prompt
+│   │   ├── shared/                     # Common utilities and exceptions
+│   │   │   ├── utils/                  # Tool result, path normalization, shell helpers
+│   │   │   ├── memory_db/              # ChromaDB persistence
+│   │   │   └── workspace/              # Development workspace
 │   ├── web/                        # React Web frontend
 │   │   ├── src/
 │   │   │   ├── components/            # React components
@@ -319,13 +325,8 @@ toyoura-nagisa/
 ## Configuration
 
 ### Environment Setup
-- Configuration system entry: `packages/backend/config/__init__.py`
-- Main config modules:
-  - `config/memory.py` - ChromaDB memory system configuration
-  - `config/dev.py` - Development environment settings
-  - `config/cors.py` - CORS policies
-  - `config/pfc.py` - PFC WebSocket integration
-  - `infrastructure/storage/llm_config_manager.py` - LLM provider/model selection (runtime)
+- Copy configuration examples from `packages/backend/config_example/` to `packages/backend/config/`
+- Main config files: `base.py`, `llm.py`
 - Database locations:
   - Memory DB: `memory_db/` (root level)
   - Session data: `data/` (root level)
