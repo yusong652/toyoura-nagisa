@@ -26,24 +26,12 @@ class OpenRouterConfig(BaseSettings):
 
     # Model selection (from environment variables, runtime overridable)
     model: str = Field(default="qwen/qwen3-235b-a22b-2507", description="Default model")
-    secondary_model: str = Field(
-        default="google/gemini-2.0-flash-001",
-        description="Secondary model for SubAgent"
-    )
+    secondary_model: str = Field(default="google/gemini-2.0-flash-001", description="Secondary model for SubAgent")
 
     # Model parameters (runtime overridable)
-    temperature: float = Field(
-        default=0.7,
-        description="Sampling temperature (0-1)."
-    )
-    max_tokens: Optional[int] = Field(
-        default=1024*16,
-        description="Maximum tokens to generate"
-    )
-    top_p: Optional[float] = Field(
-        default=None,
-        description="Nucleus sampling threshold."
-    )
+    temperature: float = Field(default=0.7, description="Sampling temperature (0-1).")
+    max_tokens: Optional[int] = Field(default=1024 * 16, description="Maximum tokens to generate")
+    top_p: Optional[float] = Field(default=None, description="Nucleus sampling threshold.")
 
     # Client settings (runtime overridable)
     debug: bool = Field(default=False, description="Enable debug logging")
@@ -51,11 +39,7 @@ class OpenRouterConfig(BaseSettings):
     max_retries: int = Field(default=3, description="Maximum retry attempts")
 
     model_config = SettingsConfigDict(
-        env_file='packages/backend/.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
+        env_file=".env", env_nested_delimiter="__", case_sensitive=False, env_prefix="", extra="ignore"
     )
 
     def to_api_params(self) -> Dict[str, Any]:
@@ -66,24 +50,20 @@ class OpenRouterConfig(BaseSettings):
             Dict with model, temperature, and optional max_tokens/top_p
         """
         params = {
-            'model': self.model,
-            'temperature': self.temperature,
+            "model": self.model,
+            "temperature": self.temperature,
         }
 
         if self.max_tokens is not None:
-            params['max_tokens'] = self.max_tokens
+            params["max_tokens"] = self.max_tokens
 
         if self.top_p is not None:
-            params['top_p'] = self.top_p
+            params["top_p"] = self.top_p
 
         return params
 
     def get_api_call_kwargs(
-        self,
-        *,
-        messages: List[Dict[str, Any]],
-        tools: Optional[List[Dict[str, Any]]] = None,
-        stream: bool = True
+        self, *, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None, stream: bool = True
     ) -> Dict[str, Any]:
         """
         Build complete kwargs for OpenRouter API call (OpenAI-compatible).
@@ -141,14 +121,11 @@ def get_openrouter_client_config(**overrides: Any) -> OpenRouterConfig:
         base_config = OpenRouterConfig()
     except Exception:
         # If env loading fails, use defaults
-        base_config = OpenRouterConfig(
-            openrouter_api_key="",
-            model="qwen/qwen3-235b-a22b-2507"
-        )
+        base_config = OpenRouterConfig(openrouter_api_key="", model="qwen/qwen3-235b-a22b-2507")
 
     # Handle nested model_settings overrides for backward compatibility
-    if 'model_settings' in overrides:
-        model_settings = overrides.pop('model_settings')
+    if "model_settings" in overrides:
+        model_settings = overrides.pop("model_settings")
         if isinstance(model_settings, dict):
             overrides.update(model_settings)
 

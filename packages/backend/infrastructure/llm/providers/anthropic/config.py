@@ -4,6 +4,7 @@ Anthropic Client Configuration
 Unified configuration for Anthropic Claude models including API credentials,
 model parameters, and client settings.
 """
+
 import copy
 from typing import List, Dict, Any, Optional
 from pydantic import Field
@@ -28,104 +29,49 @@ class AnthropicConfig(BaseSettings):
     anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API key")
 
     # Model selection (from environment variables, runtime overridable)
-    model: str = Field(
-        default="claude-sonnet-4-5-20250929",
-        description="Default model"
-    )
-    secondary_model: str = Field(
-        default="claude-haiku-4-5-20251001",
-        description="Secondary model for SubAgent"
-    )
+    model: str = Field(default="claude-sonnet-4-5-20250929", description="Default model")
+    secondary_model: str = Field(default="claude-haiku-4-5-20251001", description="Secondary model for SubAgent")
 
     # Model parameters (runtime overridable)
-    max_tokens: int = Field(
-        default=1024*16,
-        ge=1,
-        le=64000,
-        description="Maximum number of tokens to generate"
-    )
+    max_tokens: int = Field(default=1024 * 16, ge=1, le=64000, description="Maximum number of tokens to generate")
     temperature: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=2.0,
-        description="Sampling temperature. Do not set both temperature and top_p."
+        default=1.0, ge=0.0, le=2.0, description="Sampling temperature. Do not set both temperature and top_p."
     )
     top_p: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=1.0,
-        description="Nucleus sampling parameter. Do not set both temperature and top_p."
+        default=None, ge=0.0, le=1.0, description="Nucleus sampling parameter. Do not set both temperature and top_p."
     )
-    top_k: Optional[int] = Field(
-        default=None,
-        ge=1,
-        description="Top-K sampling parameter"
-    )
+    top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling parameter")
 
     # Thinking configuration (for models that support thinking)
-    enable_thinking: bool = Field(
-        default=True,
-        description="Whether to enable thinking for supported models"
-    )
+    enable_thinking: bool = Field(default=True, description="Whether to enable thinking for supported models")
     thinking_budget_tokens: int = Field(
-        default=4096,
-        ge=1000,
-        le=50000,
-        description="Budget tokens for thinking process"
+        default=4096, ge=1000, le=50000, description="Budget tokens for thinking process"
     )
 
     # API settings
-    api_version: str = Field(
-        default="2023-06-01",
-        description="Anthropic API version"
-    )
-    timeout: int = Field(
-        default=60,
-        ge=1,
-        description="Request timeout in seconds"
-    )
-    max_retries: int = Field(
-        default=3,
-        ge=0,
-        description="Maximum number of retries for failed requests"
-    )
+    api_version: str = Field(default="2023-06-01", description="Anthropic API version")
+    timeout: int = Field(default=60, ge=1, description="Request timeout in seconds")
+    max_retries: int = Field(default=3, ge=0, description="Maximum number of retries for failed requests")
 
     # Tool settings
-    tools_enabled: bool = Field(
-        default=True,
-        description="Enable tool calling functionality"
-    )
-    tool_timeout: int = Field(
-        default=30,
-        ge=1,
-        description="Tool execution timeout in seconds"
-    )
+    tools_enabled: bool = Field(default=True, description="Enable tool calling functionality")
+    tool_timeout: int = Field(default=30, ge=1, description="Tool execution timeout in seconds")
 
     # Debug settings
-    debug: bool = Field(
-        default=False,
-        description="Enable debug logging"
-    )
-    log_requests: bool = Field(
-        default=False,
-        description="Log API requests and responses"
-    )
+    debug: bool = Field(default=False, description="Enable debug logging")
+    log_requests: bool = Field(default=False, description="Log API requests and responses")
 
     model_config = SettingsConfigDict(
-        env_file='packages/backend/.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
+        env_file=".env", env_nested_delimiter="__", case_sensitive=False, env_prefix="", extra="ignore"
     )
 
     def supports_thinking(self) -> bool:
         """Check if the current model supports thinking"""
         return (
-            self.model.startswith("claude-3-7-") or
-            self.model.startswith("claude-sonnet-4-") or
-            self.model.startswith("claude-4-") or
-            self.model.startswith("claude-opus-")
+            self.model.startswith("claude-3-7-")
+            or self.model.startswith("claude-sonnet-4-")
+            or self.model.startswith("claude-4-")
+            or self.model.startswith("claude-opus-")
         )
 
     def to_api_params(self) -> Dict[str, Any]:
@@ -136,23 +82,20 @@ class AnthropicConfig(BaseSettings):
             Dict with model, temperature, max_tokens, and optional top_p/top_k
         """
         params = {
-            'model': self.model,
-            'max_tokens': self.max_tokens,
-            'temperature': self.temperature,
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
         }
 
         if self.top_p is not None:
-            params['top_p'] = self.top_p
+            params["top_p"] = self.top_p
         if self.top_k is not None:
-            params['top_k'] = self.top_k
+            params["top_k"] = self.top_k
 
         return params
 
     def get_api_call_kwargs(
-        self,
-        system_prompt: str,
-        messages: List[Dict[str, Any]],
-        tools: Optional[List[Dict[str, Any]]] = None
+        self, system_prompt: str, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Get API call parameters for Anthropic messages.create
@@ -167,16 +110,11 @@ class AnthropicConfig(BaseSettings):
         """
         # Format system prompt with cache_control for prompt caching
         # See: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
-        system_with_cache = [
-            {
-                "type": "text",
-                "text": system_prompt,
-                "cache_control": {"type": "ephemeral"}
-            }
-        ]
+        system_with_cache = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
 
         # Add cache_control to the last message for conversation caching
         from .message_formatter import MessageFormatter
+
         cached_messages = MessageFormatter.add_cache_control_to_messages(messages)
 
         kwargs = {
@@ -196,10 +134,7 @@ class AnthropicConfig(BaseSettings):
 
         # Add thinking configuration for supported models
         if self.supports_thinking() and self.enable_thinking:
-            kwargs["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": self.thinking_budget_tokens
-            }
+            kwargs["thinking"] = {"type": "enabled", "budget_tokens": self.thinking_budget_tokens}
 
         return kwargs
 
@@ -245,14 +180,11 @@ def get_anthropic_client_config(**overrides: Any) -> AnthropicConfig:
         base_config = AnthropicConfig()
     except Exception:
         # If env loading fails, use defaults
-        base_config = AnthropicConfig(
-            anthropic_api_key="missing-key",
-            model="claude-sonnet-4-5-20250929"
-        )
+        base_config = AnthropicConfig(anthropic_api_key="missing-key", model="claude-sonnet-4-5-20250929")
 
     # Handle nested model_settings overrides for backward compatibility
-    if 'model_settings' in overrides:
-        model_settings = overrides.pop('model_settings')
+    if "model_settings" in overrides:
+        model_settings = overrides.pop("model_settings")
         if isinstance(model_settings, dict):
             overrides.update(model_settings)
 

@@ -4,6 +4,7 @@ Google Client Configuration
 Unified configuration for Google Gemini models including API credentials,
 model parameters, safety settings, and client settings.
 """
+
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -14,40 +15,32 @@ class GoogleSafetySettings(BaseModel):
     """Google safety settings"""
 
     sexually_explicit_threshold: types.HarmBlockThreshold = Field(
-        default=types.HarmBlockThreshold.BLOCK_NONE,
-        description="Sexually explicit content blocking threshold"
+        default=types.HarmBlockThreshold.BLOCK_NONE, description="Sexually explicit content blocking threshold"
     )
     harassment_threshold: types.HarmBlockThreshold = Field(
-        default=types.HarmBlockThreshold.BLOCK_NONE,
-        description="Harassment content blocking threshold"
+        default=types.HarmBlockThreshold.BLOCK_NONE, description="Harassment content blocking threshold"
     )
     dangerous_content_threshold: types.HarmBlockThreshold = Field(
-        default=types.HarmBlockThreshold.BLOCK_NONE,
-        description="Dangerous content blocking threshold"
+        default=types.HarmBlockThreshold.BLOCK_NONE, description="Dangerous content blocking threshold"
     )
     hate_speech_threshold: types.HarmBlockThreshold = Field(
-        default=types.HarmBlockThreshold.BLOCK_NONE,
-        description="Hate speech blocking threshold"
+        default=types.HarmBlockThreshold.BLOCK_NONE, description="Hate speech blocking threshold"
     )
 
     def to_gemini_format(self) -> List[types.SafetySetting]:
         """Convert to Google API format safety settings"""
         return [
             types.SafetySetting(
-                category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                threshold=self.sexually_explicit_threshold
+                category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=self.sexually_explicit_threshold
             ),
             types.SafetySetting(
-                category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
-                threshold=self.harassment_threshold
+                category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=self.harassment_threshold
             ),
             types.SafetySetting(
-                category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                threshold=self.dangerous_content_threshold
+                category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=self.dangerous_content_threshold
             ),
             types.SafetySetting(
-                category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                threshold=self.hate_speech_threshold
+                category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=self.hate_speech_threshold
             ),
         ]
 
@@ -70,81 +63,42 @@ class GoogleConfig(BaseSettings):
     google_api_key: Optional[str] = Field(default=None, description="Google API key")
 
     # Model selection (from environment variables, runtime overridable)
-    model: str = Field(
-        default="gemini-3-flash-preview",
-        description="Default model"
-    )
-    secondary_model: str = Field(
-        default="gemini-3-flash-preview",
-        description="Secondary model for SubAgent"
-    )
+    model: str = Field(default="gemini-3-flash-preview", description="Default model")
+    secondary_model: str = Field(default="gemini-3-flash-preview", description="Secondary model for SubAgent")
 
     # Model parameters (runtime overridable)
     temperature: float = Field(
-        default=2.0,
-        ge=0.0,
-        le=2.0,
-        description="Sampling temperature. Do not set both temperature and top_p."
+        default=2.0, ge=0.0, le=2.0, description="Sampling temperature. Do not set both temperature and top_p."
     )
-    max_tokens: int = Field(
-        default=1024*16,
-        ge=1,
-        description="Maximum output token number"
-    )
+    max_tokens: int = Field(default=1024 * 16, ge=1, description="Maximum output token number")
     top_p: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=1.0,
-        description="Top-P sampling probability. Do not set both temperature and top_p."
+        default=None, ge=0.0, le=1.0, description="Top-P sampling probability. Do not set both temperature and top_p."
     )
-    top_k: Optional[int] = Field(
-        default=None,
-        ge=1,
-        description="Top-K sampling"
-    )
+    top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
 
     # Thinking configuration (for models that support thinking)
     enable_thinking: bool = Field(
-        default=True,
-        description="Whether to enable thinking mode for supported models (Gemini 2.5+, Gemini 3+)"
+        default=True, description="Whether to enable thinking mode for supported models (Gemini 2.5+, Gemini 3+)"
     )
     include_thoughts_in_response: bool = Field(
-        default=True,
-        description="Whether to include thinking process in the response"
+        default=True, description="Whether to include thinking process in the response"
     )
 
     # Safety settings (nested configuration for Google-specific types)
     safety_settings: GoogleSafetySettings = Field(
-        default_factory=GoogleSafetySettings,
-        description="Google safety settings"
+        default_factory=GoogleSafetySettings, description="Google safety settings"
     )
 
     # Client settings (runtime overridable)
-    debug: bool = Field(
-        default=False,
-        description="Enable debug logging"
-    )
-    timeout: float = Field(
-        default=60.0,
-        description="Request timeout in seconds"
-    )
-    max_retries: int = Field(
-        default=3,
-        description="Maximum number of retries for failed requests"
-    )
+    debug: bool = Field(default=False, description="Enable debug logging")
+    timeout: float = Field(default=60.0, description="Request timeout in seconds")
+    max_retries: int = Field(default=3, description="Maximum number of retries for failed requests")
 
     # Tool settings
-    tools_enabled: bool = Field(
-        default=True,
-        description="Enable tool calling functionality"
-    )
+    tools_enabled: bool = Field(default=True, description="Enable tool calling functionality")
 
     model_config = SettingsConfigDict(
-        env_file='packages/backend/.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
+        env_file=".env", env_nested_delimiter="__", case_sensitive=False, env_prefix="", extra="ignore"
     )
 
     def to_api_params(self) -> Dict[str, Any]:
@@ -166,11 +120,7 @@ class GoogleConfig(BaseSettings):
 
         return params
 
-    def get_api_call_kwargs(
-        self,
-        system_prompt: str,
-        tool_schemas: Optional[List[types.Tool]]
-    ) -> Dict[str, Any]:
+    def get_api_call_kwargs(self, system_prompt: str, tool_schemas: Optional[List[types.Tool]]) -> Dict[str, Any]:
         """
         Get GenerateContentConfig parameters for Google API
 
@@ -197,14 +147,13 @@ class GoogleConfig(BaseSettings):
             # Gemini 3 models use thinking_level parameter (enum)
             if self.model.startswith("gemini-3"):
                 config_kwargs["thinking_config"] = types.ThinkingConfig(
-                    thinking_level=types.ThinkingLevel.HIGH,
-                    include_thoughts=self.include_thoughts_in_response
+                    thinking_level=types.ThinkingLevel.HIGH, include_thoughts=self.include_thoughts_in_response
                 )
             # Gemini 2.5 models use thinking_budget parameter
             elif self.model.startswith("gemini-2.5"):
                 config_kwargs["thinking_config"] = types.ThinkingConfig(
                     thinking_budget=-1,  # -1 = dynamic (auto)
-                    include_thoughts=self.include_thoughts_in_response
+                    include_thoughts=self.include_thoughts_in_response,
                 )
 
         return config_kwargs
@@ -228,8 +177,8 @@ class GoogleConfig(BaseSettings):
 
         # Handle nested overrides
         for key, value in overrides.items():
-            if key == 'safety_settings' and isinstance(value, dict):
-                config_dict['safety_settings'].update(value)
+            if key == "safety_settings" and isinstance(value, dict):
+                config_dict["safety_settings"].update(value)
             else:
                 config_dict[key] = value
 
@@ -264,20 +213,17 @@ def get_google_client_config(**overrides: Any) -> GoogleConfig:
         base_config = GoogleConfig()
     except Exception:
         # If env loading fails, use defaults
-        base_config = GoogleConfig(
-            google_api_key="missing-key",
-            model="gemini-3-flash-preview"
-        )
+        base_config = GoogleConfig(google_api_key="missing-key", model="gemini-3-flash-preview")
 
     # Handle nested model_settings overrides for backward compatibility
-    if 'model_settings' in overrides:
-        model_settings = overrides.pop('model_settings')
+    if "model_settings" in overrides:
+        model_settings = overrides.pop("model_settings")
         if isinstance(model_settings, dict):
             overrides.update(model_settings)
 
     # Also support "model_config" as alias
-    if 'model_config' in overrides:
-        model_config = overrides.pop('model_config')
+    if "model_config" in overrides:
+        model_config = overrides.pop("model_config")
         if isinstance(model_config, dict):
             overrides.update(model_config)
 

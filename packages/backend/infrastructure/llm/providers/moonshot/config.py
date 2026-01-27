@@ -26,24 +26,12 @@ class MoonshotConfig(BaseSettings):
 
     # Model selection (from environment variables, runtime overridable)
     model: str = Field(default="kimi-k2-thinking", description="Default model")
-    secondary_model: str = Field(
-        default="kimi-k2-0905-preview",
-        description="Secondary model for SubAgent"
-    )
+    secondary_model: str = Field(default="kimi-k2-0905-preview", description="Secondary model for SubAgent")
 
     # Model parameters (runtime overridable)
-    temperature: float = Field(
-        default=0.6,
-        description="Sampling temperature (0-1). Recommended 0.6 for Moonshot."
-    )
-    max_tokens: Optional[int] = Field(
-        default=1024*16,
-        description="Maximum tokens to generate"
-    )
-    top_p: Optional[float] = Field(
-        default=1.0,
-        description="Nucleus sampling threshold."
-    )
+    temperature: float = Field(default=0.6, description="Sampling temperature (0-1). Recommended 0.6 for Moonshot.")
+    max_tokens: Optional[int] = Field(default=1024 * 16, description="Maximum tokens to generate")
+    top_p: Optional[float] = Field(default=1.0, description="Nucleus sampling threshold.")
 
     # Client settings (runtime overridable)
     debug: bool = Field(default=False, description="Enable debug logging")
@@ -51,11 +39,7 @@ class MoonshotConfig(BaseSettings):
     max_retries: int = Field(default=3, description="Maximum retry attempts")
 
     model_config = SettingsConfigDict(
-        env_file='packages/backend/.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
+        env_file=".env", env_nested_delimiter="__", case_sensitive=False, env_prefix="", extra="ignore"
     )
 
     def to_api_params(self) -> Dict[str, Any]:
@@ -66,22 +50,18 @@ class MoonshotConfig(BaseSettings):
             Dict with model, temperature, and optional max_tokens/top_p
         """
         params = {
-            'model': self.model,
-            'temperature': self.temperature,
-            'top_p': self.top_p,
+            "model": self.model,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
         }
 
         if self.max_tokens is not None:
-            params['max_tokens'] = self.max_tokens
+            params["max_tokens"] = self.max_tokens
 
         return params
 
     def get_api_call_kwargs(
-        self,
-        *,
-        messages: List[Dict[str, Any]],
-        tools: Optional[List[Dict[str, Any]]] = None,
-        stream: bool = True
+        self, *, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None, stream: bool = True
     ) -> Dict[str, Any]:
         """
         Build complete kwargs for Moonshot API call (OpenAI-compatible).
@@ -139,14 +119,11 @@ def get_moonshot_client_config(**overrides: Any) -> MoonshotConfig:
         base_config = MoonshotConfig()
     except Exception:
         # If env loading fails (e.g. missing API key during init), use defaults
-        base_config = MoonshotConfig(
-            moonshot_api_key="",
-            model="kimi-k2-thinking"
-        )
+        base_config = MoonshotConfig(moonshot_api_key="", model="kimi-k2-thinking")
 
     # Handle nested model_settings overrides for backward compatibility
-    if 'model_settings' in overrides:
-        model_settings = overrides.pop('model_settings')
+    if "model_settings" in overrides:
+        model_settings = overrides.pop("model_settings")
         if isinstance(model_settings, dict):
             overrides.update(model_settings)
 

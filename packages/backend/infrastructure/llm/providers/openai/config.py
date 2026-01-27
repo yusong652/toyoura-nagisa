@@ -28,71 +28,32 @@ class OpenAIConfig(BaseSettings):
     openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
 
     # Model selection (from environment variables, runtime overridable)
-    model: str = Field(
-        default="gpt-5-mini-2025-08-07",
-        description="Default model"
-    )
-    secondary_model: str = Field(
-        default="gpt-5-mini-2025-08-07",
-        description="Secondary model for SubAgent"
-    )
+    model: str = Field(default="gpt-5-mini-2025-08-07", description="Default model")
+    secondary_model: str = Field(default="gpt-5-mini-2025-08-07", description="Secondary model for SubAgent")
 
     # Model parameters (runtime overridable)
     temperature: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=2.0,
-        description="Sampling temperature. Do not set both temperature and top_p."
+        default=None, ge=0.0, le=2.0, description="Sampling temperature. Do not set both temperature and top_p."
     )
-    max_tokens: Optional[int] = Field(
-        default=1024*16,
-        description="Maximum tokens to generate"
-    )
+    max_tokens: Optional[int] = Field(default=1024 * 16, description="Maximum tokens to generate")
     top_p: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=1.0,
-        description="Nucleus sampling threshold. Do not set both temperature and top_p."
+        default=None, ge=0.0, le=1.0, description="Nucleus sampling threshold. Do not set both temperature and top_p."
     )
-    frequency_penalty: float = Field(
-        default=0.0,
-        ge=-2.0,
-        le=2.0,
-        description="Frequency penalty"
-    )
-    presence_penalty: float = Field(
-        default=0.0,
-        ge=-2.0,
-        le=2.0,
-        description="Presence penalty"
-    )
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Frequency penalty")
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Presence penalty")
 
     # Reasoning configuration (for reasoning models like o1, o3, gpt-5)
     reasoning_effort: Optional[str] = Field(
-        default=None,
-        description="Reasoning effort: minimal, medium, high (for reasoning models)"
+        default=None, description="Reasoning effort: minimal, medium, high (for reasoning models)"
     )
 
     # Client settings (runtime overridable)
-    debug: bool = Field(
-        default=False,
-        description="Enable debug logging"
-    )
-    timeout: float = Field(
-        default=120.0,
-        description="Request timeout in seconds"
-    )
-    max_retries: int = Field(
-        default=3,
-        description="Maximum number of retries for failed requests"
-    )
+    debug: bool = Field(default=False, description="Enable debug logging")
+    timeout: float = Field(default=120.0, description="Request timeout in seconds")
+    max_retries: int = Field(default=3, description="Maximum number of retries for failed requests")
 
     model_config = SettingsConfigDict(
-        env_file='packages/backend/.env',
-        env_nested_delimiter='__',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
+        env_file=".env", env_nested_delimiter="__", case_sensitive=False, env_prefix="", extra="ignore"
     )
 
     @property
@@ -115,18 +76,18 @@ class OpenAIConfig(BaseSettings):
             Dict with model, temperature, top_p, and optional max_tokens
         """
         params = {
-            'model': self.model,
+            "model": self.model,
         }
 
         # Only include sampling parameters for non-reasoning models
         if not self.is_reasoning_model:
             if self.temperature is not None:
-                params['temperature'] = self.temperature
+                params["temperature"] = self.temperature
             if self.top_p is not None:
-                params['top_p'] = self.top_p
+                params["top_p"] = self.top_p
 
         if self.max_tokens is not None:
-            params['max_output_tokens'] = self.max_tokens
+            params["max_output_tokens"] = self.max_tokens
 
         return params
 
@@ -135,7 +96,7 @@ class OpenAIConfig(BaseSettings):
         *,
         instructions: Optional[str],
         input_items: List[Dict[str, Any]],
-        tools: Optional[List[Dict[str, Any]]] = None
+        tools: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         Build complete kwargs for OpenAI Responses API call.
@@ -164,9 +125,7 @@ class OpenAIConfig(BaseSettings):
 
         # Add reasoning configuration for reasoning models (gpt-5, o1, o3 series)
         if self.reasoning_effort:
-            kwargs["reasoning"] = {
-                "effort": self.reasoning_effort
-            }
+            kwargs["reasoning"] = {"effort": self.reasoning_effort}
 
         return kwargs
 
@@ -212,14 +171,11 @@ def get_openai_client_config(**overrides: Any) -> OpenAIConfig:
         base_config = OpenAIConfig()
     except Exception:
         # If env loading fails, use defaults
-        base_config = OpenAIConfig(
-            openai_api_key=None,
-            model="gpt-5-mini-2025-08-07"
-        )
+        base_config = OpenAIConfig(openai_api_key=None, model="gpt-5-mini-2025-08-07")
 
     # Handle nested model_settings overrides for backward compatibility
-    if 'model_settings' in overrides:
-        model_settings = overrides.pop('model_settings')
+    if "model_settings" in overrides:
+        model_settings = overrides.pop("model_settings")
         if isinstance(model_settings, dict):
             overrides.update(model_settings)
 
