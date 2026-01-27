@@ -437,15 +437,15 @@ def _build_contact_color_by_command(
     return f"{color_by_part} {color_options}"
 
 
-def _build_cut_command(cut: Optional["CutPlane"]) -> str:
+def _build_cut_command(cut: Optional[Union["CutPlane", Dict[str, Any]]]) -> str:
     """
-    Build PFC cut command string from CutPlane object.
+    Build PFC cut command string from CutPlane object or dict.
 
     PFC syntax:
         cut active on type plane surface on front on back off origin (x,y,z) normal (nx,ny,nz)
 
     Args:
-        cut: CutPlane with origin and normal vectors
+        cut: CutPlane object or dict with origin and normal vectors
 
     Returns:
         PFC cut command fragment, or empty string if cut is None
@@ -453,8 +453,13 @@ def _build_cut_command(cut: Optional["CutPlane"]) -> str:
     if not cut:
         return ""
 
-    o = cut.origin
-    n = cut.normal
+    if isinstance(cut, dict):
+        o = cut["origin"]
+        n = cut["normal"]
+    else:
+        o = cut.origin
+        n = cut.normal
+
     return f"cut active on type plane surface on front on back off origin ({o[0]},{o[1]},{o[2]}) normal ({n[0]},{n[1]},{n[2]})"
 
 
@@ -476,9 +481,9 @@ def generate_plot_capture_script(
     contact_color_by: Optional[str] = "force",
     contact_color_by_quantity: str = "mag",
     contact_scale_by_force: bool = True,
-    ball_cut: Optional["CutPlane"] = None,
-    wall_cut: Optional["CutPlane"] = None,
-    contact_cut: Optional["CutPlane"] = None,
+    ball_cut: Optional[Union["CutPlane", Dict[str, Any]]] = None,
+    wall_cut: Optional[Union["CutPlane", Dict[str, Any]]] = None,
+    contact_cut: Optional[Union["CutPlane", Dict[str, Any]]] = None,
 ) -> str:
     """
     Generate Python script for PFC plot capture.
