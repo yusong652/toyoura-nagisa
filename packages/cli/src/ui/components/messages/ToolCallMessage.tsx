@@ -14,7 +14,7 @@ import { Box, Text } from 'ink';
 import type { ToolCallHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
 import { TOOL_STATUS } from '../../markers.js';
-import { formatToolDisplay, getToolLayoutConfig } from '../../utils/toolFormat.js';
+import { formatToolDisplay, getToolLayoutConfig, snakeToPascal } from '../../utils/toolFormat.js';
 
 // Status indicator width (matching "● " prefix width = 2)
 const STATUS_INDICATOR_WIDTH = 2;
@@ -44,7 +44,7 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
 
   // Check if this is an invoke_agent call
   const isInvokeAgent = item.toolName === 'invoke_agent';
-  const subagentType = isInvokeAgent ? String(item.toolInput.subagent_type || 'SubAgent') : '';
+  const subagentType = isInvokeAgent ? snakeToPascal(String(item.toolInput.subagent_type || 'SubAgent')) : '';
 
   // Get tool-specific display formatting
   const toolDisplayResult = formatToolDisplay(item.toolName, item.toolInput);

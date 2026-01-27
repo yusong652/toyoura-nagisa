@@ -25,7 +25,7 @@ import { getCachedStringWidth } from '../../utils/textUtils.js';
 import { MarkdownText } from '../MarkdownText.js';
 import { useAppState } from '../../contexts/AppStateContext.js';
 import { ReadToolResultDisplay } from './ReadToolResultDisplay.js';
-import { formatToolDisplay, formatToolParams, getToolLayoutConfig } from '../../utils/toolFormat.js';
+import { formatToolDisplay, formatToolParams, getToolLayoutConfig, snakeToPascal } from '../../utils/toolFormat.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
 // Keep in sync with AssistantMessage.tsx for consistent display
@@ -212,7 +212,7 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
 
   // Check if this is an invoke_agent call
   const isInvokeAgent = item.toolName === 'invoke_agent';
-  const subagentType = isInvokeAgent ? String(item.toolInput.subagent_type || 'SubAgent') : '';
+  const subagentType = isInvokeAgent ? snakeToPascal(String(item.toolInput.subagent_type || 'SubAgent')) : '';
 
   // Check if this is a foreground bash command (can be converted to background)
   const isBashForeground = item.toolName === 'bash' && !item.toolInput.run_in_background && !hasResult;

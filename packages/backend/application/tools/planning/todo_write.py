@@ -51,7 +51,7 @@ class TodoItem(BaseModel):
 
 async def todo_write(
     context: ToolContext,
-    todos: List[TodoItem] = Field(
+    todos: List[Dict[str, Any]] = Field(
         ...,
         description="Array of todo objects. Each object MUST have: content (imperative form, e.g. 'Run tests'), activeForm (present continuous, e.g. 'Running tests'), status ('pending'|'in_progress'|'completed')"
     )
@@ -273,8 +273,8 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
         # Get workspace directory based on agent profile
         workspace = await get_workspace_for_profile(agent_profile, session_id)
 
-        # Validate "only one in_progress" rule (enforced at runtime)
-        in_progress_count = sum(1 for todo in todos if todo.status == "in_progress")
+        # Validate \"only one in_progress\" rule (enforced at runtime)
+        in_progress_count = sum(1 for todo in todos if todo.get("status") == "in_progress")
         if in_progress_count > 1:
             return error_response(
                 f"Only ONE task can be in_progress at a time (found {in_progress_count}). Please ensure exactly one task is marked as in_progress.",
@@ -284,8 +284,9 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
         # Note: Pydantic automatically validates required fields (content, activeForm, status)
         # and status enum values. No need for manual validation.
 
-        # Convert Pydantic models to dicts for storage (backward compatibility)
-        todos_dict = [todo.model_dump() for todo in todos]
+        # todos is already a list of dicts (due to tool_manager.model_dump())
+        # No conversion needed - use directly
+        todos_dict = todos
 
         # Auto-clear logic (Claude Code compatible):
         # If all todos are completed, automatically clear the list
@@ -302,7 +303,7 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
         # Build summary
         status_counts = {}
         for todo in todos:
-            status = todo.status
+            status = todo.get("status", "pending")
             status_counts[status] = status_counts.get(status, 0) + 1
 
         summary_parts = []

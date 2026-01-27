@@ -23,6 +23,18 @@ const MAX_PARAM_VALUE_LENGTH = 60;
 const SKIP_PARAMS = new Set(['old_string', 'new_string', 'content', 'code']);
 
 /**
+ * Convert snake_case to PascalCase for display
+ * @example snakeToPascal('pfc_execute_task') => 'PfcExecuteTask'
+ * @example snakeToPascal('web_search') => 'WebSearch'
+ */
+export function snakeToPascal(str: string): string {
+  return str
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join('');
+}
+
+/**
  * Tool display result with optional multiline support
  */
 export interface ToolDisplayResult {
@@ -259,8 +271,8 @@ export function formatToolDisplay(
     default: {
       // Generic format for other tools
       const params = formatToolParams(input);
-      // Capitalize first letter of tool name
-      const displayName = toolName.charAt(0).toUpperCase() + toolName.slice(1);
+      // Convert snake_case to PascalCase for display
+      const displayName = snakeToPascal(toolName);
       return {
         display: params ? `${displayName}(${params})` : `${displayName}()`,
         isMultiline: false,
@@ -334,6 +346,10 @@ export function getToolLayoutConfig(toolName: string): ToolLayoutConfig {
     case 'pfc_browse_commands':
     case 'pfc_browse_python_api':
     case 'pfc_browse_reference':
+      return { marginBottom: 0 };
+
+    // invoke_agent: SubAgent result displays inline
+    case 'invoke_agent':
       return { marginBottom: 0 };
 
     // Default: standard margin (1)
