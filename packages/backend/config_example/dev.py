@@ -10,12 +10,9 @@ class DevelopmentConfig:
     """Development environment configuration settings."""
 
     def __init__(self):
-        # Hot reload configuration (enabled by default for development)
+        # Hot reload configuration
         self.enable_reload: bool = self._get_bool_env(
             "DEV_ENABLE_RELOAD", True)
-
-        # Reload delay in seconds (helps batch multiple file changes)
-        self.reload_delay: float = float(os.getenv("DEV_RELOAD_DELAY", "0.5"))
 
         # Server configuration for development
         self.host: str = os.getenv("DEV_HOST", "0.0.0.0")
@@ -38,3 +35,8 @@ class DevelopmentConfig:
     def is_development(self) -> bool:
         """Check if running in development environment."""
         return os.getenv("ENVIRONMENT", "development").lower() == "development"
+
+
+def get_dev_config() -> DevelopmentConfig:
+    """Get development configuration instance."""
+    return DevelopmentConfig()
