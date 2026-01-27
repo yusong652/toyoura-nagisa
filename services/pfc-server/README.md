@@ -129,23 +129,24 @@ asyncio.run(test_connection())
 |  +--------------------+----------------------+--------------------+   |
 |                       |                      |                        |
 |  +--------------------v------+  +------------v------------------+    |
-|  |  Handlers (handlers/)     |  |  Managers (managers/)         |    |
+|  |  Handlers (handlers/)     |  |  Services (services/)         |    |
 |  |  - task_handlers          |  |  - git_version (snapshots)    |    |
-|  |  - console_handlers       |  |  - interrupt (task control)   |    |
-|  |  - diagnostic_handlers    |  |  - user_console (> commands)  |    |
-|  |  - workspace_handlers     |  +-------------------------------+    |
-|  |  - utility_handlers       |                                       |
-|  +--------------------+------+                                       |
-|                       |                                              |
+|  |  - console_handlers       |  |  - user_console (> commands)  |    |
+|  |  - diagnostic_handlers    |  +-------------------------------+    |
+|  |  - workspace_handlers     |                                       |
+|  |  - utility_handlers       |  +-------------------------------+    |
+|  +--------------------+------+  |  Signals (signals/)           |    |
+|                       |         |  - interrupt (task control)   |    |
+|                       |         |  - diagnostic (callbacks)     |    |
+|                       |         +-------------------------------+    |
 |  +--------------------v------------------------------------------+   |
-|  |  Executors (executors/)                                       |   |
+|  |  Execution (execution/)                                       |   |
 |  |  - MainThreadExecutor: Queue-based main thread execution      |   |
 |  |  - ScriptRunner: Python script execution with output capture  |   |
-|  |  - DiagnosticExecutor: Callback-based cycle-safe execution    |   |
 |  +--------------------+------------------------------------------+   |
 |                       |                                              |
 |  +--------------------v------------------------------------------+   |
-|  |  Task Manager (task_manager/)                                 |   |
+|  |  Tasks (tasks/)                                               |   |
 |  |  - Task registry and lifecycle tracking                       |   |
 |  |  - Task persistence to disk                                   |   |
 |  |  - Status queries with pagination                             |   |
@@ -475,10 +476,20 @@ AUTO_START_TASK_LOOP = True  # Auto-start continuous task loop on startup
 pfc-server/
 ├── server/                           # Server implementation
 │   ├── server.py                     # WebSocket server + handler routing
-│   ├── executors/                    # Execution engines
+│   ├── execution/                    # Execution engines
 │   │   ├── main_thread.py            # Queue-based main thread execution
-│   │   ├── script.py                 # Python script execution
+│   │   └── script.py                 # Python script execution
+│   ├── tasks/                        # Task lifecycle management
+│   │   ├── manager.py                # Task registry
+│   │   ├── persistence.py            # Task persistence to disk
+│   │   ├── task_base.py              # Task base class
+│   │   └── task_types.py             # ScriptTask implementation
+│   ├── signals/                      # Inter-process communication
+│   │   ├── interrupt.py              # Task interruption control + callback
 │   │   └── diagnostic.py             # Callback-based diagnostic execution
+│   ├── services/                     # Business services
+│   │   ├── git_version.py            # Git snapshot management
+│   │   └── user_console.py           # User console script management
 │   ├── handlers/                     # Message handlers
 │   │   ├── context.py                # Server context (shared state)
 │   │   ├── task_handlers.py          # pfc_task, check_task_status, list_tasks
@@ -487,15 +498,6 @@ pfc-server/
 │   │   ├── workspace_handlers.py     # reset_workspace, get_working_directory
 │   │   ├── utility_handlers.py       # ping, interrupt_task
 │   │   └── helpers.py                # Handler utilities
-│   ├── managers/                     # State managers
-│   │   ├── git_version.py            # Git snapshot management
-│   │   ├── interrupt.py              # Task interruption control
-│   │   └── user_console.py           # User console script management
-│   ├── task_manager/                 # Task lifecycle management
-│   │   ├── manager.py                # Task registry
-│   │   ├── persistence.py            # Task persistence to disk
-│   │   ├── task_base.py              # Task base class
-│   │   └── task_types.py             # ScriptTask implementation
 │   └── utils/                        # Common utilities
 │       ├── file_buffer.py            # File-backed output buffer
 │       ├── path_utils.py             # Path utilities

@@ -107,10 +107,10 @@ Query Tools      Small-Scale Test   Full Simulation
 ```
 
 **Key Components**:
-- **Main Thread Executor**: Queue-based execution ensuring thread safety (`services/pfc-server/server/main_thread_executor.py`)
-- **Task Manager**: Non-blocking lifecycle tracking (`services/pfc-server/server/task_manager.py:19`)
-- **Script Executor**: Real-time output capture for progress monitoring (`services/pfc-server/server/script_executor.py:28`)
-- **Diagnostic Executor**: Callback-based execution for non-blocking diagnostics during simulation cycles (`services/pfc-server/server/diagnostic_executor.py`)
+- **Main Thread Executor**: Queue-based execution ensuring thread safety (`services/pfc-server/server/execution/main_thread.py`)
+- **Task Manager**: Non-blocking lifecycle tracking (`services/pfc-server/server/tasks/manager.py`)
+- **Script Executor**: Real-time output capture for progress monitoring (`services/pfc-server/server/execution/script.py`)
+- **Interrupt/Diagnostic Signals**: Callback-based execution for non-blocking diagnostics during simulation cycles (`services/pfc-server/server/signals/`)
 - **Documentation System**: Command syntax + Python usage examples (`backend/infrastructure/pfc/commands/`)
 
 **PFC Tools Workflow (Script-Only)**:
@@ -301,14 +301,12 @@ toyoura-nagisa/
 │   └── pfc-server/                 # PFC WebSocket server (independent service)
 │       ├── server/                    # Server implementation
 │       │   ├── server.py              # WebSocket server + routing
-│       │   ├── executor.py            # Command executor + task classification
-│       │   ├── script_executor.py     # Script execution with output capture
-│       │   ├── main_thread_executor.py # Queue-based main thread execution
-│       │   ├── task_manager.py        # Long-running task tracking
-│       │   └── diagnostic_executor.py # Non-blocking diagnostic script execution
-│       ├── examples/                  # Example PFC projects
-│       │   ├── scripts/               # Example simulation scripts
-│       │   └── test_scripts/          # Test scripts
+│       │   ├── execution/             # Execution engines
+│       │   ├── tasks/                 # Task lifecycle management
+│       │   ├── signals/               # Interrupt + diagnostic callbacks
+│       │   ├── services/              # Git version, user console
+│       │   ├── handlers/              # WebSocket message handlers
+│       │   └── utils/                 # Common utilities
 │       ├── start_server.py            # Startup script
 │       ├── pyproject.toml             # Server dependencies
 │       └── README.md                  # Independent server documentation

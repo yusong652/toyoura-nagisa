@@ -22,7 +22,8 @@ from typing import Any, Dict, Optional
 
 from .main_thread import MainThreadExecutor
 from ..utils import path_to_llm_format, FileBuffer, TaskDataBuilder, build_response
-from ..managers import get_git_manager, set_current_task, clear_current_task, clear_interrupt
+from ..services import get_git_manager
+from ..signals import set_current_task, clear_current_task, clear_interrupt
 
 # Module logger
 logger = logging.getLogger("PFC-Server")

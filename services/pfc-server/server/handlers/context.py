@@ -8,9 +8,9 @@ that handlers need to perform their operations.
 from typing import TYPE_CHECKING, Dict
 
 if TYPE_CHECKING:
-    from ..task_manager import TaskManager
-    from ..executors import ScriptRunner, MainThreadExecutor
-    from ..managers import UserConsoleManager
+    from ..tasks import TaskManager
+    from ..execution import ScriptRunner, MainThreadExecutor
+    from ..services import UserConsoleManager
 
 
 class ServerContext:
@@ -60,7 +60,7 @@ class ServerContext:
         Returns:
             UserConsoleManager instance for the workspace
         """
-        from ..managers import UserConsoleManager
+        from ..services import UserConsoleManager
 
         if workspace_path not in self.user_console_managers:
             self.user_console_managers[workspace_path] = UserConsoleManager(workspace_path)

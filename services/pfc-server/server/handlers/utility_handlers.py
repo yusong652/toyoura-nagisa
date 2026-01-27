@@ -35,6 +35,9 @@ async def handle_interrupt_task(ctx, data):
     """
     Handle interrupt_task message - request interrupt for a running task.
 
+    Only sets interrupt flag for tasks that are actually running or pending.
+    Returns error for completed/failed/interrupted tasks to prevent flag leaks.
+
     Args:
         ctx: Server context with dependencies
         data: Message data containing:
@@ -44,13 +47,35 @@ async def handle_interrupt_task(ctx, data):
     Returns:
         Response dict with interrupt request result
     """
-    from ..managers import request_interrupt
+    from ..signals import request_interrupt
 
     request_id = data.get("request_id", "unknown")
 
     task_id, err = require_field(data, "task_id", request_id)
     if err:
         return err
+
+    # Check if task exists and is interruptible
+    task = ctx.task_manager.tasks.get(task_id)
+    if not task:
+        return {
+            "type": "result",
+            "request_id": request_id,
+            "status": "error",
+            "message": "Task not found: {}".format(task_id),
+            "data": {"task_id": task_id, "interrupt_requested": False}
+        }
+
+    # Only allow interrupt for pending/running tasks
+    task_status = task.status
+    if task_status not in ("pending", "running"):
+        return {
+            "type": "result",
+            "request_id": request_id,
+            "status": "error",
+            "message": "Task already in terminal state: {} (status: {})".format(task_id, task_status),
+            "data": {"task_id": task_id, "status": task_status, "interrupt_requested": False}
+        }
 
     # Request interrupt (will be checked by PFC callback)
     success = request_interrupt(task_id)

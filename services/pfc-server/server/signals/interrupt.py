@@ -19,6 +19,7 @@ Python 3.6 compatible implementation.
 """
 
 import threading
+import time
 import logging
 from typing import Any, Dict, Optional
 
@@ -30,9 +31,13 @@ logger = logging.getLogger("PFC-Server")
 # Interrupt Flag Management (Thread-safe)
 # =============================================================================
 
-# Interrupt flags: {task_id: True} - only stores tasks with active requests
-_interrupt_flags = {}  # type: Dict[str, bool]
+# Interrupt flags with timestamps: {task_id: timestamp}
+# Timestamp enables cleanup of stale flags (fallback protection)
+_interrupt_flags = {}  # type: Dict[str, float]
 _flags_lock = threading.Lock()
+
+# Maximum age for interrupt flags (1 hour) - stale flags are cleaned up
+_FLAG_MAX_AGE_SECONDS = 3600.0
 
 
 def request_interrupt(task_id):
@@ -41,6 +46,7 @@ def request_interrupt(task_id):
     Request interrupt for a running task.
 
     Called from WebSocket handler thread when user requests cancellation.
+    Stores timestamp for stale flag cleanup.
 
     Args:
         task_id: Task ID to interrupt
@@ -52,7 +58,7 @@ def request_interrupt(task_id):
         return False
 
     with _flags_lock:
-        _interrupt_flags[task_id] = True
+        _interrupt_flags[task_id] = time.time()
 
     logger.info("Interrupt requested: %s", task_id)
     return True
@@ -73,7 +79,8 @@ def check_interrupt(task_id):
         bool: True if interrupt requested, False otherwise
     """
     # Fast path: dict.get() is atomic in CPython due to GIL
-    return _interrupt_flags.get(task_id, False)
+    # We only check existence, not timestamp (for speed)
+    return task_id in _interrupt_flags
 
 
 def clear_interrupt(task_id):
@@ -92,13 +99,47 @@ def clear_interrupt(task_id):
             logger.debug("Cleared interrupt flag: %s", task_id)
 
 
-def get_pending_interrupts():
-    # type: () -> Dict[str, bool]
+def cleanup_stale_flags(max_age_seconds=None):
+    # type: (Optional[float]) -> int
     """
-    Get all pending interrupt requests (for debugging).
+    Remove interrupt flags older than max_age_seconds.
+
+    This is a fallback protection against memory leaks from flags that
+    were never consumed (e.g., task completed before callback ran).
+
+    Args:
+        max_age_seconds: Maximum age in seconds (default: _FLAG_MAX_AGE_SECONDS)
 
     Returns:
-        Dict of task_id -> True for all pending interrupts
+        int: Number of stale flags removed
+    """
+    if max_age_seconds is None:
+        max_age_seconds = _FLAG_MAX_AGE_SECONDS
+
+    now = time.time()
+    stale_ids = []
+
+    with _flags_lock:
+        for task_id, timestamp in list(_interrupt_flags.items()):
+            if now - timestamp > max_age_seconds:
+                stale_ids.append(task_id)
+
+        for task_id in stale_ids:
+            del _interrupt_flags[task_id]
+
+    if stale_ids:
+        logger.info("Cleaned up %d stale interrupt flag(s): %s", len(stale_ids), stale_ids)
+
+    return len(stale_ids)
+
+
+def get_pending_interrupts():
+    # type: () -> Dict[str, float]
+    """
+    Get all pending interrupt requests with timestamps (for debugging).
+
+    Returns:
+        Dict of task_id -> timestamp for all pending interrupts
     """
     with _flags_lock:
         return dict(_interrupt_flags)
@@ -199,7 +240,7 @@ def _re_register_callback(itasca_module, position=50.0):
 
     # Also re-register diagnostic callback if it was registered
     try:
-        from ..executors.diagnostic import _pfc_diagnostic_callback, is_callback_registered
+        from .diagnostic import _pfc_diagnostic_callback, is_callback_registered
         if is_callback_registered():
             __main__._pfc_diagnostic_callback = _pfc_diagnostic_callback  # type: ignore[attr-defined]
             itasca_module.set_callback("_pfc_diagnostic_callback", 51.0)

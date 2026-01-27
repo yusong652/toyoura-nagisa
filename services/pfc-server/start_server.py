@@ -50,7 +50,7 @@ for handler in [logging.StreamHandler(sys.stdout),
     root_logger.addHandler(handler)
 
 # Import server components
-from server.executors import MainThreadExecutor
+from server.execution import MainThreadExecutor
 from server.server import create_server
 
 # Load configuration with fallback to defaults
@@ -83,8 +83,7 @@ try:
     it.command("python-reset-state false")
     _init_status["pfc_state"] = True
 
-    from server.managers import register_interrupt_callback
-    from server.executors import register_diagnostic_callback
+    from server.signals import register_interrupt_callback, register_diagnostic_callback
     _init_status["interrupt"] = register_interrupt_callback(it, position=50.0)
     _init_status["diagnostic"] = register_diagnostic_callback(it, position=51.0)
 except ImportError:
