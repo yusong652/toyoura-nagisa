@@ -103,24 +103,27 @@ export function usePfcConsoleCommand(
 
       // Resolve pending promise
       if (pendingRef.current) {
-        if (event.success) {
-          pendingRef.current.resolve({
-            task_id: event.task_id,
-            script_name: event.script_name,
-            script_path: event.script_path,
-            code_preview: event.code_preview,
-            output: event.output,
-            error: event.error,
-            result: event.result,
-            elapsed_time: event.elapsed_time,
-            context: event.context,
-            connected: event.connected,
-            backgrounded: event.backgrounded,
-          });
-        } else {
+        // We resolve with data regardless of success flag, so the UI can display errors
+        // effectively using the MessageType.PFC_CONSOLE_RESULT type
+        pendingRef.current.resolve({
+          task_id: event.task_id,
+          script_name: event.script_name,
+          script_path: event.script_path,
+          code_preview: event.code_preview,
+          output: event.output,
+          // Use error_message (system error) or error (execution error)
+          error: event.error_message || event.error || (event.success ? null : 'PFC command failed'),
+          result: event.result,
+          elapsed_time: event.elapsed_time,
+          context: event.context,
+          connected: event.connected,
+          backgrounded: event.backgrounded,
+        });
+
+        if (!event.success) {
           setError(event.error_message || event.error || 'PFC command failed');
-          pendingRef.current.resolve(null);
         }
+
         pendingRef.current = null;
         setIsExecuting(false);
       }
