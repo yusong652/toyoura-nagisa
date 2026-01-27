@@ -648,7 +648,7 @@ Tests: script execution, background tasks, status queries, WebSocket responsiven
 
 - **[ITASCA PFC Documentation](https://www.itascacg.com/software/pfc)**: Official PFC docs
 - **Client Implementation**: If using toyoura-nagisa, see `packages/backend/infrastructure/pfc/` for WebSocket client
-- **PFC Tools**: See `packages/backend/infrastructure/mcp/tools/pfc/` for agent tool implementations
+- **PFC Tools**: See `packages/backend/application/tools/pfc/` for agent tool implementations
 
 ---
 
