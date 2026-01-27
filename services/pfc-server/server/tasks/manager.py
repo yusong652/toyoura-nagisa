@@ -107,6 +107,23 @@ class TaskManager:
 
         return task_id
 
+    def has_running_tasks(self):
+        # type: () -> bool
+        """
+        Check if any task is currently running.
+
+        Used to determine execution path for diagnostic scripts:
+        - If tasks are running: queue is blocked, use callback execution
+        - If no tasks running: queue is available, use queue execution
+
+        Returns:
+            bool: True if at least one task has status "running"
+        """
+        for task in self.tasks.values():
+            if task.status == "running":
+                return True
+        return False
+
     def get_task_status(self, task_id):
         # type: (str) -> Dict[str, Any]
         """

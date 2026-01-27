@@ -9,7 +9,7 @@ import concurrent.futures
 import logging
 import os
 from io import StringIO
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from .context import ServerContext
 from .helpers import require_field
@@ -19,103 +19,177 @@ logger = logging.getLogger("PFC-Server")
 
 async def _wait_for_file(
     result: Dict[str, Any],
-    max_wait_seconds: float = 30.0,
-    poll_interval: float = 0.2
+    timeout: float = 30.0,
+    interval: float = 0.2
 ) -> Dict[str, Any]:
-    """
-    Wait for export file to exist.
-
-    This function runs asynchronously without blocking PFC main thread.
-    No delete needed - plot create auto-clears items on next capture.
-
-    Args:
-        result: Diagnostic script result containing data.output_path
-        max_wait_seconds: Maximum time to wait for file
-        poll_interval: Time between file existence checks
-
-    Returns:
-        Updated result dict with file verification status
-    """
-    # Extract output path from result
+    """Wait for export file to exist, return updated result."""
     data = result.get("data")
     if not isinstance(data, dict):
         return result
 
     output_path = data.get("output_path")
-
     if not output_path:
         return result
 
-    # Async wait for file to exist (non-blocking)
     elapsed = 0.0
-    while not os.path.exists(output_path) and elapsed < max_wait_seconds:
-        await asyncio.sleep(poll_interval)
-        elapsed += poll_interval
+    while not os.path.exists(output_path) and elapsed < timeout:
+        await asyncio.sleep(interval)
+        elapsed += interval
 
     if not os.path.exists(output_path):
-        logger.error("Export file not created after {}s: {}".format(max_wait_seconds, output_path))
         return {
             **result,
             "status": "error",
-            "message": "Export timeout: file not created after {}s".format(max_wait_seconds)
+            "message": "Export timeout: file not created after {}s".format(timeout)
         }
-
-    logger.info("Export file verified: {}".format(os.path.basename(output_path)))
 
     return result
 
 
-async def _await_future_with_timeout(
-    loop: asyncio.AbstractEventLoop,
-    future: concurrent.futures.Future,
+async def _execute_via_queue(
+    ctx: ServerContext,
+    script_path: str,
+    script_content: str,
+    output_buffer: StringIO,
+    task_id: str,
     timeout: float
 ) -> Tuple[Optional[Dict[str, Any]], bool]:
     """
-    Await a concurrent.futures.Future with timeout, non-blocking.
-
-    Args:
-        loop: Event loop for run_in_executor
-        future: Future to await
-        timeout: Timeout in seconds
+    Execute diagnostic via main thread queue.
 
     Returns:
-        Tuple of (result, timed_out):
-            - (result_dict, False) if completed within timeout
-            - (None, True) if timed out
+        (result, success): result dict if success, None otherwise
     """
+    loop = asyncio.get_event_loop()
+
+    future = ctx.main_executor.submit(
+        ctx.script_runner._execute,
+        script_path,
+        script_content,
+        output_buffer,
+        task_id
+    )
+
     try:
-        result = await loop.run_in_executor(None, future.result, timeout)
-        return result, False
-    except concurrent.futures.TimeoutError:
-        return None, True
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, future.result, timeout),
+            timeout=timeout + 0.1
+        )
+        return result, True
+    except (asyncio.TimeoutError, concurrent.futures.TimeoutError):
+        # Try to cancel; if failed, task already started - wait for it
+        if not future.cancel():
+            try:
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(None, future.result, timeout * 2),
+                    timeout=timeout * 2 + 0.1
+                )
+                return result, True
+            except (asyncio.TimeoutError, concurrent.futures.TimeoutError):
+                pass
+        return None, False
+
+
+async def _execute_via_callback(script_path: str, timeout: float) -> Tuple[Optional[Dict[str, Any]], bool]:
+    """
+    Execute diagnostic via cycle callback.
+
+    Returns:
+        (result, success): result dict if success, None otherwise
+    """
+    from ..signals import submit_diagnostic, is_diagnostic_callback_registered
+
+    if not is_diagnostic_callback_registered():
+        return None, False
+
+    loop = asyncio.get_event_loop()
+    future = submit_diagnostic(script_path)
+
+    try:
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, future.result, timeout),
+            timeout=timeout + 0.1
+        )
+        return result, True
+    except (asyncio.TimeoutError, concurrent.futures.TimeoutError):
+        return None, False
+
+
+async def _execute_diagnostic(
+    ctx: ServerContext,
+    script_path: str,
+    script_content: str,
+    output_buffer: StringIO,
+    task_id: str,
+    remaining_time_func,
+    attempt: int = 0,
+    max_attempts: int = 2
+) -> Tuple[Optional[Dict[str, Any]], str]:
+    """
+    Execute diagnostic script with recursive strategy switching.
+
+    Each attempt:
+    1. Check current state (has_running_tasks)
+    2. Choose strategy based on state
+    3. If timeout, recurse with attempt + 1 (re-evaluates state)
+
+    Args:
+        remaining_time_func: Function returning remaining time budget
+        attempt: Current attempt number (0-indexed)
+        max_attempts: Maximum attempts before giving up
+
+    Returns:
+        (result, execution_path) or (None, "timeout")
+    """
+    # Base case: exhausted attempts or time
+    if attempt >= max_attempts:
+        return None, "max_attempts"
+
+    remaining = remaining_time_func()
+    if remaining < 0.5:
+        return None, "timeout"
+
+    # Dynamic strategy selection based on current state
+    has_running = ctx.task_manager.has_running_tasks()
+    timeout = remaining * 0.4  # Use 40% of remaining time per attempt
+
+    if has_running:
+        # Tasks running → try callback (queue is blocked)
+        result, success = await _execute_via_callback(script_path, timeout)
+        if success:
+            return result, "callback"
+    else:
+        # No tasks → try queue (faster path)
+        result, success = await _execute_via_queue(
+            ctx, script_path, script_content, output_buffer, task_id, timeout
+        )
+        if success:
+            return result, "queue"
+
+    # Strategy failed → recurse (state may have changed)
+    return await _execute_diagnostic(
+        ctx=ctx,
+        script_path=script_path,
+        script_content=script_content,
+        output_buffer=output_buffer,
+        task_id=task_id,
+        remaining_time_func=remaining_time_func,
+        attempt=attempt + 1,
+        max_attempts=max_attempts
+    )
 
 
 async def handle_diagnostic_execute(ctx, data):
     # type: (ServerContext, Dict[str, Any]) -> Dict[str, Any]
     """
-    Handle diagnostic_execute message - execute diagnostic script with smart path selection.
+    Handle diagnostic_execute message.
 
-    Execution strategy:
-    1. Try queue execution first (1s timeout) - works when PFC is idle
-    2. If queue blocked, use callback execution - works during cycle
-
-    Timeout budget:
-    - Total timeout: timeout_ms (default 30000ms)
-    - Queue wait: 1s (plot commands execute quickly)
-    - Script execution: variable
-    - File wait: remaining time after script execution
-
-    Args:
-        ctx: Server context with dependencies
-        data: Message data containing:
-            - request_id: Request identifier
-            - script_path: Path to diagnostic script
-            - timeout_ms: Timeout in milliseconds (default: 30000)
-
-    Returns:
-        Response dict with diagnostic result
+    Strategy selection based on task state:
+    - Tasks running: callback first, then queue
+    - No tasks: queue first, then callback
     """
     import time as time_module
+    import uuid
 
     request_id = data.get("request_id", "unknown")
 
@@ -124,157 +198,54 @@ async def handle_diagnostic_execute(ctx, data):
         return err
 
     timeout_ms = data.get("timeout_ms", 30000)
-
-    # Track start time for timeout budget
     start_time = time_module.time()
-    total_timeout_sec = timeout_ms / 1000.0
+    total_timeout = timeout_ms / 1000.0
 
-    def remaining_time():
-        """Calculate remaining time in seconds."""
-        elapsed = time_module.time() - start_time
-        return max(total_timeout_sec - elapsed, 0.5)  # At least 0.5s
+    def remaining():
+        return max(total_timeout - (time_module.time() - start_time), 0.5)
 
     try:
-
-        import os
-        import uuid
-
-        # Read script content
         with open(script_path, 'r', encoding='utf-8') as f:
             script_content = f.read()
 
-        # Generate task_id for tracking
-        # Use StringIO for diagnostic scripts (quick, no persistence needed)
         task_id = uuid.uuid4().hex[:8]
         output_buffer = StringIO()
 
-        # Get event loop for non-blocking waits
-        loop = asyncio.get_event_loop()
-
-        # Strategy 1: Try queue execution with 1 second timeout
-        # Plot commands execute quickly (~1s), so short timeout is sufficient
-        # If timeout, likely blocked by long-running cycle
-        queue_timeout = min(1.0, remaining_time())
-        queue_future = ctx.main_executor.submit(
-            ctx.script_runner._execute,
-            script_path,
-            script_content,
-            output_buffer,
-            task_id
+        # Execute with recursive strategy switching
+        result, path = await _execute_diagnostic(
+            ctx=ctx,
+            script_path=script_path,
+            script_content=script_content,
+            output_buffer=output_buffer,
+            task_id=task_id,
+            remaining_time_func=remaining,
+            attempt=0,
+            max_attempts=2
         )
 
-        result, queue_blocked = await _await_future_with_timeout(loop, queue_future, queue_timeout)
-
-        if not queue_blocked and result is not None:
-            # Queue was available, execution completed
-            logger.info("Diagnostic executed via queue: {}".format(
-                os.path.basename(script_path)
-            ))
-            # Wait for export file with remaining time budget
-            file_wait_timeout = remaining_time()
-            result = await _wait_for_file(result, max_wait_seconds=file_wait_timeout)
+        if result is not None:
+            result = await _wait_for_file(result, timeout=remaining())
             return {
                 "type": "diagnostic_result",
                 "request_id": request_id,
-                "execution_path": "queue",
+                "execution_path": path,
                 **result
             }
 
-        # Queue timed out - try to cancel the queued task to prevent double execution
-        # cancel() returns True if task was successfully cancelled (not yet started)
-        # Returns False if task is already running or completed
-        cancelled = queue_future.cancel()
-        if cancelled:
-            logger.info("Queue blocked, cancelled queue task, switching to callback execution")
-        else:
-            # Task already started executing in queue - wait for it instead of double-submitting
-            logger.info("Queue task already started, waiting for queue completion")
-            try:
-                # Wait for remaining time (half for execution, half for file wait)
-                exec_timeout = remaining_time() * 0.5
-                result = await loop.run_in_executor(None, queue_future.result, exec_timeout)
-                # Wait for export file with remaining time budget
-                file_wait_timeout = remaining_time()
-                result = await _wait_for_file(result, max_wait_seconds=file_wait_timeout)
-                return {
-                    "type": "diagnostic_result",
-                    "request_id": request_id,
-                    "execution_path": "queue_delayed",
-                    **result
-                }
-            except concurrent.futures.TimeoutError:
-                return {
-                    "type": "diagnostic_result",
-                    "request_id": request_id,
-                    "status": "timeout",
-                    "message": "Diagnostic timed out after {}ms (queue delayed)".format(timeout_ms),
-                    "data": None
-                }
-
-        # Strategy 2: Queue blocked and cancelled, use callback execution (works during cycle)
-        logger.info("Queue blocked, switching to callback execution")
-
-        from ..signals import submit_diagnostic, is_diagnostic_callback_registered as is_callback_registered
-
-        if not is_callback_registered():
-            raise RuntimeError(
-                "Diagnostic callback not registered and queue is blocked. "
-                "Restart PFC server to enable callback execution."
-            )
-
-        # Submit to callback executor
-        callback_future = submit_diagnostic(script_path)
-
-        # Wait for callback execution (half remaining time for execution, half for file wait)
-        callback_timeout = remaining_time() * 0.5
-        result, timed_out = await _await_future_with_timeout(loop, callback_future, callback_timeout)
-
-        if not timed_out and result is not None:
-            logger.info("Diagnostic executed via callback: {}".format(
-                os.path.basename(script_path)
-            ))
-            # Wait for export file with remaining time budget
-            file_wait_timeout = remaining_time()
-            result = await _wait_for_file(result, max_wait_seconds=file_wait_timeout)
-            return {
-                "type": "diagnostic_result",
-                "request_id": request_id,
-                "execution_path": "callback",
-                **result
-            }
-
-        # Both strategies failed
         return {
             "type": "diagnostic_result",
             "request_id": request_id,
             "status": "timeout",
-            "message": "Diagnostic timed out after {}ms. "
-                       "Queue blocked and no cycle running.".format(timeout_ms),
+            "message": "Diagnostic timed out after {}ms".format(timeout_ms),
             "data": None
         }
 
-    except ValueError as e:
-        return {
-            "type": "diagnostic_result",
-            "request_id": request_id,
-            "status": "error",
-            "message": str(e),
-            "data": None
-        }
-    except RuntimeError as e:
-        return {
-            "type": "diagnostic_result",
-            "request_id": request_id,
-            "status": "error",
-            "message": str(e),
-            "data": None
-        }
     except Exception as e:
-        logger.error(f"Diagnostic execution failed: {e}")
+        logger.error("Diagnostic execution failed: {}".format(e))
         return {
             "type": "diagnostic_result",
             "request_id": request_id,
             "status": "error",
-            "message": f"Diagnostic execution failed: {e}",
+            "message": str(e),
             "data": None
         }
