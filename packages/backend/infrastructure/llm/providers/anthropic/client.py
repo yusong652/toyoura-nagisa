@@ -10,6 +10,14 @@ from .debug import AnthropicDebugger
 from .context_manager import AnthropicContextManager
 from .tool_manager import AnthropicToolManager
 
+
+# Thinking level to Anthropic budget tokens mapping
+THINKING_LEVEL_TO_BUDGET = {
+    "low": 4096,
+    "high": 16384,
+}
+
+
 class AnthropicClient(LLMClientBase):
     """
     Anthropic Claude client class.
@@ -138,22 +146,18 @@ class AnthropicClient(LLMClientBase):
             kwargs_api["top_k"] = call_options.top_k
 
         # Handle thinking configuration
-        # Priority: call_options.thinking > call_options.enable_thinking > config default
-        if call_options.thinking is not None:
-            # Explicit thinking config dict overrides everything
-            kwargs_api["thinking"] = call_options.thinking
-        elif call_options.enable_thinking is not None:
-            # enable_thinking flag controls whether thinking is used
-            if call_options.enable_thinking:
-                # Add thinking config for supported models
-                if self.anthropic_config.supports_thinking():
-                    kwargs_api["thinking"] = {
-                        "type": "enabled",
-                        "budget_tokens": self.anthropic_config.thinking_budget_tokens
-                    }
-            else:
-                # Disable thinking
-                kwargs_api.pop("thinking", None)
+        if call_options.thinking_level is not None and call_options.thinking_level != "default":
+            # Map thinking level to budget tokens using defined mapping
+            # Default to 4096 (low) if level not found
+            budget = THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, 4096)
+            kwargs_api["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": budget
+            }
+            # Ensure max_tokens > budget_tokens (Anthropic requirement)
+            current_max = kwargs_api.get("max_tokens", self.anthropic_config.max_tokens)
+            if current_max <= budget:
+                kwargs_api["max_tokens"] = budget + 1024
 
         async def _call_api():
             # call the Anthropic API (async)
@@ -235,22 +239,18 @@ class AnthropicClient(LLMClientBase):
             kwargs_api["top_k"] = call_options.top_k
 
         # Handle thinking configuration
-        # Priority: call_options.thinking > call_options.enable_thinking > config default
-        if call_options.thinking is not None:
-            # Explicit thinking config dict overrides everything
-            kwargs_api["thinking"] = call_options.thinking
-        elif call_options.enable_thinking is not None:
-            # enable_thinking flag controls whether thinking is used
-            if call_options.enable_thinking:
-                # Add thinking config for supported models
-                if self.anthropic_config.supports_thinking():
-                    kwargs_api["thinking"] = {
-                        "type": "enabled",
-                        "budget_tokens": self.anthropic_config.thinking_budget_tokens
-                    }
-            else:
-                # Disable thinking
-                kwargs_api.pop("thinking", None)
+        if call_options.thinking_level is not None and call_options.thinking_level != "default":
+            # Map thinking level to budget tokens using defined mapping
+            # Default to 4096 (low) if level not found
+            budget = THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, 4096)
+            kwargs_api["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": budget
+            }
+            # Ensure max_tokens > budget_tokens (Anthropic requirement)
+            current_max = kwargs_api.get("max_tokens", self.anthropic_config.max_tokens)
+            if current_max <= budget:
+                kwargs_api["max_tokens"] = budget + 1024
 
         if debug:
             AnthropicDebugger.print_debug_request_payload(kwargs_api)

@@ -10,7 +10,6 @@ class CallOptions:
     top_k: Optional[int] = None
     timeout: Optional[float] = None
     max_retries: Optional[int] = None
-    thinking: Optional[Dict[str, Any]] = None  # Provider-specific thinking config dict
     thinking_level: Optional[str] = None  # "default", "low", or "high"
 
 
@@ -21,7 +20,6 @@ _STANDARD_OPTION_KEYS = {
     "top_k",
     "timeout",
     "max_retries",
-    "thinking",
     "thinking_level",
 }
 
@@ -42,6 +40,5 @@ def parse_call_options(kwargs: Dict[str, Any]) -> CallOptions:
         top_k=kwargs.get("top_k"),
         timeout=kwargs.get("timeout"),
         max_retries=kwargs.get("max_retries"),
-        thinking=kwargs.get("thinking"),
         thinking_level=kwargs.get("thinking_level"),
     )
