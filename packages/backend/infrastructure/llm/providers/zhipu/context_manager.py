@@ -1,5 +1,5 @@
 """
-Zhipu (智谱) Context Manager
+Zhipu (GLM) Context Manager
 
 Manages conversation context and message history for Zhipu API calls.
 Handles ChatCompletion responses from zai SDK.

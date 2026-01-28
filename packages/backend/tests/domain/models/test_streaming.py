@@ -169,7 +169,7 @@ class TestStreamingChunkParametrized:
     @pytest.mark.parametrize("content", [
         "Simple text",
         "",  # Empty string
-        "Unicode 世界 🌍",
+        "Unicode World 🌍",
         "Line 1\nLine 2",
         "A" * 10000,  # Long content
     ])

@@ -15,9 +15,10 @@ from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.shared.constants.thinking import GOOGLE_THINKING_LEVEL_TO_BUDGET
+from backend.config.dev import get_dev_config
 
 # Import Gemini-specific implementations
-from .config import get_google_client_config
+from .config import GoogleConfig
 from .context_manager import GoogleContextManager
 from .debug import GoogleDebugger
 from .response_processor import GoogleResponseProcessor
@@ -54,31 +55,19 @@ class GoogleClient(LLMClientBase):
     - Content Generators: Specialized content generation utilities
     """
     
-    def __init__(self, api_key: str, **kwargs):
+    def __init__(self, config: GoogleConfig, extra_config: Optional[Dict[str, Any]] = None, **kwargs):
         """
         Initialize enhanced Gemini client with context preservation capabilities.
         
         Args:
-            api_key: Google API key
-            **kwargs: Additional configuration parameters
+            config: Google specific configuration
+            extra_config: Additional configuration parameters
+            **kwargs: Catch-all for extra arguments from factory
         """
-        super().__init__(**kwargs)
+        super().__init__(extra_config=extra_config)
         self.provider_name = "google"
-        self.client = genai.Client(api_key=api_key)
-        
-        # Initialize Gemini-specific configuration
-        # Extract relevant configuration from extra_config for overrides
-        # Factory only passes: model, debug
-        config_overrides = {}
-        if 'model' in self.extra_config:
-            config_overrides['model'] = self.extra_config['model']
-        if 'debug' in self.extra_config:
-            config_overrides['debug'] = self.extra_config['debug']
-
-        self.google_config = get_google_client_config(**config_overrides)
-
-        print(f"Gemini Client initialized")
-        print(f"  Model: {self.google_config.model}")
+        self.google_config = config
+        self.client = genai.Client(api_key=config.google_api_key)
 
         # Initialize component managers with unified architecture
         self.tool_manager = GoogleToolManager()
@@ -96,33 +85,9 @@ class GoogleClient(LLMClientBase):
     ) -> types.GenerateContentResponse:
         """
         Execute direct Gemini API call with complete pre-formatted context and config.
-
-        Performs a stateless API call using provided context and configuration.
-        This method is thread-safe and supports concurrent sessions.
-
-        Args:
-            context_contents: Complete Gemini context contents with structure:
-                - role: str - Message role ("user", "model", "system")
-                - parts: List[Dict] - Content parts including text and function calls
-            api_config: Gemini-specific configuration dictionary:
-                - config: types.GenerateContentConfig - Complete Gemini config object
-            **kwargs: Additional API configuration parameters:
-                - temperature: Optional[float] - Sampling temperature override
-                - max_tokens: Optional[int] - Maximum output tokens override
-                - top_p: Optional[float] - Nucleus sampling parameter
-                - top_k: Optional[int] - Top-k sampling parameter
-
-        Returns:
-            types.GenerateContentResponse: Raw Gemini API response with complete structure
-
-        Raises:
-            Exception: If API call fails, returns invalid response, or encounters authentication errors
-
-        Note:
-            This method is completely stateless. All configuration is passed via parameters.
         """
         call_options = parse_call_options(kwargs)
-        debug = self.google_config.debug
+        debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.google_config.timeout
         max_retries = (
             call_options.max_retries
@@ -130,51 +95,49 @@ class GoogleClient(LLMClientBase):
             else self.google_config.max_retries
         )
 
-        # Extract Gemini config from api_config
-        config = api_config.get('config')
-        if not config:
-            # Fallback to basic config if not provided
-            config_kwargs = self.google_config.get_generation_config_kwargs(
-                system_prompt="",
-                tool_schemas=[]
-            )
-            config = types.GenerateContentConfig(**config_kwargs)
+        # Build API parameters
+        kwargs_api = self.google_config.build_api_params()
+        
+        # System prompt and tools from api_config
+        system_prompt = api_config.get('system_prompt', '')
+        tool_schemas = api_config.get('tools', [])
 
-        config_dict = config.model_dump()
-        model = self.google_config.model
+        # Override with api_config if present
+        if system_prompt:
+            kwargs_api["system_instruction"] = system_prompt
+        if tool_schemas:
+            kwargs_api["tools"] = tool_schemas
 
+        # Apply call options overrides
         if call_options.temperature is not None:
-            config_dict["temperature"] = call_options.temperature
+            kwargs_api["temperature"] = call_options.temperature
         if call_options.max_tokens is not None:
-            config_dict["max_output_tokens"] = call_options.max_tokens
+            kwargs_api["max_output_tokens"] = call_options.max_tokens
         if call_options.top_p is not None:
-            config_dict["top_p"] = call_options.top_p
+            kwargs_api["top_p"] = call_options.top_p
         if call_options.top_k is not None:
-            config_dict["top_k"] = call_options.top_k
+            kwargs_api["top_k"] = call_options.top_k
 
         # Handle thinking configuration based on thinking_level
-        # If thinking_level is explicitly "default", remove thinking config (disable thinking)
-        # If thinking_level is "low" or "high", override with specified level
         if call_options.thinking_level == "default":
-            # Explicitly disable thinking
-            config_dict.pop("thinking_config", None)
+            kwargs_api.pop("thinking_config", None)
         elif call_options.thinking_level is not None:
+            model = self.google_config.model
             if model.startswith("gemini-3"):
-                # Gemini 3 models use thinking_level enum
                 thinking_level = GOOGLE_THINKING_LEVEL_MAP.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
-                config_dict["thinking_config"] = types.ThinkingConfig(
+                kwargs_api["thinking_config"] = types.ThinkingConfig(
                     thinking_level=thinking_level,
                     include_thoughts=True
                 )
             elif model.startswith("gemini-2.5"):
-                # Gemini 2.5 models use thinking_budget
                 budget = GOOGLE_THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
-                config_dict["thinking_config"] = types.ThinkingConfig(
+                kwargs_api["thinking_config"] = types.ThinkingConfig(
                     thinking_budget=budget,
                     include_thoughts=True
                 )
 
-        config = types.GenerateContentConfig(**config_dict)
+        config = types.GenerateContentConfig(**kwargs_api)
+        model = self.google_config.model
 
         if debug:
             GoogleDebugger.print_request(context_contents, config, model)
@@ -252,10 +215,13 @@ class GoogleClient(LLMClientBase):
         Returns:
             Dict with 'config' key containing GenerateContentConfig
         """
-        config_kwargs = self.google_config.get_api_call_kwargs(
-            system_prompt=system_prompt,
-            tool_schemas=tool_schemas or []
-        )
+        config_kwargs = self.google_config.build_api_params()
+        
+        # Override system prompt and tools
+        config_kwargs["system_instruction"] = system_prompt
+        if tool_schemas:
+            config_kwargs["tools"] = tool_schemas
+            
         config = types.GenerateContentConfig(**config_kwargs)
         return {'config': config}
 
@@ -271,24 +237,9 @@ class GoogleClient(LLMClientBase):
     ) -> AsyncGenerator[StreamingChunk, None]:
         """
         Execute streaming Gemini API call with real-time chunk delivery.
-
-        Streams responses from Gemini API and converts native chunks into
-        standardized StreamingChunk objects for consistent handling.
-
-        Args:
-            context_contents: Complete Gemini context contents
-            api_config: Gemini-specific configuration with 'config' key
-            **kwargs: Additional API parameters (temperature, max_tokens, etc.)
-
-        Yields:
-            StreamingChunk: Standardized streaming chunks containing thinking,
-                          text, or function_call content
-
-        Raises:
-            Exception: If streaming API call fails
         """
         call_options = parse_call_options(kwargs)
-        debug = self.google_config.debug
+        debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.google_config.timeout
         max_retries = (
             call_options.max_retries
@@ -296,51 +247,49 @@ class GoogleClient(LLMClientBase):
             else self.google_config.max_retries
         )
 
-        # Extract Gemini config from api_config
-        config = api_config.get('config')
-        if not config:
-            # Fallback to basic config if not provided
-            config_kwargs = self.google_config.get_generation_config_kwargs(
-                system_prompt="",
-                tool_schemas=[]
-            )
-            config = types.GenerateContentConfig(**config_kwargs)
+        # Build API parameters
+        kwargs_api = self.google_config.build_api_params()
+        
+        # System prompt and tools from api_config
+        system_prompt = api_config.get('system_prompt', '')
+        tool_schemas = api_config.get('tools', [])
 
-        config_dict = config.model_dump()
-        model = self.google_config.model
+        # Override with api_config if present
+        if system_prompt:
+            kwargs_api["system_instruction"] = system_prompt
+        if tool_schemas:
+            kwargs_api["tools"] = tool_schemas
 
+        # Apply call options overrides
         if call_options.temperature is not None:
-            config_dict["temperature"] = call_options.temperature
+            kwargs_api["temperature"] = call_options.temperature
         if call_options.max_tokens is not None:
-            config_dict["max_output_tokens"] = call_options.max_tokens
+            kwargs_api["max_output_tokens"] = call_options.max_tokens
         if call_options.top_p is not None:
-            config_dict["top_p"] = call_options.top_p
+            kwargs_api["top_p"] = call_options.top_p
         if call_options.top_k is not None:
-            config_dict["top_k"] = call_options.top_k
+            kwargs_api["top_k"] = call_options.top_k
 
         # Handle thinking configuration based on thinking_level
-        # If thinking_level is explicitly "default", remove thinking config (disable thinking)
-        # If thinking_level is "low" or "high", override with specified level
         if call_options.thinking_level == "default":
-            # Explicitly disable thinking
-            config_dict.pop("thinking_config", None)
+            kwargs_api.pop("thinking_config", None)
         elif call_options.thinking_level is not None:
+            model = self.google_config.model
             if model.startswith("gemini-3"):
-                # Gemini 3 models use thinking_level enum
                 thinking_level = GOOGLE_THINKING_LEVEL_MAP.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
-                config_dict["thinking_config"] = types.ThinkingConfig(
+                kwargs_api["thinking_config"] = types.ThinkingConfig(
                     thinking_level=thinking_level,
                     include_thoughts=True
                 )
             elif model.startswith("gemini-2.5"):
-                # Gemini 2.5 models use thinking_budget
                 budget = GOOGLE_THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
-                config_dict["thinking_config"] = types.ThinkingConfig(
+                kwargs_api["thinking_config"] = types.ThinkingConfig(
                     thinking_budget=budget,
                     include_thoughts=True
                 )
 
-        config = types.GenerateContentConfig(**config_dict)
+        config = types.GenerateContentConfig(**kwargs_api)
+        model = self.google_config.model
 
         if debug:
             GoogleDebugger.print_request(context_contents, config, model)

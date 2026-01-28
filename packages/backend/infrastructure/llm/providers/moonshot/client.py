@@ -1,13 +1,12 @@
 """
-Moonshot (Moonshot) client implementation using OpenAI-compatible API.
+Moonshot client implementation using OpenAI-compatible architecture.
 
-This implementation uses the standard OpenAI Chat Completions API format
-since Moonshot/Moonshot provides full OpenAI compatibility.
-
-Base URL: https://api.moonshot.ai/v1
+This implementation provides integration with Moonshot's Kimi models
+using standard OpenAI-compatible Chat Completions API.
 """
 
-from typing import List, Optional, Dict, Any, AsyncGenerator, cast
+import json
+from typing import List, Optional, Dict, Any, AsyncGenerator
 from openai import OpenAI, AsyncOpenAI
 from openai.types.chat import ChatCompletion
 
@@ -15,53 +14,42 @@ from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.llm.base.call_options import parse_call_options
 from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.streaming import StreamingChunk
+from backend.config.dev import get_dev_config
 
 # Import Moonshot-specific implementations
-from .config import get_moonshot_client_config
+from .config import MoonshotConfig
 from .message_formatter import MoonshotMessageFormatter
-from .tool_manager import MoonshotToolManager
 from .context_manager import MoonshotContextManager
-from .debug import MoonshotDebugger
+from .tool_manager import MoonshotToolManager
 from .response_processor import MoonshotResponseProcessor
+from .debug import MoonshotDebugger
 
 
 class MoonshotClient(LLMClientBase):
     """
-    Moonshot (Moonshot) client implementation using OpenAI-compatible API.
-
+    Moonshot client implementation using OpenAI-compatible architecture.
+    
     Key Features:
     - OpenAI-compatible Chat Completions API
-    - Long-context support (up to 200K tokens)
+    - Optimized for Kimi models
     - Full streaming support with tool calling
     - Real-time tool execution notifications
-
-    Moonshot specializes in:
-    - Long document understanding and analysis
-    - Multi-turn conversations with extensive context
-    - Chinese language processing
     """
 
-    def __init__(self, api_key: str, **kwargs):
+    def __init__(self, config: MoonshotConfig, extra_config: Optional[Dict[str, Any]] = None, **kwargs):
         """
         Initialize Moonshot client with OpenAI-compatible setup.
 
         Args:
-            api_key: Moonshot API key (MOONSHOT_API_KEY)
-            **kwargs: Additional configuration parameters
+            config: Moonshot specific configuration
+            extra_config: Additional configuration parameters
+            **kwargs: Catch-all for extra arguments from factory
         """
-        super().__init__(**kwargs)
+        super().__init__(extra_config=extra_config)
         self.provider_name = "moonshot"
-        self.api_key = api_key
-
-        # Initialize Moonshot-specific configuration
-        config_overrides = {}
-        if 'model' in self.extra_config:
-            config_overrides['model'] = self.extra_config['model']
-        if 'debug' in self.extra_config:
-            config_overrides['debug'] = self.extra_config['debug']
-
-        self.moonshot_config = get_moonshot_client_config(**config_overrides)
-
+        self.moonshot_config = config
+        self.api_key = config.moonshot_api_key
+        
         # Log initialization
         print(f"Moonshot Client initialized")
         print(f"  Model: {self.moonshot_config.model}")
@@ -77,11 +65,6 @@ class MoonshotClient(LLMClientBase):
             "api_key": self.api_key,
             "base_url": self.moonshot_config.base_url
         }
-
-        # Allow custom base URL override from extra_config
-        if 'base_url' in self.extra_config:
-            client_kwargs['base_url'] = self.extra_config['base_url']
-
         self.client = OpenAI(**client_kwargs)
         self.async_client = AsyncOpenAI(**client_kwargs)
 
@@ -105,10 +88,10 @@ class MoonshotClient(LLMClientBase):
             **kwargs: Optional overrides (temperature, max_tokens, top_p).
 
         Returns:
-            ChatCompletion object from OpenAI-compatible API.
+            OpenAI ChatCompletion object.
         """
         call_options = parse_call_options(kwargs)
-        debug = self.moonshot_config.debug
+        debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.moonshot_config.timeout
         max_retries = (
             call_options.max_retries
@@ -128,11 +111,13 @@ class MoonshotClient(LLMClientBase):
             })
 
         # Build API call parameters
-        api_kwargs = self.moonshot_config.get_api_call_kwargs(
-            messages=messages,
-            tools=tools,
-            stream=False,
-        )
+        api_kwargs = self.moonshot_config.build_api_params()
+        api_kwargs.update({
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto" if tools else None,
+            "stream": False,
+        })
 
         if call_options.temperature is not None:
             api_kwargs['temperature'] = call_options.temperature
@@ -142,11 +127,6 @@ class MoonshotClient(LLMClientBase):
             api_kwargs['top_p'] = call_options.top_p
         if call_options.timeout is not None:
             api_kwargs['timeout'] = call_options.timeout
-
-        # Handle thinking mode (K2.5 and similar models)
-        if call_options.enable_thinking is not None:
-            thinking_type = "enabled" if call_options.enable_thinking else "disabled"
-            api_kwargs["extra_body"] = {"thinking": {"type": thinking_type}}
 
         if debug:
             MoonshotDebugger.print_api_request(api_kwargs, messages, tools)
@@ -184,7 +164,7 @@ class MoonshotClient(LLMClientBase):
             StreamingChunk: Standardized streaming data chunks.
         """
         call_options = parse_call_options(kwargs)
-        debug = self.moonshot_config.debug
+        debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.moonshot_config.timeout
         max_retries = (
             call_options.max_retries
@@ -204,12 +184,14 @@ class MoonshotClient(LLMClientBase):
             })
 
         # Build API call parameters
-        api_kwargs = self.moonshot_config.get_api_call_kwargs(
-            messages=messages,
-            tools=tools,
-            stream=True,
-        )
-        api_kwargs["stream_options"] = {"include_usage": True}
+        api_kwargs = self.moonshot_config.build_api_params()
+        api_kwargs.update({
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto" if tools else None,
+            "stream": True,
+            "stream_options": {"include_usage": True}
+        })
 
         if call_options.temperature is not None:
             api_kwargs['temperature'] = call_options.temperature
@@ -219,11 +201,6 @@ class MoonshotClient(LLMClientBase):
             api_kwargs['top_p'] = call_options.top_p
         if call_options.timeout is not None:
             api_kwargs['timeout'] = call_options.timeout
-
-        # Handle thinking mode (K2.5 and similar models)
-        if call_options.enable_thinking is not None:
-            thinking_type = "enabled" if call_options.enable_thinking else "disabled"
-            api_kwargs["extra_body"] = {"thinking": {"type": thinking_type}}
 
         if debug:
             MoonshotDebugger.print_api_request(api_kwargs, messages, tools)
@@ -286,7 +263,7 @@ class MoonshotClient(LLMClientBase):
 
         Args:
             system_prompt: Pre-built system prompt
-            tool_schemas: Tool schemas in Moonshot format
+            tool_schemas: Tool schemas in OpenAI format
 
         Returns:
             Dict with 'tools' and 'system_prompt' keys
@@ -295,3 +272,6 @@ class MoonshotClient(LLMClientBase):
             'tools': tool_schemas or [],
             'system_prompt': system_prompt
         }
+
+
+__all__ = ['MoonshotClient']

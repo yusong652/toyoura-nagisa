@@ -5,10 +5,9 @@ Unified configuration for Anthropic Claude models including API credentials,
 model parameters, and client settings.
 """
 
-import copy
 from typing import List, Dict, Any, Optional
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class AnthropicConfig(BaseSettings):
@@ -27,9 +26,9 @@ class AnthropicConfig(BaseSettings):
     secondary_model: str = Field(default="claude-haiku-4-5-20251001", description="Secondary model for SubAgent")
 
     # Model parameters (runtime overridable)
-    max_tokens: int = Field(default=1024 * 16, ge=1, le=64000, description="Maximum number of tokens to generate")
+    max_tokens: int = Field(default=1024 * 16, ge=1, le=128000, description="Maximum number of tokens to generate")
     temperature: Optional[float] = Field(
-        default=None, ge=0.0, le=2.0, description="Sampling temperature. Do not set both temperature and top_p."
+        default=None, ge=0.0, le=1.0, description="Sampling temperature. Do not set both temperature and top_p."
     )
     top_p: Optional[float] = Field(
         default=None, ge=0.0, le=1.0, description="Nucleus sampling parameter. Do not set both temperature and top_p."
@@ -39,7 +38,7 @@ class AnthropicConfig(BaseSettings):
     # Thinking configuration (for models that support thinking)
     enable_thinking: bool = Field(default=True, description="Whether to enable thinking for supported models")
     thinking_budget_tokens: int = Field(
-        default=4096, ge=1000, le=50000, description="Budget tokens for thinking process"
+        default=4096, ge=1000, le=100000, description="Budget tokens for thinking process"
     )
 
     # API settings
@@ -51,132 +50,23 @@ class AnthropicConfig(BaseSettings):
     tools_enabled: bool = Field(default=True, description="Enable tool calling functionality")
     tool_timeout: int = Field(default=30, ge=1, description="Tool execution timeout in seconds")
 
-    # Debug settings
-    debug: bool = Field(default=False, description="Enable debug logging")
+    # Log settings
     log_requests: bool = Field(default=False, description="Log API requests and responses")
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_nested_delimiter="__", case_sensitive=False, env_prefix="", extra="ignore"
-    )
-
-    def to_api_params(self) -> Dict[str, Any]:
+    def build_api_params(self) -> Dict[str, Any]:
         """
-        Convert model parameters to Anthropic API format.
-
-        Returns:
-            Dict with model, temperature, max_tokens, and optional top_p/top_k
+        Convert configuration fields to Anthropic API parameters.
         """
-        params = {
+        params: Dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
         }
 
         if self.temperature is not None:
             params["temperature"] = self.temperature
-
         if self.top_p is not None:
             params["top_p"] = self.top_p
         if self.top_k is not None:
             params["top_k"] = self.top_k
 
         return params
-
-    def get_api_call_kwargs(
-        self, system_prompt: str, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None
-    ) -> Dict[str, Any]:
-        """
-        Get API call parameters for Anthropic messages.create
-
-        Args:
-            system_prompt: System prompt
-            messages: Formatted messages for Anthropic API
-            tools: Optional tool schemas
-
-        Returns:
-            Dict[str, Any]: API call parameters
-        """
-        # Format system prompt with cache_control for prompt caching
-        # See: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
-        system_with_cache = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
-
-        # Add cache_control to the last message for conversation caching
-        from .message_formatter import MessageFormatter
-
-        cached_messages = MessageFormatter.add_cache_control_to_messages(messages)
-
-        kwargs = {
-            "messages": cached_messages,
-            "system": system_with_cache,
-        }
-
-        kwargs.update(self.to_api_params())
-
-        # Add tools with cache_control on the last tool for prompt caching
-        # This caches all tool definitions as a single prefix
-        if tools and len(tools) > 0:
-            # Deep copy to avoid modifying the original tools list
-            cached_tools = copy.deepcopy(tools)
-            cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
-            kwargs["tools"] = cached_tools
-
-        return kwargs
-
-    def model_copy(self, **overrides) -> "AnthropicConfig":
-        """
-        Create a copy with overrides applied.
-
-        Args:
-            **overrides: Fields to override
-
-        Returns:
-            New AnthropicConfig instance with overrides
-        """
-        config_dict = self.model_dump()
-        config_dict.update(overrides)
-        return AnthropicConfig(**config_dict)
-
-
-def get_anthropic_client_config(**overrides: Any) -> AnthropicConfig:
-    """
-    Get Anthropic client configuration with optional overrides.
-
-    This function provides backward compatibility and a convenient way
-    to create AnthropicConfig with overrides.
-
-    Args:
-        **overrides: Configuration overrides. Supports:
-            - Direct field overrides: model, temperature, debug, etc.
-            - Nested overrides: model_settings={'temperature': 0.8}
-
-    Returns:
-        AnthropicConfig instance
-
-    Example:
-        >>> config = get_anthropic_client_config(
-        ...     model='claude-opus-4-5-20251101',
-        ...     temperature=0.8,
-        ...     debug=True
-        ... )
-    """
-    # Start with base config from environment
-    try:
-        base_config = AnthropicConfig()
-    except Exception:
-        # If env loading fails, use defaults
-        base_config = AnthropicConfig(anthropic_api_key="missing-key", model="claude-sonnet-4-5-20250929")
-
-    # Handle nested model_settings overrides for backward compatibility
-    if "model_settings" in overrides:
-        model_settings = overrides.pop("model_settings")
-        if isinstance(model_settings, dict):
-            overrides.update(model_settings)
-
-    # Apply overrides
-    if overrides:
-        return base_config.model_copy(**overrides)
-
-    return base_config
-
-
-# Backward compatibility alias
-get_anthropic_config = get_anthropic_client_config

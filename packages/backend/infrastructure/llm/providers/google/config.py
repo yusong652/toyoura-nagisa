@@ -7,7 +7,7 @@ model parameters, safety settings, and client settings.
 
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 from google.genai import types
 from backend.infrastructure.llm.shared.constants.thinking import GOOGLE_THINKING_LEVEL_TO_BUDGET
 
@@ -88,27 +88,20 @@ class GoogleConfig(BaseSettings):
     )
 
     # Client settings (runtime overridable)
-    debug: bool = Field(default=False, description="Enable debug logging")
     timeout: float = Field(default=60.0, description="Request timeout in seconds")
     max_retries: int = Field(default=3, description="Maximum number of retries for failed requests")
 
     # Tool settings
     tools_enabled: bool = Field(default=True, description="Enable tool calling functionality")
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_nested_delimiter="__", case_sensitive=False, env_prefix="", extra="ignore"
-    )
-
-    def to_api_params(self) -> Dict[str, Any]:
+    def build_api_params(self) -> Dict[str, Any]:
         """
-        Convert model parameters to Google API format.
-
-        Returns:
-            Dict with model parameters (temperature, max_output_tokens, top_p, top_k)
+        Convert configuration fields to Google API format parameters.
         """
-        params = {
+        params: Dict[str, Any] = {
             "temperature": self.temperature,
             "max_output_tokens": self.max_tokens,
+            "safety_settings": self.safety_settings.to_gemini_format(),
         }
 
         if self.top_p is not None:
@@ -116,121 +109,22 @@ class GoogleConfig(BaseSettings):
         if self.top_k is not None:
             params["top_k"] = self.top_k
 
-        return params
-
-    def get_api_call_kwargs(self, system_prompt: str, tool_schemas: Optional[List[types.Tool]]) -> Dict[str, Any]:
-        """
-        Get GenerateContentConfig parameters for Google API
-
-        Args:
-            system_prompt: System prompt
-            tool_schemas: Tool schemas list
-
-        Returns:
-            Dict[str, Any]: GenerateContentConfig parameters
-        """
-        config_kwargs = {
-            "system_instruction": system_prompt,
-            "safety_settings": self.safety_settings.to_gemini_format(),
-        }
-
-        config_kwargs.update(self.to_api_params())
-
-        # Add tool schemas
-        if tool_schemas:
-            config_kwargs["tools"] = tool_schemas
-
         # Add default thinking configuration based on model version
         if self.default_thinking_level and self.default_thinking_level != "default":
             if self.model.startswith("gemini-3"):
                 # Gemini 3 models use thinking_level enum
                 level_map = {"low": types.ThinkingLevel.LOW, "high": types.ThinkingLevel.HIGH}
                 thinking_level = level_map.get(self.default_thinking_level, types.ThinkingLevel.HIGH)
-                config_kwargs["thinking_config"] = types.ThinkingConfig(
+                params["thinking_config"] = types.ThinkingConfig(
                     thinking_level=thinking_level,
                     include_thoughts=True
                 )
             elif self.model.startswith("gemini-2.5"):
                 # Gemini 2.5 models use thinking_budget
                 budget = GOOGLE_THINKING_LEVEL_TO_BUDGET.get(self.default_thinking_level, -1)
-                config_kwargs["thinking_config"] = types.ThinkingConfig(
+                params["thinking_config"] = types.ThinkingConfig(
                     thinking_budget=budget,
                     include_thoughts=True
                 )
 
-        return config_kwargs
-
-    # Backward compatibility alias
-    def get_generation_config_kwargs(self, *args, **kwargs) -> Dict[str, Any]:
-        """Alias for get_api_call_kwargs for backward compatibility"""
-        return self.get_api_call_kwargs(*args, **kwargs)
-
-    def model_copy(self, **overrides) -> "GoogleConfig":
-        """
-        Create a copy with overrides applied.
-
-        Args:
-            **overrides: Fields to override
-
-        Returns:
-            New GoogleConfig instance with overrides
-        """
-        config_dict = self.model_dump()
-
-        # Handle nested overrides
-        for key, value in overrides.items():
-            if key == "safety_settings" and isinstance(value, dict):
-                config_dict["safety_settings"].update(value)
-            else:
-                config_dict[key] = value
-
-        return GoogleConfig(**config_dict)
-
-
-def get_google_client_config(**overrides: Any) -> GoogleConfig:
-    """
-    Get Google client configuration with optional overrides.
-
-    This function provides backward compatibility and a convenient way
-    to create GoogleConfig with overrides.
-
-    Args:
-        **overrides: Configuration overrides. Supports:
-            - Direct field overrides: model, temperature, debug, etc.
-            - Nested overrides: model_settings={'temperature': 0.8}
-            - Safety overrides: safety_settings={'harassment_threshold': ...}
-
-    Returns:
-        GoogleConfig instance
-
-    Example:
-        >>> config = get_google_client_config(
-        ...     model='gemini-2.5-pro',
-        ...     temperature=1.0,
-        ...     debug=True
-        ... )
-    """
-    # Start with base config from environment
-    try:
-        base_config = GoogleConfig()
-    except Exception:
-        # If env loading fails, use defaults
-        base_config = GoogleConfig(google_api_key="missing-key", model="gemini-3-flash-preview")
-
-    # Handle nested model_settings overrides for backward compatibility
-    if "model_settings" in overrides:
-        model_settings = overrides.pop("model_settings")
-        if isinstance(model_settings, dict):
-            overrides.update(model_settings)
-
-    # Also support "model_config" as alias
-    if "model_config" in overrides:
-        model_config = overrides.pop("model_config")
-        if isinstance(model_config, dict):
-            overrides.update(model_config)
-
-    # Apply overrides
-    if overrides:
-        return base_config.model_copy(**overrides)
-
-    return base_config
+        return params

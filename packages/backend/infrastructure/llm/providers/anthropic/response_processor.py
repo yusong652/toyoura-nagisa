@@ -226,7 +226,7 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
                 tool_calls.append({
                     "id": tool_call_id,
                     "name": item.name,
-                    "arguments": item.input  # 统一使用 arguments 字段
+                    "arguments": item.input  # Unified use of arguments field
                 })
                 
         return tool_calls

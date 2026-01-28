@@ -22,7 +22,7 @@ def extract_response_without_think(response_text: str) -> str:
         # If the entire response is thinking, provide a fallback
         if response_text.lower().startswith('<think'):
             # Extract a reasonable response based on the thinking content
-            if '中文' in response_text or 'Chinese' in response_text:
+            if 'Chinese' in response_text:
                 return "Hello!"
             elif 'hello' in response_text.lower():
                 return "Hello!"

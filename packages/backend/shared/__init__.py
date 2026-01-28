@@ -1,2 +1,2 @@
-# Shared Layer - 共享层
-# 包含通用的工具函数、常量、异常等，可被所有层使用
+# Shared Layer
+# Contains common utility functions, constants, exceptions, etc., usable by all layers.

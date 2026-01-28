@@ -1,5 +1,5 @@
 """
-Zhipu (智谱) Response Processor
+Zhipu (GLM) Response Processor
 
 Handles processing of Zhipu API responses from zai SDK.
 

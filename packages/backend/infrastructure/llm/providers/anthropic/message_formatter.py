@@ -13,7 +13,7 @@ from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
 
 
-class MessageFormatter(BaseMessageFormatter):
+class AnthropicMessageFormatter(BaseMessageFormatter):
     """
     Handles message formatting for Anthropic Claude API interactions.
     
@@ -56,7 +56,7 @@ class MessageFormatter(BaseMessageFormatter):
         """
         try:
             # Use base class validation
-            if not MessageFormatter.validate_inline_data(inline_data):
+            if not AnthropicMessageFormatter.validate_inline_data(inline_data):
                 print(f"[WARNING] inline_data missing or empty data field")
                 return None
                 
@@ -134,7 +134,7 @@ class MessageFormatter(BaseMessageFormatter):
                     })
             elif part_type == "inline_data":
                 # Process inline_data and convert to Anthropic image format
-                image_block = MessageFormatter.process_inline_data(part)
+                image_block = AnthropicMessageFormatter.process_inline_data(part)
                 if image_block:
                     formatted_parts.append(image_block)
 
@@ -164,7 +164,7 @@ class MessageFormatter(BaseMessageFormatter):
         formatted_messages = []
         
         for msg in messages:
-            # 处理普通消息
+            # Process regular messages
             content = []
 
             # Handle message content based on format
@@ -177,7 +177,7 @@ class MessageFormatter(BaseMessageFormatter):
                         nested_content = item.get("content", {})
                         if isinstance(nested_content, dict) and "parts" in nested_content:
                             # Use format_tool_result_content with adapted structure
-                            formatted_content = MessageFormatter.format_tool_result_content({
+                            formatted_content = AnthropicMessageFormatter.format_tool_result_content({
                                 "llm_content": nested_content
                             })
                         else:
@@ -216,7 +216,7 @@ class MessageFormatter(BaseMessageFormatter):
                         })
                     elif "inline_data" in item:
                         # Process image content
-                        image_block = MessageFormatter.process_inline_data(item['inline_data'])
+                        image_block = AnthropicMessageFormatter.process_inline_data(item['inline_data'])
                         if image_block:
                             content.append(image_block)
             else:
@@ -227,7 +227,7 @@ class MessageFormatter(BaseMessageFormatter):
                 })
             
             # Map role and add to messages
-            mapped_role = MessageFormatter.map_role(getattr(msg, 'role', 'user'))
+            mapped_role = AnthropicMessageFormatter.map_role(getattr(msg, 'role', 'user'))
             formatted_messages.append({
                 "role": mapped_role,
                 "content": content
@@ -261,7 +261,7 @@ class MessageFormatter(BaseMessageFormatter):
                     nested_content = item.get("content", {})
                     if isinstance(nested_content, dict) and "parts" in nested_content:
                         # Use format_tool_result_content with adapted structure
-                        formatted_content = MessageFormatter.format_tool_result_content({
+                        formatted_content = AnthropicMessageFormatter.format_tool_result_content({
                             "llm_content": nested_content
                         })
                     else:
@@ -296,7 +296,7 @@ class MessageFormatter(BaseMessageFormatter):
                     })
                 elif "inline_data" in item:
                     # Process image content
-                    image_block = MessageFormatter.process_inline_data(item['inline_data'])
+                    image_block = AnthropicMessageFormatter.process_inline_data(item['inline_data'])
                     if image_block:
                         content.append(image_block)
         else:
@@ -308,7 +308,7 @@ class MessageFormatter(BaseMessageFormatter):
         
         # Map role and return formatted message
         if content:
-            mapped_role = MessageFormatter.map_role(getattr(message, 'role', 'user'))
+            mapped_role = AnthropicMessageFormatter.map_role(getattr(message, 'role', 'user'))
             return {
                 "role": mapped_role,
                 "content": content
@@ -336,7 +336,7 @@ class MessageFormatter(BaseMessageFormatter):
         tool_result_block = {
             "type": "tool_result",
             "tool_use_id": tool_call_id,
-            "content": MessageFormatter.format_tool_result_content(result)
+            "content": AnthropicMessageFormatter.format_tool_result_content(result)
         }
         
         # Build user message containing tool_result

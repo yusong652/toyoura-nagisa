@@ -112,53 +112,53 @@ class LLMFactory:
 
         if provider == "google":
             from backend.infrastructure.llm.providers.google.config import GoogleConfig
-            cfg = GoogleConfig()
+            cfg = GoogleConfig(model=model)
             return {
-                "api_key": cfg.google_api_key,
-                "extra_config": {**extra, "model": model}
+                "config": cfg,
+                "extra_config": extra
             }
         elif provider == "anthropic":
             from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
-            cfg = AnthropicConfig()
+            cfg = AnthropicConfig(model=model)
             return {
-                "api_key": cfg.anthropic_api_key,
-                "extra_config": {**extra, "model": model}
+                "config": cfg,
+                "extra_config": extra
             }
         elif provider in ["openai", "gpt"]:
             from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
-            cfg = OpenAIConfig()
+            cfg = OpenAIConfig(model=model)
             if not cfg.openai_api_key:
                 raise ValueError("OpenAI API key not configured")
             return {
-                "api_key": cfg.openai_api_key,
-                "extra_config": {**extra, "model": model}
+                "config": cfg,
+                "extra_config": extra
             }
         elif provider == "moonshot":
             from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
-            cfg = MoonshotConfig()
+            cfg = MoonshotConfig(model=model)
             if not cfg.moonshot_api_key:
                 raise ValueError("Moonshot API key not configured")
             return {
-                "api_key": cfg.moonshot_api_key,
-                "extra_config": {**extra, "model": model}
+                "config": cfg,
+                "extra_config": extra
             }
         elif provider == "zhipu":
             from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
-            cfg = ZhipuConfig()
+            cfg = ZhipuConfig(model=model)
             if not cfg.zhipu_api_key:
                 raise ValueError("Zhipu API key not configured")
             return {
-                "api_key": cfg.zhipu_api_key,
-                "extra_config": {**extra, "model": model}
+                "config": cfg,
+                "extra_config": extra
             }
         elif provider == "openrouter":
             from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
-            cfg = OpenRouterConfig()
+            cfg = OpenRouterConfig(model=model)
             if not cfg.openrouter_api_key:
                 raise ValueError("OpenRouter API key not configured")
             return {
-                "api_key": cfg.openrouter_api_key,
-                "extra_config": {**extra, "model": model}
+                "config": cfg,
+                "extra_config": extra
             }
 
         raise ValueError(f"Unknown provider: {provider}")

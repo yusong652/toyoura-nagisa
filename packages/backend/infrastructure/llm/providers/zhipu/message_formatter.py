@@ -1,5 +1,5 @@
 """
-Zhipu (智谱) Message Formatter
+Zhipu (GLM) Message Formatter
 
 Handles conversion of internal message formats to Zhipu official API format (via zai SDK).
 

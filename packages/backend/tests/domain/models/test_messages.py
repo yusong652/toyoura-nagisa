@@ -299,7 +299,7 @@ class TestMessageEdgeCases:
     def test_message_with_unicode_content(self):
         """Test message with unicode characters."""
         # Arrange
-        unicode_content = "Hello 世界 🌍 مرحبا"
+        unicode_content = "Hello World 🌍 مرحبا"
 
         # Act
         message = UserMessage(content=unicode_content)

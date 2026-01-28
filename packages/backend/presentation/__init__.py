@@ -1,2 +1,2 @@
-# Presentation Layer - 表现层
-# 负责处理用户界面相关的逻辑，包括API、WebSocket、流式响应等
+# Presentation Layer
+# Responsible for handling UI-related logic, including APIs, WebSockets, streaming responses, etc.

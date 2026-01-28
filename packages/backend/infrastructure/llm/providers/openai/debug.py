@@ -67,7 +67,7 @@ class OpenAIDebugger:
             tools_count: Number of tools available
             model: Model being used
         """
-        print("\n========== OpenAI API 请求信息 ==========")
+        print("\n========== OpenAI API Request Info ==========")
         print(f"🤖 Model: {model}")
         print(f"🔧 Tools Available: {tools_count}")
         if tools_count > 0:

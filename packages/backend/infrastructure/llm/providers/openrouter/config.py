@@ -9,7 +9,7 @@ OpenRouter uses OpenAI-compatible API format with base URL: https://openrouter.a
 
 from typing import Dict, Any, List, Optional
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class OpenRouterConfig(BaseSettings):
@@ -34,22 +34,14 @@ class OpenRouterConfig(BaseSettings):
     top_p: Optional[float] = Field(default=None, description="Nucleus sampling threshold.")
 
     # Client settings (runtime overridable)
-    debug: bool = Field(default=False, description="Enable debug logging")
     timeout: float = Field(default=60.0, description="Request timeout in seconds")
     max_retries: int = Field(default=3, description="Maximum retry attempts")
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_nested_delimiter="__", case_sensitive=False, env_prefix="", extra="ignore"
-    )
-
-    def to_api_params(self) -> Dict[str, Any]:
+    def build_api_params(self) -> Dict[str, Any]:
         """
-        Convert model parameters to OpenRouter API format.
-
-        Returns:
-            Dict with model, temperature, and optional max_tokens/top_p
+        Convert configuration fields to OpenRouter API format.
         """
-        params = {
+        params: Dict[str, Any] = {
             "model": self.model,
             "temperature": self.temperature,
         }
@@ -61,76 +53,3 @@ class OpenRouterConfig(BaseSettings):
             params["top_p"] = self.top_p
 
         return params
-
-    def get_api_call_kwargs(
-        self, *, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None, stream: bool = True
-    ) -> Dict[str, Any]:
-        """
-        Build complete kwargs for OpenRouter API call (OpenAI-compatible).
-
-        Args:
-            messages: Conversation messages in OpenAI format
-            tools: Optional tool schemas in OpenAI format
-            stream: Whether to stream the response
-
-        Returns:
-            Dict containing all API call parameters
-        """
-        kwargs: Dict[str, Any] = {
-            "messages": messages,
-            "stream": stream,
-            "timeout": self.timeout,
-        }
-
-        kwargs.update(self.to_api_params())
-
-        if tools:
-            kwargs["tools"] = tools
-            kwargs["tool_choice"] = "auto"
-
-        return kwargs
-
-    def model_copy(self, **overrides) -> "OpenRouterConfig":
-        """
-        Create a copy with overrides applied.
-
-        Args:
-            **overrides: Fields to override
-
-        Returns:
-            New OpenRouterConfig instance with overrides
-        """
-        config_dict = self.model_dump()
-        config_dict.update(overrides)
-        return OpenRouterConfig(**config_dict)
-
-
-def get_openrouter_client_config(**overrides: Any) -> OpenRouterConfig:
-    """
-    Get OpenRouter client configuration with optional overrides.
-
-    Args:
-        **overrides: Configuration overrides. Supports direct field overrides
-                    or nested model_settings overrides.
-
-    Returns:
-        OpenRouterConfig instance
-    """
-    # Start with base config from environment
-    try:
-        base_config = OpenRouterConfig()
-    except Exception:
-        # If env loading fails, use defaults
-        base_config = OpenRouterConfig(openrouter_api_key="", model="qwen/qwen3-235b-a22b-2507")
-
-    # Handle nested model_settings overrides for backward compatibility
-    if "model_settings" in overrides:
-        model_settings = overrides.pop("model_settings")
-        if isinstance(model_settings, dict):
-            overrides.update(model_settings)
-
-    # Apply overrides
-    if overrides:
-        return base_config.model_copy(**overrides)
-
-    return base_config

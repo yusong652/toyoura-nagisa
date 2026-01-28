@@ -1,7 +1,7 @@
 """
-全局异常处理器模块
+Global Exception Handlers Module
 
-提供标准化的异常处理逻辑，特别是针对LLM配置和导入错误的处理。
+Provides standardized exception handling logic, particularly for LLM configuration and import errors.
 """
 
 from fastapi import Request
@@ -10,11 +10,11 @@ from fastapi.responses import JSONResponse
 
 async def handle_value_error(request: Request, exc: ValueError) -> JSONResponse:
     """
-    处理配置相关的值错误，特别是LLM客户端不支持的情况
+    Handle configuration-related value errors, particularly when an LLM client is unsupported.
     """
     error_message = str(exc)
     
-    # 检查是否是LLM客户端相关的错误
+    # Check if it's an LLM client related error
     if "Unsupported LLM client" in error_message or "Unknown LLM client" in error_message:
         return JSONResponse(
             status_code=400,
@@ -26,7 +26,7 @@ async def handle_value_error(request: Request, exc: ValueError) -> JSONResponse:
             }
         )
     
-    # 其他值错误
+    # Other value errors
     return JSONResponse(
         status_code=400,
         content={
@@ -39,11 +39,11 @@ async def handle_value_error(request: Request, exc: ValueError) -> JSONResponse:
 
 async def handle_import_error(request: Request, exc: ImportError) -> JSONResponse:
     """
-    处理导入错误，通常是由于缺少依赖或已删除的模块引起
+    Handle import errors, typically caused by missing dependencies or deleted modules.
     """
     error_message = str(exc)
     
-    # 检查是否是LLM客户端相关的导入错误
+    # Check if it's an LLM client related import error
     if any(client in error_message for client in ["gpt", "anthropic", "mistral", "grok"]):
         return JSONResponse(
             status_code=500,
@@ -56,7 +56,7 @@ async def handle_import_error(request: Request, exc: ImportError) -> JSONRespons
             }
         )
     
-    # 其他导入错误
+    # Other import errors
     return JSONResponse(
         status_code=500,
         content={

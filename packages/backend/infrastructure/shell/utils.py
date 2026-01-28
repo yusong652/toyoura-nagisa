@@ -93,7 +93,7 @@ def prepare_shell_env(
     else:
         # On Unix-like systems (macOS, Linux), ensure UTF-8 locale
         # This ensures commands like git, ls output Unicode properly
-        # instead of octal escape sequences (e.g., \346\265\213 instead of 测试)
+        # instead of octal escape sequences (e.g., \346\265\213 instead of "test")
         env['LC_ALL'] = 'en_US.UTF-8'
         env['LANG'] = 'en_US.UTF-8'
 

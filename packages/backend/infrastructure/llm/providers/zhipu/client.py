@@ -1,5 +1,5 @@
 """
-Zhipu (智谱) client implementation using official zai SDK.
+Zhipu (GLM) client implementation using official zai SDK.
 
 This implementation uses the zai-sdk which provides access to Zhipu GLM models.
 Since zai SDK is synchronous, we use asyncio.to_thread() for async compatibility.
@@ -14,9 +14,10 @@ from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.llm.base.call_options import parse_call_options
 from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.streaming import StreamingChunk
+from backend.config.dev import get_dev_config
 
 # Import Zhipu-specific implementations
-from .config import get_zhipu_client_config
+from .config import ZhipuConfig
 from .message_formatter import ZhipuMessageFormatter
 from .tool_manager import ZhipuToolManager
 from .context_manager import ZhipuContextManager
@@ -37,38 +38,19 @@ class ZhipuClient(LLMClientBase):
     Note: zai SDK is synchronous, so we use asyncio.to_thread() for async operations.
     """
 
-    def __init__(self, api_key: str, **kwargs):
+    def __init__(self, config: ZhipuConfig, extra_config: Optional[Dict[str, Any]] = None, **kwargs):
         """
         Initialize Zhipu client.
 
         Args:
-            api_key: Zhipu API key
-            **kwargs: Additional configuration parameters
+            config: Zhipu specific configuration
+            extra_config: Additional configuration parameters
+            **kwargs: Catch-all for extra arguments from factory
         """
-        super().__init__(**kwargs)
+        super().__init__(extra_config=extra_config)
         self.provider_name = "zhipu"
-        self.api_key = api_key
-
-        # Initialize Zhipu-specific configuration
-        # Extract relevant configuration from extra_config for overrides
-        # Factory only passes: model, debug
-        config_overrides = {}
-        if 'model' in self.extra_config:
-            config_overrides['model'] = self.extra_config['model']
-        if 'debug' in self.extra_config:
-            config_overrides['debug'] = self.extra_config['debug']
-
-        self.zhipu_config = get_zhipu_client_config(**config_overrides)
-
-        # Log initialization
-        print(f"Zhipu Client initialized")
-        print(f"  Model: {self.zhipu_config.model}")
-
-        # Debug: Print masked API key
-        if self.api_key:
-            masked_key = f"{self.api_key[:8]}...{self.api_key[-4:]}" if len(self.api_key) > 12 else "***"
-            print(f"  API Key (masked): {masked_key}")
-
+        self.zhipu_config = config
+        self.api_key = config.zhipu_api_key
         # Initialize zai SDK client (use SDK default base_url)
         self.client = ZhipuAiClient(
             api_key=self.api_key,
@@ -147,7 +129,7 @@ class ZhipuClient(LLMClientBase):
             Response object from zai SDK.
         """
         call_options = parse_call_options(kwargs)
-        debug = self.zhipu_config.debug
+        debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.zhipu_config.timeout
         max_retries = (
             call_options.max_retries
@@ -168,11 +150,14 @@ class ZhipuClient(LLMClientBase):
                 "content": system_prompt
             })
 
-        api_kwargs = self.zhipu_config.get_api_call_kwargs(
-            messages=messages,
-            tools=tools,
-            stream=False,
-        )
+        # Build API parameters
+        api_kwargs = self.zhipu_config.build_api_params()
+        api_kwargs.update({
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto" if tools else None,
+            "stream": False,
+        })
 
         if call_options.temperature is not None:
             api_kwargs['temperature'] = call_options.temperature
@@ -183,18 +168,9 @@ class ZhipuClient(LLMClientBase):
         if call_options.timeout is not None:
             api_kwargs['timeout'] = call_options.timeout
 
-        # Handle thinking configuration
-        # Priority: call_options.thinking > call_options.enable_thinking > default enabled
-        if call_options.thinking is not None:
-            # Explicit thinking config overrides everything
-            api_kwargs["thinking"] = call_options.thinking
-        elif call_options.enable_thinking is not None:
-            # enable_thinking flag controls whether thinking is used
-            if call_options.enable_thinking:
-                api_kwargs["thinking"] = {"type": "enabled"}
-            # When enable_thinking is False, don't add thinking
-        else:
-            # Default: enable thinking for Zhipu models
+        # Handle thinking configuration based on thinking_level
+        if call_options.thinking_level is not None and call_options.thinking_level != "default":
+            # For Zhipu, we currently just enable it if level is low/high
             api_kwargs["thinking"] = {"type": "enabled"}
 
         if debug:
@@ -241,7 +217,7 @@ class ZhipuClient(LLMClientBase):
             StreamingChunk: Standardized streaming data chunks.
         """
         call_options = parse_call_options(kwargs)
-        debug = self.zhipu_config.debug
+        debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.zhipu_config.timeout
         max_retries = (
             call_options.max_retries
@@ -262,11 +238,14 @@ class ZhipuClient(LLMClientBase):
                 "content": system_prompt
             })
 
-        api_kwargs = self.zhipu_config.get_api_call_kwargs(
-            messages=messages,
-            tools=tools,
-            stream=True,
-        )
+        # Build API parameters
+        api_kwargs = self.zhipu_config.build_api_params()
+        api_kwargs.update({
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto" if tools else None,
+            "stream": True,
+        })
 
         if call_options.temperature is not None:
             api_kwargs['temperature'] = call_options.temperature
@@ -277,18 +256,9 @@ class ZhipuClient(LLMClientBase):
         if call_options.timeout is not None:
             api_kwargs['timeout'] = call_options.timeout
 
-        # Handle thinking configuration
-        # Priority: call_options.thinking > call_options.enable_thinking > default enabled
-        if call_options.thinking is not None:
-            # Explicit thinking config overrides everything
-            api_kwargs["thinking"] = call_options.thinking
-        elif call_options.enable_thinking is not None:
-            # enable_thinking flag controls whether thinking is used
-            if call_options.enable_thinking:
-                api_kwargs["thinking"] = {"type": "enabled"}
-            # When enable_thinking is False, don't add thinking
-        else:
-            # Default: enable thinking for Zhipu models
+        # Handle thinking configuration based on thinking_level
+        if call_options.thinking_level is not None and call_options.thinking_level != "default":
+            # For Zhipu, we currently just enable it if level is low/high
             api_kwargs["thinking"] = {"type": "enabled"}
 
         if debug:

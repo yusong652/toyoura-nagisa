@@ -29,8 +29,8 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.google.message_formatter import GoogleMessageFormatter
         return GoogleMessageFormatter
     elif provider_name == "anthropic":
-        from backend.infrastructure.llm.providers.anthropic.message_formatter import MessageFormatter
-        return MessageFormatter
+        from backend.infrastructure.llm.providers.anthropic.message_formatter import AnthropicMessageFormatter
+        return AnthropicMessageFormatter        
     elif provider_name == "openai":
         from backend.infrastructure.llm.providers.openai.message_formatter import OpenAIMessageFormatter
         return OpenAIMessageFormatter

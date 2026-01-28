@@ -3,11 +3,10 @@ Google (Gemini) provider implementation using unified architecture.
 """
 
 from .client import GoogleClient
-from .config import GoogleConfig, GoogleSafetySettings, get_google_client_config
+from .config import GoogleConfig, GoogleSafetySettings
 
 __all__ = [
     "GoogleClient",
     "GoogleConfig",
-    "GoogleSafetySettings",
-    "get_google_client_config"
+    "GoogleSafetySettings"
 ]

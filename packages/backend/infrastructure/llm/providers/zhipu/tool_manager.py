@@ -1,5 +1,5 @@
 """
-Zhipu (智谱) Tool Manager
+Zhipu (GLM) Tool Manager
 
 Manages MCP tool integration for Zhipu client including schema formatting,
 tool execution, and result processing.
@@ -25,13 +25,13 @@ class ZhipuToolManager(BaseToolManager):
         "type": "function",
         "function": {
             "name": "get_weather",
-            "description": "获取指定地点的天气信息",
+            "description": "Get weather information for a specified location",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "location": {
                         "type": "string",
-                        "description": "地点名称"
+                        "description": "Location name"
                     }
                 },
                 "required": ["location"]

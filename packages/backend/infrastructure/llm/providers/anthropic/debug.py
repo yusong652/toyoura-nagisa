@@ -128,7 +128,7 @@ class AnthropicDebugger:
                 print(f"[{component}]   Type: {thinking_config.get('type', 'N/A')}")
                 print(f"[{component}]   Budget tokens: {thinking_config.get('budget_tokens', 'N/A')}")
         
-        # 添加消息格式验证
+        # Add message format validation
         AnthropicDebugger._validate_message_format(messages, component)
         
         print(f"[{component}] === End API Payload ===")
@@ -168,7 +168,7 @@ class AnthropicDebugger:
             api_kwargs: Complete API call parameters dictionary
             component: Component name for log prefix
         """
-        print(f"\n========== {component} API 请求消息格式 ==========")
+        print(f"\n========== {component} API Request Message Format ==========")
         
         # Create debug-friendly version of the payload
         debug_payload = AnthropicDebugger._create_debug_payload(api_kwargs)
@@ -579,7 +579,7 @@ class AnthropicDebugger:
                     is_error = content_block.get('is_error', False)
                     print(f"[{component}] Found tool_result: id={tool_id}, error={is_error}")
         
-        # 检查工具调用和结果的匹配
+        # Check for matching tool calls and results
         missing_results = tool_use_ids - tool_result_ids
         extra_results = tool_result_ids - tool_use_ids
         

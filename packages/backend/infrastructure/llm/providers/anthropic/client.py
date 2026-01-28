@@ -4,8 +4,9 @@ from backend.infrastructure.llm.base.call_options import parse_call_options
 from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.shared.constants.thinking import ANTHROPIC_THINKING_LEVEL_TO_BUDGET
+from backend.config.dev import get_dev_config
 import anthropic
-from .config import get_anthropic_client_config
+from .config import AnthropicConfig
 from .response_processor import AnthropicResponseProcessor
 from .debug import AnthropicDebugger
 from .context_manager import AnthropicContextManager
@@ -17,30 +18,18 @@ class AnthropicClient(LLMClientBase):
     Anthropic Claude client class.
     """
     
-    def __init__(self, api_key: str, **kwargs):
+    def __init__(self, config: AnthropicConfig, extra_config: Optional[Dict[str, Any]] = None, **kwargs):
         """
         Initialize AnthropicClient instance.
         Args:
-            api_key: Anthropic API key。
-            **kwargs: Additional configuration parameters
+            config: Anthropic specific configuration
+            extra_config: Additional configuration parameters
+            **kwargs: Catch-all for extra arguments from factory
         """
-        super().__init__(**kwargs)
+        super().__init__(extra_config=extra_config)
         self.provider_name = "anthropic"
-        self.api_key = api_key
-        
-        # Initialize Anthropic-specific configuration
-        # Extract relevant configuration from extra_config for overrides
-        # Factory only passes: model, debug
-        config_overrides = {}
-        if 'model' in self.extra_config:
-            config_overrides['model'] = self.extra_config['model']
-        if 'debug' in self.extra_config:
-            config_overrides['debug'] = self.extra_config['debug']
-
-        self.anthropic_config = get_anthropic_client_config(**config_overrides)
-
-        print(f"Anthropic Client initialized")
-        print(f"  Model: {self.anthropic_config.model}")
+        self.anthropic_config = config
+        self.api_key = config.anthropic_api_key
 
         # initialize Anthropic API client (use async client for streaming)
         self.client = anthropic.AsyncAnthropic(api_key=self.api_key)
@@ -107,7 +96,7 @@ class AnthropicClient(LLMClientBase):
             This method is completely stateless. All configuration is passed via parameters.
         """
         call_options = parse_call_options(kwargs)
-        debug = self.anthropic_config.debug
+        debug = get_dev_config().debug_mode
         timeout = (
             call_options.timeout
             if call_options.timeout is not None
@@ -124,11 +113,26 @@ class AnthropicClient(LLMClientBase):
         system_prompt = api_config.get('system_prompt', '')
 
         # Build API parameters using configuration system
-        kwargs_api = self.anthropic_config.get_api_call_kwargs(
-            system_prompt=system_prompt,
-            messages=context_contents,
-            tools=tools
-        )
+        kwargs_api = self.anthropic_config.build_api_params()
+        
+        # Format system prompt with cache_control for prompt caching
+        system_with_cache = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
+        
+        # Add cache_control to the last message for conversation caching
+        from .message_formatter import AnthropicMessageFormatter
+        cached_messages = AnthropicMessageFormatter.add_cache_control_to_messages(context_contents)
+
+        kwargs_api.update({
+            "messages": cached_messages,
+            "system": system_with_cache,
+        })
+
+        # Add tools with cache_control on the last tool for prompt caching
+        if tools and len(tools) > 0:
+            import copy
+            cached_tools = copy.deepcopy(tools)
+            cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
+            kwargs_api["tools"] = cached_tools
 
         if call_options.temperature is not None:
             kwargs_api["temperature"] = call_options.temperature
@@ -200,7 +204,7 @@ class AnthropicClient(LLMClientBase):
             Exception: If streaming API call fails
         """
         call_options = parse_call_options(kwargs)
-        debug = self.anthropic_config.debug
+        debug = get_dev_config().debug_mode
         timeout = (
             call_options.timeout
             if call_options.timeout is not None
@@ -217,11 +221,26 @@ class AnthropicClient(LLMClientBase):
         system_prompt = api_config.get('system_prompt', '')
 
         # Build API parameters using configuration system
-        kwargs_api = self.anthropic_config.get_api_call_kwargs(
-            system_prompt=system_prompt,
-            messages=context_contents,
-            tools=tools
-        )
+        kwargs_api = self.anthropic_config.build_api_params()
+        
+        # Format system prompt with cache_control for prompt caching
+        system_with_cache = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
+        
+        # Add cache_control to the last message for conversation caching
+        from .message_formatter import AnthropicMessageFormatter
+        cached_messages = AnthropicMessageFormatter.add_cache_control_to_messages(context_contents)
+
+        kwargs_api.update({
+            "messages": cached_messages,
+            "system": system_with_cache,
+        })
+
+        # Add tools with cache_control on the last tool for prompt caching
+        if tools and len(tools) > 0:
+            import copy
+            cached_tools = copy.deepcopy(tools)
+            cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
+            kwargs_api["tools"] = cached_tools
 
         if call_options.temperature is not None:
             kwargs_api["temperature"] = call_options.temperature

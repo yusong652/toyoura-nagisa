@@ -29,9 +29,10 @@ from backend.infrastructure.llm.base.call_options import parse_call_options
 from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
+from backend.config.dev import get_dev_config
 
 # Import OpenAI-specific implementations
-from .config import get_openai_client_config
+from .config import OpenAIConfig
 from .message_formatter import OpenAIMessageFormatter
 from .context_manager import OpenAIContextManager
 from .debug import OpenAIDebugger
@@ -54,32 +55,20 @@ class OpenAIClient(LLMClientBase):
     - Comprehensive error handling
     """
     
-    def __init__(self, api_key: str, **kwargs):
+    def __init__(self, config: OpenAIConfig, extra_config: Optional[Dict[str, Any]] = None, **kwargs):
         """
         Initialize OpenAI client.
         
         Args:
-            api_key: OpenAI API key
-            **kwargs: Additional configuration parameters
+            config: OpenAI specific configuration
+            extra_config: Additional configuration parameters
+            **kwargs: Catch-all for extra arguments from factory
         """
-        super().__init__(**kwargs)
+        super().__init__(extra_config=extra_config)
         self.provider_name = "openai"
-        self.api_key = api_key
+        self.openai_config = config
+        self.api_key = config.openai_api_key
         
-        # Initialize OpenAI-specific configuration
-        # Extract relevant configuration from extra_config for overrides
-        # Factory only passes: model, debug
-        config_overrides = {}
-        if 'model' in self.extra_config:
-            config_overrides['model'] = self.extra_config['model']
-        if 'debug' in self.extra_config:
-            config_overrides['debug'] = self.extra_config['debug']
-
-        self.openai_config = get_openai_client_config(**config_overrides)
-
-        print(f"OpenAI Client initialized")
-        print(f"  Model: {self.openai_config.model}")
-
         # Initialize both sync and async API clients
         client_kwargs: Dict[str, Any] = {"api_key": self.api_key}
         base_url = self.extra_config.get("base_url")
@@ -117,7 +106,7 @@ class OpenAIClient(LLMClientBase):
             OpenAI Responses API `Response` object.
         """
         call_options = parse_call_options(kwargs)
-        debug = self.openai_config.debug
+        debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.openai_config.timeout
         max_retries = (
             call_options.max_retries
@@ -131,11 +120,13 @@ class OpenAIClient(LLMClientBase):
         # context_contents is already in Responses API input format from context_manager
         input_items = context_contents
 
-        kwargs_api = self.openai_config.get_api_call_kwargs(
-            instructions=instructions,
-            input_items=input_items,
-            tools=tools
-        )
+        kwargs_api = self.openai_config.build_api_params()
+        kwargs_api.update({
+            "instructions": instructions,
+            "input": input_items,
+            "tools": tools,
+            "tool_choice": "auto" if tools else None
+        })
 
         # Apply call options overrides
         if call_options.temperature is not None:
@@ -229,7 +220,7 @@ class OpenAIClient(LLMClientBase):
         Execute streaming Responses API call and yield standardized chunks.
         """
         call_options = parse_call_options(kwargs)
-        debug = self.openai_config.debug
+        debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.openai_config.timeout
         max_retries = (
             call_options.max_retries
@@ -243,11 +234,13 @@ class OpenAIClient(LLMClientBase):
         # context_contents is already in Responses API input format from context_manager
         input_items = context_contents
 
-        kwargs_api = self.openai_config.get_api_call_kwargs(
-            instructions=instructions,
-            input_items=input_items,
-            tools=tools
-        )
+        kwargs_api = self.openai_config.build_api_params()
+        kwargs_api.update({
+            "instructions": instructions,
+            "input": input_items,
+            "tools": tools,
+            "tool_choice": "auto" if tools else None,
+        })
 
         # Apply call options overrides
         if call_options.temperature is not None:

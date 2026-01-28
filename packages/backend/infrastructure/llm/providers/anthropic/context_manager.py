@@ -50,14 +50,14 @@ class AnthropicContextManager(BaseContextManager):
             result: Tool execution result
             inject_reminders: Whether to inject system reminders into this result
         """
-        from .message_formatter import MessageFormatter
+        from .message_formatter import AnthropicMessageFormatter
 
         # Inject system reminders to result content if needed (async)
         if inject_reminders:
             await self._inject_reminders_to_result(result)
 
         # Use message formatter to handle tool result format
-        working_content = MessageFormatter.format_tool_result_for_context(tool_call_id, tool_name, result)
+        working_content = AnthropicMessageFormatter.format_tool_result_for_context(tool_call_id, tool_name, result)
 
         # Add to working context
         self.working_contents.append(working_content)
