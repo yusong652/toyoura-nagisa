@@ -165,14 +165,14 @@ class GoogleClient(LLMClientBase):
                 thinking_level = THINKING_LEVEL_MAP.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
                 config_dict["thinking_config"] = types.ThinkingConfig(
                     thinking_level=thinking_level,
-                    include_thoughts=self.google_config.include_thoughts_in_response
+                    include_thoughts=True
                 )
             elif model.startswith("gemini-2.5"):
                 # Gemini 2.5 models use thinking_budget
                 budget = THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
                 config_dict["thinking_config"] = types.ThinkingConfig(
                     thinking_budget=budget,
-                    include_thoughts=self.google_config.include_thoughts_in_response
+                    include_thoughts=True
                 )
 
         config = types.GenerateContentConfig(**config_dict)
@@ -326,14 +326,14 @@ class GoogleClient(LLMClientBase):
                 thinking_level = THINKING_LEVEL_MAP.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
                 config_dict["thinking_config"] = types.ThinkingConfig(
                     thinking_level=thinking_level,
-                    include_thoughts=self.google_config.include_thoughts_in_response
+                    include_thoughts=True
                 )
             elif model.startswith("gemini-2.5"):
                 # Gemini 2.5 models use thinking_budget
                 budget = THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
                 config_dict["thinking_config"] = types.ThinkingConfig(
                     thinking_budget=budget,
-                    include_thoughts=self.google_config.include_thoughts_in_response
+                    include_thoughts=True
                 )
 
         config = types.GenerateContentConfig(**config_dict)

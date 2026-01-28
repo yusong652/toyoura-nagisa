@@ -76,11 +76,6 @@ class GoogleConfig(BaseSettings):
     )
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
 
-    # Thinking configuration (for models that support thinking)
-    include_thoughts_in_response: bool = Field(
-        default=True, description="Whether to include thinking process in the response"
-    )
-
     # Safety settings (nested configuration for Google-specific types)
     safety_settings: GoogleSafetySettings = Field(
         default_factory=GoogleSafetySettings, description="Google safety settings"
