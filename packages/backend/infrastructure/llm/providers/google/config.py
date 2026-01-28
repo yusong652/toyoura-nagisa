@@ -77,9 +77,6 @@ class GoogleConfig(BaseSettings):
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
 
     # Thinking configuration (for models that support thinking)
-    enable_thinking: bool = Field(
-        default=True, description="Whether to enable thinking mode for supported models (Gemini 2.5+, Gemini 3+)"
-    )
     include_thoughts_in_response: bool = Field(
         default=True, description="Whether to include thinking process in the response"
     )
@@ -141,20 +138,6 @@ class GoogleConfig(BaseSettings):
         # Add tool schemas
         if tool_schemas:
             config_kwargs["tools"] = tool_schemas
-
-        # Add thinking configuration based on model version
-        if self.enable_thinking:
-            # Gemini 3 models use thinking_level parameter (enum)
-            if self.model.startswith("gemini-3"):
-                config_kwargs["thinking_config"] = types.ThinkingConfig(
-                    thinking_level=types.ThinkingLevel.HIGH, include_thoughts=self.include_thoughts_in_response
-                )
-            # Gemini 2.5 models use thinking_budget parameter
-            elif self.model.startswith("gemini-2.5"):
-                config_kwargs["thinking_config"] = types.ThinkingConfig(
-                    thinking_budget=-1,  # -1 = dynamic (auto)
-                    include_thoughts=self.include_thoughts_in_response,
-                )
 
         return config_kwargs
 

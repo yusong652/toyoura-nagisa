@@ -23,6 +23,21 @@ from .response_processor import GoogleResponseProcessor
 from .tool_manager import GoogleToolManager
 
 
+# Thinking level to Gemini ThinkingLevel mapping
+# - "default": Don't add thinking config (use config default)
+# - "low"/"high": Map to ThinkingLevel enum
+THINKING_LEVEL_MAP = {
+    "low": types.ThinkingLevel.LOW,
+    "high": types.ThinkingLevel.HIGH,
+}
+
+# Thinking level to budget tokens for Gemini 2.5 models
+THINKING_LEVEL_TO_BUDGET = {
+    "low": 1024,
+    "high": -1,  # -1 = dynamic (auto)
+}
+
+
 class GoogleClient(LLMClientBase):
     """
     Enhanced Google Gemini client with unified architecture.
@@ -143,31 +158,22 @@ class GoogleClient(LLMClientBase):
         if call_options.top_k is not None:
             config_dict["top_k"] = call_options.top_k
 
-        # Handle thinking configuration
-        # Priority: call_options.thinking > call_options.enable_thinking > config default
-        if call_options.thinking is not None:
-            # Explicit thinking config dict overrides everything
-            if isinstance(call_options.thinking, dict):
-                config_dict["thinking_config"] = types.ThinkingConfig(**call_options.thinking)
-            else:
-                config_dict["thinking_config"] = call_options.thinking
-        elif call_options.enable_thinking is not None:
-            # enable_thinking flag controls whether thinking is used
-            if call_options.enable_thinking:
-                # Add thinking config based on model version
-                if model.startswith("gemini-3"):
-                    config_dict["thinking_config"] = types.ThinkingConfig(
-                        thinking_level=types.ThinkingLevel.HIGH,
-                        include_thoughts=self.google_config.include_thoughts_in_response
-                    )
-                elif model.startswith("gemini-2.5"):
-                    config_dict["thinking_config"] = types.ThinkingConfig(
-                        thinking_budget=-1,  # -1 = dynamic (auto)
-                        include_thoughts=self.google_config.include_thoughts_in_response
-                    )
-            else:
-                # Disable thinking
-                config_dict.pop("thinking_config", None)
+        # Handle thinking configuration based on thinking_level
+        if call_options.thinking_level is not None and call_options.thinking_level != "default":
+            if model.startswith("gemini-3"):
+                # Gemini 3 models use thinking_level enum
+                thinking_level = THINKING_LEVEL_MAP.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
+                config_dict["thinking_config"] = types.ThinkingConfig(
+                    thinking_level=thinking_level,
+                    include_thoughts=self.google_config.include_thoughts_in_response
+                )
+            elif model.startswith("gemini-2.5"):
+                # Gemini 2.5 models use thinking_budget
+                budget = THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
+                config_dict["thinking_config"] = types.ThinkingConfig(
+                    thinking_budget=budget,
+                    include_thoughts=self.google_config.include_thoughts_in_response
+                )
 
         config = types.GenerateContentConfig(**config_dict)
 
@@ -313,31 +319,22 @@ class GoogleClient(LLMClientBase):
         if call_options.top_k is not None:
             config_dict["top_k"] = call_options.top_k
 
-        # Handle thinking configuration
-        # Priority: call_options.thinking > call_options.enable_thinking > config default
-        if call_options.thinking is not None:
-            # Explicit thinking config dict overrides everything
-            if isinstance(call_options.thinking, dict):
-                config_dict["thinking_config"] = types.ThinkingConfig(**call_options.thinking)
-            else:
-                config_dict["thinking_config"] = call_options.thinking
-        elif call_options.enable_thinking is not None:
-            # enable_thinking flag controls whether thinking is used
-            if call_options.enable_thinking:
-                # Add thinking config based on model version
-                if model.startswith("gemini-3"):
-                    config_dict["thinking_config"] = types.ThinkingConfig(
-                        thinking_level=types.ThinkingLevel.HIGH,
-                        include_thoughts=self.google_config.include_thoughts_in_response
-                    )
-                elif model.startswith("gemini-2.5"):
-                    config_dict["thinking_config"] = types.ThinkingConfig(
-                        thinking_budget=-1,  # -1 = dynamic (auto)
-                        include_thoughts=self.google_config.include_thoughts_in_response
-                    )
-            else:
-                # Disable thinking
-                config_dict.pop("thinking_config", None)
+        # Handle thinking configuration based on thinking_level
+        if call_options.thinking_level is not None and call_options.thinking_level != "default":
+            if model.startswith("gemini-3"):
+                # Gemini 3 models use thinking_level enum
+                thinking_level = THINKING_LEVEL_MAP.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
+                config_dict["thinking_config"] = types.ThinkingConfig(
+                    thinking_level=thinking_level,
+                    include_thoughts=self.google_config.include_thoughts_in_response
+                )
+            elif model.startswith("gemini-2.5"):
+                # Gemini 2.5 models use thinking_budget
+                budget = THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
+                config_dict["thinking_config"] = types.ThinkingConfig(
+                    thinking_budget=budget,
+                    include_thoughts=self.google_config.include_thoughts_in_response
+                )
 
         config = types.GenerateContentConfig(**config_dict)
 
