@@ -41,7 +41,3 @@ class MoonshotConfig(BaseSettings):
         }
 
         return params
-
-    def _is_k25_model(self) -> bool:
-        """Check if current model is a K2.5 variant."""
-        return "k2.5" in self.model.lower() or "k2-5" in self.model.lower()

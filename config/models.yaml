@@ -170,8 +170,8 @@ providers:
         multimodal: true
         thinking:
           mode: configurable
-          options: [default, high]
-          default: default
+          options: [default, low, high]  # low = disabled, high = enabled
+          default: high
 
       - id: kimi-k2-thinking-turbo
         name: Kimi K2 Thinking Turbo

@@ -64,3 +64,20 @@ GOOGLE_THINKING_LEVEL_TO_BUDGET: Dict[str, int] = {
     "low": 1024,
     "high": -1,  # -1 = dynamic (auto)
 }
+
+
+# =============================================================================
+# Moonshot Mappings (thinking.type)
+# =============================================================================
+# Moonshot kimi-k2.5 uses thinking parameter with type: "enabled" or "disabled"
+#
+# Mapping:
+# - "default": Don't pass thinking param (Moonshot default is enabled)
+# - "low": Explicitly disable thinking (type: "disabled")
+# - "high": Explicitly enable thinking (type: "enabled")
+
+MOONSHOT_THINKING_LEVEL_TO_TYPE: Dict[str, Optional[str]] = {
+    "default": None,  # Don't pass thinking param
+    "low": "disabled",  # Disable thinking
+    "high": "enabled",  # Enable thinking
+}

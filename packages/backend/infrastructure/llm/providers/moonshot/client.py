@@ -28,7 +28,7 @@ from .debug import MoonshotDebugger
 class MoonshotClient(LLMClientBase):
     """
     Moonshot client implementation using OpenAI-compatible architecture.
-    
+
     Key Features:
     - OpenAI-compatible Chat Completions API
     - Optimized for Kimi models
@@ -49,17 +49,14 @@ class MoonshotClient(LLMClientBase):
         self.provider_name = "moonshot"
         self.moonshot_config = config
         self.api_key = config.moonshot_api_key
-        
+
         # Debug: Print masked API key
         if self.api_key:
             masked_key = f"{self.api_key[:8]}...{self.api_key[-4:]}" if len(self.api_key) > 12 else "***"
             print(f"  API Key (masked): {masked_key}")
 
         # Initialize both sync and async OpenAI clients with Moonshot base URL
-        client_kwargs: Dict[str, Any] = {
-            "api_key": self.api_key,
-            "base_url": self.moonshot_config.base_url
-        }
+        client_kwargs: Dict[str, Any] = {"api_key": self.api_key, "base_url": self.moonshot_config.base_url}
         self.client = OpenAI(**client_kwargs)
         self.async_client = AsyncOpenAI(**client_kwargs)
 
@@ -69,10 +66,7 @@ class MoonshotClient(LLMClientBase):
     # ========== CORE API METHODS ==========
 
     async def call_api_with_context(
-        self,
-        context_contents: List[Dict[str, Any]],
-        api_config: Dict[str, Any],
-        **kwargs
+        self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs
     ) -> ChatCompletion:
         """
         Execute a stateless Moonshot API call with prepared context.
@@ -89,9 +83,7 @@ class MoonshotClient(LLMClientBase):
         debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.moonshot_config.timeout
         max_retries = (
-            call_options.max_retries
-            if call_options.max_retries is not None
-            else self.moonshot_config.max_retries
+            call_options.max_retries if call_options.max_retries is not None else self.moonshot_config.max_retries
         )
 
         tools = api_config.get("tools", []) or []
@@ -100,28 +92,36 @@ class MoonshotClient(LLMClientBase):
         # Add system message if provided
         system_prompt = api_config.get("system_prompt")
         if system_prompt:
-            messages.insert(0, {
-                "role": "system",
-                "content": system_prompt
-            })
+            messages.insert(0, {"role": "system", "content": system_prompt})
 
         # Build API call parameters
         api_kwargs = self.moonshot_config.build_api_params()
-        api_kwargs.update({
-            "messages": messages,
-            "tools": tools,
-            "tool_choice": "auto" if tools else None,
-            "stream": False,
-        })
+        api_kwargs.update(
+            {
+                "messages": messages,
+                "tools": tools,
+                "tool_choice": "auto" if tools else None,
+                "stream": False,
+            }
+        )
 
         if call_options.temperature is not None:
-            api_kwargs['temperature'] = call_options.temperature
+            api_kwargs["temperature"] = call_options.temperature
         if call_options.max_tokens is not None:
-            api_kwargs['max_tokens'] = call_options.max_tokens
+            api_kwargs["max_tokens"] = call_options.max_tokens
         if call_options.top_p is not None:
-            api_kwargs['top_p'] = call_options.top_p
+            api_kwargs["top_p"] = call_options.top_p
         if call_options.timeout is not None:
-            api_kwargs['timeout'] = call_options.timeout
+            api_kwargs["timeout"] = call_options.timeout
+
+        # Handle thinking configuration (if level is provided and not default)
+        from backend.infrastructure.llm.shared.constants.thinking import MOONSHOT_THINKING_LEVEL_TO_TYPE
+
+        if call_options.thinking_level is not None:
+            thinking_type = MOONSHOT_THINKING_LEVEL_TO_TYPE.get(call_options.thinking_level)
+            if thinking_type is not None:
+                # Inject Moonshot specific thinking parameter via extra_body
+                api_kwargs["extra_body"] = {"thinking": {"type": thinking_type}}
 
         if debug:
             MoonshotDebugger.print_api_request(api_kwargs, messages, tools)
@@ -142,10 +142,7 @@ class MoonshotClient(LLMClientBase):
             raise
 
     async def call_api_with_context_streaming(
-        self,
-        context_contents: List[Dict[str, Any]],
-        api_config: Dict[str, Any],
-        **kwargs
+        self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs
     ) -> AsyncGenerator[StreamingChunk, None]:
         """
         Execute streaming Moonshot API call with real-time chunk delivery.
@@ -162,9 +159,7 @@ class MoonshotClient(LLMClientBase):
         debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.moonshot_config.timeout
         max_retries = (
-            call_options.max_retries
-            if call_options.max_retries is not None
-            else self.moonshot_config.max_retries
+            call_options.max_retries if call_options.max_retries is not None else self.moonshot_config.max_retries
         )
 
         tools = api_config.get("tools", []) or []
@@ -173,29 +168,37 @@ class MoonshotClient(LLMClientBase):
         # Add system message if provided
         system_prompt = api_config.get("system_prompt")
         if system_prompt:
-            messages.insert(0, {
-                "role": "system",
-                "content": system_prompt
-            })
+            messages.insert(0, {"role": "system", "content": system_prompt})
 
         # Build API call parameters
         api_kwargs = self.moonshot_config.build_api_params()
-        api_kwargs.update({
-            "messages": messages,
-            "tools": tools,
-            "tool_choice": "auto" if tools else None,
-            "stream": True,
-            "stream_options": {"include_usage": True}
-        })
+        api_kwargs.update(
+            {
+                "messages": messages,
+                "tools": tools,
+                "tool_choice": "auto" if tools else None,
+                "stream": True,
+                "stream_options": {"include_usage": True},
+            }
+        )
 
         if call_options.temperature is not None:
-            api_kwargs['temperature'] = call_options.temperature
+            api_kwargs["temperature"] = call_options.temperature
         if call_options.max_tokens is not None:
-            api_kwargs['max_tokens'] = call_options.max_tokens
+            api_kwargs["max_tokens"] = call_options.max_tokens
         if call_options.top_p is not None:
-            api_kwargs['top_p'] = call_options.top_p
+            api_kwargs["top_p"] = call_options.top_p
         if call_options.timeout is not None:
-            api_kwargs['timeout'] = call_options.timeout
+            api_kwargs["timeout"] = call_options.timeout
+
+        # Handle thinking configuration (if level is provided and not default)
+        from backend.infrastructure.llm.shared.constants.thinking import MOONSHOT_THINKING_LEVEL_TO_TYPE
+
+        if call_options.thinking_level is not None:
+            thinking_type = MOONSHOT_THINKING_LEVEL_TO_TYPE.get(call_options.thinking_level)
+            if thinking_type is not None:
+                # Inject Moonshot specific thinking parameter via extra_body
+                api_kwargs["extra_body"] = {"thinking": {"type": thinking_type}}
 
         if debug:
             MoonshotDebugger.print_api_request(api_kwargs, messages, tools)
@@ -248,11 +251,7 @@ class MoonshotClient(LLMClientBase):
         """Get Moonshot-specific configuration object."""
         return self.moonshot_config
 
-    def _build_api_config(
-        self,
-        system_prompt: str,
-        tool_schemas: Optional[List[Any]]
-    ) -> Dict[str, Any]:
+    def _build_api_config(self, system_prompt: str, tool_schemas: Optional[List[Any]]) -> Dict[str, Any]:
         """
         Build Moonshot-specific API configuration.
 
@@ -263,10 +262,7 @@ class MoonshotClient(LLMClientBase):
         Returns:
             Dict with 'tools' and 'system_prompt' keys
         """
-        return {
-            'tools': tool_schemas or [],
-            'system_prompt': system_prompt
-        }
+        return {"tools": tool_schemas or [], "system_prompt": system_prompt}
 
 
-__all__ = ['MoonshotClient']
+__all__ = ["MoonshotClient"]
