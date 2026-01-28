@@ -52,7 +52,7 @@ async def _generate_title(llm_client: Any, latest_messages: List[BaseMessage]) -
     response = await llm_client.call_api_with_context(
         context_contents=context_contents,
         api_config=api_config,
-        enable_thinking=False,
+        thinking_level="default",  # No thinking for title generation
     )
 
     title_response_text = llm_client.extract_text(response)

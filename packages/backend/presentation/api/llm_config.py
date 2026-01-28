@@ -27,12 +27,17 @@ from backend.infrastructure.storage.session_manager import (
     get_session_llm_config,
     update_session_llm_config,
     clear_session_llm_config,
+    get_session_thinking_level,
+    update_session_thinking_level,
+    VALID_THINKING_LEVELS,
 )
 from backend.infrastructure.llm.shared.models_registry import (
     get_all_providers,
     get_model_info,
+    get_model_thinking_config,
     ModelInfo as RegistryModelInfo,
     ProviderInfo as RegistryProviderInfo,
+    ThinkingConfig as RegistryThinkingConfig,
 )
 
 router = APIRouter(prefix="/api/llm-config", tags=["llm-config"])
@@ -61,12 +66,23 @@ class LLMConfigUpdateRequest(BaseModel):
     )
 
 
+class ThinkingConfigInfo(BaseModel):
+    """Thinking configuration for API response."""
+    supported: bool = Field(..., description="Whether model supports thinking mode")
+    default: str = Field(..., description="Default thinking level for new sessions")
+    options: List[str] = Field(
+        default=["default", "low", "high"],
+        description="Available thinking levels"
+    )
+
+
 class ModelInfo(BaseModel):
     """Model information for API response."""
     id: str = Field(..., description="Model identifier")
     name: str = Field(..., description="Display name")
     description: Optional[str] = Field(None, description="Model description")
     context_window: Optional[int] = Field(None, description="Context window size (tokens)")
+    thinking: Optional[ThinkingConfigInfo] = Field(None, description="Thinking configuration")
 
 
 class ProviderInfo(BaseModel):
@@ -81,6 +97,26 @@ class ProviderInfo(BaseModel):
 class ProviderListData(BaseModel):
     """Response data for provider list."""
     providers: List[ProviderInfo] = Field(..., description="Available providers")
+
+
+class ThinkingConfigRequest(BaseModel):
+    """Request to update thinking configuration."""
+    thinking_level: str = Field(
+        ...,
+        description="Thinking level: 'default' (no thinking params), 'low', or 'high'"
+    )
+
+
+class ThinkingConfigData(BaseModel):
+    """Thinking configuration data."""
+    thinking_level: str = Field(
+        ...,
+        description="Current thinking level: 'default', 'low', or 'high'"
+    )
+    options: List[str] = Field(
+        default=["default", "low", "high"],
+        description="Available thinking levels for the current model"
+    )
 
 
 # =====================
@@ -150,15 +186,24 @@ def _get_available_providers() -> List[ProviderInfo]:
         has_key = _check_api_key_configured(reg_provider.provider)
 
         # Convert registry models to API models
-        api_models = [
-            ModelInfo(
+        api_models = []
+        for m in reg_provider.models:
+            # Convert thinking config if present
+            thinking_info = None
+            if m.thinking and m.thinking.supported:
+                thinking_info = ThinkingConfigInfo(
+                    supported=m.thinking.supported,
+                    default=m.thinking.default,
+                    options=m.thinking.options
+                )
+
+            api_models.append(ModelInfo(
                 id=m.id,
                 name=m.name,
                 description=m.description,
-                context_window=m.context_window
-            )
-            for m in reg_provider.models
-        ]
+                context_window=m.context_window,
+                thinking=thinking_info
+            ))
 
         # Create API provider info
         provider_info = ProviderInfo(
@@ -424,4 +469,126 @@ async def get_model_details_endpoint(
     except Exception as e:
         raise InternalServerError(
             message=f"Failed to get model details: {str(e)}"
+        )
+
+
+# =====================
+# Thinking Configuration Endpoints
+# =====================
+@router.get("/thinking", response_model=ApiResponse[ThinkingConfigData])
+async def get_thinking_config(
+    session_id: str,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+) -> ApiResponse[ThinkingConfigData]:
+    """
+    Get thinking/reasoning mode configuration for a session.
+
+    Thinking level controls the reasoning effort of LLM providers:
+    - "default": Don't pass thinking params, use API's default behavior
+    - "low": Use low reasoning effort
+    - "high": Use high reasoning effort
+
+    Args:
+        session_id: Session ID to get thinking config for
+        provider: Optional provider ID to get model-specific options
+        model: Optional model ID to get model-specific options
+
+    Returns:
+        ApiResponse containing ThinkingConfigData with current thinking_level
+    """
+    try:
+        thinking_level = get_session_thinking_level(session_id)
+
+        # Get model-specific options from models.yaml
+        options = list(VALID_THINKING_LEVELS)  # Fallback
+        if provider and model:
+            thinking_config = get_model_thinking_config(provider, model)
+            if thinking_config:
+                if thinking_config.supported:
+                    options = thinking_config.options
+                else:
+                    # Model exists but thinking not supported -> only default allowed
+                    options = ["default"]
+
+
+        # Sanitise thinking_level for response
+        # If the stored level is not valid for the current model, return "default"
+        # This ensures the UI reflects the effective state without destroying the user's preference
+        return ApiResponse(
+            success=True,
+            message="Retrieved thinking configuration",
+            data=ThinkingConfigData(
+                thinking_level=thinking_level if thinking_level in options else "default",
+                options=options
+            )
+        )
+
+    except Exception as e:
+        raise InternalServerError(
+            message=f"Failed to get thinking configuration: {str(e)}"
+        )
+
+
+@router.post("/thinking", response_model=ApiResponse[ThinkingConfigData])
+async def update_thinking_config(
+    request: ThinkingConfigRequest,
+    session_id: str,
+) -> ApiResponse[ThinkingConfigData]:
+    """
+    Update thinking/reasoning mode configuration for a session.
+
+    Sets the LLM's thinking/reasoning level:
+    - "default": Don't pass thinking params (OpenAI default is 'none')
+    - "low": Low reasoning effort
+    - "high": High reasoning effort
+
+    Provider-specific mappings:
+    - OpenAI: reasoning.effort = "low" | "high" (default = no param)
+    - Anthropic: thinking.budget_tokens varies by level
+    - Gemini: thinking_level = LOW | HIGH
+
+    Args:
+        request: ThinkingConfigRequest with thinking_level string
+        session_id: Session ID to update thinking config for
+
+    Returns:
+        ApiResponse confirming the update
+    """
+    try:
+        # Validate thinking level
+        if request.thinking_level not in VALID_THINKING_LEVELS:
+            raise BadRequestError(
+                message=f"Invalid thinking level: {request.thinking_level}. "
+                        f"Must be one of: {', '.join(VALID_THINKING_LEVELS)}"
+            )
+
+        success = update_session_thinking_level(session_id, request.thinking_level)
+
+        if not success:
+            raise BadRequestError(message=f"Session not found: {session_id}")
+
+        # Notify frontend about the change via WebSocket
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+        await WebSocketNotificationService.send_thinking_level_update(
+            session_id,
+            request.thinking_level
+        )
+
+        return ApiResponse(
+            success=True,
+            message=f"Thinking level set to '{request.thinking_level}'",
+            data=ThinkingConfigData(
+                thinking_level=request.thinking_level,
+                options=list(VALID_THINKING_LEVELS)
+            )
+        )
+
+    except BadRequestError:
+        raise
+    except ValueError as e:
+        raise BadRequestError(message=str(e))
+    except Exception as e:
+        raise InternalServerError(
+            message=f"Failed to update thinking configuration: {str(e)}"
         )

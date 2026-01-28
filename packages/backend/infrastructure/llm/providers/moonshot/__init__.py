@@ -2,13 +2,15 @@
 Moonshot LLM Provider
 
 OpenAI-compatible API provider specializing in long-context understanding.
-Base URL: https://api.moonshot.cn/v1
+Base URL: https://api.moonshot.ai/v1
 
 Available models:
-- moonshot-v1-8k: 8K context window
-- moonshot-v1-32k: 32K context window (default)
-- moonshot-v1-128k: 128K context window
-- kimi-k2-0905-preview: Latest K2 model
+- kimi-k2.5: Native multimodal model with vision, coding, and agentic capabilities (262K context)
+  - Thinking mode (default): Includes reasoning traces, recommended temperature=1.0
+  - Instant mode: No reasoning traces, recommended temperature=0.6
+- kimi-k2-thinking: Deep reasoning model with extended context (262K)
+- kimi-k2-thinking-turbo: Fast thinking model (262K)
+- kimi-k2-0905-preview: K2 preview release (262K)
 
 Architecture:
 Moonshot uses OpenAI-compatible Chat Completions API (not Responses API).

@@ -11,11 +11,13 @@ import { ConnectionProvider } from './contexts/connection/ConnectionContext'
 import { SessionProvider } from './contexts/session/SessionContext'
 import { ChatProvider } from './contexts/chat/ChatContext'
 import { MemoryProvider } from './contexts/MemoryContext'
+import { ThinkingProvider, useThinking } from './contexts/ThinkingContext'
 import { useConnection } from './contexts/connection/ConnectionContext'
 import { ConnectionStatus } from './types/connection'
 
 function AppContent(): React.ReactElement {
   const { connectionStatus, connectionError, checkConnection, sendWebSocketMessage, sessionId } = useConnection()
+  const { toggleThinking, thinkingEnabled, isToggling } = useThinking()
 
   // Global ESC key listener for interrupt
   useEffect(() => {
@@ -40,6 +42,23 @@ function AppContent(): React.ReactElement {
     window.addEventListener('keydown', handleEscKey)
     return () => window.removeEventListener('keydown', handleEscKey)
   }, [sendWebSocketMessage, sessionId])
+
+  // Global Ctrl+T listener for thinking mode toggle
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+T (or Cmd+T on Mac) to toggle thinking mode
+      if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+        e.preventDefault()
+        if (!isToggling) {
+          toggleThinking()
+          console.log(`[App] Thinking mode toggled to: ${!thinkingEnabled}`)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggleThinking, thinkingEnabled, isToggling])
 
   return (
     <div className="app-container">
@@ -72,11 +91,13 @@ function App(): React.ReactElement {
     <>
       <ConnectionProvider>
         <SessionProvider>
-          <MemoryProvider>
-            <ChatProvider>
-              <AppContent />
-            </ChatProvider>
-          </MemoryProvider>
+          <ThinkingProvider>
+            <MemoryProvider>
+              <ChatProvider>
+                <AppContent />
+              </ChatProvider>
+            </MemoryProvider>
+          </ThinkingProvider>
         </SessionProvider>
       </ConnectionProvider>
     </>

@@ -214,6 +214,11 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       window.dispatchEvent(new CustomEvent('toolResultUpdate', { detail: data }))
     })
 
+    manager.on('thinking_config_update', (data) => {
+      console.log('[ConnectionContext] Dispatching thinkingConfigUpdate event:', data)
+      window.dispatchEvent(new CustomEvent('thinkingConfigUpdate', { detail: data }))
+    })
+
     connectionManagerRef.current = manager
     return manager
   }, [])

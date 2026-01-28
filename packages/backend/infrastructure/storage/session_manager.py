@@ -892,3 +892,52 @@ def load_token_usage(session_id: str) -> Optional[Dict[str, int]]:
     """
     state = load_runtime_state(session_id)
     return state.get('token_usage')
+
+
+# ========== Thinking Mode Configuration ==========
+
+# Valid thinking levels (same for all providers that support thinking)
+VALID_THINKING_LEVELS = {"default", "low", "high"}
+
+
+def get_session_thinking_level(session_id: str) -> str:
+    """
+    Get thinking_level setting from session metadata.
+
+    Thinking level controls the reasoning effort of LLM providers:
+    - "default": Don't pass thinking params, use API's default behavior
+    - "low": Use low reasoning effort
+    - "high": Use high reasoning effort
+
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        str: Thinking level. Default: "default"
+    """
+    session_metadata = get_session_metadata(session_id)
+    if not session_metadata:
+        return "default"
+
+    level = session_metadata.get("thinking_level", "default")
+    return level if level in VALID_THINKING_LEVELS else "default"
+
+
+def update_session_thinking_level(session_id: str, thinking_level: str) -> bool:
+    """
+    Update thinking_level setting in session metadata.
+
+    Args:
+        session_id: Session identifier
+        thinking_level: Thinking level ("default", "low", or "high")
+
+    Returns:
+        bool: True if update was successful, False otherwise
+
+    Raises:
+        ValueError: If thinking_level is not valid
+    """
+    if thinking_level not in VALID_THINKING_LEVELS:
+        raise ValueError(f"Invalid thinking level: {thinking_level}. Must be one of {VALID_THINKING_LEVELS}")
+
+    return update_session_metadata(session_id, {"thinking_level": thinking_level})

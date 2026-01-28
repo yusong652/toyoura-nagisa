@@ -143,6 +143,11 @@ class MoonshotClient(LLMClientBase):
         if call_options.timeout is not None:
             api_kwargs['timeout'] = call_options.timeout
 
+        # Handle thinking mode (K2.5 and similar models)
+        if call_options.enable_thinking is not None:
+            thinking_type = "enabled" if call_options.enable_thinking else "disabled"
+            api_kwargs["extra_body"] = {"thinking": {"type": thinking_type}}
+
         if debug:
             MoonshotDebugger.print_api_request(api_kwargs, messages, tools)
 
@@ -214,6 +219,11 @@ class MoonshotClient(LLMClientBase):
             api_kwargs['top_p'] = call_options.top_p
         if call_options.timeout is not None:
             api_kwargs['timeout'] = call_options.timeout
+
+        # Handle thinking mode (K2.5 and similar models)
+        if call_options.enable_thinking is not None:
+            thinking_type = "enabled" if call_options.enable_thinking else "disabled"
+            api_kwargs["extra_body"] = {"thinking": {"type": thinking_type}}
 
         if debug:
             MoonshotDebugger.print_api_request(api_kwargs, messages, tools)

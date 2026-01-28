@@ -13,6 +13,7 @@ from backend.application.session.message_service import MessageService
 from backend.application.agent.streaming_models import StreamingState
 from backend.application.agent.streaming_processor import StreamingProcessor
 from backend.application.tools.runtime import ToolExecutor
+from backend.infrastructure.storage.session_manager import get_session_thinking_level
 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
 if TYPE_CHECKING:
@@ -56,7 +57,13 @@ class MainAgentExecutor(BaseAgentExecutor):
             agent._set_stream_state(StreamingState(message_id=agent._get_message_id()))
 
             working_contents = agent.context_manager.get_working_contents()
-            stream = agent.llm_client.call_api_with_context_streaming(working_contents, api_config)
+
+            # Get thinking level from session
+            thinking_level = get_session_thinking_level(agent.session_id)
+
+            stream = agent.llm_client.call_api_with_context_streaming(
+                working_contents, api_config, thinking_level=thinking_level
+            )
             was_interrupted, response = await agent._get_streaming_processor().process_stream(
                 stream, agent._get_stream_state()
             )
@@ -136,9 +143,14 @@ class SubAgentExecutor(BaseAgentExecutor):
             api_config = agent.llm_client._build_api_config(agent._system_prompt, tool_schemas)
 
             working_contents = agent.context_manager.get_working_contents()
+
+            # Get thinking level from parent session (notification_session_id)
+            thinking_level = get_session_thinking_level(agent._notification_session_id)
+
             response = await agent.llm_client.call_api_with_context(
                 context_contents=working_contents,
                 api_config=api_config,
+                thinking_level=thinking_level,
             )
 
             processor = agent.llm_client._get_response_processor()

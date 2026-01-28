@@ -132,6 +132,8 @@ class GoogleClient(LLMClientBase):
             config = types.GenerateContentConfig(**config_kwargs)
 
         config_dict = config.model_dump()
+        model = self.google_config.model
+
         if call_options.temperature is not None:
             config_dict["temperature"] = call_options.temperature
         if call_options.max_tokens is not None:
@@ -140,17 +142,34 @@ class GoogleClient(LLMClientBase):
             config_dict["top_p"] = call_options.top_p
         if call_options.top_k is not None:
             config_dict["top_k"] = call_options.top_k
+
+        # Handle thinking configuration
+        # Priority: call_options.thinking > call_options.enable_thinking > config default
         if call_options.thinking is not None:
+            # Explicit thinking config dict overrides everything
             if isinstance(call_options.thinking, dict):
                 config_dict["thinking_config"] = types.ThinkingConfig(**call_options.thinking)
             else:
                 config_dict["thinking_config"] = call_options.thinking
-        if call_options.enable_thinking is False:
-            config_dict.pop("thinking_config", None)
+        elif call_options.enable_thinking is not None:
+            # enable_thinking flag controls whether thinking is used
+            if call_options.enable_thinking:
+                # Add thinking config based on model version
+                if model.startswith("gemini-3"):
+                    config_dict["thinking_config"] = types.ThinkingConfig(
+                        thinking_level=types.ThinkingLevel.HIGH,
+                        include_thoughts=self.google_config.include_thoughts_in_response
+                    )
+                elif model.startswith("gemini-2.5"):
+                    config_dict["thinking_config"] = types.ThinkingConfig(
+                        thinking_budget=-1,  # -1 = dynamic (auto)
+                        include_thoughts=self.google_config.include_thoughts_in_response
+                    )
+            else:
+                # Disable thinking
+                config_dict.pop("thinking_config", None)
 
         config = types.GenerateContentConfig(**config_dict)
-
-        model = self.google_config.model
 
         if debug:
             GoogleDebugger.print_request(context_contents, config, model)
@@ -283,6 +302,8 @@ class GoogleClient(LLMClientBase):
             config = types.GenerateContentConfig(**config_kwargs)
 
         config_dict = config.model_dump()
+        model = self.google_config.model
+
         if call_options.temperature is not None:
             config_dict["temperature"] = call_options.temperature
         if call_options.max_tokens is not None:
@@ -291,17 +312,34 @@ class GoogleClient(LLMClientBase):
             config_dict["top_p"] = call_options.top_p
         if call_options.top_k is not None:
             config_dict["top_k"] = call_options.top_k
+
+        # Handle thinking configuration
+        # Priority: call_options.thinking > call_options.enable_thinking > config default
         if call_options.thinking is not None:
+            # Explicit thinking config dict overrides everything
             if isinstance(call_options.thinking, dict):
                 config_dict["thinking_config"] = types.ThinkingConfig(**call_options.thinking)
             else:
                 config_dict["thinking_config"] = call_options.thinking
-        if call_options.enable_thinking is False:
-            config_dict.pop("thinking_config", None)
+        elif call_options.enable_thinking is not None:
+            # enable_thinking flag controls whether thinking is used
+            if call_options.enable_thinking:
+                # Add thinking config based on model version
+                if model.startswith("gemini-3"):
+                    config_dict["thinking_config"] = types.ThinkingConfig(
+                        thinking_level=types.ThinkingLevel.HIGH,
+                        include_thoughts=self.google_config.include_thoughts_in_response
+                    )
+                elif model.startswith("gemini-2.5"):
+                    config_dict["thinking_config"] = types.ThinkingConfig(
+                        thinking_budget=-1,  # -1 = dynamic (auto)
+                        include_thoughts=self.google_config.include_thoughts_in_response
+                    )
+            else:
+                # Disable thinking
+                config_dict.pop("thinking_config", None)
 
         config = types.GenerateContentConfig(**config_dict)
-
-        model = self.google_config.model
 
         if debug:
             GoogleDebugger.print_request(context_contents, config, model)

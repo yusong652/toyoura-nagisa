@@ -257,6 +257,13 @@ export class ConnectionManager extends WebSocketManager {
         });
         break;
 
+      case 'THINKING_LEVEL_UPDATE':
+        this.emit('thinking_level_update', {
+          session_id: message.session_id,
+          thinking_level: message.thinking_level
+        });
+        break;
+
       case 'USER_PFC_CONSOLE_RESULT':
         this.emit('user_pfc_console_result', {
           task_id: message.task_id,

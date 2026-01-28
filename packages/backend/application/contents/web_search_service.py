@@ -184,7 +184,7 @@ async def _perform_zhipu_search(llm_client, query: str) -> Dict[str, Any]:
         llm_client,
         query,
         tool_schemas,
-        enable_thinking=False,
+        thinking_level="default",  # No thinking for web search
     )
 
 
@@ -198,7 +198,7 @@ async def _perform_search(
     query: str,
     tool_schemas: List[Any],
     *,
-    enable_thinking: Optional[bool] = None,
+    thinking_level: Optional[str] = None,
 ) -> Dict[str, Any]:
     context_contents = _build_search_context(llm_client, query)
     api_config = llm_client.build_api_config(DEFAULT_WEB_SEARCH_SYSTEM_PROMPT, tool_schemas)
@@ -206,7 +206,7 @@ async def _perform_search(
     response = await llm_client.call_api_with_context(
         context_contents=context_contents,
         api_config=api_config,
-        enable_thinking=enable_thinking,
+        thinking_level=thinking_level,
     )
 
     response_text = llm_client.extract_text(response)

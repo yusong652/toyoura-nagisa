@@ -201,21 +201,52 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
         for tool_result in tool_result_blocks:
             # Extract tool result content
             nested_content = tool_result.get("content", {})
+            
+            # Check if we have structured parts (new format)
             if isinstance(nested_content, dict) and "parts" in nested_content:
-                # Extract text from parts
-                text_parts_result = []
-                for part in nested_content.get("parts", []):
-                    if isinstance(part, dict) and part.get("type") == "text":
-                        text_parts_result.append(part.get("text", ""))
-                output_content = "\n".join(text_parts_result)
+                parts = nested_content.get("parts", [])
+                has_images_in_result = any(p.get("type") in ("image", "image_url", "inline_data") for p in parts)
+                
+                if has_images_in_result:
+                    # Multimodal tool output
+                    content_parts = []
+                    for part in parts:
+                        if part.get("type") == "text":
+                            text = part.get("text", "")
+                            if text:
+                                content_parts.append({"type": "input_text", "text": text})
+                        elif part.get("type") in ("image", "image_url", "inline_data"):
+                            image_part = OpenAIMessageFormatter._convert_image_block_to_input(part)
+                            if image_part:
+                                content_parts.append(image_part)
+                    
+                    function_output_item = {
+                        "type": "function_call_output",
+                        "call_id": tool_result.get("tool_use_id", ""),
+                        "output": content_parts  # Changed from content to output per API requirement
+                    }
+                else:
+                    # Text-only parts
+                    text_parts_result = []
+                    for part in parts:
+                        if isinstance(part, dict) and part.get("type") == "text":
+                            text_parts_result.append(part.get("text", ""))
+                    output_content = "\n".join(text_parts_result)
+                    
+                    function_output_item = {
+                        "type": "function_call_output",
+                        "call_id": tool_result.get("tool_use_id", ""),
+                        "output": output_content
+                    }
             else:
+                # Legacy/Simple format
                 output_content = str(nested_content)
-
-            function_output_item = {
-                "type": "function_call_output",
-                "call_id": tool_result.get("tool_use_id", ""),
-                "output": output_content
-            }
+                function_output_item = {
+                    "type": "function_call_output",
+                    "call_id": tool_result.get("tool_use_id", ""),
+                    "output": output_content
+                }
+                
             result_items.append(function_output_item)
 
         # Return single item or list
@@ -257,21 +288,44 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
         llm_content = result.get("llm_content", {})
         content_parts = llm_content.get("parts", [])
 
-        # Extract text content from parts
-        text_parts = []
-        for part in content_parts:
-            if isinstance(part, dict) and part.get("type") == "text":
-                text_content = part.get("text", "")
-                if text_content:
-                    text_parts.append(text_content)
+        # Check for multimodal content
+        has_images = any(p.get("type") in ("image", "image_url", "inline_data") for p in content_parts)
 
-        output_text = "\n".join(text_parts) if text_parts else ""
+        if has_images:
+            # Multimodal format
+            api_parts = []
+            for part in content_parts:
+                if isinstance(part, dict):
+                    if part.get("type") == "text":
+                        text = part.get("text", "")
+                        if text:
+                            api_parts.append({"type": "input_text", "text": text})
+                    elif part.get("type") in ("image", "image_url", "inline_data"):
+                        image_part = OpenAIMessageFormatter._convert_image_block_to_input(part)
+                        if image_part:
+                            api_parts.append(image_part)
+            
+            return {
+                "type": "function_call_output",
+                "call_id": tool_call_id,
+                "output": api_parts  # Changed from content to output per API requirement
+            }
+        else:
+            # Text-only format
+            text_parts = []
+            for part in content_parts:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    text_content = part.get("text", "")
+                    if text_content:
+                        text_parts.append(text_content)
 
-        return {
-            "type": "function_call_output",
-            "call_id": tool_call_id,
-            "output": output_text
-        }
+            output_text = "\n".join(text_parts) if text_parts else ""
+
+            return {
+                "type": "function_call_output",
+                "call_id": tool_call_id,
+                "output": output_text
+            }
 
 
     @staticmethod
@@ -309,13 +363,22 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
             return image_part
 
         # Handle image format (with type field) or Gemini native inline_data (without type field)
-        if block_type == "image" or "inline_data" in block:
-            inline_data = block.get("inline_data", {})
-            data = inline_data.get("data")
+        if block_type == "image" or block_type == "inline_data" or "inline_data" in block:
+            # Check for nested inline_data (Gemini style)
+            if "inline_data" in block:
+                inline_data = block.get("inline_data", {})
+                data = inline_data.get("data")
+                mime_type = inline_data.get("mime_type", "image/png")
+                detail = inline_data.get("detail", "high")
+            else:
+                # Flat format (Standardized)
+                data = block.get("data")
+                mime_type = block.get("mime_type", "image/png")
+                detail = block.get("detail", "high")
+
             if not data:
                 return None
 
-            mime_type = inline_data.get("mime_type", "image/png")
             if isinstance(data, bytes):
                 import base64
                 data = base64.b64encode(data).decode("utf-8")
@@ -325,7 +388,7 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
             return {
                 "type": "input_image",
                 "image_url": f"data:{mime_type};base64,{data}",
-                "detail": inline_data.get("detail", "high")
+                "detail": detail
             }
 
         # Skip text blocks - they should be handled as strings at higher level

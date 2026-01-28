@@ -102,6 +102,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const [contextWindow, setContextWindow] = useState<number | null>(null);
   const [isQuitting, setIsQuitting] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(false);
+  const [thinkingLevel, setThinkingLevel] = useState<string>('default');
+  const [thinkingLevelOptions, setThinkingLevelOptions] = useState<string[]>(['default', 'low', 'high']);
   const [sessionTokenUsage, setSessionTokenUsage] = useState<TokenUsage | null>(null);
 
   // Ctrl+C confirmation state
@@ -264,6 +266,21 @@ export const AppContainer: React.FC<AppContainerProps> = ({
           await sessionManager.loadTokenUsage(sessionId);
         }
 
+        // Fetch thinking config (level and available options)
+        try {
+          const thinkingConfig = await apiClient.get<{ thinking_level: string; options: string[] }>(
+            `/api/llm-config/thinking?session_id=${sessionId}`
+          );
+          if (thinkingConfig?.thinking_level) {
+            setThinkingLevel(thinkingConfig.thinking_level);
+          }
+          if (thinkingConfig?.options?.length) {
+            setThinkingLevelOptions(thinkingConfig.options);
+          }
+        } catch (err) {
+          // Ignore error, use defaults
+        }
+
         // Connect WebSocket with retry handling
         try {
           await connectionManager.connectToSession(sessionId);
@@ -327,6 +344,54 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const toggleFullContextMode = useCallback(() => {
     setIsFullContextMode(prev => !prev);
   }, []);
+
+  // Notification actions
+  const showNotification = useCallback((message: string, type: 'info' | 'success' | 'error' = 'info', duration = 3000) => {
+    // Clear existing timeout
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+
+    setNotification({
+      id: Date.now().toString(),
+      message,
+      type,
+    });
+
+    notificationTimeoutRef.current = setTimeout(() => {
+      setNotification(null);
+      notificationTimeoutRef.current = null;
+    }, duration);
+  }, []);
+
+  const clearNotification = useCallback(() => {
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+      notificationTimeoutRef.current = null;
+    }
+    setNotification(null);
+  }, []);
+
+  // Cycle through thinking levels: default -> low -> high -> ...
+  const cycleThinkingLevel = useCallback(async () => {
+    if (!currentSessionId || thinkingLevelOptions.length === 0) return;
+
+    const currentIndex = thinkingLevelOptions.indexOf(thinkingLevel);
+    const nextIndex = (currentIndex + 1) % thinkingLevelOptions.length;
+    const nextLevel = thinkingLevelOptions[nextIndex];
+
+    try {
+      // Optimistic update
+      setThinkingLevel(nextLevel);
+
+      await apiClient.post(`/api/llm-config/thinking?session_id=${currentSessionId}`, {
+        thinking_level: nextLevel,
+      });
+    } catch (err: unknown) {
+      // Revert on error
+      setThinkingLevel(thinkingLevel);
+    }
+  }, [currentSessionId, thinkingLevel, thinkingLevelOptions]);
 
   // ========== Global Keypress Handling ==========
 
@@ -395,7 +460,12 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     if (key.ctrl && key.name === 'o' && !isFullContextMode) {
       toggleFullContextMode();
     }
-  }, [quit, isStreaming, isShellExecuting, isPfcExecuting, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager, toggleFullContextMode, isFullContextMode, currentSessionId, connectionManager]);
+
+    // Ctrl+T: cycle thinking level
+    if (key.ctrl && key.name === 't') {
+      cycleThinkingLevel();
+    }
+  }, [quit, isStreaming, isShellExecuting, isPfcExecuting, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager, toggleFullContextMode, isFullContextMode, currentSessionId, connectionManager, cycleThinkingLevel]);
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 
@@ -414,13 +484,39 @@ export const AppContainer: React.FC<AppContainerProps> = ({
       if (!payload?.session_id || !payload?.llm_config) return;
       if (payload.session_id !== currentSessionId) return;
       setLlmConfig(payload.llm_config);
+
+      // Re-fetch thinking config when LLM config changes
+      apiClient.get<{ thinking_level: string; options: string[] }>(
+        `/api/llm-config/thinking?session_id=${payload.session_id}&provider=${payload.llm_config.provider}&model=${payload.llm_config.model}`
+      ).then(thinkingConfig => {
+        if (thinkingConfig?.thinking_level) {
+          setThinkingLevel(thinkingConfig.thinking_level);
+        }
+        if (thinkingConfig?.options) {
+          setThinkingLevelOptions(thinkingConfig.options);
+          // If current level is not valid for new model, reset to default
+          if (!thinkingConfig.options.includes(thinkingLevel)) {
+             setThinkingLevel('default');
+          }
+        }
+      }).catch(() => {
+        // Ignore error
+      });
     };
 
     connectionManager.on('session_llm_config_update', handleLlmConfigUpdate);
 
+    const handleThinkingLevelUpdate = (message: { session_id: string; thinking_level: string }) => {
+      if (message.session_id !== currentSessionId) return;
+      setThinkingLevel(message.thinking_level);
+    };
+
+    connectionManager.on('thinking_level_update', handleThinkingLevelUpdate);
+
     return () => {
       connectionManager.off('session_mode_update', handleSessionModeUpdate);
       connectionManager.off('session_llm_config_update', handleLlmConfigUpdate);
+      connectionManager.off('thinking_level_update', handleThinkingLevelUpdate);
     };
   }, [connectionManager, currentSessionId]);
 
@@ -457,33 +553,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     };
   }, []);
 
-  // Notification actions
-  const showNotification = useCallback((message: string, type: 'info' | 'success' | 'error' = 'info', duration = 3000) => {
-    // Clear existing timeout
-    if (notificationTimeoutRef.current) {
-      clearTimeout(notificationTimeoutRef.current);
-    }
-
-    setNotification({
-      id: Date.now().toString(),
-      message,
-      type,
-    });
-
-    notificationTimeoutRef.current = setTimeout(() => {
-      setNotification(null);
-      notificationTimeoutRef.current = null;
-    }, duration);
-  }, []);
-
-  const clearNotification = useCallback(() => {
-    if (notificationTimeoutRef.current) {
-      clearTimeout(notificationTimeoutRef.current);
-      notificationTimeoutRef.current = null;
-    }
-    setNotification(null);
-  }, []);
-
   // ========== Context Values ==========
 
   const appState: AppState = useMemo(() => ({
@@ -494,6 +563,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     llmConfig,
     contextWindow,
     memoryEnabled,
+    thinkingLevel,
     history: historyManager.history,
     pendingHistoryItems,
     streamingState: {
@@ -522,6 +592,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     llmConfig,
     contextWindow,
     memoryEnabled,
+    thinkingLevel,
     historyManager.history,
     pendingHistoryItems,
     streamingStateEnum,
@@ -550,6 +621,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     setSessionMode: updateSessionMode,
     cycleSessionMode,
     setMemoryEnabled,
+    cycleThinkingLevel,
     sendMessage,
     cancelRequest,
     confirmTool,
@@ -570,6 +642,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     updateSessionMode,
     cycleSessionMode,
     setMemoryEnabled,
+    cycleThinkingLevel,
     sendMessage,
     cancelRequest,
     confirmTool,

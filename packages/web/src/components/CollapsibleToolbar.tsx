@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MemoryToggle } from './Toggle/variants/MemoryToggle';
+import { ThinkingToggle } from './Toggle/variants/ThinkingToggle';
 import { SettingsToggle } from './Toggle/variants/SettingsToggle';
 import './CollapsibleToolbar.css';
 

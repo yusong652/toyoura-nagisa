@@ -39,6 +39,16 @@ from .response_processor import OpenAIResponseProcessor
 from .tool_manager import OpenAIToolManager
 
 
+# Thinking level to OpenAI reasoning.effort mapping
+# - "default": Don't pass reasoning param (OpenAI uses 'none' behavior)
+# - "low"/"high": Pass directly to reasoning.effort
+THINKING_LEVEL_TO_EFFORT = {
+    "default": None,
+    "low": "low",
+    "high": "high",
+}
+
+
 class OpenAIClient(LLMClientBase):
     """
     OpenAI GPT client implementation using unified architecture.
@@ -156,6 +166,12 @@ class OpenAIClient(LLMClientBase):
 
         if call_options.timeout is not None:
             kwargs_api['timeout'] = call_options.timeout
+
+        # Handle thinking mode (reasoning effort for reasoning models)
+        if call_options.thinking_level is not None:
+            effort = THINKING_LEVEL_TO_EFFORT.get(call_options.thinking_level)
+            if effort is not None:
+                kwargs_api["reasoning"] = {"effort": effort}
 
         if debug:
             OpenAIDebugger.log_api_call_info(
@@ -275,6 +291,12 @@ class OpenAIClient(LLMClientBase):
 
         if call_options.timeout is not None:
             kwargs_api['timeout'] = call_options.timeout
+
+        # Handle thinking mode (reasoning effort for reasoning models)
+        if call_options.thinking_level is not None:
+            effort = THINKING_LEVEL_TO_EFFORT.get(call_options.thinking_level)
+            if effort is not None:
+                kwargs_api["reasoning"] = {"effort": effort}
 
         if debug:
             OpenAIDebugger.log_api_call_info(

@@ -121,7 +121,7 @@ class AnthropicClient(LLMClientBase):
         tools = api_config.get('tools', [])
         system_prompt = api_config.get('system_prompt', '')
 
-        # 使用配置系统构建API参数
+        # Build API parameters using configuration system
         kwargs_api = self.anthropic_config.get_api_call_kwargs(
             system_prompt=system_prompt,
             messages=context_contents,
@@ -136,10 +136,24 @@ class AnthropicClient(LLMClientBase):
             kwargs_api["top_p"] = call_options.top_p
         if call_options.top_k is not None:
             kwargs_api["top_k"] = call_options.top_k
+
+        # Handle thinking configuration
+        # Priority: call_options.thinking > call_options.enable_thinking > config default
         if call_options.thinking is not None:
+            # Explicit thinking config dict overrides everything
             kwargs_api["thinking"] = call_options.thinking
-        if call_options.enable_thinking is False:
-            kwargs_api.pop("thinking", None)
+        elif call_options.enable_thinking is not None:
+            # enable_thinking flag controls whether thinking is used
+            if call_options.enable_thinking:
+                # Add thinking config for supported models
+                if self.anthropic_config.supports_thinking():
+                    kwargs_api["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": self.anthropic_config.thinking_budget_tokens
+                    }
+            else:
+                # Disable thinking
+                kwargs_api.pop("thinking", None)
 
         async def _call_api():
             # call the Anthropic API (async)
@@ -219,10 +233,24 @@ class AnthropicClient(LLMClientBase):
             kwargs_api["top_p"] = call_options.top_p
         if call_options.top_k is not None:
             kwargs_api["top_k"] = call_options.top_k
+
+        # Handle thinking configuration
+        # Priority: call_options.thinking > call_options.enable_thinking > config default
         if call_options.thinking is not None:
+            # Explicit thinking config dict overrides everything
             kwargs_api["thinking"] = call_options.thinking
-        if call_options.enable_thinking is False:
-            kwargs_api.pop("thinking", None)
+        elif call_options.enable_thinking is not None:
+            # enable_thinking flag controls whether thinking is used
+            if call_options.enable_thinking:
+                # Add thinking config for supported models
+                if self.anthropic_config.supports_thinking():
+                    kwargs_api["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": self.anthropic_config.thinking_budget_tokens
+                    }
+            else:
+                # Disable thinking
+                kwargs_api.pop("thinking", None)
 
         if debug:
             AnthropicDebugger.print_debug_request_payload(kwargs_api)

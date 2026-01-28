@@ -183,10 +183,18 @@ class ZhipuClient(LLMClientBase):
         if call_options.timeout is not None:
             api_kwargs['timeout'] = call_options.timeout
 
-        enable_thinking = call_options.enable_thinking
+        # Handle thinking configuration
+        # Priority: call_options.thinking > call_options.enable_thinking > default enabled
         if call_options.thinking is not None:
+            # Explicit thinking config overrides everything
             api_kwargs["thinking"] = call_options.thinking
-        elif enable_thinking is None or enable_thinking is True:
+        elif call_options.enable_thinking is not None:
+            # enable_thinking flag controls whether thinking is used
+            if call_options.enable_thinking:
+                api_kwargs["thinking"] = {"type": "enabled"}
+            # When enable_thinking is False, don't add thinking
+        else:
+            # Default: enable thinking for Zhipu models
             api_kwargs["thinking"] = {"type": "enabled"}
 
         if debug:
@@ -269,10 +277,18 @@ class ZhipuClient(LLMClientBase):
         if call_options.timeout is not None:
             api_kwargs['timeout'] = call_options.timeout
 
-        enable_thinking = call_options.enable_thinking
+        # Handle thinking configuration
+        # Priority: call_options.thinking > call_options.enable_thinking > default enabled
         if call_options.thinking is not None:
+            # Explicit thinking config overrides everything
             api_kwargs["thinking"] = call_options.thinking
-        elif enable_thinking is None or enable_thinking is True:
+        elif call_options.enable_thinking is not None:
+            # enable_thinking flag controls whether thinking is used
+            if call_options.enable_thinking:
+                api_kwargs["thinking"] = {"type": "enabled"}
+            # When enable_thinking is False, don't add thinking
+        else:
+            # Default: enable thinking for Zhipu models
             api_kwargs["thinking"] = {"type": "enabled"}
 
         if debug:

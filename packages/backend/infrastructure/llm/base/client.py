@@ -113,7 +113,7 @@ class LLMClientBase(ABC):
                 - timeout: Optional[float] - Request timeout override
                 - max_retries: Optional[int] - Retry count override
                 - thinking: Optional[Dict[str, Any]] - Provider-specific thinking config
-                - enable_thinking: Optional[bool] - Enable thinking where supported
+                - thinking_level: Optional[str] - Thinking level ("default", "low", "high")
 
         Returns:
             Any: Raw API response object in provider-specific format:

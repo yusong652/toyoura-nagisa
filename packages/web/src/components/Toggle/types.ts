@@ -57,6 +57,20 @@ export interface MemoryToggleProps {
 }
 
 /**
+ * Thinking Toggle specific props
+ */
+export interface ThinkingToggleProps {
+  /** Callback when thinking state changes */
+  onThinkingChange?: (enabled: boolean) => void
+
+  /** Whether the toggle is disabled */
+  disabled?: boolean
+
+  /** Additional CSS classes */
+  className?: string
+}
+
+/**
  * Settings Toggle specific props
  * Supports both controlled and uncontrolled modes
  */

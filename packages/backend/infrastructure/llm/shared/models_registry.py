@@ -32,6 +32,20 @@ from pydantic import BaseModel, Field, ValidationError
 # =====================
 # Data Models
 # =====================
+class ThinkingConfig(BaseModel):
+    """Thinking/reasoning configuration for a model."""
+    supported: bool = Field(False, description="Whether the model supports thinking/reasoning mode")
+    options: List[str] = Field(
+        default=["default", "low", "high"],
+        description="Available thinking levels for this model"
+    )
+    default: str = Field("default", description="Default thinking level for new sessions")
+    # Thinking levels:
+    # - default: Don't pass thinking params, let API use its default behavior
+    # - low: Use low reasoning effort
+    # - high: Use high reasoning effort
+
+
 class ModelInfo(BaseModel):
     """Information about a specific model."""
     id: str = Field(..., description="Model identifier for API calls")
@@ -39,6 +53,7 @@ class ModelInfo(BaseModel):
     description: Optional[str] = Field(None, description="Model description")
     context_window: Optional[int] = Field(None, description="Context window size (tokens)")
     multimodal: bool = Field(False, description="Whether the model supports multimodal content like images")
+    thinking: Optional[ThinkingConfig] = Field(None, description="Thinking/reasoning configuration")
 
 
 class ProviderInfo(BaseModel):
@@ -92,6 +107,10 @@ def _load_providers_from_yaml() -> List[ProviderInfo]:
             models = []
             for model_data in provider_data.get('models', []):
                 try:
+                    # Parse thinking config if present
+                    if 'thinking' in model_data:
+                        thinking_data = model_data['thinking']
+                        model_data['thinking'] = ThinkingConfig(**thinking_data)
                     model = ModelInfo(**model_data)
                     models.append(model)
                 except ValidationError as e:
@@ -257,3 +276,20 @@ def get_supported_provider_ids() -> List[str]:
         # ["google", "anthropic", "openai", ...]
     """
     return [p.provider for p in PROVIDERS_REGISTRY]
+
+
+def get_model_thinking_config(provider: str, model: str) -> Optional[ThinkingConfig]:
+    """
+    Get thinking configuration for a specific model.
+
+    Args:
+        provider: Provider identifier
+        model: Model identifier
+
+    Returns:
+        Optional[ThinkingConfig]: Thinking config, None if model not found or not supported
+    """
+    model_info = get_model_info(provider, model)
+    if not model_info:
+        return None
+    return model_info.thinking

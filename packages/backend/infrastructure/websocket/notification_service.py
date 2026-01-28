@@ -550,3 +550,52 @@ class WebSocketNotificationService:
         except Exception as e:
             logger.warning(f"Failed to send subagent tool result notification: {e}")
             # Don't re-raise - this is a non-critical notification
+
+    @staticmethod
+    async def send_thinking_level_update(
+        session_id: str,
+        thinking_level: str
+    ) -> None:
+        """
+        Send thinking level update notification to frontend.
+
+        This notification informs the frontend when the thinking/reasoning level
+        changes, allowing the UI to update its display accordingly.
+
+        Args:
+            session_id: Target session ID
+            thinking_level: New thinking level ("default", "low", or "high")
+
+        Example:
+            await WebSocketNotificationService.send_thinking_level_update(
+                session_id="session-123",
+                thinking_level="high"
+            )
+        """
+        if not session_id:
+            return
+
+        try:
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+
+            connection_manager = get_connection_manager()
+            if not connection_manager:
+                logger.debug("Connection manager not available for THINKING_LEVEL_UPDATE")
+                return
+
+            notification = {
+                'type': 'THINKING_LEVEL_UPDATE',
+                'session_id': session_id,
+                'thinking_level': thinking_level
+            }
+
+            success = await connection_manager.send_json(session_id, notification)
+
+            if success:
+                logger.info(f"Sent THINKING_LEVEL_UPDATE (level={thinking_level}) for session {session_id}")
+            else:
+                logger.debug(f"Failed to send THINKING_LEVEL_UPDATE (no connection for session {session_id})")
+
+        except Exception as e:
+            logger.warning(f"Failed to send thinking level update notification: {e}")
+            # Don't re-raise - this is a non-critical notification

@@ -42,6 +42,9 @@ export interface AppState {
   // Memory
   memoryEnabled: boolean;
 
+  // Thinking Level ("default" | "low" | "high")
+  thinkingLevel: string;
+
   // History (committed items - rendered in <Static>)
   history: HistoryItem[];
 
@@ -106,6 +109,9 @@ export interface AppActions {
   // Memory
   setMemoryEnabled: (enabled: boolean) => void;
 
+  // Thinking Level
+  cycleThinkingLevel: () => Promise<void>;
+
   // Messages
   sendMessage: (text: string, mentionedFiles?: string[]) => void;
   cancelRequest: () => void;
@@ -140,6 +146,7 @@ const defaultState: AppState = {
   llmConfig: null,
   contextWindow: null,
   memoryEnabled: false,
+  thinkingLevel: 'default',
   history: [],
   pendingHistoryItems: [],
   streamingState: {
@@ -170,6 +177,7 @@ const defaultActions: AppActions = {
   setSessionMode: () => {},
   cycleSessionMode: () => {},
   setMemoryEnabled: () => {},
+  cycleThinkingLevel: async () => {},
   sendMessage: () => {},
   cancelRequest: () => {},
   confirmTool: () => {},
