@@ -50,11 +50,6 @@ class MoonshotClient(LLMClientBase):
         self.moonshot_config = config
         self.api_key = config.moonshot_api_key
         
-        # Log initialization
-        print(f"Moonshot Client initialized")
-        print(f"  Model: {self.moonshot_config.model}")
-        print(f"  Base URL: {self.moonshot_config.base_url}")
-
         # Debug: Print masked API key
         if self.api_key:
             masked_key = f"{self.api_key[:8]}...{self.api_key[-4:]}" if len(self.api_key) > 12 else "***"

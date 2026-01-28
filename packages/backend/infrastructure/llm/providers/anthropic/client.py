@@ -17,7 +17,7 @@ class AnthropicClient(LLMClientBase):
     """
     Anthropic Claude client class.
     """
-    
+
     def __init__(self, config: AnthropicConfig, extra_config: Optional[Dict[str, Any]] = None, **kwargs):
         """
         Initialize AnthropicClient instance.
@@ -37,7 +37,6 @@ class AnthropicClient(LLMClientBase):
         # initialize tool manager
         self.tool_manager = AnthropicToolManager()
 
-
     def _get_response_processor(self) -> AnthropicResponseProcessor:
         """Get Anthropic-specific response processor instance."""
         return AnthropicResponseProcessor()
@@ -46,11 +45,7 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific context manager class."""
         return AnthropicContextManager
 
-    def _build_api_config(
-        self,
-        system_prompt: str,
-        tool_schemas: Optional[List[Any]]
-    ) -> Dict[str, Any]:
+    def _build_api_config(self, system_prompt: str, tool_schemas: Optional[List[Any]]) -> Dict[str, Any]:
         """
         Build Anthropic-specific API configuration.
 
@@ -61,21 +56,13 @@ class AnthropicClient(LLMClientBase):
         Returns:
             Dict with 'tools' and 'system_prompt' keys
         """
-        return {
-            'tools': tool_schemas or [],
-            'system_prompt': system_prompt
-        }
+        return {"tools": tool_schemas or [], "system_prompt": system_prompt}
 
     def _get_provider_config(self):
         """Get Anthropic-specific configuration object."""
         return self.anthropic_config
 
-    async def call_api_with_context(
-        self,
-        context_contents: List[Dict[str, Any]],
-        api_config: Dict[str, Any],
-        **kwargs
-    ):
+    async def call_api_with_context(self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs):
         """
         Execute direct Anthropic API call with complete pre-formatted context and config.
 
@@ -97,39 +84,37 @@ class AnthropicClient(LLMClientBase):
         """
         call_options = parse_call_options(kwargs)
         debug = get_dev_config().debug_mode
-        timeout = (
-            call_options.timeout
-            if call_options.timeout is not None
-            else self.anthropic_config.timeout
-        )
+        timeout = call_options.timeout if call_options.timeout is not None else self.anthropic_config.timeout
         max_retries = (
-            call_options.max_retries
-            if call_options.max_retries is not None
-            else self.anthropic_config.max_retries
+            call_options.max_retries if call_options.max_retries is not None else self.anthropic_config.max_retries
         )
 
         # Extract configuration from api_config
-        tools = api_config.get('tools', [])
-        system_prompt = api_config.get('system_prompt', '')
+        tools = api_config.get("tools", [])
+        system_prompt = api_config.get("system_prompt", "")
 
         # Build API parameters using configuration system
         kwargs_api = self.anthropic_config.build_api_params()
-        
+
         # Format system prompt with cache_control for prompt caching
         system_with_cache = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
-        
+
         # Add cache_control to the last message for conversation caching
         from .message_formatter import AnthropicMessageFormatter
+
         cached_messages = AnthropicMessageFormatter.add_cache_control_to_messages(context_contents)
 
-        kwargs_api.update({
-            "messages": cached_messages,
-            "system": system_with_cache,
-        })
+        kwargs_api.update(
+            {
+                "messages": cached_messages,
+                "system": system_with_cache,
+            }
+        )
 
         # Add tools with cache_control on the last tool for prompt caching
         if tools and len(tools) > 0:
             import copy
+
             cached_tools = copy.deepcopy(tools)
             cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
             kwargs_api["tools"] = cached_tools
@@ -148,14 +133,17 @@ class AnthropicClient(LLMClientBase):
             # Map thinking level to budget tokens using defined mapping
             # Default to 4096 (low) if level not found
             budget = ANTHROPIC_THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, 4096)
-            kwargs_api["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": budget
-            }
+            kwargs_api["thinking"] = {"type": "enabled", "budget_tokens": budget}
             # Ensure max_tokens > budget_tokens (Anthropic requirement)
             current_max = kwargs_api.get("max_tokens", self.anthropic_config.max_tokens)
             if current_max <= budget:
                 kwargs_api["max_tokens"] = budget + 1024
+
+        if debug:
+            AnthropicDebugger.log_api_call_info(
+                tools_count=len(tools), model=kwargs_api.get("model", ""), thinking_level=call_options.thinking_level
+            )
+            AnthropicDebugger.log_api_payload(kwargs_api)
 
         async def _call_api():
             # call the Anthropic API (async)
@@ -178,10 +166,7 @@ class AnthropicClient(LLMClientBase):
             raise e
 
     async def call_api_with_context_streaming(
-        self,
-        context_contents: List[Dict[str, Any]],
-        api_config: Dict[str, Any],
-        **kwargs
+        self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs
     ) -> AsyncGenerator[StreamingChunk, None]:
         """
         Execute streaming Anthropic API call with real-time chunk delivery.
@@ -205,39 +190,37 @@ class AnthropicClient(LLMClientBase):
         """
         call_options = parse_call_options(kwargs)
         debug = get_dev_config().debug_mode
-        timeout = (
-            call_options.timeout
-            if call_options.timeout is not None
-            else self.anthropic_config.timeout
-        )
+        timeout = call_options.timeout if call_options.timeout is not None else self.anthropic_config.timeout
         max_retries = (
-            call_options.max_retries
-            if call_options.max_retries is not None
-            else self.anthropic_config.max_retries
+            call_options.max_retries if call_options.max_retries is not None else self.anthropic_config.max_retries
         )
 
         # Extract configuration from api_config
-        tools = api_config.get('tools', [])
-        system_prompt = api_config.get('system_prompt', '')
+        tools = api_config.get("tools", [])
+        system_prompt = api_config.get("system_prompt", "")
 
         # Build API parameters using configuration system
         kwargs_api = self.anthropic_config.build_api_params()
-        
+
         # Format system prompt with cache_control for prompt caching
         system_with_cache = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
-        
+
         # Add cache_control to the last message for conversation caching
         from .message_formatter import AnthropicMessageFormatter
+
         cached_messages = AnthropicMessageFormatter.add_cache_control_to_messages(context_contents)
 
-        kwargs_api.update({
-            "messages": cached_messages,
-            "system": system_with_cache,
-        })
+        kwargs_api.update(
+            {
+                "messages": cached_messages,
+                "system": system_with_cache,
+            }
+        )
 
         # Add tools with cache_control on the last tool for prompt caching
         if tools and len(tools) > 0:
             import copy
+
             cached_tools = copy.deepcopy(tools)
             cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
             kwargs_api["tools"] = cached_tools
@@ -256,16 +239,16 @@ class AnthropicClient(LLMClientBase):
             # Map thinking level to budget tokens using defined mapping
             # Default to 4096 (low) if level not found
             budget = ANTHROPIC_THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, 4096)
-            kwargs_api["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": budget
-            }
+            kwargs_api["thinking"] = {"type": "enabled", "budget_tokens": budget}
             # Ensure max_tokens > budget_tokens (Anthropic requirement)
             current_max = kwargs_api.get("max_tokens", self.anthropic_config.max_tokens)
             if current_max <= budget:
                 kwargs_api["max_tokens"] = budget + 1024
 
         if debug:
+            AnthropicDebugger.log_api_call_info(
+                tools_count=len(tools), model=kwargs_api.get("model", ""), thinking_level=call_options.thinking_level
+            )
             AnthropicDebugger.print_debug_request_payload(kwargs_api)
 
         async def _stream_once():

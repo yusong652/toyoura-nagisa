@@ -4,24 +4,48 @@
  * This context provides global state management for the thinking feature,
  * allowing users to enable/disable extended thinking/reasoning mode in LLM responses.
  *
- * Provider-specific behavior when thinking is enabled:
- * - Google Gemini: thinking_config with thinking_level "high"
- * - OpenAI: reasoning with effort "medium"
+ * Thinking levels (for configurable mode):
+ * - "default": Don't pass thinking params, use API's default behavior
+ * - "low": Use low reasoning effort
+ * - "high": Use high reasoning effort
+ *
+ * Provider-specific behavior:
+ * - Google Gemini: thinking_config with thinking_level
+ * - OpenAI: reasoning with effort
  * - Anthropic Claude: extended thinking with budget_tokens
- * - Moonshot K2.5: thinking type "enabled"
+ * - Moonshot K2.5: thinking type "enabled"/"disabled"
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
 import { useSession } from './session/SessionContext'
+import { useLlmConfig } from './LlmConfigContext'
+
+/** Available thinking levels */
+export type ThinkingLevel = 'default' | 'low' | 'high'
+
+/** Thinking mode types */
+export type ThinkingMode = 'none' | 'always_on' | 'configurable'
 
 interface ThinkingContextType {
-  /** Whether thinking/reasoning mode is enabled */
+  /** Current thinking level */
+  thinkingLevel: ThinkingLevel
+
+  /** Thinking mode for the current model */
+  thinkingMode: ThinkingMode
+
+  /** Available thinking level options for the current model (only for 'configurable' mode) */
+  thinkingOptions: ThinkingLevel[]
+
+  /** Whether thinking is enabled (level != 'default') */
   thinkingEnabled: boolean
 
-  /** Update thinking enabled state */
-  setThinkingEnabled: (enabled: boolean) => void
+  /** Whether thinking is configurable for the current model */
+  isConfigurable: boolean
 
-  /** Toggle thinking enabled state */
+  /** Update thinking level */
+  setThinkingLevel: (level: ThinkingLevel) => void
+
+  /** Toggle thinking between 'default' and 'high' */
   toggleThinking: () => void
 
   /** Whether a toggle operation is in progress */
@@ -32,38 +56,66 @@ const ThinkingContext = createContext<ThinkingContextType | undefined>(undefined
 
 interface ThinkingProviderProps {
   children: ReactNode
-  /** Initial thinking enabled state (default: true) */
-  initialEnabled?: boolean
+  /** Initial thinking level (default: 'high') */
+  initialLevel?: ThinkingLevel
 }
 
 /**
  * Thinking Provider Component
  *
  * Provides thinking mode state management to the application.
- * Thinking is enabled by default for enhanced LLM reasoning capabilities.
+ * Thinking is enabled by default (level='high') for enhanced LLM reasoning capabilities.
  * State is synced with backend via REST API for session-level persistence.
  */
 export const ThinkingProvider: React.FC<ThinkingProviderProps> = ({
   children,
-  initialEnabled = true
+  initialLevel = 'high'
 }) => {
-  const [thinkingEnabled, setThinkingEnabledState] = useState<boolean>(initialEnabled)
+  const [thinkingLevel, setThinkingLevelState] = useState<ThinkingLevel>(initialLevel)
+  const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('configurable')
+  const [thinkingOptions, setThinkingOptions] = useState<ThinkingLevel[]>(['default', 'low', 'high'])
   const [isToggling, setIsToggling] = useState<boolean>(false)
   const { currentSessionId } = useSession()
+  const { selectedProviderId, selectedModelId } = useLlmConfig()
 
-  // Fetch initial thinking config from backend when session changes
+  // Computed: whether thinking is enabled (any level except 'default')
+  const thinkingEnabled = thinkingLevel !== 'default'
+
+  // Computed: whether thinking is configurable
+  const isConfigurable = thinkingMode === 'configurable'
+
+  // Fetch thinking config from backend when session or model changes
   useEffect(() => {
     const fetchThinkingConfig = async () => {
       if (!currentSessionId) return
 
       try {
-        const response = await fetch(
-          `/api/llm-config/thinking?session_id=${encodeURIComponent(currentSessionId)}`
-        )
+        // Build URL with provider and model params
+        let url = `/api/llm-config/thinking?session_id=${encodeURIComponent(currentSessionId)}`
+        if (selectedProviderId) {
+          url += `&provider=${encodeURIComponent(selectedProviderId)}`
+        }
+        if (selectedModelId) {
+          url += `&model=${encodeURIComponent(selectedModelId)}`
+        }
+
+        const response = await fetch(url)
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.data) {
-            setThinkingEnabledState(data.data.thinking_enabled)
+            // Use thinking_level from backend API
+            const level = data.data.thinking_level as ThinkingLevel
+            setThinkingLevelState(level || 'default')
+
+            // Update mode if provided
+            if (data.data.mode) {
+              setThinkingMode(data.data.mode as ThinkingMode)
+            }
+
+            // Update available options if provided
+            if (data.data.options && Array.isArray(data.data.options)) {
+              setThinkingOptions(data.data.options as ThinkingLevel[])
+            }
           }
         }
       } catch (error) {
@@ -72,48 +124,59 @@ export const ThinkingProvider: React.FC<ThinkingProviderProps> = ({
     }
 
     fetchThinkingConfig()
-  }, [currentSessionId])
+  }, [currentSessionId, selectedProviderId, selectedModelId])
 
-  // Listen for WebSocket thinking config updates
+  // Listen for WebSocket thinking level updates
   useEffect(() => {
     const handleThinkingUpdate = (event: CustomEvent) => {
-      const { thinking_enabled } = event.detail
-      if (typeof thinking_enabled === 'boolean') {
-        setThinkingEnabledState(thinking_enabled)
+      const { thinking_level } = event.detail
+      if (typeof thinking_level === 'string') {
+        setThinkingLevelState(thinking_level as ThinkingLevel)
       }
     }
 
-    window.addEventListener('thinkingConfigUpdate', handleThinkingUpdate as EventListener)
-
+    window.addEventListener('thinking_config_updated' as any, handleThinkingUpdate as any)
     return () => {
-      window.removeEventListener('thinkingConfigUpdate', handleThinkingUpdate as EventListener)
+      window.removeEventListener('thinking_config_updated' as any, handleThinkingUpdate as any)
     }
   }, [])
 
-  const setThinkingEnabled = useCallback(async (enabled: boolean) => {
+  const setThinkingLevel = useCallback(async (level: ThinkingLevel) => {
     if (!currentSessionId) {
       console.warn('Cannot update thinking config: no session ID')
       return
     }
 
+    // Only allow changes for configurable mode
+    if (thinkingMode !== 'configurable') {
+      console.warn(`Cannot change thinking level: mode is '${thinkingMode}'`)
+      return
+    }
+
     setIsToggling(true)
     try {
-      const response = await fetch(
-        `/api/llm-config/thinking?session_id=${encodeURIComponent(currentSessionId)}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ thinking_enabled: enabled }),
-        }
-      )
+      // Build URL with provider and model params
+      let url = `/api/llm-config/thinking?session_id=${encodeURIComponent(currentSessionId)}`
+      if (selectedProviderId) {
+        url += `&provider=${encodeURIComponent(selectedProviderId)}`
+      }
+      if (selectedModelId) {
+        url += `&model=${encodeURIComponent(selectedModelId)}`
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ thinking_level: level }),
+      })
 
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.data) {
-          setThinkingEnabledState(data.data.thinking_enabled)
-          console.log(`Thinking mode ${enabled ? 'enabled' : 'disabled'}`)
+          setThinkingLevelState(data.data.thinking_level as ThinkingLevel)
+          console.log(`Thinking level set to '${level}'`)
         }
       } else {
         console.error('Failed to update thinking config:', response.statusText)
@@ -123,15 +186,20 @@ export const ThinkingProvider: React.FC<ThinkingProviderProps> = ({
     } finally {
       setIsToggling(false)
     }
-  }, [currentSessionId])
+  }, [currentSessionId, selectedProviderId, selectedModelId, thinkingMode])
 
   const toggleThinking = useCallback(() => {
-    setThinkingEnabled(!thinkingEnabled)
-  }, [thinkingEnabled, setThinkingEnabled])
+    if (!isConfigurable) return
+    setThinkingLevel(thinkingEnabled ? 'default' : 'high')
+  }, [thinkingEnabled, setThinkingLevel, isConfigurable])
 
   const value: ThinkingContextType = {
+    thinkingLevel,
+    thinkingMode,
+    thinkingOptions,
     thinkingEnabled,
-    setThinkingEnabled,
+    isConfigurable,
+    setThinkingLevel,
     toggleThinking,
     isToggling
   }

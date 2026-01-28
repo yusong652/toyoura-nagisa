@@ -19,6 +19,13 @@
 #           description: Model description (optional)
 #           context_window: Token limit in tokens (optional, integer without commas)
 #           multimodal: Whether the model supports multimodal content like images (optional, default: false)
+#           thinking:
+#             mode: "none" | "always_on" | "configurable"
+#               - none: Model does not support thinking
+#               - always_on: Model always uses thinking (e.g., o1, kimi-k2-thinking)
+#               - configurable: Thinking can be configured via API params
+#             options: [default, low, high]  # Only for 'configurable' mode
+#             default: default  # Default thinking level
 
 # System default configuration (used when user hasn't set custom config via frontend)
 default:
@@ -39,7 +46,7 @@ providers:
         context_window: 400000
         multimodal: true
         thinking:
-          supported: true
+          mode: configurable
           options: [default, low, high]
           default: high
 
@@ -49,7 +56,7 @@ providers:
         context_window: 400000
         multimodal: true
         thinking:
-          supported: true
+          mode: configurable
           options: [default, low, high]
           default: high
 
@@ -59,7 +66,7 @@ providers:
         context_window: 400000
         multimodal: true
         thinking:
-          supported: true
+          mode: configurable
           options: [default, low, high]
           default: default
 
@@ -69,7 +76,7 @@ providers:
         context_window: 128000
         multimodal: true
         thinking:
-          supported: false
+          mode: none
 
   # Google Gemini
   - provider: google
@@ -82,7 +89,7 @@ providers:
         context_window: 1048576
         multimodal: true
         thinking:
-          supported: true
+          mode: configurable
           options: [default, low, high]
           default: high
 
@@ -92,7 +99,7 @@ providers:
         context_window: 1048576
         multimodal: true
         thinking:
-          supported: true
+          mode: configurable
           options: [default, low, high]
           default: high
 
@@ -102,7 +109,7 @@ providers:
         context_window: 1048576
         multimodal: true
         thinking:
-          supported: true
+          mode: configurable
           options: [default, low, high]
           default: default
 
@@ -112,7 +119,7 @@ providers:
         context_window: 1048576
         multimodal: true
         thinking:
-          supported: true
+          mode: configurable
           options: [default, low, high]
           default: default
 
@@ -127,7 +134,7 @@ providers:
         context_window: 200000
         multimodal: true
         thinking:
-          supported: true
+          mode: configurable
           options: [default, low, high]
           default: high
 
@@ -137,7 +144,7 @@ providers:
         context_window: 200000
         multimodal: true
         thinking:
-          supported: true
+          mode: configurable
           options: [default, low, high]
           default: high
 
@@ -147,7 +154,7 @@ providers:
         context_window: 200000
         multimodal: true
         thinking:
-          supported: true
+          mode: configurable
           options: [default, low, high]
           default: high
 
@@ -158,12 +165,12 @@ providers:
     models:
       - id: kimi-k2.5
         name: Kimi K2.5
-        description: Native multimodal model with vision, coding, and agentic capabilities (thinking mode)
+        description: Native multimodal model with vision, coding, and agentic capabilities
         context_window: 262144
         multimodal: true
         thinking:
-          supported: true
-          options: [default, low, high]
+          mode: configurable
+          options: [default, high]
           default: default
 
       - id: kimi-k2-thinking-turbo
@@ -172,9 +179,7 @@ providers:
         context_window: 262144
         multimodal: false
         thinking:
-          supported: true
-          options: [default, low, high]
-          default: default
+          mode: always_on
 
       - id: kimi-k2-thinking
         name: Kimi K2 Thinking
@@ -182,9 +187,7 @@ providers:
         context_window: 262144
         multimodal: false
         thinking:
-          supported: true
-          options: [default, low, high]
-          default: default
+          mode: always_on
 
       - id: kimi-k2-turbo-preview
         name: Kimi K2 Turbo Preview
@@ -192,7 +195,7 @@ providers:
         context_window: 262144
         multimodal: false
         thinking:
-          supported: false
+          mode: none
 
       - id: kimi-k2-0905-preview
         name: Kimi K2 0905 Preview
@@ -200,7 +203,7 @@ providers:
         context_window: 262144
         multimodal: false
         thinking:
-          supported: false
+          mode: none
 
   # Zhipu AI
   - provider: zhipu
@@ -213,9 +216,7 @@ providers:
         context_window: 200000
         multimodal: false
         thinking:
-          supported: true
-          options: [default, low, high]
-          default: default
+          mode: always_on
 
       - id: glm-4.6v
         name: GLM-4.6v
@@ -223,7 +224,7 @@ providers:
         context_window: 200000
         multimodal: true
         thinking:
-          supported: false
+          mode: always_on
 
       - id: glm-4.7-flash
         name: GLM-4.7 Flash
@@ -231,7 +232,7 @@ providers:
         context_window: 200000
         multimodal: false
         thinking:
-          supported: false
+          mode: always_on
 
   # OpenRouter
   - provider: openrouter
@@ -244,7 +245,7 @@ providers:
         context_window: 200000
         multimodal: false
         thinking:
-          supported: false
+          mode: none
 
       - id: x-ai/grok-4.1-fast
         name: Grok 4.1 Fast
@@ -252,6 +253,4 @@ providers:
         context_window: 1048576
         multimodal: true
         thinking:
-          supported: true
-          options: [default, low, high]
-          default: default
+          mode: none

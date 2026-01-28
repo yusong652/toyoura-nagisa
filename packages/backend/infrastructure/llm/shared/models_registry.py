@@ -32,22 +32,46 @@ from pydantic import BaseModel, Field, ValidationError
 # =====================
 # Data Models
 # =====================
+from enum import Enum
+
+
+class ThinkingMode(str, Enum):
+    """Thinking mode for a model."""
+
+    NONE = "none"  # Model does not support thinking
+    ALWAYS_ON = "always_on"  # Model always uses thinking (e.g., o1, kimi-k2-thinking)
+    CONFIGURABLE = "configurable"  # Thinking can be configured via API params
+
+
 class ThinkingConfig(BaseModel):
-    """Thinking/reasoning configuration for a model."""
-    supported: bool = Field(False, description="Whether the model supports thinking/reasoning mode")
+    """Thinking/reasoning configuration for a model.
+
+    Modes:
+    - none: Model does not support thinking/reasoning
+    - always_on: Model is a native thinking model (always uses thinking, no param control)
+    - configurable: Thinking can be enabled/disabled or adjusted via API parameters
+
+    Options (only relevant for 'configurable' mode):
+    - default: Don't pass thinking params, use API's default behavior
+    - low: Use low reasoning effort
+    - high: Use high reasoning effort
+    """
+
+    mode: str = Field(default="none", description="Thinking mode: 'none', 'always_on', or 'configurable'")
     options: List[str] = Field(
-        default=["default", "low", "high"],
-        description="Available thinking levels for this model"
+        default=["default", "low", "high"], description="Available thinking levels (only for 'configurable' mode)"
     )
     default: str = Field("default", description="Default thinking level for new sessions")
-    # Thinking levels:
-    # - default: Don't pass thinking params, let API use its default behavior
-    # - low: Use low reasoning effort
-    # - high: Use high reasoning effort
+
+    @property
+    def supported(self) -> bool:
+        """Whether thinking is configurable (for API compatibility)."""
+        return self.mode == "configurable"
 
 
 class ModelInfo(BaseModel):
     """Information about a specific model."""
+
     id: str = Field(..., description="Model identifier for API calls")
     name: str = Field(..., description="Display name for UI")
     description: Optional[str] = Field(None, description="Model description")
@@ -58,6 +82,7 @@ class ModelInfo(BaseModel):
 
 class ProviderInfo(BaseModel):
     """Information about an LLM provider."""
+
     provider: str = Field(..., description="Provider identifier (matches llm.py config)")
     name: str = Field(..., description="Display name for UI")
     description: str = Field(..., description="Provider description")
@@ -94,23 +119,23 @@ def _load_providers_from_yaml() -> List[ProviderInfo]:
         return []
 
     try:
-        with open(MODELS_YAML_PATH, 'r', encoding='utf-8') as f:
+        with open(MODELS_YAML_PATH, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        if not data or 'providers' not in data:
+        if not data or "providers" not in data:
             print(f"[WARNING] Invalid YAML structure in {MODELS_YAML_PATH}")
             return []
 
         providers = []
-        for provider_data in data['providers']:
+        for provider_data in data["providers"]:
             # Parse models
             models = []
-            for model_data in provider_data.get('models', []):
+            for model_data in provider_data.get("models", []):
                 try:
                     # Parse thinking config if present
-                    if 'thinking' in model_data:
-                        thinking_data = model_data['thinking']
-                        model_data['thinking'] = ThinkingConfig(**thinking_data)
+                    if "thinking" in model_data:
+                        thinking_data = model_data["thinking"]
+                        model_data["thinking"] = ThinkingConfig(**thinking_data)
                     model = ModelInfo(**model_data)
                     models.append(model)
                 except ValidationError as e:
@@ -120,10 +145,10 @@ def _load_providers_from_yaml() -> List[ProviderInfo]:
             # Parse provider
             try:
                 provider = ProviderInfo(
-                    provider=provider_data['provider'],
-                    name=provider_data['name'],
-                    description=provider_data.get('description', ''),
-                    models=models
+                    provider=provider_data["provider"],
+                    name=provider_data["name"],
+                    description=provider_data.get("description", ""),
+                    models=models,
                 )
                 providers.append(provider)
             except (KeyError, ValidationError) as e:
@@ -148,6 +173,7 @@ PROVIDERS_REGISTRY: List[ProviderInfo] = _load_providers_from_yaml()
 # =====================
 # Public API
 # =====================
+
 
 def get_all_providers() -> List[ProviderInfo]:
     """

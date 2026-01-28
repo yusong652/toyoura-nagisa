@@ -11,6 +11,7 @@ Routes:
     DELETE /api/llm-config - Clear LLM configuration (global or session)
     GET /api/llm-config/providers - Get available providers and models
 """
+
 from typing import List, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -48,36 +49,33 @@ router = APIRouter(prefix="/api/llm-config", tags=["llm-config"])
 # =====================
 class LLMConfigData(BaseModel):
     """LLM configuration data."""
+
     provider: str = Field(..., description="LLM provider name (e.g., 'google', 'anthropic')")
     model: str = Field(..., description="Model identifier (e.g., 'gemini-2.0-flash-exp')")
-    secondary_model: Optional[str] = Field(
-        None,
-        description="Secondary model identifier for SubAgents"
-    )
+    secondary_model: Optional[str] = Field(None, description="Secondary model identifier for SubAgents")
 
 
 class LLMConfigUpdateRequest(BaseModel):
     """Request to update LLM configuration."""
+
     provider: str = Field(..., description="LLM provider name")
     model: str = Field(..., description="Model identifier")
-    secondary_model: Optional[str] = Field(
-        None,
-        description="Secondary model identifier for SubAgents"
-    )
+    secondary_model: Optional[str] = Field(None, description="Secondary model identifier for SubAgents")
 
 
 class ThinkingConfigInfo(BaseModel):
     """Thinking configuration for API response."""
-    supported: bool = Field(..., description="Whether model supports thinking mode")
+
+    mode: str = Field(..., description="Thinking mode: 'none', 'always_on', or 'configurable'")
     default: str = Field(..., description="Default thinking level for new sessions")
     options: List[str] = Field(
-        default=["default", "low", "high"],
-        description="Available thinking levels"
+        default=["default", "low", "high"], description="Available thinking levels (only for 'configurable' mode)"
     )
 
 
 class ModelInfo(BaseModel):
     """Model information for API response."""
+
     id: str = Field(..., description="Model identifier")
     name: str = Field(..., description="Display name")
     description: Optional[str] = Field(None, description="Model description")
@@ -87,6 +85,7 @@ class ModelInfo(BaseModel):
 
 class ProviderInfo(BaseModel):
     """Provider information with available models."""
+
     provider: str = Field(..., description="Provider identifier")
     name: str = Field(..., description="Display name")
     description: str = Field(..., description="Provider description")
@@ -96,26 +95,23 @@ class ProviderInfo(BaseModel):
 
 class ProviderListData(BaseModel):
     """Response data for provider list."""
+
     providers: List[ProviderInfo] = Field(..., description="Available providers")
 
 
 class ThinkingConfigRequest(BaseModel):
     """Request to update thinking configuration."""
-    thinking_level: str = Field(
-        ...,
-        description="Thinking level: 'default' (no thinking params), 'low', or 'high'"
-    )
+
+    thinking_level: str = Field(..., description="Thinking level: 'default' (no thinking params), 'low', or 'high'")
 
 
 class ThinkingConfigData(BaseModel):
     """Thinking configuration data."""
-    thinking_level: str = Field(
-        ...,
-        description="Current thinking level: 'default', 'low', or 'high'"
-    )
+
+    thinking_level: str = Field(..., description="Current thinking level: 'default', 'low', or 'high'")
+    mode: str = Field(default="configurable", description="Thinking mode: 'none', 'always_on', or 'configurable'")
     options: List[str] = Field(
-        default=["default", "low", "high"],
-        description="Available thinking levels for the current model"
+        default=["default", "low", "high"], description="Available thinking levels for the current model"
     )
 
 
@@ -135,31 +131,37 @@ def _check_api_key_configured(provider: str) -> bool:
     try:
         if provider == "google":
             from backend.infrastructure.llm.providers.google.config import GoogleConfig
+
             cfg = GoogleConfig()
             return bool(cfg.google_api_key)
 
         elif provider == "anthropic":
             from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
+
             cfg = AnthropicConfig()
             return bool(cfg.anthropic_api_key)
 
         elif provider in ["openai", "gpt"]:
             from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
+
             cfg = OpenAIConfig()
             return bool(cfg.openai_api_key)
 
         elif provider == "moonshot":
             from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
+
             cfg = MoonshotConfig()
             return bool(cfg.moonshot_api_key)
 
         elif provider == "zhipu":
             from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
+
             cfg = ZhipuConfig()
             return bool(cfg.zhipu_api_key)
 
         elif provider == "openrouter":
             from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
+
             cfg = OpenRouterConfig()
             return bool(cfg.openrouter_api_key)
 
@@ -190,20 +192,20 @@ def _get_available_providers() -> List[ProviderInfo]:
         for m in reg_provider.models:
             # Convert thinking config if present
             thinking_info = None
-            if m.thinking and m.thinking.supported:
+            if m.thinking:
                 thinking_info = ThinkingConfigInfo(
-                    supported=m.thinking.supported,
-                    default=m.thinking.default,
-                    options=m.thinking.options
+                    mode=m.thinking.mode, default=m.thinking.default, options=m.thinking.options
                 )
 
-            api_models.append(ModelInfo(
-                id=m.id,
-                name=m.name,
-                description=m.description,
-                context_window=m.context_window,
-                thinking=thinking_info
-            ))
+            api_models.append(
+                ModelInfo(
+                    id=m.id,
+                    name=m.name,
+                    description=m.description,
+                    context_window=m.context_window,
+                    thinking=thinking_info,
+                )
+            )
 
         # Create API provider info
         provider_info = ProviderInfo(
@@ -211,7 +213,7 @@ def _get_available_providers() -> List[ProviderInfo]:
             name=reg_provider.name,
             description=reg_provider.description,
             models=api_models,
-            api_key_configured=has_key
+            api_key_configured=has_key,
         )
 
         result.append(provider_info)
@@ -240,9 +242,7 @@ async def get_llm_config(
             config = get_session_llm_config(session_id)
             if config:
                 return ApiResponse(
-                    success=True,
-                    message="Retrieved session LLM configuration",
-                    data=LLMConfigData(**config)
+                    success=True, message="Retrieved session LLM configuration", data=LLMConfigData(**config)
                 )
 
             config = get_default_llm_config()
@@ -250,34 +250,24 @@ async def get_llm_config(
                 return ApiResponse(
                     success=True,
                     message="No session LLM override (using global defaults)",
-                    data=LLMConfigData(**config)
+                    data=LLMConfigData(**config),
                 )
 
             return ApiResponse(
-                success=True,
-                message="No custom LLM configuration set (using system defaults)",
-                data=None
+                success=True, message="No custom LLM configuration set (using system defaults)", data=None
             )
 
         config = get_default_llm_config()
 
         if config:
             return ApiResponse(
-                success=True,
-                message="Retrieved default LLM configuration",
-                data=LLMConfigData(**config)
+                success=True, message="Retrieved default LLM configuration", data=LLMConfigData(**config)
             )
 
-        return ApiResponse(
-            success=True,
-            message="No custom LLM configuration set (using system defaults)",
-            data=None
-        )
+        return ApiResponse(success=True, message="No custom LLM configuration set (using system defaults)", data=None)
 
     except Exception as e:
-        raise InternalServerError(
-            message=f"Failed to get LLM configuration: {str(e)}"
-        )
+        raise InternalServerError(message=f"Failed to get LLM configuration: {str(e)}")
 
 
 @router.post("/", response_model=ApiResponse[LLMConfigData])
@@ -323,6 +313,7 @@ async def update_llm_config(
 
             # Notify frontend about the change
             from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+
             llm_config = {
                 "provider": request.provider,
                 "model": request.model,
@@ -337,7 +328,7 @@ async def update_llm_config(
                     provider=request.provider,
                     model=request.model,
                     secondary_model=request.secondary_model,
-                )
+                ),
             )
 
         success = save_default_llm_config(
@@ -355,15 +346,13 @@ async def update_llm_config(
                 provider=request.provider,
                 model=request.model,
                 secondary_model=request.secondary_model,
-            )
+            ),
         )
 
     except BadRequestError:
         raise
     except Exception as e:
-        raise InternalServerError(
-            message=f"Failed to update LLM configuration: {str(e)}"
-        )
+        raise InternalServerError(message=f"Failed to update LLM configuration: {str(e)}")
 
 
 @router.delete("/", response_model=ApiResponse[None])
@@ -387,28 +376,21 @@ async def clear_llm_config(
 
             # Notify frontend about the change
             from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+
             await WebSocketNotificationService.send_session_llm_config_update(session_id, {})
 
-            return ApiResponse(
-                success=True,
-                message="Cleared session LLM override",
-                data=None
-            )
+            return ApiResponse(success=True, message="Cleared session LLM override", data=None)
 
         success = clear_default_llm_config()
         if not success:
             raise InternalServerError(message="Failed to clear LLM configuration")
 
         return ApiResponse(
-            success=True,
-            message="Cleared custom LLM configuration (reverted to system defaults)",
-            data=None
+            success=True, message="Cleared custom LLM configuration (reverted to system defaults)", data=None
         )
 
     except Exception as e:
-        raise InternalServerError(
-            message=f"Failed to clear LLM configuration: {str(e)}"
-        )
+        raise InternalServerError(message=f"Failed to clear LLM configuration: {str(e)}")
 
 
 @router.get("/providers", response_model=ApiResponse[ProviderListData])
@@ -430,22 +412,15 @@ async def get_available_providers_endpoint() -> ApiResponse[ProviderListData]:
         providers = _get_available_providers()
 
         return ApiResponse(
-            success=True,
-            message=f"Retrieved {len(providers)} providers",
-            data=ProviderListData(providers=providers)
+            success=True, message=f"Retrieved {len(providers)} providers", data=ProviderListData(providers=providers)
         )
 
     except Exception as e:
-        raise InternalServerError(
-            message=f"Failed to get providers: {str(e)}"
-        )
+        raise InternalServerError(message=f"Failed to get providers: {str(e)}")
 
 
 @router.get("/model-details", response_model=ApiResponse[ModelInfo])
-async def get_model_details_endpoint(
-    provider: str,
-    model: str
-) -> ApiResponse[ModelInfo]:
+async def get_model_details_endpoint(provider: str, model: str) -> ApiResponse[ModelInfo]:
     """
     Get detailed information for a specific model, including context window.
     """
@@ -461,15 +436,18 @@ async def get_model_details_endpoint(
                 id=info.id,
                 name=info.name,
                 description=info.description,
-                context_window=info.context_window
-            )
+                context_window=info.context_window,
+                thinking=ThinkingConfigInfo(
+                    mode=info.thinking.mode, default=info.thinking.default, options=info.thinking.options
+                )
+                if info.thinking
+                else None,
+            ),
         )
     except BadRequestError:
         raise
     except Exception as e:
-        raise InternalServerError(
-            message=f"Failed to get model details: {str(e)}"
-        )
+        raise InternalServerError(message=f"Failed to get model details: {str(e)}")
 
 
 # =====================
@@ -484,56 +462,64 @@ async def get_thinking_config(
     """
     Get thinking/reasoning mode configuration for a session.
 
-    Thinking level controls the reasoning effort of LLM providers:
+    Thinking modes:
+    - "none": Model does not support thinking
+    - "always_on": Model always uses thinking (native thinking model)
+    - "configurable": Thinking can be configured via API params
+
+    Thinking levels (for configurable mode):
     - "default": Don't pass thinking params, use API's default behavior
     - "low": Use low reasoning effort
     - "high": Use high reasoning effort
 
     Args:
         session_id: Session ID to get thinking config for
-        provider: Optional provider ID to get model-specific options
+        provider: Optional model ID to get model-specific options
         model: Optional model ID to get model-specific options
 
     Returns:
-        ApiResponse containing ThinkingConfigData with current thinking_level
+        ApiResponse containing ThinkingConfigData with current thinking_level and mode
     """
     try:
         thinking_level = get_session_thinking_level(session_id)
 
-        # Get model-specific options from models.yaml
+        # Get model-specific config from models.yaml
+        mode = "configurable"  # Default fallback
         options = list(VALID_THINKING_LEVELS)  # Fallback
+
         if provider and model:
             thinking_config = get_model_thinking_config(provider, model)
             if thinking_config:
-                if thinking_config.supported:
+                mode = thinking_config.mode
+                if mode == "configurable":
                     options = thinking_config.options
+                elif mode == "always_on":
+                    # Native thinking model - no configurable options
+                    options = []
                 else:
-                    # Model exists but thinking not supported -> only default allowed
+                    # mode == "none" - only default allowed
                     options = ["default"]
-
 
         # Sanitise thinking_level for response
         # If the stored level is not valid for the current model, return "default"
-        # This ensures the UI reflects the effective state without destroying the user's preference
         return ApiResponse(
             success=True,
             message="Retrieved thinking configuration",
             data=ThinkingConfigData(
-                thinking_level=thinking_level if thinking_level in options else "default",
-                options=options
-            )
+                thinking_level=thinking_level if thinking_level in options else "default", mode=mode, options=options
+            ),
         )
 
     except Exception as e:
-        raise InternalServerError(
-            message=f"Failed to get thinking configuration: {str(e)}"
-        )
+        raise InternalServerError(message=f"Failed to get thinking configuration: {str(e)}")
 
 
 @router.post("/thinking", response_model=ApiResponse[ThinkingConfigData])
 async def update_thinking_config(
     request: ThinkingConfigRequest,
     session_id: str,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> ApiResponse[ThinkingConfigData]:
     """
     Update thinking/reasoning mode configuration for a session.
@@ -547,10 +533,13 @@ async def update_thinking_config(
     - OpenAI: reasoning.effort = "low" | "high" (default = no param)
     - Anthropic: thinking.budget_tokens varies by level
     - Gemini: thinking_level = LOW | HIGH
+    - Moonshot: thinking.type = "enabled" | "disabled"
 
     Args:
         request: ThinkingConfigRequest with thinking_level string
         session_id: Session ID to update thinking config for
+        provider: Optional provider ID for model-specific validation
+        model: Optional model ID for model-specific validation
 
     Returns:
         ApiResponse confirming the update
@@ -560,7 +549,7 @@ async def update_thinking_config(
         if request.thinking_level not in VALID_THINKING_LEVELS:
             raise BadRequestError(
                 message=f"Invalid thinking level: {request.thinking_level}. "
-                        f"Must be one of: {', '.join(VALID_THINKING_LEVELS)}"
+                f"Must be one of: {', '.join(VALID_THINKING_LEVELS)}"
             )
 
         success = update_session_thinking_level(session_id, request.thinking_level)
@@ -570,18 +559,24 @@ async def update_thinking_config(
 
         # Notify frontend about the change via WebSocket
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-        await WebSocketNotificationService.send_thinking_level_update(
-            session_id,
-            request.thinking_level
-        )
+
+        await WebSocketNotificationService.send_thinking_level_update(session_id, request.thinking_level)
+
+        # Get model-specific config for response
+        mode = "configurable"
+        options = list(VALID_THINKING_LEVELS)
+
+        if provider and model:
+            thinking_config = get_model_thinking_config(provider, model)
+            if thinking_config:
+                mode = thinking_config.mode
+                if mode == "configurable":
+                    options = thinking_config.options
 
         return ApiResponse(
             success=True,
             message=f"Thinking level set to '{request.thinking_level}'",
-            data=ThinkingConfigData(
-                thinking_level=request.thinking_level,
-                options=list(VALID_THINKING_LEVELS)
-            )
+            data=ThinkingConfigData(thinking_level=request.thinking_level, mode=mode, options=options),
         )
 
     except BadRequestError:
@@ -589,6 +584,4 @@ async def update_thinking_config(
     except ValueError as e:
         raise BadRequestError(message=str(e))
     except Exception as e:
-        raise InternalServerError(
-            message=f"Failed to update thinking configuration: {str(e)}"
-        )
+        raise InternalServerError(message=f"Failed to update thinking configuration: {str(e)}")
