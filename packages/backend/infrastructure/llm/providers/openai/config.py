@@ -56,36 +56,24 @@ class OpenAIConfig(BaseSettings):
         env_file=".env", env_nested_delimiter="__", case_sensitive=False, env_prefix="", extra="ignore"
     )
 
-    @property
-    def is_reasoning_model(self) -> bool:
-        """
-        Check if the current model is a reasoning model (gpt-5, o1, o3, etc.).
-        Reasoning models have restricted support for sampling parameters.
-        """
-        model_lower = self.model.lower()
-        return any(p in model_lower for p in ["gpt-5", "o1-", "o3-"])
-
     def to_api_params(self) -> Dict[str, Any]:
         """
         Convert model parameters to OpenAI API format.
 
         Note: Responses API ignores frequency/presence penalties for compatibility.
-        Reasoning models (o1, o3, gpt-5) do not support temperature or top_p in Responses API.
+        Temperature/top_p handling for reasoning models is done in client.py.
 
         Returns:
-            Dict with model, temperature, top_p, and optional max_tokens
+            Dict with model and optional sampling parameters
         """
-        params = {
+        params: Dict[str, Any] = {
             "model": self.model,
         }
 
-        # Only include sampling parameters for non-reasoning models
-        if not self.is_reasoning_model:
-            if self.temperature is not None:
-                params["temperature"] = self.temperature
-            if self.top_p is not None:
-                params["top_p"] = self.top_p
-
+        if self.temperature is not None:
+            params["temperature"] = self.temperature
+        if self.top_p is not None:
+            params["top_p"] = self.top_p
         if self.max_tokens is not None:
             params["max_output_tokens"] = self.max_tokens
 

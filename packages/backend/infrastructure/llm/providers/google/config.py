@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from google.genai import types
+from backend.infrastructure.llm.shared.constants.thinking import GOOGLE_THINKING_LEVEL_TO_BUDGET
 
 
 class GoogleSafetySettings(BaseModel):
@@ -76,6 +77,11 @@ class GoogleConfig(BaseSettings):
     )
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
 
+    # Thinking configuration (for models that support thinking)
+    default_thinking_level: str = Field(
+        default="high", description="Default thinking level: 'default' (disabled), 'low', or 'high'"
+    )
+
     # Safety settings (nested configuration for Google-specific types)
     safety_settings: GoogleSafetySettings = Field(
         default_factory=GoogleSafetySettings, description="Google safety settings"
@@ -133,6 +139,24 @@ class GoogleConfig(BaseSettings):
         # Add tool schemas
         if tool_schemas:
             config_kwargs["tools"] = tool_schemas
+
+        # Add default thinking configuration based on model version
+        if self.default_thinking_level and self.default_thinking_level != "default":
+            if self.model.startswith("gemini-3"):
+                # Gemini 3 models use thinking_level enum
+                level_map = {"low": types.ThinkingLevel.LOW, "high": types.ThinkingLevel.HIGH}
+                thinking_level = level_map.get(self.default_thinking_level, types.ThinkingLevel.HIGH)
+                config_kwargs["thinking_config"] = types.ThinkingConfig(
+                    thinking_level=thinking_level,
+                    include_thoughts=True
+                )
+            elif self.model.startswith("gemini-2.5"):
+                # Gemini 2.5 models use thinking_budget
+                budget = GOOGLE_THINKING_LEVEL_TO_BUDGET.get(self.default_thinking_level, -1)
+                config_kwargs["thinking_config"] = types.ThinkingConfig(
+                    thinking_budget=budget,
+                    include_thoughts=True
+                )
 
         return config_kwargs
 

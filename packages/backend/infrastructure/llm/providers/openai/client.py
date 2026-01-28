@@ -38,15 +38,8 @@ from .debug import OpenAIDebugger
 from .response_processor import OpenAIResponseProcessor
 from .tool_manager import OpenAIToolManager
 
-
-# Thinking level to OpenAI reasoning.effort mapping
-# - "default": Don't pass reasoning param (OpenAI uses 'none' behavior)
-# - "low"/"high": Pass directly to reasoning.effort
-THINKING_LEVEL_TO_EFFORT = {
-    "default": None,
-    "low": "low",
-    "high": "high",
-}
+# Import unified thinking level mappings
+from backend.infrastructure.llm.shared.constants.thinking import OPENAI_THINKING_LEVEL_TO_EFFORT
 
 
 class OpenAIClient(LLMClientBase):
@@ -144,32 +137,19 @@ class OpenAIClient(LLMClientBase):
             tools=tools
         )
 
-        # Apply call options if provided, but respect model constraints
-        is_reasoning = self.openai_config.is_reasoning_model
-
+        # Apply call options overrides
         if call_options.temperature is not None:
-            if not is_reasoning:
-                kwargs_api['temperature'] = call_options.temperature
-            else:
-                # Omit temperature for reasoning models as it's unsupported
-                kwargs_api.pop('temperature', None)
-
+            kwargs_api['temperature'] = call_options.temperature
         if call_options.max_tokens is not None:
             kwargs_api['max_output_tokens'] = call_options.max_tokens
-
         if call_options.top_p is not None:
-            if not is_reasoning:
-                kwargs_api['top_p'] = call_options.top_p
-            else:
-                # Omit top_p for reasoning models as it's unsupported
-                kwargs_api.pop('top_p', None)
-
+            kwargs_api['top_p'] = call_options.top_p
         if call_options.timeout is not None:
             kwargs_api['timeout'] = call_options.timeout
 
         # Handle thinking mode (reasoning effort for reasoning models)
         if call_options.thinking_level is not None:
-            effort = THINKING_LEVEL_TO_EFFORT.get(call_options.thinking_level)
+            effort = OPENAI_THINKING_LEVEL_TO_EFFORT.get(call_options.thinking_level)
             if effort is not None:
                 kwargs_api["reasoning"] = {"effort": effort}
 
@@ -269,32 +249,19 @@ class OpenAIClient(LLMClientBase):
             tools=tools
         )
 
-        # Apply call options if provided, but respect model constraints
-        is_reasoning = self.openai_config.is_reasoning_model
-
+        # Apply call options overrides
         if call_options.temperature is not None:
-            if not is_reasoning:
-                kwargs_api['temperature'] = call_options.temperature
-            else:
-                # Omit temperature for reasoning models as it's unsupported
-                kwargs_api.pop('temperature', None)
-
+            kwargs_api['temperature'] = call_options.temperature
         if call_options.max_tokens is not None:
             kwargs_api['max_output_tokens'] = call_options.max_tokens
-
         if call_options.top_p is not None:
-            if not is_reasoning:
-                kwargs_api['top_p'] = call_options.top_p
-            else:
-                # Omit top_p for reasoning models as it's unsupported
-                kwargs_api.pop('top_p', None)
-
+            kwargs_api['top_p'] = call_options.top_p
         if call_options.timeout is not None:
             kwargs_api['timeout'] = call_options.timeout
 
         # Handle thinking mode (reasoning effort for reasoning models)
         if call_options.thinking_level is not None:
-            effort = THINKING_LEVEL_TO_EFFORT.get(call_options.thinking_level)
+            effort = OPENAI_THINKING_LEVEL_TO_EFFORT.get(call_options.thinking_level)
             if effort is not None:
                 kwargs_api["reasoning"] = {"effort": effort}
 

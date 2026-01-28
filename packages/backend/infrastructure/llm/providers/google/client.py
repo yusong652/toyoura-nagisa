@@ -14,6 +14,7 @@ from backend.infrastructure.llm.base.call_options import parse_call_options
 from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
+from backend.infrastructure.llm.shared.constants.thinking import GOOGLE_THINKING_LEVEL_TO_BUDGET
 
 # Import Gemini-specific implementations
 from .config import get_google_client_config
@@ -23,18 +24,11 @@ from .response_processor import GoogleResponseProcessor
 from .tool_manager import GoogleToolManager
 
 
-# Thinking level to Gemini ThinkingLevel mapping
-# - "default": Don't add thinking config (use config default)
-# - "low"/"high": Map to ThinkingLevel enum
-THINKING_LEVEL_MAP = {
+# Thinking level to Gemini ThinkingLevel enum mapping
+# Must be defined here due to google.genai.types dependency
+GOOGLE_THINKING_LEVEL_MAP = {
     "low": types.ThinkingLevel.LOW,
     "high": types.ThinkingLevel.HIGH,
-}
-
-# Thinking level to budget tokens for Gemini 2.5 models
-THINKING_LEVEL_TO_BUDGET = {
-    "low": 1024,
-    "high": -1,  # -1 = dynamic (auto)
 }
 
 
@@ -159,17 +153,22 @@ class GoogleClient(LLMClientBase):
             config_dict["top_k"] = call_options.top_k
 
         # Handle thinking configuration based on thinking_level
-        if call_options.thinking_level is not None and call_options.thinking_level != "default":
+        # If thinking_level is explicitly "default", remove thinking config (disable thinking)
+        # If thinking_level is "low" or "high", override with specified level
+        if call_options.thinking_level == "default":
+            # Explicitly disable thinking
+            config_dict.pop("thinking_config", None)
+        elif call_options.thinking_level is not None:
             if model.startswith("gemini-3"):
                 # Gemini 3 models use thinking_level enum
-                thinking_level = THINKING_LEVEL_MAP.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
+                thinking_level = GOOGLE_THINKING_LEVEL_MAP.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
                 config_dict["thinking_config"] = types.ThinkingConfig(
                     thinking_level=thinking_level,
                     include_thoughts=True
                 )
             elif model.startswith("gemini-2.5"):
                 # Gemini 2.5 models use thinking_budget
-                budget = THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
+                budget = GOOGLE_THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
                 config_dict["thinking_config"] = types.ThinkingConfig(
                     thinking_budget=budget,
                     include_thoughts=True
@@ -320,17 +319,22 @@ class GoogleClient(LLMClientBase):
             config_dict["top_k"] = call_options.top_k
 
         # Handle thinking configuration based on thinking_level
-        if call_options.thinking_level is not None and call_options.thinking_level != "default":
+        # If thinking_level is explicitly "default", remove thinking config (disable thinking)
+        # If thinking_level is "low" or "high", override with specified level
+        if call_options.thinking_level == "default":
+            # Explicitly disable thinking
+            config_dict.pop("thinking_config", None)
+        elif call_options.thinking_level is not None:
             if model.startswith("gemini-3"):
                 # Gemini 3 models use thinking_level enum
-                thinking_level = THINKING_LEVEL_MAP.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
+                thinking_level = GOOGLE_THINKING_LEVEL_MAP.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
                 config_dict["thinking_config"] = types.ThinkingConfig(
                     thinking_level=thinking_level,
                     include_thoughts=True
                 )
             elif model.startswith("gemini-2.5"):
                 # Gemini 2.5 models use thinking_budget
-                budget = THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
+                budget = GOOGLE_THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
                 config_dict["thinking_config"] = types.ThinkingConfig(
                     thinking_budget=budget,
                     include_thoughts=True

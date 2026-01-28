@@ -3,19 +3,13 @@ from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.llm.base.call_options import parse_call_options
 from backend.infrastructure.llm.base.retry import run_with_retries, stream_with_retries
 from backend.domain.models.streaming import StreamingChunk
+from backend.infrastructure.llm.shared.constants.thinking import ANTHROPIC_THINKING_LEVEL_TO_BUDGET
 import anthropic
 from .config import get_anthropic_client_config
 from .response_processor import AnthropicResponseProcessor
 from .debug import AnthropicDebugger
 from .context_manager import AnthropicContextManager
 from .tool_manager import AnthropicToolManager
-
-
-# Thinking level to Anthropic budget tokens mapping
-THINKING_LEVEL_TO_BUDGET = {
-    "low": 4096,
-    "high": 16384,
-}
 
 
 class AnthropicClient(LLMClientBase):
@@ -149,7 +143,7 @@ class AnthropicClient(LLMClientBase):
         if call_options.thinking_level is not None and call_options.thinking_level != "default":
             # Map thinking level to budget tokens using defined mapping
             # Default to 4096 (low) if level not found
-            budget = THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, 4096)
+            budget = ANTHROPIC_THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, 4096)
             kwargs_api["thinking"] = {
                 "type": "enabled",
                 "budget_tokens": budget
@@ -242,7 +236,7 @@ class AnthropicClient(LLMClientBase):
         if call_options.thinking_level is not None and call_options.thinking_level != "default":
             # Map thinking level to budget tokens using defined mapping
             # Default to 4096 (low) if level not found
-            budget = THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, 4096)
+            budget = ANTHROPIC_THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, 4096)
             kwargs_api["thinking"] = {
                 "type": "enabled",
                 "budget_tokens": budget
