@@ -17,12 +17,6 @@ class AnthropicConfig(BaseSettings):
 
     Combines environment variable loading (API keys) with
     runtime-overridable parameters (model, temperature, etc.).
-
-    Available Models:
-    - claude-sonnet-4-5-20250929: Latest Sonnet 4.5 (recommended)
-    - claude-haiku-4-5-20251001: Fast and efficient Haiku 4.5
-    - claude-opus-4-5-20251101: Most capable Opus 4.5
-    - claude-3-7-sonnet-20250219: Sonnet 3.7 with thinking
     """
 
     # API credentials (from environment variables)
@@ -34,8 +28,8 @@ class AnthropicConfig(BaseSettings):
 
     # Model parameters (runtime overridable)
     max_tokens: int = Field(default=1024 * 16, ge=1, le=64000, description="Maximum number of tokens to generate")
-    temperature: float = Field(
-        default=1.0, ge=0.0, le=2.0, description="Sampling temperature. Do not set both temperature and top_p."
+    temperature: Optional[float] = Field(
+        default=None, ge=0.0, le=2.0, description="Sampling temperature. Do not set both temperature and top_p."
     )
     top_p: Optional[float] = Field(
         default=None, ge=0.0, le=1.0, description="Nucleus sampling parameter. Do not set both temperature and top_p."
@@ -65,15 +59,6 @@ class AnthropicConfig(BaseSettings):
         env_file=".env", env_nested_delimiter="__", case_sensitive=False, env_prefix="", extra="ignore"
     )
 
-    def supports_thinking(self) -> bool:
-        """Check if the current model supports thinking"""
-        return (
-            self.model.startswith("claude-3-7-")
-            or self.model.startswith("claude-sonnet-4-")
-            or self.model.startswith("claude-4-")
-            or self.model.startswith("claude-opus-")
-        )
-
     def to_api_params(self) -> Dict[str, Any]:
         """
         Convert model parameters to Anthropic API format.
@@ -84,8 +69,10 @@ class AnthropicConfig(BaseSettings):
         params = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
         }
+
+        if self.temperature is not None:
+            params["temperature"] = self.temperature
 
         if self.top_p is not None:
             params["top_p"] = self.top_p
@@ -131,10 +118,6 @@ class AnthropicConfig(BaseSettings):
             cached_tools = copy.deepcopy(tools)
             cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
             kwargs["tools"] = cached_tools
-
-        # Add thinking configuration for supported models
-        if self.supports_thinking() and self.enable_thinking:
-            kwargs["thinking"] = {"type": "enabled", "budget_tokens": self.thinking_budget_tokens}
 
         return kwargs
 
