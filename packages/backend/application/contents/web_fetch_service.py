@@ -4,8 +4,11 @@ Web Fetch Service - Application layer URL content retrieval.
 
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
+from google.genai import types
 from backend.infrastructure.llm.providers.google.config import GoogleConfig
 from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
+from backend.infrastructure.llm.providers.google.debug import GoogleDebugger
+from backend.config.dev import get_dev_config
 
 
 @dataclass
@@ -126,24 +129,41 @@ async def fetch_url_content(llm_client, url: str, prompt: str) -> WebFetchResult
 
     _log_fetch_start(url)
 
-    from backend.infrastructure.llm.providers.google.config import GoogleConfig
     google_config = GoogleConfig()
-
-    from google.genai import types
 
     model = google_config.secondary_model
     user_prompt = f"{prompt}\n\nURL: {url}"
 
     fetch_config = types.GenerateContentConfig(
-        tools=[types.Tool(url_context=types.UrlContext())],
+        tools = [
+            {"url_context": {}},
+            {"google_search": {}}],
         safety_settings=google_config.safety_settings.to_gemini_format(),
     )
 
-    response = await llm_client.client.aio.models.generate_content(
+    debug = get_dev_config().debug_mode
+
+    if debug:
+        # Prepare a clean preview for debugger
+        GoogleDebugger.print_request(
+            contents=[{"role": "user", "parts": [{"text": user_prompt}]}], 
+            config=fetch_config, 
+            model=model
+        )
+
+    # Use client directly if it's a genai.Client (used by builtin/web_fetch.py)
+    # or llm_client.client if it's a GoogleClient (the unified client wrapper)
+    client = llm_client.client if hasattr(llm_client, 'client') else llm_client
+
+    response = await client.aio.models.generate_content(
+
         model=model,
         contents=user_prompt,
         config=fetch_config,
     )
+
+    if debug:
+        GoogleDebugger.print_response(response)
 
     if not response.candidates:
         return _format_fetch_error(url, "No response candidates")

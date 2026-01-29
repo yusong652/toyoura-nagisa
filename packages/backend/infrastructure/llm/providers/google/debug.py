@@ -18,6 +18,33 @@ class GoogleDebugger:
         print(f"📝 Context items: {len(contents)}")
 
         config_dict = config.model_dump()
+
+        # Print config summary
+        config_parts = []
+        if config_dict.get('temperature') is not None:
+            config_parts.append(f"temp={config_dict['temperature']}")
+        if config_dict.get('max_output_tokens') is not None:
+            config_parts.append(f"max_tokens={config_dict['max_output_tokens']}")
+
+        thinking = config_dict.get('thinking_config')
+        if thinking:
+            if isinstance(thinking, dict):
+                level = thinking.get('thinking_level') or thinking.get('thinking_budget')
+                if level: config_parts.append(f"thinking={level}")
+            else:
+                level = getattr(thinking, 'thinking_level', None) or getattr(thinking, 'thinking_budget', None)
+                if level: config_parts.append(f"thinking={level}")
+
+        if config_parts:
+            print(f"⚙️ Config: {', '.join(config_parts)}")
+
+        # Print system instruction preview if present
+        sys_instr = config_dict.get('system_instruction')
+        if sys_instr:
+            if isinstance(sys_instr, str):
+                preview = sys_instr[:60].replace("\n", " ") + "..." if len(sys_instr) > 60 else sys_instr
+                print(f"📜 System Instruction: {repr(preview)}")
+
         debug_config = GoogleDebugger._truncate_config(config_dict)
 
         payload = {"model": model, "contents": contents, "config": debug_config}
@@ -160,10 +187,17 @@ class GoogleDebugger:
         """Truncate long fields in config for debug output."""
         result = {}
         for key, value in config_dict.items():
+            if value is None:
+                continue
+
             if key == "system_instruction" and isinstance(value, str):
                 result[key] = GoogleDebugger._truncate(value, 200, "system_instruction")
             elif key == "tools" and isinstance(value, list):
                 result[key] = GoogleDebugger._truncate_tools(value)
+            elif key == "thinking_config" and isinstance(value, dict):
+                # Clean up thinking_config if it has Nones
+                thinking_cleaned = {k: v for k, v in value.items() if v is not None}
+                result[key] = thinking_cleaned
             else:
                 result[key] = value
         return result
@@ -174,21 +208,33 @@ class GoogleDebugger:
         result = []
         for tool in tools:
             if not isinstance(tool, dict):
-                result.append(f"<{type(tool).__name__}>")
-                continue
+                if hasattr(tool, 'model_dump'):
+                    tool_dict = tool.model_dump()
+                else:
+                    result.append(f"<{type(tool).__name__}>")
+                    continue
+            else:
+                tool_dict = tool.copy()
 
-            tool_copy = tool.copy()
-            # Handle google_search and other special tools
-            if 'google_search' in tool_copy:
-                result.append({'google_search': '<GoogleSearch>'})
-                continue
-            if 'code_execution' in tool_copy:
-                result.append({'code_execution': '<CodeExecution>'})
-                continue
-            if 'function_declarations' in tool_copy:
+            # Create a clean version with only set tool types
+            truncated_tool = {}
+            
+            # Handle google_search
+            if tool_dict.get('google_search') is not None:
+                truncated_tool['google_search'] = '<GoogleSearch>'
+            
+            # Handle google_search_retrieval
+            if tool_dict.get('google_search_retrieval') is not None:
+                truncated_tool['google_search_retrieval'] = '<GoogleSearchRetrieval>'
+
+            # Handle code_execution
+            if tool_dict.get('code_execution') is not None:
+                truncated_tool['code_execution'] = '<CodeExecution>'
+            
+            # Handle function_declarations
+            if tool_dict.get('function_declarations') is not None:
                 decls = []
-                # Use `or []` to handle None values
-                for func in tool_copy.get('function_declarations') or []:
+                for func in tool_dict.get('function_declarations') or []:
                     if isinstance(func, dict):
                         func_copy = func.copy()
                         if 'description' in func_copy:
@@ -196,12 +242,18 @@ class GoogleDebugger:
                                 func_copy['description'], 80, func.get('name', 'func')
                             )
                         if 'parameters' in func_copy:
+                            # Truncate parameters structure for brevity
                             func_copy['parameters'] = {'properties': '...'}
                         decls.append(func_copy)
                     else:
-                        decls.append(func)
-                tool_copy['function_declarations'] = decls
-            result.append(tool_copy)
+                        decls.append(str(func))
+                truncated_tool['function_declarations'] = decls
+            
+            # If we couldn't identify tool types, use original but filtered
+            if not truncated_tool:
+                result.append({k: v for k, v in tool_dict.items() if v is not None})
+            else:
+                result.append(truncated_tool)
         return result
 
     @staticmethod

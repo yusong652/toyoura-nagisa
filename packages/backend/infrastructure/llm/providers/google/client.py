@@ -213,17 +213,14 @@ class GoogleClient(LLMClientBase):
             tool_schemas: Tool schemas in Gemini format
 
         Returns:
-            Dict with 'config' key containing GenerateContentConfig
+            Dict containing raw configuration components for call_api_with_context
         """
-        config_kwargs = self.google_config.build_api_params()
-        
-        # Override system prompt and tools
-        config_kwargs["system_instruction"] = system_prompt
-        if tool_schemas:
-            config_kwargs["tools"] = tool_schemas
-            
-        config = types.GenerateContentConfig(**config_kwargs)
-        return {'config': config}
+        # Return raw components so call_api_with_context can assemble the final config
+        # and apply runtime overrides (temperature, etc.) correctly.
+        return {
+            "system_prompt": system_prompt,
+            "tools": tool_schemas
+        }
 
     def _get_provider_config(self):
         """Get Gemini-specific configuration object."""

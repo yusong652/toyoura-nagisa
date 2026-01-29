@@ -4,9 +4,10 @@ from typing import Dict, Any
 
 from backend.application.tools.registrar import ToolRegistrar
 from backend.application.tools.context import ToolContext
-# from fastmcp.server.context import Context
 from pydantic import Field
 from backend.shared.utils.tool_result import success_response, error_response
+from backend.infrastructure.llm.providers.google import GoogleClient, GoogleConfig
+from backend.application.contents.web_fetch_service import fetch_url_content
 
 __all__ = ["web_fetch", "register_web_fetch_tool"]
 
@@ -31,19 +32,14 @@ async def web_fetch(
       - Results may be summarized if the content is very large
     """
     try:
-        # Initialize Gemini client for this request
-        from google import genai
-        from backend.infrastructure.llm.providers.google.config import GoogleConfig
-
         try:
             google_config = GoogleConfig()
-            google_client = genai.Client(api_key=google_config.google_api_key)
+            # Use GoogleClient wrapper instead of raw genai.Client
+            google_client = GoogleClient(config=google_config)
         except Exception as e:
             return error_response(
                 f"Gemini API not configured. web_fetch requires GOOGLE_API_KEY: {e}"
             )
-
-        from backend.application.contents.web_fetch_service import fetch_url_content
 
         result = await fetch_url_content(google_client, url=url, prompt=prompt)
 

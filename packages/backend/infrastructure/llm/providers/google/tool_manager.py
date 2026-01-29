@@ -34,6 +34,10 @@ class GoogleToolManager(BaseToolManager):
         # Get standardized tools from base class
         tools_dict = await self.get_standardized_tools(session_id, agent_profile)
         
+        # Debug logging for tool discovery
+        if get_dev_config().debug_mode:
+            print(f"[DEBUG] GoogleToolManager: agent_profile={agent_profile}, tools_found={list(tools_dict.keys())}")
+
         if not tools_dict:
             return []
         
@@ -44,6 +48,11 @@ class GoogleToolManager(BaseToolManager):
             if func_decl:
                 function_declarations.append(func_decl)
         
+        if get_dev_config().debug_mode:
+            print(f"[DEBUG] GoogleToolManager: Converted {len(function_declarations)}/{len(tools_dict)} tools to Gemini format.")
+            if not function_declarations and tools_dict:
+                print("[DEBUG] WARNING: All tools failed conversion!")
+
         # Return as Tool objects
         if function_declarations:
             return [types.Tool(function_declarations=function_declarations)]
@@ -70,6 +79,7 @@ class GoogleToolManager(BaseToolManager):
         Returns:
             types.FunctionDeclaration: Gemini function declaration, or None if conversion failed
         """
+        sdk_schema = None
         try:
             input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True, by_alias=True)
 
@@ -83,6 +93,10 @@ class GoogleToolManager(BaseToolManager):
 
             # Restore descriptions lost during anyOf conversion (SDK bug workaround)
             self._restore_descriptions(gemini_schema, sdk_schema)
+            
+            # Debug log for successful conversion
+            # if get_dev_config().debug_mode:
+            #     print(f"[DEBUG] Successfully converted tool: {tool_schema.name}")
 
             return types.FunctionDeclaration(
                 name=tool_schema.name,
@@ -91,7 +105,14 @@ class GoogleToolManager(BaseToolManager):
             )
 
         except Exception as e:
-            print(f"[WARNING] Failed to convert tool {tool_schema.name} to Gemini format: {e}")
+            # Enhanced error logging
+            print(f"!!! [ERROR] Failed to convert tool {tool_schema.name} to Gemini format: {type(e).__name__}: {e}")
+            if sdk_schema:
+                import json
+                try:
+                    print(f"!!! [ERROR] Problematic SDK schema for {tool_schema.name}: {json.dumps(sdk_schema, default=str)}")
+                except:
+                    print(f"!!! [ERROR] Problematic SDK schema for {tool_schema.name}: {sdk_schema}")
             return None
 
     def _restore_descriptions(self, gemini_schema: types.Schema, original_schema: Dict[str, Any]) -> None:
@@ -147,6 +168,12 @@ class GoogleToolManager(BaseToolManager):
 
         result = {}
         for key, value in schema.items():
+            # Remove unsupported fields for Gemini's strict types.JSONSchema
+            # $schema and $id are definitely not supported
+            # title, examples, default, and additionalProperties might also trigger "Extra inputs not permitted"
+            if key in ("$schema", "$id", "title", "examples", "default", "additionalProperties"):
+                continue
+
             # Convert 'definitions' to '$defs' (the only field SDK doesn't auto-alias)
             out_key = "$defs" if key == "definitions" else key
 
