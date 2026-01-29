@@ -1,6 +1,6 @@
 """
-Startup banner and logging utilities for toyoura-nagisa
-FastMCP-inspired beautiful terminal interface using Rich
+Startup banner and logging utilities for toyoura-nagisa.
+Beautiful terminal interface using Rich.
 """
 
 import os
@@ -43,18 +43,16 @@ def print_banner(
     host: str,
     port: int,
     cors_origins: Optional[List[str]] = None,
-    mcp_port: int = 9000,
     version: str = "0.1.0"
 ):
     """
-    Print FastMCP-inspired startup banner using Rich.
+    Print startup banner using Rich.
 
     Args:
         environment: Environment name (development/staging/production)
         host: Server host
         port: Server port
         cors_origins: List of allowed CORS origins (optional)
-        mcp_port: MCP server port
         version: Application version
     """
     console = Console(stderr=True)
@@ -69,9 +67,7 @@ def print_banner(
     tagline_text = Text("AI Agent Platform for PFC Scientific Computing", style="dim cyan")
 
     # Server URL
-    protocol = "http"
-    server_url = f"{protocol}://{host}:{port}"
-    mcp_url = f"{protocol}://{host}:{mcp_port}/sse"
+    server_url = f"http://{host}:{port}"
 
     # Create information table (minimal, essential info only)
     info_table = Table.grid(padding=(0, 1))

@@ -1,0 +1,51 @@
+read_only_tools:
+  - read
+  - glob
+  - grep
+  - list
+  - bash_output
+  - web_fetch
+  - web_search
+  - todo_write
+  - pfc_browse_commands
+  - pfc_browse_python_api
+  - pfc_browse_reference
+  - pfc_query_python_api
+  - pfc_query_command
+  - pfc_check_task_status
+  - pfc_list_tasks
+  - pfc_capture_plot
+  - trigger_skill
+  - invoke_agent
+  - resolve-library-id
+  - query-docs
+read_only_bash_commands:
+  - ls
+  - pwd
+  - whoami
+  - date
+  - cat
+  - grep
+  - head
+  - tail
+  - wc
+  - file
+  - stat
+  - rg
+read_only_git_subcommands:
+  - status
+  - diff
+  - log
+  - show
+  - rev-parse
+  - branch
+  - remote
+  - describe
+  - ls-files
+blocked_command_tokens:
+  - "&&"
+  - ";"
+  - "|"
+  - ">"
+  - "<"
+  - "\n"

@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from backend.application.tools.schema_builder import build_params_model, get_context_param_name
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
 from backend.config.dev import get_dev_config
+
 # Security imports removed - all tools now require session ID
 from backend.application.tools.context import ToolContext, ToolRequestMeta, ToolRequestContext
 
@@ -37,6 +38,10 @@ class BaseToolManager(ABC):
         # Track files read per session (for edit prerequisite validation)
         # Not affected by context window truncation - real-time tracking
         self._session_read_files: Dict[str, set] = {}  # {session_id: {normalized_paths}}
+
+        # Track MCP tool sources for execution routing
+        # Maps tool_name -> server_name (only for MCP tools)
+        self._mcp_tool_mapping: Dict[str, str] = {}
 
     @staticmethod
     def _build_tool_context(session_id: str, tool_call_id: str) -> ToolContext:
@@ -122,6 +127,8 @@ class BaseToolManager(ABC):
         """
         Get standardized ToolSchema objects based on agent profile.
 
+        Includes both internal tools and MCP tools from connected servers.
+
         Args:
             session_id: Session ID (required for future session-specific tool filtering)
             agent_profile: Agent profile name ("coding", "pfc", "disabled")
@@ -133,6 +140,7 @@ class BaseToolManager(ABC):
 
         tools_dict: Dict[str, ToolSchema] = {}
 
+        # Step 1: Load internal tools
         try:
             from backend.application.tools.registry import TOOL_REGISTRY
 
@@ -141,13 +149,40 @@ class BaseToolManager(ABC):
                 tool_schema = ToolSchema.from_tool_definition(tool_def)
                 tools_dict[tool_schema.name] = tool_schema
 
-            return tools_dict
-
         except Exception as e:
             if get_dev_config().debug_mode:
                 print(f"[DEBUG] Error reading tool registry: {e}")
 
-        return {}
+        # Step 2: Load MCP tools from connected servers
+        try:
+            from backend.infrastructure.mcp.client import get_mcp_client_manager
+
+            mcp_manager = get_mcp_client_manager()
+            mcp_tools = mcp_manager.get_all_tools()
+
+            # Clear and rebuild MCP tool mapping
+            self._mcp_tool_mapping.clear()
+
+            for mcp_tool in mcp_tools.values():
+                # Convert MCPTool to ToolSchema
+                tool_schema = mcp_tool.to_tool_schema()
+
+                # Avoid name collision: MCP tools don't override internal tools
+                if tool_schema.name not in tools_dict:
+                    tools_dict[tool_schema.name] = tool_schema
+                    # Track this tool as MCP for execution routing
+                    self._mcp_tool_mapping[tool_schema.name] = mcp_tool.server_name
+                elif get_dev_config().debug_mode:
+                    print(
+                        f"[DEBUG] MCP tool '{tool_schema.name}' from {mcp_tool.server_name} "
+                        f"skipped (internal tool exists)"
+                    )
+
+        except Exception as e:
+            # Always log MCP errors for debugging
+            print(f"[MCP] Error loading MCP tools: {e}")
+
+        return tools_dict
 
     @abstractmethod
     async def get_function_call_schemas(self, session_id: str, agent_profile="pfc_expert") -> Any:
@@ -186,6 +221,30 @@ class BaseToolManager(ABC):
         self, tool_name: str, tool_args: Dict[str, Any], session_id: str, tool_call_id: str = ""
     ) -> Dict[str, Any]:
         """
+        Execute a tool (internal or MCP) with routing based on tool source.
+
+        Args:
+            tool_name: Tool name
+            tool_args: Tool arguments
+            session_id: Session ID for dependency injection
+            tool_call_id: LLM-generated tool call ID
+
+        Returns:
+            Dict[str, Any]: ToolResult dictionary
+        """
+        from backend.shared.utils.tool_result import error_response
+
+        # Check if this is an MCP tool
+        if tool_name in self._mcp_tool_mapping:
+            return await self._execute_mcp_tool(tool_name, tool_args)
+
+        # Execute as internal tool
+        return await self._execute_internal_tool(tool_name, tool_args, session_id, tool_call_id)
+
+    async def _execute_internal_tool(
+        self, tool_name: str, tool_args: Dict[str, Any], session_id: str, tool_call_id: str = ""
+    ) -> Dict[str, Any]:
+        """
         Execute an internal tool with manual validation and context injection.
 
         Args:
@@ -219,6 +278,57 @@ class BaseToolManager(ABC):
             result = await result
 
         return result
+
+    async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute an MCP tool via the MCP client manager.
+
+        Args:
+            tool_name: Tool name
+            tool_args: Tool arguments
+
+        Returns:
+            Dict[str, Any]: ToolResult dictionary (converted from MCP result)
+        """
+        from backend.infrastructure.mcp.client import get_mcp_client_manager
+        from backend.shared.utils.tool_result import error_response, success_response
+
+        try:
+            mcp_manager = get_mcp_client_manager()
+            result = await mcp_manager.call_tool(tool_name, tool_args)
+
+            if result.get("status") == "success":
+                # Convert MCP result to internal ToolResult format
+                content_parts = result.get("content", [])
+
+                # Extract text content for llm_content
+                text_parts = []
+                for part in content_parts:
+                    if part.get("type") == "text":
+                        text_parts.append({"type": "text", "text": part.get("text", "")})
+
+                return success_response(
+                    message=f"MCP tool '{tool_name}' executed successfully",
+                    llm_content={"parts": text_parts} if text_parts else None,
+                    data={
+                        "server": result.get("server"),
+                        "content": content_parts,
+                        "structuredContent": result.get("structuredContent"),
+                    },
+                )
+            else:
+                return error_response(
+                    result.get("message", f"MCP tool '{tool_name}' failed"),
+                    llm_content={"parts": [{"type": "text", "text": result.get("message", "Unknown error")}]},
+                )
+
+        except Exception as e:
+            if get_dev_config().debug_mode:
+                print(f"[DEBUG] MCP tool execution error: {e}")
+            return error_response(
+                f"MCP tool '{tool_name}' execution failed: {e}",
+                llm_content={"parts": [{"type": "text", "text": str(e)}]},
+            )
 
     async def _execute_tool_with_interrupt_check(
         self, function_call: dict, session_id: str, message_id: str

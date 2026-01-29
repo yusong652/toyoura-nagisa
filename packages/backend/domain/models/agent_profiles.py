@@ -1,112 +1,19 @@
 """
 Agent Configuration - Unified agent definitions.
 
-This module provides the single source of truth for main agent and SubAgent
-configuration, including tool assignments and runtime behavior.
-
-Architecture note:
-- Domain layer configuration (business rules)
-- Infrastructure layer reads from here for tool selection
+Configuration data is loaded from config/agents.yaml. This module provides
+the domain model and accessors for main agent and SubAgent configuration.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List
+import logging
+from pathlib import Path
+from typing import Any, Dict, List
+
+import yaml
 
 
-# =============================================================================
-# Tool Lists (flat definitions for easy maintenance)
-# =============================================================================
-
-PFC_TOOLS: List[str] = [
-    # File operations
-    "write",
-    "read",
-    "edit",
-    # System commands
-    "bash",
-    "bash_output",
-    "kill_shell",
-    "glob",
-    "grep",
-    # Search and planning
-    "web_search",
-    "web_fetch",
-    "todo_write",
-    # PFC documentation - Browse (directory listing)
-    "pfc_browse_commands",
-    "pfc_browse_python_api",
-    "pfc_browse_reference",
-    # PFC documentation - Query (detailed lookup)
-    "pfc_query_python_api",
-    "pfc_query_command",
-    # PFC execution (script-only workflow)
-    "pfc_execute_task",
-    "pfc_check_task_status",
-    "pfc_list_tasks",
-    "pfc_interrupt_task",
-    # PFC diagnostic (multimodal visual analysis)
-    "pfc_capture_plot",
-    # SubAgent delegation
-    "invoke_agent",
-    # Skills (on-demand workflow instructions)
-    "trigger_skill",
-]
-
-# SubAgent-specific tool list for PFC Explorer (read-only exploration)
-SUBAGENT_PFC_EXPLORER_TOOLS: List[str] = [
-    # File operations (read-only)
-    "read",
-    "glob",
-    "grep",
-    # Bash for fallback search (ls, find, git log, etc.)
-    "bash",
-    "bash_output",
-    # PFC documentation query (read-only)
-    "pfc_browse_commands",
-    "pfc_browse_python_api",
-    "pfc_query_python_api",
-    "pfc_query_command",
-    "pfc_browse_reference",
-    # Task context inspection (script is context)
-    "pfc_list_tasks",
-    "pfc_check_task_status",
-    # Web search for external docs
-    "web_search",
-    # Task tracking (consistent with Claude Code Explore agent)
-    "todo_write",
-]
-
-# SubAgent-specific tool list for PFC Diagnostic Expert (multimodal visual analysis)
-SUBAGENT_PFC_DIAGNOSTIC_TOOLS: List[str] = [
-    # Core diagnostic tools (multimodal)
-    "pfc_capture_plot",
-    "read",
-    # Task status inspection (read MainAgent's executed tasks)
-    "pfc_check_task_status",
-    "pfc_list_tasks",
-    # Support tools (workspace navigation, read-only)
-    "glob",
-    "grep",
-    "bash",
-    "bash_output",
-    # Workflow tracking
-    "todo_write",
-]
-
-
-# =============================================================================
-# Skills Configuration (on-demand workflow instructions)
-# =============================================================================
-
-PFC_SKILLS: List[str] = [
-    "pfc-package-management",
-    "pfc-server-setup",
-]
-
-
-# =============================================================================
-# Unified Agent Configuration
-# =============================================================================
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -157,57 +64,158 @@ class AgentConfig:
         return len(self.tools) * 282
 
 
-MAIN_AGENT_CONFIG = AgentConfig(
-    name="pfc_expert",
-    display_name="PFC Expert",
-    description="ITASCA PFC simulation with script-based workflow",
-    tools=tuple(PFC_TOOLS),
-    max_iterations=64,
-    streaming_enabled=True,
-    enable_memory=True,
-    is_main_agent=True,
-    color="#9C27B0",
-    icon="⚛️",
-    skills=tuple(PFC_SKILLS),
-)
+def _project_root() -> Path:
+    return Path(__file__).resolve().parent.parent.parent.parent.parent
 
 
-# =============================================================================
-# SubAgent Definitions
-# =============================================================================
+def _load_agents_yaml(yaml_path: str | None = None) -> dict[str, Any]:
+    if yaml_path is None:
+        yaml_path = str(_project_root() / "config" / "agents.yaml")
+
+    path = Path(yaml_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Agent config file not found: {yaml_path}")
+
+    with path.open(encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid agent config in {yaml_path}: expected mapping")
+
+    return data
 
 
-PFC_EXPLORER = AgentConfig(
-    name="pfc_explorer",
-    display_name="Tama (PFC Explorer)",
-    description="Tama - PFC documentation query agent (read-only)",
-    tools=tuple(SUBAGENT_PFC_EXPLORER_TOOLS),
-    max_iterations=64,
-    streaming_enabled=False,
-    enable_memory=False,
-    is_main_agent=False,
-)
-
-PFC_DIAGNOSTIC = AgentConfig(
-    name="pfc_diagnostic",
-    display_name="Hoshi (PFC Diagnostic)",
-    description="Hoshi - Multimodal visual analysis agent for PFC simulation diagnostics",
-    tools=tuple(SUBAGENT_PFC_DIAGNOSTIC_TOOLS),
-    max_iterations=64,
-    streaming_enabled=False,
-    enable_memory=False,
-    is_main_agent=False,
-)
-
-SUBAGENT_CONFIGS: Dict[str, AgentConfig] = {
-    "pfc_explorer": PFC_EXPLORER,
-    "pfc_diagnostic": PFC_DIAGNOSTIC,
-}
+def _require_mapping(data: dict[str, Any], key: str, context: str) -> dict[str, Any]:
+    if key not in data:
+        raise ValueError(f"Missing {context}.{key} in agent config")
+    value = data.get(key)
+    if not isinstance(value, dict):
+        raise ValueError(f"Invalid {context}.{key}: expected mapping")
+    return value
 
 
-# =============================================================================
-# Accessor Functions
-# =============================================================================
+def _require_str(data: dict[str, Any], key: str, context: str) -> str:
+    if key not in data:
+        raise ValueError(f"Missing {context}.{key} in agent config")
+    value = data.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Invalid {context}.{key}: expected non-empty string")
+    return value.strip()
+
+
+def _require_bool(data: dict[str, Any], key: str, context: str) -> bool:
+    if key not in data:
+        raise ValueError(f"Missing {context}.{key} in agent config")
+    value = data.get(key)
+    if not isinstance(value, bool):
+        raise ValueError(f"Invalid {context}.{key}: expected boolean")
+    return value
+
+
+def _require_int(data: dict[str, Any], key: str, context: str) -> int:
+    if key not in data:
+        raise ValueError(f"Missing {context}.{key} in agent config")
+    value = data.get(key)
+    if not isinstance(value, int):
+        raise ValueError(f"Invalid {context}.{key}: expected integer")
+    if value <= 0:
+        raise ValueError(f"Invalid {context}.{key}: must be greater than zero")
+    return value
+
+
+def _require_str_list(data: dict[str, Any], key: str, context: str, allow_empty: bool = False) -> List[str]:
+    if key not in data:
+        raise ValueError(f"Missing {context}.{key} in agent config")
+    value = data.get(key)
+    if not isinstance(value, list):
+        raise ValueError(f"Invalid {context}.{key}: expected list")
+
+    items: List[str] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, str):
+            raise ValueError(f"Invalid {context}.{key}[{index}]: expected string")
+        text = item.strip()
+        if text:
+            items.append(text)
+
+    if not allow_empty and not items:
+        raise ValueError(f"Invalid {context}.{key}: must not be empty")
+
+    return items
+
+
+def _build_agent_config(
+    data: dict[str, Any], *, context: str, is_main_agent: bool, default_name: str | None = None
+) -> AgentConfig:
+    if "name" in data:
+        name = _require_str(data, "name", context)
+        if default_name and name != default_name:
+            raise ValueError(f"Invalid {context}.name: '{name}' does not match key '{default_name}'")
+    elif default_name:
+        name = default_name
+    else:
+        raise ValueError(f"Missing {context}.name in agent config")
+
+    display_name = _require_str(data, "display_name", context)
+    description = _require_str(data, "description", context)
+    tools = tuple(_require_str_list(data, "tools", context, allow_empty=False))
+    max_iterations = _require_int(data, "max_iterations", context)
+    streaming_enabled = _require_bool(data, "streaming_enabled", context)
+    enable_memory = _require_bool(data, "enable_memory", context)
+    color = _require_str(data, "color", context)
+    icon = _require_str(data, "icon", context)
+    skills = tuple(_require_str_list(data, "skills", context, allow_empty=True))
+
+    return AgentConfig(
+        name=name,
+        display_name=display_name,
+        description=description,
+        tools=tools,
+        max_iterations=max_iterations,
+        streaming_enabled=streaming_enabled,
+        enable_memory=enable_memory,
+        is_main_agent=is_main_agent,
+        color=color,
+        icon=icon,
+        skills=skills,
+    )
+
+
+def _load_agent_configs() -> tuple[AgentConfig, Dict[str, AgentConfig]]:
+    data = _load_agents_yaml()
+    main_agent_data = _require_mapping(data, "main_agent", "agents")
+    main_agent = _build_agent_config(
+        main_agent_data,
+        context="main_agent",
+        is_main_agent=True,
+        default_name=None,
+    )
+
+    subagents_data = _require_mapping(data, "subagents", "agents")
+    subagents: Dict[str, AgentConfig] = {}
+    for key, value in subagents_data.items():
+        if not isinstance(value, dict):
+            raise ValueError(f"Invalid subagents.{key}: expected mapping")
+        config = _build_agent_config(
+            value,
+            context=f"subagents.{key}",
+            is_main_agent=False,
+            default_name=key,
+        )
+        subagents[config.name] = config
+
+    return main_agent, subagents
+
+
+try:
+    MAIN_AGENT_CONFIG, SUBAGENT_CONFIGS = _load_agent_configs()
+except Exception as exc:
+    logger.error("Failed to load agent configs: %s", exc)
+    raise
+
+
+PFC_EXPLORER = SUBAGENT_CONFIGS["pfc_explorer"]
+PFC_DIAGNOSTIC = SUBAGENT_CONFIGS["pfc_diagnostic"]
 
 
 def get_agent_config() -> AgentConfig:

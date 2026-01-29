@@ -125,48 +125,5 @@ class OpenRouterToolManager(BaseToolManager):
             print(f"[DEBUG] Tool schema content: {tool_schema}")
             return None
 
-    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile = 'pfc_expert') -> List[Dict[str, Any]]:
-        """
-        Get tool schemas in standardized dictionary format for system prompt embedding.
-
-        This method returns a clean dictionary format specifically designed for embedding
-        tool schemas into system prompts, separate from the API-specific formats.
-
-        Args:
-            session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name ("pfc_expert", "disabled")
-
-        Returns:
-            List[Dict[str, Any]]: Tool schemas in standardized dictionary format for system prompt
-        """
-
-        # Get standardized tools from base class
-        tools_dict = await self.get_standardized_tools(session_id, agent_profile)
-
-        if not tools_dict:
-            return []
-
-        # Convert ToolSchema objects to clean dictionary format for system prompt
-        prompt_schemas = []
-
-        for tool_name, tool_schema in tools_dict.items():
-            try:
-                # Build clean schema dictionary
-                schema_dict = {
-                    "name": tool_schema.name,
-                    "description": tool_schema.description,
-                    "parameters": tool_schema.inputSchema.model_dump(exclude_none=True, by_alias=True)
-                }
-                prompt_schemas.append(schema_dict)
-            except Exception as e:
-                if get_dev_config().debug_mode:
-                    print(f"[WARNING] Failed to convert tool {tool_name} for system prompt: {e}")
-                continue
-
-        if get_dev_config().debug_mode:
-            print(f"[DEBUG] OpenRouter system prompt schemas count: {len(prompt_schemas)}")
-
-        return prompt_schemas
-
 
 __all__ = ['OpenRouterToolManager']

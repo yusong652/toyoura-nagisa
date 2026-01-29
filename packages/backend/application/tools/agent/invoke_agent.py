@@ -15,6 +15,7 @@ from pydantic import Field
 
 from backend.application.tools.registrar import ToolRegistrar
 from backend.application.tools.context import ToolContext
+from backend.domain.models.agent_profiles import SUBAGENT_CONFIGS
 # from fastmcp.server.context import Context
 
 from backend.shared.utils.tool_result import success_response, error_response
@@ -24,11 +25,8 @@ logger = logging.getLogger(__name__)
 __all__ = ["invoke_agent", "register_invoke_agent_tool"]
 
 
-# Available SubAgent types (matches AgentConfig names in agent_profiles.py)
-AVAILABLE_SUBAGENTS = {
-    "pfc_explorer": "Tama - PFC documentation query agent (read-only)",
-    "pfc_diagnostic": "Hoshi - PFC multimodal diagnostic agent (visual analysis)",
-}
+# Available SubAgent types (loaded from config/agents.yaml)
+AVAILABLE_SUBAGENTS = {name: config.description for name, config in SUBAGENT_CONFIGS.items()}
 
 
 async def invoke_agent(
@@ -202,7 +200,7 @@ async def invoke_agent(
     except KeyError as e:
         logger.error(f"SubAgent configuration not found: {e}")
         return error_response(
-            f"SubAgent '{subagent_type}' is not configured. Please check SUBAGENT_CONFIGS in agent_profiles.py",
+            f"SubAgent '{subagent_type}' is not configured. Please check config/agents.yaml",
             subagent_type=subagent_type,
         )
     except Exception as e:

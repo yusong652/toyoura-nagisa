@@ -137,7 +137,7 @@ class ToolExecutor:
         rejection_message: Optional[str] = None
 
         # Plan/build mode gate: block non-read-only tools in plan mode
-        from backend.application.policies.mode_policy import (
+        from backend.application.tools.policy import (
             is_tool_allowed_in_mode,
             build_mode_blocked_message,
         )
