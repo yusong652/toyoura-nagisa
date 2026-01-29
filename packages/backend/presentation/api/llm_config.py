@@ -12,6 +12,7 @@ Routes:
     GET /api/llm-config/providers - Get available providers and models
 """
 
+import os
 from typing import List, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -118,6 +119,35 @@ class ThinkingConfigData(BaseModel):
 # =====================
 # Helper Functions
 # =====================
+_API_KEY_ENV_VARS = {
+    "google": "GOOGLE_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "gpt": "OPENAI_API_KEY",
+    "moonshot": "MOONSHOT_API_KEY",
+    "zhipu": "ZHIPU_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+}
+
+
+def _get_env_api_key(provider: str) -> Optional[str]:
+    env_var = _API_KEY_ENV_VARS.get(provider)
+    if not env_var:
+        return None
+
+    value = os.getenv(env_var)
+    if value is None and env_var.lower() != env_var:
+        value = os.getenv(env_var.lower())
+    if value is None and env_var.upper() != env_var:
+        value = os.getenv(env_var.upper())
+
+    if value is None:
+        return None
+
+    value = value.strip()
+    return value or None
+
+
 def _check_api_key_configured(provider: str) -> bool:
     """
     Check if API key is configured for a provider.
@@ -128,47 +158,7 @@ def _check_api_key_configured(provider: str) -> bool:
     Returns:
         bool: True if API key/server URL is configured
     """
-    try:
-        if provider == "google":
-            from backend.infrastructure.llm.providers.google.config import GoogleConfig
-
-            cfg = GoogleConfig()
-            return bool(cfg.google_api_key)
-
-        elif provider == "anthropic":
-            from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
-
-            cfg = AnthropicConfig()
-            return bool(cfg.anthropic_api_key)
-
-        elif provider in ["openai", "gpt"]:
-            from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
-
-            cfg = OpenAIConfig()
-            return bool(cfg.openai_api_key)
-
-        elif provider == "moonshot":
-            from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
-
-            cfg = MoonshotConfig()
-            return bool(cfg.moonshot_api_key)
-
-        elif provider == "zhipu":
-            from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
-
-            cfg = ZhipuConfig()
-            return bool(cfg.zhipu_api_key)
-
-        elif provider == "openrouter":
-            from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
-
-            cfg = OpenRouterConfig()
-            return bool(cfg.openrouter_api_key)
-
-        return False
-
-    except Exception:
-        return False
+    return bool(_get_env_api_key(provider))
 
 
 def _get_available_providers() -> List[ProviderInfo]:

@@ -32,6 +32,44 @@ from typing import Any, Dict, Optional
 DEFAULT_LLM_CONFIG_FILE = "data/default_llm.json"  # User customization (root/data/)
 MODELS_YAML_FILE = "config/models.yaml"  # System defaults (root/config/)
 
+_API_KEY_ENV_VARS = {
+    "google": "GOOGLE_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "gpt": "OPENAI_API_KEY",
+    "moonshot": "MOONSHOT_API_KEY",
+    "zhipu": "ZHIPU_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+}
+
+_API_KEY_DISPLAY_NAMES = {
+    "google": "Google",
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "gpt": "OpenAI",
+    "moonshot": "Moonshot",
+    "zhipu": "Zhipu",
+    "openrouter": "OpenRouter",
+}
+
+
+def _get_env_api_key(provider: str) -> Optional[str]:
+    env_var = _API_KEY_ENV_VARS.get(provider)
+    if not env_var:
+        return None
+
+    value = os.getenv(env_var)
+    if value is None and env_var.lower() != env_var:
+        value = os.getenv(env_var.lower())
+    if value is None and env_var.upper() != env_var:
+        value = os.getenv(env_var.upper())
+
+    if value is None:
+        return None
+
+    value = value.strip()
+    return value or None
+
 
 def _get_system_default_config() -> Optional[Dict[str, Any]]:
     """
@@ -386,44 +424,9 @@ def validate_llm_config(
         )
 
     # Check if API key exists for this provider
-    try:
-        if provider == "google":
-            from backend.infrastructure.llm.providers.google.config import GoogleConfig
-            cfg = GoogleConfig()
-            if not cfg.google_api_key:
-                return False, "Google API key not configured"
-
-        elif provider == "anthropic":
-            from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
-            cfg = AnthropicConfig()
-            if not cfg.anthropic_api_key:
-                return False, "Anthropic API key not configured"
-
-        elif provider in ["openai", "gpt"]:
-            from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
-            cfg = OpenAIConfig()
-            if not cfg.openai_api_key:
-                return False, "OpenAI API key not configured"
-
-        elif provider == "moonshot":
-            from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
-            cfg = MoonshotConfig()
-            if not cfg.moonshot_api_key:
-                return False, "Moonshot API key not configured"
-
-        elif provider == "zhipu":
-            from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
-            cfg = ZhipuConfig()
-            if not cfg.zhipu_api_key:
-                return False, "Zhipu API key not configured"
-
-        elif provider == "openrouter":
-            from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
-            cfg = OpenRouterConfig()
-            if not cfg.openrouter_api_key:
-                return False, "OpenRouter API key not configured"
-
-    except Exception as e:
-        return False, f"Failed to validate configuration: {str(e)}"
+    if provider in _API_KEY_ENV_VARS:
+        if not _get_env_api_key(provider):
+            display_name = _API_KEY_DISPLAY_NAMES.get(provider, provider)
+            return False, f"{display_name} API key not configured"
 
     return True, None

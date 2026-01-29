@@ -38,11 +38,11 @@ providers:
   # OpenAI GPT
   - provider: openai
     name: OpenAI GPT
-    description: OpenAI's GPT models with advanced reasoning capabilities
+    description: OpenAI's GPT models
     models:
       - id: gpt-5.2-2025-12-11
         name: GPT-5.2
-        description: Latest GPT-5.2 model with enhanced capabilities
+        description: GPT-5.2 model 
         context_window: 400000
         multimodal: true
         thinking:
@@ -72,7 +72,7 @@ providers:
 
       - id: gpt-4o-2024-08-06
         name: GPT-4o
-        description: GPT-4 optimized for general tasks
+        description: GPT-4o
         context_window: 128000
         multimodal: true
         thinking:
@@ -81,11 +81,11 @@ providers:
   # Google Gemini
   - provider: google
     name: Google Gemini
-    description: Google's Gemini models with multimodal capabilities and long context
+    description: Google's Gemini models
     models:
       - id: gemini-3-pro-preview
         name: Gemini 3.0 Pro
-        description: Preview of next-generation Gemini Pro
+        description: Gemini 3.0 Pro 
         context_window: 1048576
         multimodal: true
         thinking:
@@ -95,7 +95,7 @@ providers:
 
       - id: gemini-3-flash-preview
         name: Gemini 3.0 Flash
-        description: Fast preview variant of Gemini 3.0
+        description: Gemini 3.0 Flash
         context_window: 1048576
         multimodal: true
         thinking:
@@ -105,7 +105,7 @@ providers:
 
       - id: gemini-2.5-pro
         name: Gemini 2.5 Pro
-        description: Latest production Gemini Pro model
+        description: Gemini 2.5 Pro
         context_window: 1048576
         multimodal: true
         thinking:
@@ -115,7 +115,7 @@ providers:
 
       - id: gemini-2.5-flash
         name: Gemini 2.5 Flash
-        description: Fast and efficient Gemini model
+        description: Gemini 2.5 Flash
         context_window: 1048576
         multimodal: true
         thinking:
@@ -126,11 +126,11 @@ providers:
   # Anthropic Claude
   - provider: anthropic
     name: Anthropic Claude
-    description: Anthropic's Claude models with strong reasoning and tool use
+    description: Anthropic's Claude models
     models:
       - id: claude-opus-4-5-20251101
         name: Claude Opus 4.5
-        description: Most capable Claude model for complex tasks
+        description: Claude Opus
         context_window: 200000
         multimodal: true
         thinking:
@@ -140,7 +140,7 @@ providers:
 
       - id: claude-sonnet-4-5-20250929
         name: Claude Sonnet 4.5
-        description: Balanced performance and speed
+        description: Claude Sonnet
         context_window: 200000
         multimodal: true
         thinking:
@@ -161,11 +161,11 @@ providers:
   # Moonshot AI
   - provider: moonshot
     name: Moonshot Kimi
-    description: Moonshot's Kimi models with extended thinking capabilities
+    description: Moonshot's Kimi models
     models:
       - id: kimi-k2.5
         name: Kimi K2.5
-        description: Native multimodal model with vision, coding, and agentic capabilities
+        description: Multimodal model with vision capabilities
         context_window: 262144
         multimodal: true
         thinking:
@@ -175,7 +175,7 @@ providers:
 
       - id: kimi-k2-thinking-turbo
         name: Kimi K2 Thinking Turbo
-        description: Fast thinking model with enhanced reasoning
+        description: Fast thinking model
         context_window: 262144
         multimodal: false
         thinking:
@@ -183,7 +183,7 @@ providers:
 
       - id: kimi-k2-thinking
         name: Kimi K2 Thinking
-        description: Deep reasoning model with extended context
+        description: Standard thinking model
         context_window: 262144
         multimodal: false
         thinking:
@@ -191,7 +191,7 @@ providers:
 
       - id: kimi-k2-turbo-preview
         name: Kimi K2 Turbo Preview
-        description: Preview of high-speed K2 variant
+        description: Kimi K2 without thinking, optimized for speed
         context_window: 262144
         multimodal: false
         thinking:
@@ -199,7 +199,7 @@ providers:
 
       - id: kimi-k2-0905-preview
         name: Kimi K2 0905 Preview
-        description: September 2024 preview release
+        description: Kimi K2 without thinking
         context_window: 262144
         multimodal: false
         thinking:
@@ -208,11 +208,11 @@ providers:
   # Zhipu AI
   - provider: zhipu
     name: Zhipu GLM
-    description: Zhipu's GLM models with bilingual capabilities
+    description: Zhipu's GLM models
     models:
       - id: glm-4.7
         name: GLM-4.7
-        description: Latest GLM generation with improved performance
+        description: GLM-4.7 standard model
         context_window: 200000
         multimodal: false
         thinking:
@@ -241,7 +241,7 @@ providers:
     models:
       - id: qwen/qwen3-235b-a22b-2507
         name: Qwen 3 235B
-        description: Large-scale Qwen model via OpenRouter
+        description: Qwen model via OpenRouter
         context_window: 200000
         multimodal: false
         thinking:

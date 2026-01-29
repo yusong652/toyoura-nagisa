@@ -28,8 +28,8 @@ class ZhipuConfig(BaseSettings):
     secondary_model: str = Field(default="glm-4.7", description="Secondary model for SubAgent")
 
     # Model parameters (runtime overridable)
-    temperature: float = Field(
-        default=0.95, description="Sampling temperature (0-1). Do not set both temperature and top_p."
+    temperature: Optional[float] = Field(
+        default=None, description="Sampling temperature (0-1). Do not set both temperature and top_p."
     )
     max_tokens: Optional[int] = Field(default=1024 * 16, description="Maximum tokens to generate")
     top_p: Optional[float] = Field(
