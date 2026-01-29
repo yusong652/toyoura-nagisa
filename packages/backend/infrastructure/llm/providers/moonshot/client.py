@@ -114,10 +114,11 @@ class MoonshotClient(LLMClientBase):
         if call_options.timeout is not None:
             api_kwargs["timeout"] = call_options.timeout
 
-        # Handle thinking configuration (if level is provided and not default)
+        # Handle thinking configuration (only for k2.5 models that support it)
         from backend.infrastructure.llm.shared.constants.thinking import MOONSHOT_THINKING_LEVEL_TO_TYPE
 
-        if call_options.thinking_level is not None:
+        model_name = api_kwargs.get("model", "")
+        if "k2.5" in model_name and call_options.thinking_level is not None:
             thinking_type = MOONSHOT_THINKING_LEVEL_TO_TYPE.get(call_options.thinking_level)
             if thinking_type is not None:
                 # Inject Moonshot specific thinking parameter via extra_body
@@ -191,10 +192,11 @@ class MoonshotClient(LLMClientBase):
         if call_options.timeout is not None:
             api_kwargs["timeout"] = call_options.timeout
 
-        # Handle thinking configuration (if level is provided and not default)
+        # Handle thinking configuration (only for k2.5 models that support it)
         from backend.infrastructure.llm.shared.constants.thinking import MOONSHOT_THINKING_LEVEL_TO_TYPE
 
-        if call_options.thinking_level is not None:
+        model_name = api_kwargs.get("model", "")
+        if "k2.5" in model_name and call_options.thinking_level is not None:
             thinking_type = MOONSHOT_THINKING_LEVEL_TO_TYPE.get(call_options.thinking_level)
             if thinking_type is not None:
                 # Inject Moonshot specific thinking parameter via extra_body

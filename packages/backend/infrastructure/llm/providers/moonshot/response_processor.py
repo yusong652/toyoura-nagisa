@@ -424,8 +424,10 @@ class MoonshotResponseProcessor(BaseResponseProcessor):
             "role": message.role
         }
 
-        # Add reasoning_content as separate field if present (Moonshot k2-thinking format)
-        if reasoning_content and reasoning_content.strip():
+        # Add reasoning_content as separate field (Moonshot k2-thinking format)
+        # Must preserve this field (even if empty) when thinking mode is enabled,
+        # otherwise API returns "reasoning_content is missing in assistant tool call message"
+        if reasoning_content is not None:
             message_dict["reasoning_content"] = reasoning_content
 
         # Add tool calls if present

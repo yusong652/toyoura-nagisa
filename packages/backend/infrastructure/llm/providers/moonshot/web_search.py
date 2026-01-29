@@ -27,6 +27,7 @@ async def perform_moonshot_search(
         response = await llm_client.call_api_with_context(
             context_contents=context_contents,
             api_config=api_config,
+            thinking_level="low",  # Explicitly disable thinking for web search
         )
 
         if not response.choices:
