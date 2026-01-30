@@ -9,6 +9,7 @@ import os
 import json
 import uuid
 import shutil
+import tempfile
 from typing import List, Dict, Any, Optional, Tuple, cast
 from datetime import datetime
 from backend.domain.models.message_factory import message_factory
@@ -37,25 +38,122 @@ def _get_runtime_state_file(session_id: str) -> str:
     return os.path.join(_get_session_dir(session_id), "runtime_state.json")
 
 
-def _get_metadata_file() -> str:
-    return os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
+def _get_session_metadata_file(session_id: str) -> str:
+    """Get per-session metadata file path"""
+    return os.path.join(_get_session_dir(session_id), "metadata.json")
+
+
+def _atomic_json_write(file_path: str, data: Any) -> None:
+    """
+    Write JSON data atomically using temp file + rename pattern.
+
+    This ensures that:
+    1. Either the old file or new file exists (never empty)
+    2. Interruption during write leaves the original file intact
+    3. The write is atomic on POSIX systems (rename is atomic)
+
+    Args:
+        file_path: Target file path
+        data: Data to write (must be JSON serializable)
+    """
+    dir_path = os.path.dirname(file_path)
+    os.makedirs(dir_path, exist_ok=True)
+
+    # Write to temp file in the same directory (ensures same filesystem for atomic rename)
+    fd, temp_path = tempfile.mkstemp(suffix='.tmp', dir=dir_path)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())  # Ensure data is written to disk
+
+        # Atomic rename (on POSIX systems)
+        os.replace(temp_path, file_path)
+    except Exception:
+        # Clean up temp file if rename failed
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+        raise
+
+
+def _load_session_metadata(session_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Load metadata for a single session from per-session file.
+
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        Session metadata dict or None if not found
+    """
+    session_metadata_file = _get_session_metadata_file(session_id)
+    if not os.path.exists(session_metadata_file):
+        return None
+
+    try:
+        with open(session_metadata_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"[WARNING] Failed to load metadata for session {session_id}: {e}")
+        return None
+
+
+def _save_session_metadata(session_id: str, metadata: Dict[str, Any]) -> None:
+    """
+    Save metadata for a single session to per-session file atomically.
+
+    Args:
+        session_id: Session identifier
+        metadata: Session metadata to save
+    """
+    session_metadata_file = _get_session_metadata_file(session_id)
+    _atomic_json_write(session_metadata_file, metadata)
 
 
 def _load_sessions_metadata() -> Dict[str, Any]:
-    metadata_file = _get_metadata_file()
-    if not os.path.exists(metadata_file):
-        return {}
-    try:
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+    """
+    Load all sessions metadata by scanning per-session metadata files.
+
+    Scans chat/data/{session_id}/metadata.json for each session directory.
+
+    Returns:
+        Dict mapping session_id to metadata
+    """
+    all_metadata: Dict[str, Any] = {}
+
+    if not os.path.exists(HISTORY_BASE_DIR):
+        return all_metadata
+
+    for entry in os.listdir(HISTORY_BASE_DIR):
+        session_dir = os.path.join(HISTORY_BASE_DIR, entry)
+        if os.path.isdir(session_dir) and entry != "backups":
+            session_metadata_file = os.path.join(session_dir, "metadata.json")
+            if os.path.exists(session_metadata_file):
+                try:
+                    with open(session_metadata_file, 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
+                        all_metadata[entry] = metadata
+                except (FileNotFoundError, json.JSONDecodeError) as e:
+                    print(f"[WARNING] Failed to load metadata for session {entry}: {e}")
+
+    return all_metadata
 
 
 def _save_sessions_metadata(metadata: Dict[str, Any]) -> None:
-    metadata_file = _get_metadata_file()
-    with open(metadata_file, 'w', encoding='utf-8') as f:
-        json.dump(metadata, f, indent=4, ensure_ascii=False)
+    """
+    Save sessions metadata to per-session files.
+
+    Args:
+        metadata: Dict mapping session_id to metadata
+    """
+    for session_id, session_metadata in metadata.items():
+        try:
+            _save_session_metadata(session_id, session_metadata)
+        except Exception as e:
+            print(f"[ERROR] Failed to save metadata for session {session_id}: {e}")
 
 
 def _normalize_session_metadata_entry(session_metadata: Dict[str, Any]) -> bool:
@@ -107,20 +205,16 @@ def create_new_history(name: Optional[str] = None) -> str:
     if default_llm_config:
         session_metadata["llm_config"] = cast(Any, default_llm_config)
 
-    # Ensure base directory exists
-    os.makedirs(HISTORY_BASE_DIR, exist_ok=True)
-
-    # Save metadata
-    metadata: Dict[str, Any] = _load_sessions_metadata()
-    metadata[session_id] = session_metadata
-    _save_sessions_metadata(metadata)
-
-    # Create session directory and empty chat history file
+    # Create session directory
     session_dir = _get_session_dir(session_id)
     os.makedirs(session_dir, exist_ok=True)
+
+    # Save metadata to per-session file atomically
+    _save_session_metadata(session_id, session_metadata)
+
+    # Create empty chat history file
     session_file = _get_session_file(session_id)
-    with open(session_file, 'w', encoding='utf-8') as f:
-        json.dump([], f, indent=4, ensure_ascii=False)
+    _atomic_json_write(session_file, [])
 
     return session_id
 
@@ -150,7 +244,7 @@ def get_all_sessions() -> List[Dict[str, Any]]:
 
 
 def delete_session_data(session_id: str) -> bool:
-    """Delete chat history for specified session ID"""
+    """Delete chat history and metadata for specified session ID"""
     try:
         # Clean up background processes for this session
         try:
@@ -159,86 +253,54 @@ def delete_session_data(session_id: str) -> bool:
         except Exception as e:
             print(f"[WARNING] Failed to cleanup background processes for session {session_id}: {e}")
 
+        # Delete session directory (includes metadata.json, history.json, runtime_state.json)
         session_dir = _get_session_dir(session_id)
         if os.path.exists(session_dir):
             shutil.rmtree(session_dir)
-        # Update metadata
-        metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
-        if os.path.exists(metadata_file):
-            try:
-                with open(metadata_file, 'r', encoding='utf-8') as f:
-                    metadata = json.load(f)
-                if session_id in metadata:
-                    del metadata[session_id]
-                    with open(metadata_file, 'w', encoding='utf-8') as f:
-                        json.dump(metadata, f, indent=4, ensure_ascii=False)
-            except (FileNotFoundError, json.JSONDecodeError) as e:
-                pass
+            print(f"[DEBUG] Deleted session directory: {session_dir}")
+
         return True
     except Exception as e:
+        print(f"[ERROR] Failed to delete session {session_id}: {e}")
         return False
 
 
 def update_session_title(session_id: str, new_title: str) -> bool:
     """
     Update session title
-    
+
     Args:
         session_id: Session ID to update
         new_title: New session title
-        
+
     Returns:
         Whether update was successful
     """
-    try:
-        # Load session metadata
-        metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
-        if not os.path.exists(metadata_file):
-            return False
-            
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
-        
-        # Check if session exists
-        if session_id not in metadata:
-            return False
-            
-        # Update title and update time
-        metadata[session_id]["name"] = new_title
-        metadata[session_id]["updated_at"] = datetime.now().isoformat()
-        
-        # Save updated metadata
-        with open(metadata_file, 'w', encoding='utf-8') as f:
-            json.dump(metadata, f, indent=4, ensure_ascii=False)
-            
-        return True
-    except Exception as e:
-        print(f"[ERROR] Failed to update session title: {str(e)}")
-        return False
+    return update_session_metadata(session_id, {"name": new_title})
 
 
 def get_session_metadata(session_id: str) -> Optional[Dict[str, Any]]:
     """Get session metadata by session ID."""
-    metadata = _load_sessions_metadata()
-    session_metadata = metadata.get(session_id)
+    session_metadata = _load_session_metadata(session_id)
     if not session_metadata:
         return None
 
     if _normalize_session_metadata_entry(session_metadata):
-        _save_sessions_metadata(metadata)
+        # Save normalized metadata back to per-session file
+        _save_session_metadata(session_id, session_metadata)
 
     return session_metadata
 
 
 def update_session_metadata(session_id: str, updates: Dict[str, Any]) -> bool:
     """Update session metadata fields and refresh updated_at timestamp."""
-    metadata = _load_sessions_metadata()
-    if session_id not in metadata:
+    session_metadata = _load_session_metadata(session_id)
+    if not session_metadata:
         return False
 
-    metadata[session_id].update(updates)
-    metadata[session_id]["updated_at"] = datetime.now().isoformat()
-    _save_sessions_metadata(metadata)
+    session_metadata.update(updates)
+    session_metadata["updated_at"] = datetime.now().isoformat()
+    _save_session_metadata(session_id, session_metadata)
     return True
 
 
@@ -265,8 +327,8 @@ def update_session_llm_config(
     secondary_model: Optional[str] = None,
 ) -> bool:
     """Update session-level LLM configuration in metadata."""
-    metadata = _load_sessions_metadata()
-    if session_id not in metadata:
+    session_metadata = _load_session_metadata(session_id)
+    if not session_metadata:
         return False
 
     llm_config: Dict[str, Any] = {
@@ -276,23 +338,23 @@ def update_session_llm_config(
     if secondary_model:
         llm_config["secondary_model"] = secondary_model
 
-    metadata[session_id]["llm_config"] = llm_config
-    metadata[session_id]["updated_at"] = datetime.now().isoformat()
-    _save_sessions_metadata(metadata)
+    session_metadata["llm_config"] = llm_config
+    session_metadata["updated_at"] = datetime.now().isoformat()
+    _save_session_metadata(session_id, session_metadata)
     return True
 
 
 def clear_session_llm_config(session_id: str) -> bool:
     """Clear session-level LLM configuration from metadata."""
-    metadata = _load_sessions_metadata()
-    if session_id not in metadata:
+    session_metadata = _load_session_metadata(session_id)
+    if not session_metadata:
         return False
 
-    if "llm_config" in metadata[session_id]:
-        del metadata[session_id]["llm_config"]
+    if "llm_config" in session_metadata:
+        del session_metadata["llm_config"]
 
-    metadata[session_id]["updated_at"] = datetime.now().isoformat()
-    _save_sessions_metadata(metadata)
+    session_metadata["updated_at"] = datetime.now().isoformat()
+    _save_session_metadata(session_id, session_metadata)
     return True
 
 
@@ -316,7 +378,7 @@ def update_session_mode(session_id: str, mode: str) -> bool:
 # ========== Message History Operations ==========
 
 def save_history(session_id: str, current_history: List[Any]) -> None:
-    """Save chat history for specified session ID"""
+    """Save chat history for specified session ID using atomic write"""
     session_dir = _get_session_dir(session_id)
     session_file = _get_session_file(session_id)
     os.makedirs(session_dir, exist_ok=True)
@@ -337,8 +399,10 @@ def save_history(session_id: str, current_history: List[Any]) -> None:
             if 'name' not in msg_copy:
                 print(f"[WARNING] Tool message missing name: {msg_copy}")
         processed_history.append(msg_copy)
-    with open(session_file, 'w', encoding='utf-8') as f:
-        json.dump(processed_history, f, indent=4, ensure_ascii=False)
+
+    # Use atomic write to prevent data loss on interruption
+    _atomic_json_write(session_file, processed_history)
+
     # Update the update time in metadata
     _update_session_metadata_timestamp(session_id)
 
@@ -451,12 +515,12 @@ def delete_message(session_id: str, message_id: str) -> bool:
         return False
 
 
-def _cleanup_message_files(session_id: str, message: dict) -> None:
+def _cleanup_message_files(_session_id: str, message: dict) -> None:
     """
     Clean up message-related files (videos, images, etc.)
-    
+
     Args:
-        session_id: Session ID
+        _session_id: Session ID (reserved for future use)
         message: Message object to clean up
     """
     try:
@@ -764,24 +828,17 @@ def _is_tool_message(msg: BaseMessage) -> bool:
 
 def _update_session_metadata_timestamp(session_id: str) -> None:
     """Update timestamp in session metadata"""
-    metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
-    if os.path.exists(metadata_file):
-        try:
-            with open(metadata_file, 'r', encoding='utf-8') as f:
-                metadata = json.load(f)
-                if session_id in metadata:
-                    metadata[session_id]['updated_at'] = datetime.now().isoformat()
-                    with open(metadata_file, 'w', encoding='utf-8') as f:
-                        json.dump(metadata, f, indent=4, ensure_ascii=False)
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
+    session_metadata = _load_session_metadata(session_id)
+    if session_metadata:
+        session_metadata['updated_at'] = datetime.now().isoformat()
+        _save_session_metadata(session_id, session_metadata)
 
 
 # ========== Session Runtime State Management ==========
 
 def save_runtime_state(session_id: str, state: Dict[str, Any]) -> None:
     """
-    Save runtime state for a session.
+    Save runtime state for a session using atomic write.
 
     Runtime state includes temporary flags like:
     - last_response_interrupted: Whether the last response was interrupted by user
@@ -798,8 +855,7 @@ def save_runtime_state(session_id: str, state: Dict[str, Any]) -> None:
     os.makedirs(session_dir, exist_ok=True)
 
     try:
-        with open(runtime_file, 'w', encoding='utf-8') as f:
-            json.dump(state, f, indent=4, ensure_ascii=False)
+        _atomic_json_write(runtime_file, state)
         print(f"[DEBUG] Saved runtime state for session {session_id}: {state}")
     except Exception as e:
         print(f"[ERROR] Failed to save runtime state for session {session_id}: {e}")
