@@ -14,7 +14,7 @@ Responsibilities:
 
 from typing import Any
 
-from backend.application.agent.core import Agent
+from backend.application.agent.core import MainAgent, SubAgent
 from backend.domain.models.agent import AgentResult
 from backend.domain.models.agent_profiles import AgentConfig, get_agent_config
 from backend.domain.models.messages import UserMessage
@@ -115,7 +115,7 @@ class AgentService:
             )
 
         config = get_agent_config()
-        agent = Agent(
+        agent = MainAgent(
             config=config,
             llm_client=llm_client,
             session_id=session_id,
@@ -164,12 +164,12 @@ class AgentService:
         # Convert string to UserMessage
         user_message = UserMessage(content=full_instruction)
 
-        agent = Agent(
+        agent = SubAgent(
             config=config,
             llm_client=self._llm_client,
+            session_id=session_id,
             notification_session_id=notification_session_id,
             parent_tool_call_id=parent_tool_call_id,
-            session_id=session_id,
         )
         return await agent.execute(instruction=user_message)
 

@@ -17,21 +17,14 @@ from backend.infrastructure.storage.session_manager import get_session_thinking_
 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
 if TYPE_CHECKING:
-    from backend.application.agent.core import Agent
+    from backend.application.agent.core import MainAgent, SubAgent
 
 
-class BaseAgentExecutor:
-    """Base executor for shared Agent execution interface."""
-
-    def __init__(self, agent: "Agent") -> None:
-        self.agent = agent
-
-    async def execute_loop(self) -> Any:
-        raise NotImplementedError
-
-
-class MainAgentExecutor(BaseAgentExecutor):
+class MainAgentExecutor:
     """Executor for MainAgent streaming workflow."""
+
+    def __init__(self, agent: "MainAgent") -> None:
+        self.agent = agent
 
     async def execute_loop(self) -> Any:
         from backend.shared.exceptions import UserRejectionInterruption
@@ -127,8 +120,11 @@ class MainAgentExecutor(BaseAgentExecutor):
             iteration += 1
 
 
-class SubAgentExecutor(BaseAgentExecutor):
+class SubAgentExecutor:
     """Executor for SubAgent non-streaming workflow."""
+
+    def __init__(self, agent: "SubAgent") -> None:
+        self.agent = agent
 
     async def execute_loop(self) -> Any:
         agent = self.agent
