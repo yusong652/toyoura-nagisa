@@ -56,18 +56,15 @@ class OpenRouterClient(LLMClientBase):
         self.openrouter_config = config
         self.api_key = config.openrouter_api_key
         # Initialize both sync and async OpenAI clients with OpenRouter base URL
-        client_kwargs: Dict[str, Any] = {
-            "api_key": self.api_key,
-            "base_url": self.openrouter_config.base_url
-        }
+        client_kwargs: Dict[str, Any] = {"api_key": self.api_key, "base_url": self.openrouter_config.base_url}
 
         # Allow custom base URL override from extra_config
-        if 'base_url' in self.extra_config:
-            client_kwargs['base_url'] = self.extra_config['base_url']
+        if "base_url" in self.extra_config:
+            client_kwargs["base_url"] = self.extra_config["base_url"]
 
         # Add custom headers if needed (common for OpenRouter)
-        if 'default_headers' in self.extra_config:
-            client_kwargs['default_headers'] = self.extra_config['default_headers']
+        if "default_headers" in self.extra_config:
+            client_kwargs["default_headers"] = self.extra_config["default_headers"]
 
         self.client = OpenAI(**client_kwargs)
         self.async_client = AsyncOpenAI(**client_kwargs)
@@ -78,10 +75,7 @@ class OpenRouterClient(LLMClientBase):
     # ========== CORE API METHODS ==========
 
     async def call_api_with_context(
-        self,
-        context_contents: List[Dict[str, Any]],
-        api_config: Dict[str, Any],
-        **kwargs
+        self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs
     ) -> ChatCompletion:
         """
         Execute a stateless OpenRouter API call with prepared context.
@@ -98,9 +92,7 @@ class OpenRouterClient(LLMClientBase):
         debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.openrouter_config.timeout
         max_retries = (
-            call_options.max_retries
-            if call_options.max_retries is not None
-            else self.openrouter_config.max_retries
+            call_options.max_retries if call_options.max_retries is not None else self.openrouter_config.max_retries
         )
 
         tools = api_config.get("tools", []) or []
@@ -109,34 +101,27 @@ class OpenRouterClient(LLMClientBase):
         # Add system message if provided
         system_prompt = api_config.get("system_prompt")
         if system_prompt:
-            messages.insert(0, {
-                "role": "system",
-                "content": system_prompt
-            })
+            messages.insert(0, {"role": "system", "content": system_prompt})
 
         # Build API call parameters
         api_kwargs = self.openrouter_config.build_api_params()
-        api_kwargs.update({
-            "messages": messages,
-            "tools": tools,
-            "tool_choice": "auto" if tools else None,
-            "stream": False,
-        })
-
-        if system_prompt:
-            messages.insert(0, {
-                "role": "system",
-                "content": system_prompt
-            })
+        api_kwargs.update(
+            {
+                "messages": messages,
+                "tools": tools,
+                "tool_choice": "auto" if tools else None,
+                "stream": False,
+            }
+        )
 
         if call_options.temperature is not None:
-            api_kwargs['temperature'] = call_options.temperature
+            api_kwargs["temperature"] = call_options.temperature
         if call_options.max_tokens is not None:
-            api_kwargs['max_tokens'] = call_options.max_tokens
+            api_kwargs["max_tokens"] = call_options.max_tokens
         if call_options.top_p is not None:
-            api_kwargs['top_p'] = call_options.top_p
+            api_kwargs["top_p"] = call_options.top_p
         if call_options.timeout is not None:
-            api_kwargs['timeout'] = call_options.timeout
+            api_kwargs["timeout"] = call_options.timeout
 
         if debug:
             OpenRouterDebugger.print_api_request(api_kwargs, messages, tools)
@@ -157,10 +142,7 @@ class OpenRouterClient(LLMClientBase):
             raise
 
     async def call_api_with_context_streaming(
-        self,
-        context_contents: List[Dict[str, Any]],
-        api_config: Dict[str, Any],
-        **kwargs
+        self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs
     ) -> AsyncGenerator[StreamingChunk, None]:
         """
         Execute streaming OpenRouter API call with real-time chunk delivery.
@@ -177,9 +159,7 @@ class OpenRouterClient(LLMClientBase):
         debug = get_dev_config().debug_mode
         timeout = call_options.timeout if call_options.timeout is not None else self.openrouter_config.timeout
         max_retries = (
-            call_options.max_retries
-            if call_options.max_retries is not None
-            else self.openrouter_config.max_retries
+            call_options.max_retries if call_options.max_retries is not None else self.openrouter_config.max_retries
         )
 
         tools = api_config.get("tools", []) or []
@@ -188,35 +168,28 @@ class OpenRouterClient(LLMClientBase):
         # Add system message if provided
         system_prompt = api_config.get("system_prompt")
         if system_prompt:
-            messages.insert(0, {
-                "role": "system",
-                "content": system_prompt
-            })
+            messages.insert(0, {"role": "system", "content": system_prompt})
 
         # Build API call parameters
         api_kwargs = self.openrouter_config.build_api_params()
-        api_kwargs.update({
-            "messages": messages,
-            "tools": tools,
-            "tool_choice": "auto" if tools else None,
-            "stream": True,
-            "stream_options": {"include_usage": True}
-        })
-
-        if system_prompt:
-            messages.insert(0, {
-                "role": "system",
-                "content": system_prompt
-            })
+        api_kwargs.update(
+            {
+                "messages": messages,
+                "tools": tools,
+                "tool_choice": "auto" if tools else None,
+                "stream": True,
+                "stream_options": {"include_usage": True},
+            }
+        )
 
         if call_options.temperature is not None:
-            api_kwargs['temperature'] = call_options.temperature
+            api_kwargs["temperature"] = call_options.temperature
         if call_options.max_tokens is not None:
-            api_kwargs['max_tokens'] = call_options.max_tokens
+            api_kwargs["max_tokens"] = call_options.max_tokens
         if call_options.top_p is not None:
-            api_kwargs['top_p'] = call_options.top_p
+            api_kwargs["top_p"] = call_options.top_p
         if call_options.timeout is not None:
-            api_kwargs['timeout'] = call_options.timeout
+            api_kwargs["timeout"] = call_options.timeout
 
         if debug:
             OpenRouterDebugger.print_api_request(api_kwargs, messages, tools)
@@ -269,11 +242,7 @@ class OpenRouterClient(LLMClientBase):
         """Get OpenRouter-specific configuration object."""
         return self.openrouter_config
 
-    def _build_api_config(
-        self,
-        system_prompt: str,
-        tool_schemas: Optional[List[Any]]
-    ) -> Dict[str, Any]:
+    def _build_api_config(self, system_prompt: str, tool_schemas: Optional[List[Any]]) -> Dict[str, Any]:
         """
         Build OpenRouter-specific API configuration.
 
@@ -284,7 +253,4 @@ class OpenRouterClient(LLMClientBase):
         Returns:
             Dict with 'tools' and 'system_prompt' keys
         """
-        return {
-            'tools': tool_schemas or [],
-            'system_prompt': system_prompt
-        }
+        return {"tools": tool_schemas or [], "system_prompt": system_prompt}
