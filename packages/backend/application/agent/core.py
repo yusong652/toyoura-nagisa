@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-import uuid
 from typing import Any, Optional, cast, TYPE_CHECKING
 
 from backend.application.agent.executors import MainAgentExecutor, SubAgentExecutor
@@ -61,7 +60,7 @@ class Agent:
         self,
         config: AgentConfig,
         llm_client: LLMClientBase,
-        session_id: str | None = None,
+        session_id: str,
         enable_memory: bool | None = None,
         notification_session_id: str | None = None,
         parent_tool_call_id: str | None = None,
@@ -72,8 +71,9 @@ class Agent:
         Args:
             config: Agent configuration (main or SubAgent)
             llm_client: LLM client for API calls
-            session_id: Session ID for MainAgent (required for persistent sessions).
-                       SubAgents may omit this and use a temporary session ID.
+            session_id: Session ID (required for both MainAgent and SubAgent).
+                       MainAgent uses persistent session ID.
+                       SubAgent uses temporary session ID.
             enable_memory: Whether to enable memory persistence.
                           If None, uses config.enable_memory as default.
             notification_session_id: Session ID for WebSocket notifications and confirmations.
@@ -87,9 +87,7 @@ class Agent:
 
         # Execution mode is determined by configuration, not session_id
         self._is_main_agent = self.config.is_main_agent
-        if self._is_main_agent and session_id is None:
-            raise ValueError("MainAgent requires a session_id")
-        self.session_id: str = session_id if session_id is not None else str(uuid.uuid4())[:8]
+        self.session_id: str = session_id
 
         # notification_session_id: for SubAgent, route to parent's WebSocket
         self._notification_session_id = notification_session_id or self.session_id
@@ -171,7 +169,7 @@ class Agent:
         - MainAgent: streaming LLM calls, WebSocket notifications, persistence
         - SubAgent: non-streaming calls, activity callbacks, context-only storage
 
-        All configuration comes from self.config (tool_profile, enable_memory, etc.)
+        All configuration comes from self.config (name, enable_memory, etc.)
 
         Args:
             instruction: UserMessage object containing user input (required)
@@ -190,7 +188,7 @@ class Agent:
 
         try:
             # Configure context manager from definition and instance settings
-            self.context_manager.agent_profile = self.config.tool_profile
+            self.context_manager.agent_profile = self.config.name
             self.context_manager.enable_memory = self._enable_memory
 
             # SubAgent: Also register in primary LLM client for tool workspace resolution
@@ -202,7 +200,7 @@ class Agent:
                     # Resolve primary session LLM client
                     primary_client = get_session_llm_client(self.session_id)
                     primary_ctx = primary_client.get_or_create_context_manager(self.session_id)
-                    primary_ctx.agent_profile = self.config.tool_profile
+                    primary_ctx.agent_profile = self.config.name
                 except Exception:
                     pass  # Fallback gracefully if primary client unavailable
 
@@ -362,7 +360,6 @@ class Agent:
         # Use notification_session_id for SubAgent (MainAgent's session)
         target_session_id = self._notification_session_id if is_subagent else self.session_id
         update_runtime_state(target_session_id, "rejection_context", rejection_context)
-        print(f"[Agent] Saved rejection context for session {target_session_id}: {rejection_context}")
 
     async def _handle_stream_interruption(self, iteration: int) -> Any:
         """Handle user interruption during streaming."""

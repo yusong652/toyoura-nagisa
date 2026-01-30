@@ -44,7 +44,7 @@ class MainAgentExecutor(BaseAgentExecutor):
             agent.status_monitor.set_iteration_context(iteration, agent.config.max_iterations)
 
             tool_schemas = await agent.llm_client.tool_manager.get_function_call_schemas(
-                agent.session_id, agent.config.tool_profile
+                agent.session_id, agent.config.name
             )
             api_config = agent.llm_client._build_api_config(agent._system_prompt, tool_schemas)
 
@@ -90,7 +90,7 @@ class MainAgentExecutor(BaseAgentExecutor):
                 notification_session_id=agent._notification_session_id,
             )
             execution_result = await tool_executor.execute_all(
-                tool_calls, agent._get_message_id(), agent.config.tool_profile
+                tool_calls, agent._get_message_id(), agent.config.name
             )
 
             await tool_executor.save_results_to_context(tool_calls, execution_result.results, agent.context_manager)
@@ -138,7 +138,7 @@ class SubAgentExecutor(BaseAgentExecutor):
             agent.status_monitor.set_iteration_context(iteration, agent.config.max_iterations)
 
             tool_schemas = await agent.llm_client.tool_manager.get_function_call_schemas(
-                agent.session_id, agent.config.tool_profile
+                agent.session_id, agent.config.name
             )
             api_config = agent.llm_client._build_api_config(agent._system_prompt, tool_schemas)
 
@@ -186,7 +186,7 @@ class SubAgentExecutor(BaseAgentExecutor):
             execution_result = await tool_executor.execute_all(
                 tool_calls=tool_calls,
                 message_id=f"agent_{agent.session_id}_{iteration}",
-                agent_profile=agent.config.tool_profile,
+                agent_profile=agent.config.name,
             )
 
             if agent._parent_tool_call_id:

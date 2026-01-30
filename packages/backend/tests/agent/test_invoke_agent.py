@@ -82,6 +82,9 @@ class TestInvokeAgentExecution:
                 "backend.infrastructure.storage.llm_config_manager.get_default_llm_config"
             ) as mock_get_default_config,
             patch("backend.infrastructure.storage.session_manager.get_session_llm_config") as mock_get_session_config,
+            patch("backend.infrastructure.storage.session_manager.create_new_history") as mock_create_history,
+            patch("backend.infrastructure.storage.session_manager.update_session_llm_config") as mock_update_config,
+            patch("backend.infrastructure.storage.session_manager.delete_session_data") as mock_delete_data,
         ):
             mock_service = MagicMock()
             mock_service.run_subagent = AsyncMock(return_value=mock_agent_result)
@@ -97,6 +100,7 @@ class TestInvokeAgentExecution:
             # Force use of get_secondary_llm_client by returning empty configs
             mock_get_default_config.return_value = {}
             mock_get_session_config.return_value = {}
+            mock_create_history.return_value = "temp_session_id"
 
             result = await invoke_agent(
                 context=mock_context,
@@ -127,6 +131,9 @@ class TestInvokeAgentExecution:
                 "backend.infrastructure.storage.llm_config_manager.get_default_llm_config"
             ) as mock_get_default_config,
             patch("backend.infrastructure.storage.session_manager.get_session_llm_config") as mock_get_session_config,
+            patch("backend.infrastructure.storage.session_manager.create_new_history") as mock_create_history,
+            patch("backend.infrastructure.storage.session_manager.update_session_llm_config") as mock_update_config,
+            patch("backend.infrastructure.storage.session_manager.delete_session_data") as mock_delete_data,
         ):
             mock_service = MagicMock()
             mock_service.run_subagent = AsyncMock(return_value=mock_agent_result)
@@ -136,6 +143,7 @@ class TestInvokeAgentExecution:
             # Force use of get_secondary_llm_client by returning empty configs
             mock_get_default_config.return_value = {}
             mock_get_session_config.return_value = {}
+            mock_create_history.return_value = "temp_session_id"
 
             result = await invoke_agent(
                 context=mock_context, description="Complex query", prompt="Complex query", subagent_type="pfc_explorer"
@@ -190,6 +198,9 @@ class TestActivityTracking:
                 "backend.infrastructure.storage.llm_config_manager.get_default_llm_config"
             ) as mock_get_default_config,
             patch("backend.infrastructure.storage.session_manager.get_session_llm_config") as mock_get_session_config,
+            patch("backend.infrastructure.storage.session_manager.create_new_history") as mock_create_history,
+            patch("backend.infrastructure.storage.session_manager.update_session_llm_config") as mock_update_config,
+            patch("backend.infrastructure.storage.session_manager.delete_session_data") as mock_delete_data,
         ):
             mock_service = MagicMock()
             mock_service.run_subagent = mock_run_subagent
@@ -199,6 +210,7 @@ class TestActivityTracking:
             # Force use of get_secondary_llm_client by returning empty configs
             mock_get_default_config.return_value = {}
             mock_get_session_config.return_value = {}
+            mock_create_history.return_value = "temp_session_id"
 
             result = await invoke_agent(
                 context=mock_context, description="Test query", prompt="Test query", subagent_type="pfc_explorer"

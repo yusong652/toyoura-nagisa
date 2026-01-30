@@ -127,6 +127,7 @@ class AgentService:
         self,
         config: AgentConfig,
         instruction: str,
+        session_id: str,
         context: str | None = None,
         notification_session_id: str | None = None,
         parent_tool_call_id: str | None = None,
@@ -140,6 +141,8 @@ class AgentService:
         Args:
             config: AgentConfig for the SubAgent
             instruction: Task instruction to execute (string)
+            session_id: Explicit session ID to use for the SubAgent.
+                       Required to ensure consistent configuration lookup (e.g. for web_search).
             context: Optional additional context to prepend
             notification_session_id: Session ID for WebSocket notifications.
                                     If provided, confirmation requests will be routed
@@ -166,6 +169,7 @@ class AgentService:
             llm_client=self._llm_client,
             notification_session_id=notification_session_id,
             parent_tool_call_id=parent_tool_call_id,
+            session_id=session_id,
         )
         return await agent.execute(instruction=user_message)
 

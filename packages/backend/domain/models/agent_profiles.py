@@ -50,11 +50,6 @@ class AgentConfig:
             raise ValueError("SubAgent config must not include invoke_agent")
 
     @property
-    def tool_profile(self) -> str:
-        """Tool profile name (same as name for AgentConfig)."""
-        return self.name
-
-    @property
     def tool_count(self) -> int:
         return len(self.tools)
 

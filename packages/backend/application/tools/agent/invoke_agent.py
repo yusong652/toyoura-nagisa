@@ -77,7 +77,12 @@ async def invoke_agent(
         from backend.application.agent.service import AgentService
         from backend.shared.utils.app_context import get_secondary_llm_client, get_llm_factory
         from backend.infrastructure.storage.llm_config_manager import get_default_llm_config
-        from backend.infrastructure.storage.session_manager import get_session_llm_config
+        from backend.infrastructure.storage.session_manager import (
+            get_session_llm_config,
+            create_new_history,
+            update_session_llm_config,
+            delete_session_data,
+        )
 
         # Get SubAgent configuration
         config = get_subagent_config(subagent_type)
@@ -131,6 +136,12 @@ async def invoke_agent(
             )
         else:
             llm_client = get_secondary_llm_client()
+            # If falling back to default secondary client, try to infer provider/model for session config
+            if hasattr(llm_client, "provider"):
+                provider = llm_client.provider
+            if hasattr(llm_client, "model"):
+                secondary_model = llm_client.model
+
         agent_service = AgentService(llm_client)
 
         # Get tool_call_id from request_context.meta (passed by tool_manager)
@@ -140,12 +151,24 @@ async def invoke_agent(
         if req_ctx and hasattr(req_ctx, "meta") and req_ctx.meta:
             parent_tool_call_id = getattr(req_ctx.meta, "tool_call_id", "") or ""
 
-        result = await agent_service.run_subagent(
-            config=config,
-            instruction=prompt,
-            notification_session_id=session_id_value,  # Route confirmations to MainAgent's WebSocket
-            parent_tool_call_id=parent_tool_call_id,  # For frontend to associate SubAgent tools
-        )
+        # Create temporary session for SubAgent to ensure valid LLM config for tools (e.g. web_search)
+        subagent_session_id = create_new_history(name=f"SubAgent-{subagent_type}")
+        try:
+            # Register the LLM config for this temporary session
+            # This ensures get_session_llm_client(subagent_session_id) works correctly
+            if provider and secondary_model:
+                update_session_llm_config(subagent_session_id, provider, secondary_model)
+
+            result = await agent_service.run_subagent(
+                config=config,
+                instruction=prompt,
+                notification_session_id=session_id_value,  # Route confirmations to MainAgent's WebSocket
+                parent_tool_call_id=parent_tool_call_id,  # For frontend to associate SubAgent tools
+                session_id=subagent_session_id,  # Use explicitly created session with registered config
+            )
+        finally:
+            # Clean up temporary session
+            delete_session_data(subagent_session_id)
 
         # Format result based on execution status (domain-level status)
         if result.status == "success":

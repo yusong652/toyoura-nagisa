@@ -16,7 +16,7 @@ def test_get_agent_config_returns_main_agent():
 
 def test_agent_config_properties():
     config = get_agent_config()
-    assert config.tool_profile == "pfc_expert"
+    assert config.name == "pfc_expert"
     assert config.tool_count == len(config.tools)
     assert config.estimated_tokens == len(config.tools) * 282
 
