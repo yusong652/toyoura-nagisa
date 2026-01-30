@@ -153,7 +153,10 @@ def _build_agent_config(
 
     display_name = _require_str(data, "display_name", context)
     description = _require_str(data, "description", context)
-    tools = tuple(_require_str_list(data, "tools", context, allow_empty=False))
+    if "tools" in data and data["tools"] is not None:
+        tools = tuple(_require_str_list(data, "tools", context, allow_empty=True))
+    else:
+        tools = ()
     max_iterations = _require_int(data, "max_iterations", context)
     streaming_enabled = _require_bool(data, "streaming_enabled", context)
     enable_memory = _require_bool(data, "enable_memory", context)
