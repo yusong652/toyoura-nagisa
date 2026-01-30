@@ -17,6 +17,7 @@ from backend.infrastructure.llm.shared.constants import (
     DEFAULT_TITLE_MAX_LENGTH,
 )
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
+from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
 
 
 def _format_conversation_context(messages: List[BaseMessage]) -> str:
@@ -46,7 +47,8 @@ async def _generate_title(llm_client: Any, latest_messages: List[BaseMessage]) -
         return None
 
     user_message = _build_title_user_message(conversation_context)
-    context_contents = llm_client.format_messages([user_message])
+    formatter_class = get_message_formatter_class(llm_client.provider_name.lower())
+    context_contents = formatter_class.format_messages([user_message])
     api_config = llm_client.build_api_config(DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT)
 
     response = await llm_client.call_api_with_context(

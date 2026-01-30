@@ -140,8 +140,8 @@ class SessionService:
             return None
         
         # Clear tool cache if LLM client provided
-        if llm_client and hasattr(llm_client, '_clear_session_context'):
-            await llm_client._clear_session_context(session_id)
+        if llm_client and hasattr(llm_client, 'cleanup_session_context'):
+            llm_client.cleanup_session_context(session_id)
         
         # Load session history
         history = load_all_message_history(session_id)
@@ -202,8 +202,8 @@ class SessionService:
             raise Exception(f"Failed to delete session data for {session_id}")
         
         # Clear tool cache if LLM client provided
-        if llm_client and hasattr(llm_client, '_clear_session_context'):
-            await llm_client._clear_session_context(session_id)
+        if llm_client and hasattr(llm_client, 'cleanup_session_context'):
+            llm_client.cleanup_session_context(session_id)
         
         # TODO: Delete related memories from vector database
         # This will be implemented when memory service is refactored

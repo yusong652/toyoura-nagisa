@@ -9,8 +9,6 @@ execution) resides in the application layer (Agent, AgentService).
 
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any, Type, AsyncGenerator
-from backend.domain.models.messages import BaseMessage
-from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
 from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
@@ -55,13 +53,6 @@ class LLMClientBase(ABC):
 
         # Session-based context manager management
         self._session_context_managers: Dict[str, BaseContextManager] = {}
-
-    def format_messages(self, messages: List[BaseMessage]) -> List[Dict[str, Any]]:
-        if not self.provider_name:
-            raise ValueError("LLM client is missing provider_name")
-
-        formatter_class = get_message_formatter_class(self.provider_name.lower())
-        return formatter_class.format_messages(messages)
 
     def extract_text(self, response: Any) -> str:
         processor = self._get_response_processor()
@@ -232,10 +223,6 @@ class LLMClientBase(ABC):
         """
         pass
 
-    async def _clear_session_context(self, session_id: str):
-        """Clear session context - shared implementation."""
-        # Clear session-specific context manager
-        self.cleanup_session_context(session_id)
 
     @abstractmethod
     def _get_context_manager_class(self) -> Type[BaseContextManager]:

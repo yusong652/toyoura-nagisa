@@ -103,31 +103,6 @@ class DummyClient(LLMClientBase):
         return DummyContextManager
 
 
-def test_format_messages_uses_provider_formatter(monkeypatch):
-    client = DummyClient()
-
-    class DummyFormatter:
-        @staticmethod
-        def format_messages(messages):
-            return [{"role": "user", "content": "ok"}]
-
-    get_formatter = Mock(return_value=DummyFormatter)
-    monkeypatch.setattr(client_module, "get_message_formatter_class", get_formatter)
-
-    result = client.format_messages([Mock()])
-
-    get_formatter.assert_called_once_with("dummy")
-    assert result == [{"role": "user", "content": "ok"}]
-
-
-def test_format_messages_requires_provider_name():
-    client = DummyClient()
-    client.provider_name = None
-
-    with pytest.raises(ValueError, match="provider_name"):
-        client.format_messages([Mock()])
-
-
 def test_extract_text_delegates_to_response_processor():
     client = DummyClient()
 

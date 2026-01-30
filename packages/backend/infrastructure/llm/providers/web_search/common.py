@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, List
 
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.infrastructure.llm.shared.constants import DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
+from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
 
 
 _DEFAULT_MAX_USES: Dict[str, int] = {
@@ -59,7 +60,8 @@ def _build_search_user_message(query: str) -> UserMessage:
 
 def build_search_context(llm_client, query: str) -> List[Dict[str, Any]]:
     messages: List[BaseMessage] = [_build_search_user_message(query)]
-    return llm_client.format_messages(messages)
+    formatter_class = get_message_formatter_class(llm_client.provider_name.lower())
+    return formatter_class.format_messages(messages)
 
 
 async def perform_search(
