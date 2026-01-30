@@ -23,7 +23,7 @@ def _ensure_backend_config_available() -> None:
     except ModuleNotFoundError:
         config_module = importlib.import_module("backend.config_example")
         sys.modules.setdefault("backend.config", config_module)
-        for name in ("cors", "llm", "pfc"):
+        for name in ("cors", "pfc"):
             sys.modules.setdefault(
                 f"backend.config.{name}",
                 importlib.import_module(f"backend.config_example.{name}"),
