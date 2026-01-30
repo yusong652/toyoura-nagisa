@@ -18,7 +18,6 @@ from backend.domain.models.messages import BaseMessage
 
 # Chat history related tools
 HISTORY_BASE_DIR = "chat/data"
-BACKUP_DIR = "chat/data/backups"
 DEFAULT_SESSION_MODE = "build"
 VALID_SESSION_MODES = {"build", "plan"}
 
@@ -117,8 +116,6 @@ def _load_sessions_metadata() -> Dict[str, Any]:
     """
     Load all sessions metadata by scanning per-session metadata files.
 
-    Scans chat/data/{session_id}/metadata.json for each session directory.
-
     Returns:
         Dict mapping session_id to metadata
     """
@@ -129,15 +126,10 @@ def _load_sessions_metadata() -> Dict[str, Any]:
 
     for entry in os.listdir(HISTORY_BASE_DIR):
         session_dir = os.path.join(HISTORY_BASE_DIR, entry)
-        if os.path.isdir(session_dir) and entry != "backups":
-            session_metadata_file = os.path.join(session_dir, "metadata.json")
-            if os.path.exists(session_metadata_file):
-                try:
-                    with open(session_metadata_file, 'r', encoding='utf-8') as f:
-                        metadata = json.load(f)
-                        all_metadata[entry] = metadata
-                except (FileNotFoundError, json.JSONDecodeError) as e:
-                    print(f"[WARNING] Failed to load metadata for session {entry}: {e}")
+        if os.path.isdir(session_dir):
+            metadata = _load_session_metadata(entry)
+            if metadata:
+                all_metadata[entry] = metadata
 
     return all_metadata
 
@@ -327,32 +319,19 @@ def update_session_llm_config(
     secondary_model: Optional[str] = None,
 ) -> bool:
     """Update session-level LLM configuration in metadata."""
-    session_metadata = _load_session_metadata(session_id)
-    if not session_metadata:
-        return False
-
-    llm_config: Dict[str, Any] = {
-        "provider": provider,
-        "model": model,
-    }
+    llm_config: Dict[str, Any] = {"provider": provider, "model": model}
     if secondary_model:
         llm_config["secondary_model"] = secondary_model
-
-    session_metadata["llm_config"] = llm_config
-    session_metadata["updated_at"] = datetime.now().isoformat()
-    _save_session_metadata(session_id, session_metadata)
-    return True
+    return update_session_metadata(session_id, {"llm_config": llm_config})
 
 
 def clear_session_llm_config(session_id: str) -> bool:
     """Clear session-level LLM configuration from metadata."""
     session_metadata = _load_session_metadata(session_id)
-    if not session_metadata:
+    if not session_metadata or "llm_config" not in session_metadata:
         return False
 
-    if "llm_config" in session_metadata:
-        del session_metadata["llm_config"]
-
+    del session_metadata["llm_config"]
     session_metadata["updated_at"] = datetime.now().isoformat()
     _save_session_metadata(session_id, session_metadata)
     return True
@@ -407,9 +386,14 @@ def save_history(session_id: str, current_history: List[Any]) -> None:
     _update_session_metadata_timestamp(session_id)
 
 
-def load_history(session_id: str) -> List[Dict[str, Any]]:
+def load_history(session_id: str, include_media: bool = False) -> List[Dict[str, Any]]:
     """
-    Load history without image and video.
+    Load message history for session.
+
+    Args:
+        session_id: Session identifier
+        include_media: If False (default), filters out image/video messages.
+                      If True, includes all message types.
 
     NOTE: This function returns RAW history from disk without any modifications.
     For LLM API calls that require tool_use/tool_result pairing, use
@@ -421,50 +405,30 @@ def load_history(session_id: str) -> List[Dict[str, Any]]:
     try:
         with open(session_file, 'r', encoding='utf-8') as f:
             history = json.load(f)
-            # After reading, filter out image and video types
-            history = [msg for msg in history if msg.get('role') not in ['image', 'video']]
-            for msg in history:
-                if 'timestamp' not in msg or not msg['timestamp']:
-                    msg['timestamp'] = datetime.now().isoformat()
-                if msg.get('role') == 'tool':
-                    if 'tool_call_id' not in msg:
-                        print(f"[WARNING] Tool message missing tool_call_id: {msg}")
-                    if 'name' not in msg:
-                        print(f"[WARNING] Tool message missing name: {msg}")
 
-            return history
+        # Filter out media messages if not included
+        if not include_media:
+            history = [msg for msg in history if msg.get('role') not in ['image', 'video']]
+
+        # Ensure timestamps and validate tool messages
+        for msg in history:
+            if not msg.get('timestamp'):
+                msg['timestamp'] = datetime.now().isoformat()
+            if msg.get('role') == 'tool':
+                if 'tool_call_id' not in msg:
+                    print(f"[WARNING] Tool message missing tool_call_id: {msg}")
+                if 'name' not in msg:
+                    print(f"[WARNING] Tool message missing name: {msg}")
+
+        return history
     except Exception as e:
         print(f"[ERROR] Failed to load history for session {session_id}: {str(e)}")
         return []
 
 
 def load_all_message_history(session_id: str) -> List[Dict[str, Any]]:
-    """
-    Load complete message history for session, including image messages.
-
-    NOTE: This function returns RAW history from disk without any modifications.
-    For LLM API calls that require tool_use/tool_result pairing, use
-    repair_interrupted_tool_calls() after loading.
-    """
-    session_file = _get_session_file(session_id)
-    if not os.path.exists(session_file):
-        return []
-    try:
-        with open(session_file, 'r', encoding='utf-8') as f:
-            history = json.load(f)
-            for msg in history:
-                if 'timestamp' not in msg or not msg['timestamp']:
-                    msg['timestamp'] = datetime.now().isoformat()
-                if msg.get('role') == 'tool':
-                    if 'tool_call_id' not in msg:
-                        print(f"[WARNING] Tool message missing tool_call_id: {msg}")
-                    if 'name' not in msg:
-                        print(f"[WARNING] Tool message missing name: {msg}")
-
-            return history
-    except Exception as e:
-        print(f"[ERROR] Failed to load all message history for session {session_id}: {str(e)}")
-        return []
+    """Load complete message history including media. Alias for load_history(include_media=True)."""
+    return load_history(session_id, include_media=True)
 
 
 def load_and_restore_history(session_id: str) -> List[BaseMessage]:
@@ -502,7 +466,7 @@ def delete_message(session_id: str, message_id: str) -> bool:
             return False  # Message to delete not found
         
         # If it's a video or image message, delete related files
-        _cleanup_message_files(session_id, message_to_delete)
+        _cleanup_message_files(message_to_delete)
         
         # Delete message
         new_history = [msg for msg in session_history if msg.get('id') != message_id]
@@ -515,53 +479,27 @@ def delete_message(session_id: str, message_id: str) -> bool:
         return False
 
 
-def _cleanup_message_files(_session_id: str, message: dict) -> None:
+def _cleanup_message_files(message: dict) -> None:
     """
     Clean up message-related files (videos, images, etc.)
 
     Args:
-        _session_id: Session ID (reserved for future use)
         message: Message object to clean up
     """
+    def _delete_file(path: Optional[str], file_type: str) -> None:
+        if not path:
+            return
+        full_path = path if os.path.isabs(path) else os.path.join(HISTORY_BASE_DIR, path)
+        if os.path.exists(full_path):
+            os.remove(full_path)
+            print(f"[DEBUG] Deleted {file_type} file: {full_path}")
+
     try:
         message_type = message.get('role', message.get('type', '')).lower()
-        
-        if message_type == 'video' and message.get('video_path'):
-            # Clean up video file
-            video_path = message.get('video_path')
-            if video_path and not os.path.isabs(video_path):
-                # If it's a relative path, build full path
-                full_path = os.path.join(HISTORY_BASE_DIR, video_path)
-            elif video_path:
-                full_path = video_path
-            else:
-                return  # No valid video path
-            
-            if os.path.exists(full_path):
-                os.remove(full_path)
-                print(f"[DEBUG] Deleted video file: {full_path}")
-            else:
-                print(f"[DEBUG] Video file not found: {full_path}")
-        
-        elif message_type == 'image' and message.get('image_path'):
-            # Clean up image file
-            image_path = message.get('image_path')
-            if image_path and not os.path.isabs(image_path):
-                # If it's a relative path, build full path
-                full_path = os.path.join(HISTORY_BASE_DIR, image_path)
-            elif image_path:
-                full_path = image_path
-            else:
-                return  # No valid image path
-            
-            if os.path.exists(full_path):
-                os.remove(full_path)
-                print(f"[DEBUG] Deleted image file: {full_path}")
-            else:
-                print(f"[DEBUG] Image file not found: {full_path}")
-        
-        # Other file type cleanup logic can be added here
-        
+        if message_type == 'video':
+            _delete_file(message.get('video_path'), 'video')
+        elif message_type == 'image':
+            _delete_file(message.get('image_path'), 'image')
     except Exception as e:
         print(f"[WARNING] Failed to cleanup files for message {message.get('id')}: {e}")
 
@@ -606,16 +544,6 @@ def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[BaseMessage, ...
 
     latest_messages.reverse()
     return tuple(latest_messages)
-
-
-def get_latest_two_messages(session_id: str) -> Tuple[BaseMessage, ...]:
-    """
-    Get latest two messages from specified session (returns message objects instead of dict)
-    Only returns user/assistant messages, filters out image/tool and other types
-    
-    Deprecated: Use get_latest_n_messages(session_id, 2) instead
-    """
-    return get_latest_n_messages(session_id, 2)
 
 
 def get_latest_user_text(session_id: str) -> Optional[str]:
@@ -898,23 +826,6 @@ def update_runtime_state(session_id: str, key: str, value: Any) -> None:
     state = load_runtime_state(session_id)
     state[key] = value
     save_runtime_state(session_id, state)
-
-
-def clear_runtime_state(session_id: str) -> None:
-    """
-    Clear runtime state for a session.
-
-    Args:
-        session_id: Session identifier
-    """
-    runtime_file = _get_runtime_state_file(session_id)
-
-    if os.path.exists(runtime_file):
-        try:
-            os.remove(runtime_file)
-            print(f"[DEBUG] Cleared runtime state for session {session_id}")
-        except Exception as e:
-            print(f"[ERROR] Failed to clear runtime state for session {session_id}: {e}")
 
 
 # ========== Token Usage Management ==========
