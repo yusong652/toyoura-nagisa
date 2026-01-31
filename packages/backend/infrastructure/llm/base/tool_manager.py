@@ -128,16 +128,15 @@ class BaseToolManager(ABC):
         Get standardized ToolSchema objects based on agent profile.
 
         Includes both internal tools and MCP tools from connected servers.
+        MCP tools are filtered based on session-specific server settings.
 
         Args:
-            session_id: Session ID (required for future session-specific tool filtering)
+            session_id: Session ID (required for session-specific MCP tool filtering)
             agent_profile: Agent profile name ("coding", "pfc", "disabled")
 
         Returns:
             Dict[str, ToolSchema]: Tool name -> ToolSchema mapping
         """
-        _ = session_id  # Reserved for future session-specific tool filtering
-
         tools_dict: Dict[str, ToolSchema] = {}
 
         # Step 1: Load internal tools
@@ -153,9 +152,10 @@ class BaseToolManager(ABC):
             if get_dev_config().debug_mode:
                 print(f"[DEBUG] Error reading tool registry: {e}")
 
-        # Step 2: Load MCP tools from connected servers
+        # Step 2: Load MCP tools from connected servers (filtered by session config)
         try:
             from backend.infrastructure.mcp.client import get_mcp_client_manager
+            from backend.infrastructure.storage.session_manager import is_mcp_server_enabled_for_session
 
             mcp_manager = get_mcp_client_manager()
             mcp_tools = mcp_manager.get_all_tools()
@@ -164,6 +164,17 @@ class BaseToolManager(ABC):
             self._mcp_tool_mapping.clear()
 
             for mcp_tool in mcp_tools.values():
+                server_name = mcp_tool.server_name
+
+                # Check if this server is enabled for this session
+                if not is_mcp_server_enabled_for_session(session_id, server_name):
+                    if get_dev_config().debug_mode:
+                        print(
+                            f"[DEBUG] MCP tool '{mcp_tool.name}' from {server_name} "
+                            f"skipped (server disabled for session)"
+                        )
+                    continue
+
                 # Convert MCPTool to ToolSchema
                 tool_schema = mcp_tool.to_tool_schema()
 
@@ -171,10 +182,10 @@ class BaseToolManager(ABC):
                 if tool_schema.name not in tools_dict:
                     tools_dict[tool_schema.name] = tool_schema
                     # Track this tool as MCP for execution routing
-                    self._mcp_tool_mapping[tool_schema.name] = mcp_tool.server_name
+                    self._mcp_tool_mapping[tool_schema.name] = server_name
                 elif get_dev_config().debug_mode:
                     print(
-                        f"[DEBUG] MCP tool '{tool_schema.name}' from {mcp_tool.server_name} "
+                        f"[DEBUG] MCP tool '{tool_schema.name}' from {server_name} "
                         f"skipped (internal tool exists)"
                     )
 

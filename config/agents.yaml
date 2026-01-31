@@ -28,7 +28,7 @@ main_agent:
     - trigger_skill
   max_iterations: 64
   streaming_enabled: true
-  enable_memory: true
+  enable_memory: false
   color: "#9C27B0"
   icon: "⚛️"
   skills:

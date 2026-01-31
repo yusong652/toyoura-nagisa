@@ -23,6 +23,7 @@ from backend.presentation.api import (
     content,
     file_search,
     llm_config,
+    mcp_config,
     messages,
     pfc_console,
     sessions,
@@ -131,6 +132,7 @@ app.include_router(todos.router)
 app.include_router(shell.router)
 app.include_router(pfc_console.router)
 app.include_router(llm_config.router)
+app.include_router(mcp_config.router)
 
 # Register WebSocket routes (cannot use include_router for WebSocket)
 register_websocket_routes(app)
