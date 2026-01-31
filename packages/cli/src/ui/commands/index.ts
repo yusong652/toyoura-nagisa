@@ -24,3 +24,6 @@ export { pfcResetCommand } from './pfcResetCommand.js';
 
 // PFC tasks command for listing simulation tasks
 export { pfcTasksCommand } from './pfcTasksCommand.js';
+
+// MCP servers command for managing MCP server configurations
+export { mcpsCommand } from './mcpsCommand.js';

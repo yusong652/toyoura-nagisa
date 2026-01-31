@@ -22,7 +22,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MCPServerConfig:
-    """Configuration for an MCP server."""
+    """Configuration for an MCP server.
+
+    Attributes:
+        name: Unique identifier for the server
+        command: Command to launch the server (e.g., "npx", "uvx", "python")
+        args: List of arguments for the command
+        env: Optional environment variables
+        enabled: Default session-level setting for new sessions.
+                 If True, tools from this server are available by default.
+                 If False, users must enable via /mcps command.
+                 Note: Server is always connected regardless of this flag.
+        description: Human-readable description
+    """
 
     name: str
     command: str
@@ -257,16 +269,16 @@ class MCPClientManager:
         """
         Add and connect to an MCP server.
 
+        All configured servers are connected regardless of 'enabled' flag.
+        The 'enabled' flag only controls the default session-level setting
+        (whether tools from this server are available by default for new sessions).
+
         Args:
             config: Server configuration
 
         Returns:
             True if server added and connected successfully
         """
-        if not config.enabled:
-            logger.info(f"[{config.name}] Server disabled, skipping")
-            return False
-
         if config.name in self._clients:
             logger.warning(f"[{config.name}] Server already registered")
             return True

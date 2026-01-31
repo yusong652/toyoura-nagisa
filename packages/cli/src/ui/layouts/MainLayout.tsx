@@ -65,6 +65,8 @@ type ActiveDialog =
   | 'models_provider'
   | 'models_primary'
   | 'models_secondary'
+  | 'mcp_servers'
+  | 'mcp_server_detail'
   | null;
 
 // Session action type
@@ -91,6 +93,14 @@ interface SessionLlmConfig {
   secondary_model?: string | null;
 }
 
+interface McpServerStatus {
+  name: string;
+  description: string;
+  enabled: boolean;
+  connected: boolean;
+  tools: string[];
+}
+
 // Memory options for SelectDialog
 const MEMORY_OPTIONS: SelectOption<boolean>[] = [
   { key: 'on', value: true, label: 'On', description: 'AI can recall previous conversations' },
@@ -112,9 +122,9 @@ const THEME_OPTIONS: SelectOption<ThemeName>[] = Object.entries(themes).map(([ke
   description: def.description,
 }));
 
-// PFC reset confirmation options
+// PFC reset confirmation options (equal-length labels to prevent description jumping)
 const PFC_RESET_OPTIONS: SelectOption<boolean>[] = [
-  { key: 'cancel', value: false, label: 'Cancel', description: 'Abort reset operation' },
+  { key: 'cancel', value: false, label: 'Cancel Reset', description: 'Abort reset operation' },
   { key: 'confirm', value: true, label: 'Confirm Reset', description: 'Delete all PFC history (cannot be undone)' },
 ];
 
@@ -220,6 +230,12 @@ export const MainLayout: React.FC = () => {
   const [selectedPrimaryModelId, setSelectedPrimaryModelId] = useState<string | null>(null);
   const [currentLlmConfig, setCurrentLlmConfig] = useState<SessionLlmConfig | null>(null);
 
+  // MCP servers state
+  const [mcpServers, setMcpServers] = useState<McpServerStatus[]>([]);
+  const [isMcpServersLoading, setIsMcpServersLoading] = useState(false);
+  const [mcpServersError, setMcpServersError] = useState<string | null>(null);
+  const [selectedMcpServerName, setSelectedMcpServerName] = useState<string | null>(null);
+
   const loadLlmProviders = useCallback(async (sessionId: string) => {
     setIsLlmProvidersLoading(true);
     setLlmProvidersError(null);
@@ -243,6 +259,148 @@ export const MainLayout: React.FC = () => {
     } finally {
       setIsLlmProvidersLoading(false);
     }
+  }, []);
+
+  // Load MCP servers for the current session
+  const loadMcpServers = useCallback(async (sessionId: string) => {
+    setIsMcpServersLoading(true);
+    setMcpServersError(null);
+    try {
+      const response = await apiClient.get<{ servers: McpServerStatus[] }>(
+        `/api/mcp-config?session_id=${sessionId}`
+      );
+      setMcpServers(response.servers ?? []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load MCP servers';
+      setMcpServersError(message);
+      setMcpServers([]);
+    } finally {
+      setIsMcpServersLoading(false);
+    }
+  }, []);
+
+  // MCP server options for SelectDialog (first-level menu)
+  const mcpServerOptions = useMemo<SelectOption<string>[]>(() => {
+    if (mcpServersError) {
+      return [
+        {
+          key: 'error',
+          value: 'error',
+          label: `Error: ${mcpServersError}`,
+          description: 'Press Enter to retry',
+        },
+      ];
+    }
+
+    return mcpServers.map((server) => {
+      const statusIcon = server.enabled ? '[ON]' : '[OFF]';
+      const connectedIcon = server.connected ? '' : ' (disconnected)';
+      const toolCount = server.tools.length > 0 ? ` | ${server.tools.length} tools` : '';
+
+      return {
+        key: server.name,
+        value: server.name,
+        label: `${statusIcon} ${server.name}${connectedIcon}${toolCount}`,
+        description: server.description || undefined,
+      };
+    });
+  }, [mcpServers, mcpServersError]);
+
+  // Get the selected MCP server details
+  const selectedMcpServer = useMemo(() => {
+    if (!selectedMcpServerName) return null;
+    return mcpServers.find((s) => s.name === selectedMcpServerName) ?? null;
+  }, [mcpServers, selectedMcpServerName]);
+
+  // MCP server detail options (second-level menu)
+  const mcpServerDetailOptions = useMemo<SelectOption<string>[]>(() => {
+    if (!selectedMcpServer) return [];
+
+    const currentState = selectedMcpServer.enabled ? 'ON' : 'OFF';
+    const nextState = selectedMcpServer.enabled ? 'OFF' : 'ON';
+
+    return [
+      {
+        key: 'toggle',
+        value: 'toggle',
+        label: 'Toggle Server',
+        description: `Switch to ${nextState}`,
+      },
+      { key: 'back', value: 'back', label: 'Back to list', description: 'Return to server list' },
+    ];
+  }, [selectedMcpServer]);
+
+  // Build description for MCP server detail dialog
+  const mcpServerDetailDescription = useMemo(() => {
+    if (!selectedMcpServer) return '';
+
+    const lines: string[] = [];
+    lines.push(`Status: ${selectedMcpServer.enabled ? 'Enabled' : 'Disabled'}`);
+    if (selectedMcpServer.description) {
+      lines.push(`\nDescription: ${selectedMcpServer.description}`);
+    }
+    if (selectedMcpServer.tools.length > 0) {
+      lines.push(`\nTools (${selectedMcpServer.tools.length}):`);
+      selectedMcpServer.tools.forEach((tool) => {
+        lines.push(`  - ${tool}`);
+      });
+    } else {
+      lines.push('\nNo tools available');
+    }
+
+    return lines.join('\n');
+  }, [selectedMcpServer]);
+
+  // Handle MCP server selection (open detail dialog)
+  const handleMcpServerSelect = useCallback((serverName: string) => {
+    if (serverName === 'error') {
+      // Retry loading
+      if (appState.currentSessionId) {
+        loadMcpServers(appState.currentSessionId);
+      }
+      return;
+    }
+
+    setSelectedMcpServerName(serverName);
+    setActiveDialog('mcp_server_detail');
+  }, [appState.currentSessionId, loadMcpServers]);
+
+  // Handle MCP server detail action
+  const handleMcpServerDetailSelect = useCallback(async (action: string) => {
+    if (action === 'back') {
+      setActiveDialog('mcp_servers');
+      return;
+    }
+
+    if (action === 'toggle' && selectedMcpServer && appState.currentSessionId) {
+      const newEnabled = !selectedMcpServer.enabled;
+
+      try {
+        await apiClient.post(`/api/mcp-config?session_id=${appState.currentSessionId}`, {
+          server_name: selectedMcpServer.name,
+          enabled: newEnabled,
+        });
+
+        // Update local state
+        setMcpServers((prev) =>
+          prev.map((s) => (s.name === selectedMcpServer.name ? { ...s, enabled: newEnabled } : s))
+        );
+
+        appActions.showNotification(
+          `MCP server '${selectedMcpServer.name}' ${newEnabled ? 'enabled' : 'disabled'}`,
+          'success'
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to update MCP server';
+        appActions.showNotification(message, 'error');
+      }
+      // Stay on detail page so user can see the updated status
+    }
+  }, [appActions, appState.currentSessionId, selectedMcpServer]);
+
+  // Handle MCP server detail cancel (back to server list)
+  const handleMcpServerDetailCancel = useCallback(() => {
+    setActiveDialog('mcp_servers');
   }, []);
 
   const activeProviderId = selectedProviderId ?? currentLlmConfig?.provider ?? null;
@@ -353,6 +511,21 @@ export const MainLayout: React.FC = () => {
     setSelectedPrimaryModelId(null);
     void loadLlmProviders(appState.currentSessionId);
   }, [activeDialog, appState.currentSessionId, loadLlmProviders]);
+
+  // Load MCP servers when dialog opens
+  useEffect(() => {
+    if (activeDialog !== 'mcp_servers') {
+      return;
+    }
+
+    if (!appState.currentSessionId) {
+      setMcpServersError('No active session. Create or restore a session first.');
+      setIsMcpServersLoading(false);
+      return;
+    }
+
+    void loadMcpServers(appState.currentSessionId);
+  }, [activeDialog, appState.currentSessionId, loadMcpServers]);
 
   // Track session ID to detect session changes
   const previousSessionIdRef = useRef(appState.currentSessionId);
@@ -919,6 +1092,8 @@ export const MainLayout: React.FC = () => {
           loadPfcTasks();
         } else if (result.dialog === 'models_provider') {
           setActiveDialog('models_provider');
+        } else if (result.dialog === 'mcp_servers') {
+          setActiveDialog('mcp_servers');
         }
         break;
 
@@ -1188,6 +1363,36 @@ export const MainLayout: React.FC = () => {
             emptyMessage="No models available for this provider."
             showNumbers={true}
             showDescriptions={true}
+            maxItemsToShow={10}
+          />
+        )}
+
+        {/* MCP servers management dialog (first-level) */}
+        {activeDialog === 'mcp_servers' && (
+          <SelectDialog
+            title="MCP Servers"
+            description="Select a server to view details:"
+            options={mcpServerOptions}
+            onSelect={handleMcpServerSelect}
+            onCancel={handleDialogCancel}
+            isLoading={isMcpServersLoading}
+            loadingMessage="Loading MCP servers..."
+            emptyMessage={mcpServersError || 'No MCP servers configured.'}
+            showNumbers={true}
+            showDescriptions={true}
+            maxItemsToShow={10}
+          />
+        )}
+
+        {/* MCP server detail dialog (second-level) */}
+        {activeDialog === 'mcp_server_detail' && selectedMcpServer && (
+          <SelectDialog
+            title={`MCP: ${selectedMcpServer.name}`}
+            description={mcpServerDetailDescription}
+            options={mcpServerDetailOptions}
+            onSelect={handleMcpServerDetailSelect}
+            onCancel={handleMcpServerDetailCancel}
+            showNumbers={true}
             maxItemsToShow={10}
           />
         )}

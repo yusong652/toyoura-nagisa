@@ -197,6 +197,11 @@ def create_new_history(name: Optional[str] = None) -> str:
     if default_llm_config:
         session_metadata["llm_config"] = cast(Any, default_llm_config)
 
+    # Initialize MCP config from global defaults
+    mcp_config = build_initial_mcp_config()
+    if mcp_config.get("servers"):
+        session_metadata["mcp_config"] = mcp_config
+
     # Create session directory
     session_dir = _get_session_dir(session_id)
     os.makedirs(session_dir, exist_ok=True)
@@ -908,3 +913,109 @@ def update_session_thinking_level(session_id: str, thinking_level: str) -> bool:
         raise ValueError(f"Invalid thinking level: {thinking_level}. Must be one of {VALID_THINKING_LEVELS}")
 
     return update_session_metadata(session_id, {"thinking_level": thinking_level})
+
+
+# ========== MCP Configuration Management ==========
+
+
+def build_initial_mcp_config() -> Dict[str, Any]:
+    """
+    Build initial MCP configuration from global defaults.
+
+    Reads mcp_servers.yaml and creates a session-level config dictionary
+    with each server's default enabled state.
+
+    Returns:
+        Dict with structure: {"servers": {"server_name": {"enabled": bool}, ...}}
+    """
+    try:
+        from backend.infrastructure.mcp.client import load_mcp_configs_from_yaml
+
+        configs = load_mcp_configs_from_yaml()
+        return {"servers": {c.name: {"enabled": c.enabled} for c in configs}}
+    except Exception as e:
+        print(f"[WARNING] Failed to build initial MCP config: {e}")
+        return {"servers": {}}
+
+
+def get_session_mcp_config(session_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get session-level MCP configuration from metadata.
+
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        MCP config dict or None if not found
+    """
+    session_metadata = get_session_metadata(session_id)
+    if not session_metadata:
+        return None
+    return session_metadata.get("mcp_config")
+
+
+def update_session_mcp_config(session_id: str, mcp_config: Dict[str, Any]) -> bool:
+    """
+    Update full MCP configuration in session metadata.
+
+    Args:
+        session_id: Session identifier
+        mcp_config: Full MCP config dict
+
+    Returns:
+        Whether update was successful
+    """
+    return update_session_metadata(session_id, {"mcp_config": mcp_config})
+
+
+def update_session_mcp_server(session_id: str, server_name: str, enabled: bool) -> bool:
+    """
+    Update a single MCP server's enabled state for a session.
+
+    Args:
+        session_id: Session identifier
+        server_name: Name of the MCP server
+        enabled: Whether to enable this server for the session
+
+    Returns:
+        Whether update was successful
+    """
+    mcp_config = get_session_mcp_config(session_id) or {"servers": {}}
+    if "servers" not in mcp_config:
+        mcp_config["servers"] = {}
+    mcp_config["servers"][server_name] = {"enabled": enabled}
+    return update_session_mcp_config(session_id, mcp_config)
+
+
+def is_mcp_server_enabled_for_session(session_id: str, server_name: str) -> bool:
+    """
+    Check if an MCP server is enabled for a specific session.
+
+    Priority:
+    1. Session-specific override in mcp_config
+    2. Global default from mcp_servers.yaml
+
+    Args:
+        session_id: Session identifier
+        server_name: Name of the MCP server to check
+
+    Returns:
+        Whether the server is enabled for this session
+    """
+    mcp_config = get_session_mcp_config(session_id)
+    if mcp_config and "servers" in mcp_config:
+        server_cfg = mcp_config["servers"].get(server_name)
+        if server_cfg is not None:
+            return server_cfg.get("enabled", False)
+
+    # Fallback to global default from yaml config
+    try:
+        from backend.infrastructure.mcp.client import load_mcp_configs_from_yaml
+
+        for config in load_mcp_configs_from_yaml():
+            if config.name == server_name:
+                return config.enabled
+    except Exception as e:
+        print(f"[WARNING] Failed to load MCP configs for fallback check: {e}")
+
+    return False
