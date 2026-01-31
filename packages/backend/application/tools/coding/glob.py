@@ -13,12 +13,6 @@ from backend.application.tools.registrar import ToolRegistrar
 from backend.application.tools.context import ToolContext
 # from fastmcp.server.context import Context  # type: ignore
 
-from .utils.path_security import (
-    validate_path_in_workspace,
-    get_workspace_root_async,
-    is_safe_symlink,
-    check_parent_symlinks
-)
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
@@ -99,28 +93,25 @@ async def glob(
 
     # pattern is pre-validated by Pydantic (min_length=1)
 
-    # Get workspace root dynamically based on current session
-    workspace_root = await get_workspace_root_async(context)
-
-    # Determine search directory
+    # Determine search directory (no workspace restriction for read operations)
     if path:
         # Normalize path separators for cross-platform compatibility
         original_path_for_display = path_to_llm_format(path.strip())
         path = normalize_path_separators(path.strip())
 
-        # Validate provided path against dynamic workspace
-        search_path = validate_path_in_workspace(path, workspace_root)
-        if search_path is None:
-            return error_response(f"Path is outside workspace: {original_path_for_display}")
+        # Resolve path to absolute
+        search_dir = Path(path).expanduser()
+        if not search_dir.is_absolute():
+            search_dir = Path.cwd() / search_dir
+        search_dir = search_dir.resolve()
 
-        search_dir = Path(search_path)
         if not search_dir.exists():
             return error_response(f"Directory does not exist: {original_path_for_display}")
         if not search_dir.is_dir():
             return error_response(f"Path is not a directory: {original_path_for_display}")
     else:
-        # Default to dynamic workspace root
-        search_dir = workspace_root
+        # Default to current working directory
+        search_dir = Path.cwd()
 
     try:
         # Expand brace patterns {a,b,c}
@@ -141,19 +132,8 @@ async def glob(
             for match in matches:
                 file_path = (search_dir / match).resolve()
 
-                # Security check: ensure path is within workspace
-                try:
-                    file_path.relative_to(workspace_root.resolve())
-                except ValueError:
-                    continue  # Skip files outside workspace
-
-                # Symlink safety checks
-                if file_path.is_symlink() and not is_safe_symlink(file_path, workspace_root):
-                    continue
-
-                if not check_parent_symlinks(file_path, workspace_root):
-                    continue
-
+                # No workspace restriction for read operations
+                # Symlinks are followed normally
                 all_matches.add(file_path)
 
                 # Apply limit early to avoid processing too many files

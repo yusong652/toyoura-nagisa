@@ -19,12 +19,6 @@ from backend.application.tools.context import ToolContext
 
 logger = logging.getLogger(__name__)
 
-from .utils.path_security import (
-    validate_path_in_workspace,
-    get_workspace_root_async,
-    is_safe_symlink,
-    check_parent_symlinks
-)
 from .utils.file_reader import (
     read_file_safely,
     MAX_FILE_SIZE_BYTES,
@@ -96,13 +90,12 @@ Usage:
     original_path_for_display = path_to_llm_format(path.strip())
     path = normalize_path_separators(path.strip())
 
-    # Get workspace root dynamically based on current session
-    workspace_root = await get_workspace_root_async(context)
-
-    # Validate file path against dynamic workspace
-    abs_file_path = validate_path_in_workspace(path, workspace_root)
-    if abs_file_path is None:
-        return error_response(f"File path is outside workspace: {original_path_for_display}")
+    # Resolve path to absolute (no workspace restriction for read operations)
+    file_path_obj = Path(path).expanduser()
+    if not file_path_obj.is_absolute():
+        # Relative paths resolved against current working directory
+        file_path_obj = Path.cwd() / file_path_obj
+    abs_file_path = str(file_path_obj.resolve())
 
     try:
         file_path = Path(abs_file_path)
@@ -123,12 +116,8 @@ Usage:
         if file_size > MAX_FILE_SIZE_BYTES:
             return error_response(f"File too large: {file_size // 1024 // 1024}MB exceeds {MAX_FILE_SIZE_BYTES // 1024 // 1024}MB limit")
         
-        # Security checks (use dynamic workspace root for consistency)
-        if file_path.is_symlink() and not is_safe_symlink(file_path, workspace_root):
-            return error_response("Cannot read unsafe symlink pointing outside workspace")
-
-        if not check_parent_symlinks(file_path, workspace_root):
-            return error_response("Cannot read file with unsafe parent symlinks")
+        # Note: No workspace restriction for read operations
+        # Symlinks are followed normally - user can read any accessible file
 
         # ------------------------------------------------------------------
         # File reading and analysis

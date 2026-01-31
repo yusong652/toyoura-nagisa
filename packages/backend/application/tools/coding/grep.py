@@ -9,12 +9,6 @@ from backend.application.tools.registrar import ToolRegistrar
 from backend.application.tools.context import ToolContext
 # from fastmcp.server.context import Context  # type: ignore
 
-from .utils.path_security import (
-    validate_path_in_workspace,
-    get_workspace_root_async,
-    is_safe_symlink,
-    check_parent_symlinks
-)
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
@@ -303,23 +297,22 @@ async def grep(
     except re.error as e:
         return error_response(f"Invalid regex pattern: {e}")
 
-    # Get workspace root dynamically
-    workspace_root = await get_workspace_root_async(context)
-
-    # Determine search path
+    # Determine search path (no workspace restriction for read operations)
     if path:
         original_path_for_display = path_to_llm_format(path.strip())
         path = normalize_path_separators(path.strip())
 
-        search_path_abs = validate_path_in_workspace(path, workspace_root)
-        if search_path_abs is None:
-            return error_response(f"Path is outside workspace: {original_path_for_display}")
+        # Resolve path to absolute
+        search_path = Path(path).expanduser()
+        if not search_path.is_absolute():
+            search_path = Path.cwd() / search_path
+        search_path = search_path.resolve()
 
-        search_path = Path(search_path_abs)
         if not search_path.exists():
             return error_response(f"Path does not exist: {original_path_for_display}")
     else:
-        search_path = workspace_root
+        # Default to current working directory
+        search_path = Path.cwd()
 
     # Process context arguments
     ctx_before = context_both if context_both else (context_before or 0)
@@ -346,17 +339,8 @@ async def grep(
             if not file_path.is_file():
                 continue
 
-            # Security checks
-            try:
-                file_path.relative_to(workspace_root.resolve())
-            except ValueError:
-                continue
-
-            if file_path.is_symlink() and not is_safe_symlink(file_path, workspace_root):
-                continue
-
-            if not check_parent_symlinks(file_path, workspace_root):
-                continue
+            # No workspace restriction for read operations
+            # Symlinks are followed normally
 
             # Skip binary/large files
             if _should_skip_file(file_path):
