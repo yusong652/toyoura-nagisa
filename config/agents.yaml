@@ -32,8 +32,10 @@ main_agent:
   color: "#9C27B0"
   icon: "⚛️"
   skills:
-    - pfc-package-management
-    - pfc-server-setup
+    - name: pfc-package-management
+      enabled: true
+    - name: pfc-server-setup
+      enabled: true
 
 subagents:
   pfc_explorer:
@@ -60,7 +62,7 @@ subagents:
     enable_memory: false
     color: "#9E9E9E"
     icon: "🤖"
-    skills: []
+    skills: []  # SubAgents currently have no skills
 
   pfc_diagnostic:
     name: pfc_diagnostic
@@ -81,4 +83,4 @@ subagents:
     enable_memory: false
     color: "#9E9E9E"
     icon: "🤖"
-    skills: []
+    skills: []  # SubAgents currently have no skills

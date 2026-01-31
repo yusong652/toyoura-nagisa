@@ -42,4 +42,6 @@ def test_get_subagent_config_returns_expected_tools():
 def test_get_skills_for_agent():
     assert get_skills_for_agent("pfc_explorer") == []
     assert get_skills_for_agent("pfc_diagnostic") == []
-    assert get_skills_for_agent("pfc_expert") == list(MAIN_AGENT_CONFIG.skills)
+    # get_skills_for_agent returns skill names (strings), not SkillConfig objects
+    expected_names = [s.name for s in MAIN_AGENT_CONFIG.skills]
+    assert get_skills_for_agent("pfc_expert") == expected_names

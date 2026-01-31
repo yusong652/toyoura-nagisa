@@ -17,6 +17,20 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class SkillConfig:
+    """
+    Skill configuration with enabled state.
+
+    Attributes:
+        name: Unique identifier for the skill (e.g., 'pfc-package-management')
+        enabled: Default enabled state for new sessions. Users can toggle per-session.
+    """
+
+    name: str
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
 class AgentConfig:
     """
     Unified agent configuration for both main agent and SubAgents.
@@ -43,7 +57,8 @@ class AgentConfig:
     icon: str = "🤖"
 
     # Skills configuration (on-demand workflow instructions)
-    skills: tuple = ()
+    # Each skill has a name and default enabled state
+    skills: tuple = ()  # tuple[SkillConfig, ...]
 
     def __post_init__(self) -> None:
         if not self.is_main_agent and "invoke_agent" in self.tools:
@@ -139,6 +154,44 @@ def _require_str_list(data: dict[str, Any], key: str, context: str, allow_empty:
     return items
 
 
+def _parse_skills_config(data: dict[str, Any], key: str, context: str) -> List[SkillConfig]:
+    """
+    Parse skills configuration from YAML.
+
+    Format: [{name: "skill-name", enabled: true}, ...]
+
+    Args:
+        data: Parent dict containing the skills key
+        key: The key name (usually "skills")
+        context: Context string for error messages
+
+    Returns:
+        List of SkillConfig objects
+    """
+    if key not in data:
+        raise ValueError(f"Missing {context}.{key} in agent config")
+
+    value = data.get(key)
+    if not isinstance(value, list):
+        raise ValueError(f"Invalid {context}.{key}: expected list")
+
+    skills: List[SkillConfig] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f"Invalid {context}.{key}[{index}]: expected mapping with 'name' and 'enabled' fields")
+        if "name" not in item:
+            raise ValueError(f"Invalid {context}.{key}[{index}]: missing 'name' field")
+        name = item["name"]
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"Invalid {context}.{key}[{index}].name: expected non-empty string")
+        enabled = item.get("enabled", True)
+        if not isinstance(enabled, bool):
+            raise ValueError(f"Invalid {context}.{key}[{index}].enabled: expected boolean")
+        skills.append(SkillConfig(name=name.strip(), enabled=enabled))
+
+    return skills
+
+
 def _build_agent_config(
     data: dict[str, Any], *, context: str, is_main_agent: bool, default_name: str | None = None
 ) -> AgentConfig:
@@ -162,7 +215,7 @@ def _build_agent_config(
     enable_memory = _require_bool(data, "enable_memory", context)
     color = _require_str(data, "color", context)
     icon = _require_str(data, "icon", context)
-    skills = tuple(_require_str_list(data, "skills", context, allow_empty=True))
+    skills = tuple(_parse_skills_config(data, "skills", context))
 
     return AgentConfig(
         name=name,
@@ -245,13 +298,33 @@ def get_tools_for_agent(agent_name: str) -> List[str]:
 
 def get_skills_for_agent(agent_name: str) -> List[str]:
     """
-    Get available skills for an agent.
+    Get available skill names for an agent.
+
+    NOTE: This returns only skill names for backward compatibility.
+    Use get_skill_configs_for_agent() for full SkillConfig objects.
 
     Args:
         agent_name: Main agent name or SubAgent name
 
     Returns:
         List of skill names available for the agent
+    """
+    if agent_name in SUBAGENT_CONFIGS:
+        return [s.name for s in SUBAGENT_CONFIGS[agent_name].skills]
+    if agent_name == MAIN_AGENT_CONFIG.name:
+        return [s.name for s in MAIN_AGENT_CONFIG.skills]
+    raise KeyError(f"Unknown agent name: {agent_name}")
+
+
+def get_skill_configs_for_agent(agent_name: str) -> List[SkillConfig]:
+    """
+    Get full skill configurations for an agent.
+
+    Args:
+        agent_name: Main agent name or SubAgent name
+
+    Returns:
+        List of SkillConfig objects for the agent
     """
     if agent_name in SUBAGENT_CONFIGS:
         return list(SUBAGENT_CONFIGS[agent_name].skills)

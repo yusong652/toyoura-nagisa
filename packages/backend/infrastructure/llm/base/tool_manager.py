@@ -128,10 +128,11 @@ class BaseToolManager(ABC):
         Get standardized ToolSchema objects based on agent profile.
 
         Includes both internal tools and MCP tools from connected servers.
+        Session-specific tool overrides are applied by the registry.
         MCP tools are filtered based on session-specific server settings.
 
         Args:
-            session_id: Session ID (required for session-specific MCP tool filtering)
+            session_id: Session ID (required for session-specific tool filtering)
             agent_profile: Agent profile name ("coding", "pfc", "disabled")
 
         Returns:
@@ -139,11 +140,11 @@ class BaseToolManager(ABC):
         """
         tools_dict: Dict[str, ToolSchema] = {}
 
-        # Step 1: Load internal tools
+        # Step 1: Load internal tools (with session overrides applied by registry)
         try:
             from backend.application.tools.registry import TOOL_REGISTRY
 
-            tool_defs = TOOL_REGISTRY.get_by_agent_profile(agent_profile)
+            tool_defs = TOOL_REGISTRY.get_by_agent_profile_for_session(agent_profile, session_id)
             for tool_def in tool_defs.values():
                 tool_schema = ToolSchema.from_tool_definition(tool_def)
                 tools_dict[tool_schema.name] = tool_schema
@@ -270,7 +271,7 @@ class BaseToolManager(ABC):
         from backend.application.tools.registry import TOOL_REGISTRY
         from backend.shared.utils.tool_result import error_response
 
-        tool_def = TOOL_REGISTRY.get(tool_name)
+        tool_def = TOOL_REGISTRY.get(tool_name, session_id)
         if tool_def is None or tool_def.handler is None:
             return error_response(f"Tool not found: {tool_name}")
 

@@ -202,6 +202,11 @@ def create_new_history(name: Optional[str] = None) -> str:
     if mcp_config.get("servers"):
         session_metadata["mcp_config"] = mcp_config
 
+    # Initialize skills config from agent defaults
+    skills_config = build_initial_skills_config()
+    if skills_config.get("skills"):
+        session_metadata["skills_config"] = skills_config
+
     # Create session directory
     session_dir = _get_session_dir(session_id)
     os.makedirs(session_dir, exist_ok=True)
@@ -212,6 +217,9 @@ def create_new_history(name: Optional[str] = None) -> str:
     # Create empty chat history file
     session_file = _get_session_file(session_id)
     _atomic_json_write(session_file, [])
+
+    # Register session-specific trigger_skill with initial skills config
+    _refresh_session_trigger_skill(session_id)
 
     return session_id
 
@@ -249,6 +257,13 @@ def delete_session_data(session_id: str) -> bool:
             cleanup_session_processes(session_id)
         except Exception as e:
             print(f"[WARNING] Failed to cleanup background processes for session {session_id}: {e}")
+
+        # Clear session tool registrations
+        try:
+            from backend.application.skills import clear_session_trigger_skill
+            clear_session_trigger_skill(session_id)
+        except Exception as e:
+            print(f"[WARNING] Failed to cleanup tool registrations for session {session_id}: {e}")
 
         # Delete session directory (includes metadata.json, history.json, runtime_state.json)
         session_dir = _get_session_dir(session_id)
@@ -1019,3 +1034,177 @@ def is_mcp_server_enabled_for_session(session_id: str, server_name: str) -> bool
         print(f"[WARNING] Failed to load MCP configs for fallback check: {e}")
 
     return False
+
+
+# ========== Skills Configuration Management ==========
+
+
+def build_initial_skills_config(agent_name: str = "pfc_expert") -> Dict[str, Any]:
+    """
+    Build initial skills configuration from agent defaults.
+
+    Reads agents.yaml and creates a session-level config dictionary
+    with each skill's default enabled state.
+
+    Args:
+        agent_name: Agent name to get skill config from
+
+    Returns:
+        Dict with structure: {"skills": {"skill_name": {"enabled": bool}, ...}}
+    """
+    try:
+        from backend.domain.models.agent_profiles import get_skill_configs_for_agent
+
+        configs = get_skill_configs_for_agent(agent_name)
+        return {"skills": {c.name: {"enabled": c.enabled} for c in configs}}
+    except Exception as e:
+        print(f"[WARNING] Failed to build initial skills config: {e}")
+        return {"skills": {}}
+
+
+def get_session_skills_config(session_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get session-level skills configuration from metadata.
+
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        Skills config dict or None if not found
+    """
+    session_metadata = get_session_metadata(session_id)
+    if not session_metadata:
+        return None
+    return session_metadata.get("skills_config")
+
+
+def update_session_skills_config(session_id: str, skills_config: Dict[str, Any]) -> bool:
+    """
+    Update full skills configuration in session metadata.
+
+    Args:
+        session_id: Session identifier
+        skills_config: Full skills config dict
+
+    Returns:
+        Whether update was successful
+    """
+    return update_session_metadata(session_id, {"skills_config": skills_config})
+
+
+def update_session_skill(session_id: str, skill_name: str, enabled: bool) -> bool:
+    """
+    Update a single skill's enabled state for a session.
+
+    This function also triggers re-registration of the trigger_skill tool
+    with the updated skill list for this session.
+
+    Args:
+        session_id: Session identifier
+        skill_name: Name of the skill
+        enabled: Whether to enable this skill for the session
+
+    Returns:
+        Whether update was successful
+    """
+    skills_config = get_session_skills_config(session_id) or {"skills": {}}
+    if "skills" not in skills_config:
+        skills_config["skills"] = {}
+    skills_config["skills"][skill_name] = {"enabled": enabled}
+    
+    success = update_session_skills_config(session_id, skills_config)
+    
+    if success:
+        # Re-register trigger_skill with updated skill list
+        _refresh_session_trigger_skill(session_id)
+    
+    return success
+
+
+def is_skill_enabled_for_session(session_id: str, skill_name: str, agent_name: str = "pfc_expert") -> bool:
+    """
+    Check if a skill is enabled for a specific session.
+
+    Priority:
+    1. Session-specific override in skills_config
+    2. Global default from agents.yaml
+
+    Args:
+        session_id: Session identifier
+        skill_name: Name of the skill to check
+        agent_name: Agent name for fallback to global defaults
+
+    Returns:
+        Whether the skill is enabled for this session
+    """
+    skills_config = get_session_skills_config(session_id)
+    if skills_config and "skills" in skills_config:
+        skill_cfg = skills_config["skills"].get(skill_name)
+        if skill_cfg is not None:
+            return skill_cfg.get("enabled", False)
+
+    # Fallback to global default from agent config
+    try:
+        from backend.domain.models.agent_profiles import get_skill_configs_for_agent
+
+        for config in get_skill_configs_for_agent(agent_name):
+            if config.name == skill_name:
+                return config.enabled
+    except Exception as e:
+        print(f"[WARNING] Failed to load skill configs for fallback check: {e}")
+
+    return False
+
+
+def get_enabled_skills_for_session(session_id: str, agent_name: str = "pfc_expert") -> List[str]:
+    """
+    Get list of enabled skill names for a session.
+
+    This is the primary function for filtering skills in system prompt and tool validation.
+
+    Args:
+        session_id: Session identifier
+        agent_name: Agent name for skill configuration
+
+    Returns:
+        List of enabled skill names
+    """
+    try:
+        from backend.domain.models.agent_profiles import get_skill_configs_for_agent
+
+        all_skills = get_skill_configs_for_agent(agent_name)
+        enabled = []
+        for skill in all_skills:
+            if is_skill_enabled_for_session(session_id, skill.name, agent_name):
+                enabled.append(skill.name)
+        return enabled
+    except Exception as e:
+        print(f"[WARNING] Failed to get enabled skills for session: {e}")
+        return []
+
+
+# ========== Session Tool Registration ==========
+
+
+def _refresh_session_trigger_skill(session_id: str, agent_name: str = "pfc_expert") -> None:
+    """
+    Refresh trigger_skill tool registration for a session.
+
+    Called when:
+    - Session is created (initial registration)
+    - Skills configuration changes via /skills command
+
+    This ensures the trigger_skill tool has the correct Literal type
+    containing only the session's enabled skills.
+
+    Args:
+        session_id: Session identifier
+        agent_name: Agent name for skill configuration
+    """
+    try:
+        from backend.application.skills import register_session_trigger_skill
+
+        enabled_skills = get_enabled_skills_for_session(session_id, agent_name)
+        register_session_trigger_skill(session_id, enabled_skills)
+    except Exception as e:
+        print(f"[WARNING] Failed to refresh trigger_skill for session {session_id}: {e}")

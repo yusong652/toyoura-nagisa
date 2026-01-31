@@ -179,10 +179,17 @@ async def build_system_prompt(
 
     # 6. Replace {available_skills} placeholder if present
     if SKILLS_PLACEHOLDER in base:
-        # Get allowed skills for this profile
-        from backend.domain.models.agent_profiles import get_skills_for_agent
+        # Get allowed skills for this profile, filtered by session config
+        if session_id:
+            # Use session-specific skill filtering
+            from backend.infrastructure.storage.session_manager import get_enabled_skills_for_session
 
-        allowed_skills = get_skills_for_agent(agent_profile)
+            allowed_skills = get_enabled_skills_for_session(session_id, agent_profile)
+        else:
+            # Fallback to agent profile defaults (for SubAgents or when no session)
+            from backend.domain.models.agent_profiles import get_skills_for_agent
+
+            allowed_skills = get_skills_for_agent(agent_profile)
         skills_xml = _get_available_skills_xml(allowed_skills)
         base = base.replace(SKILLS_PLACEHOLDER, skills_xml)
 

@@ -28,6 +28,7 @@ from backend.presentation.api import (
     pfc_console,
     sessions,
     shell,
+    skills_config,
     todos,
 )
 from backend.presentation.exceptions import register_exception_handlers
@@ -133,6 +134,7 @@ app.include_router(shell.router)
 app.include_router(pfc_console.router)
 app.include_router(llm_config.router)
 app.include_router(mcp_config.router)
+app.include_router(skills_config.router)
 
 # Register WebSocket routes (cannot use include_router for WebSocket)
 register_websocket_routes(app)

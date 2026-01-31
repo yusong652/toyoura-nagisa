@@ -91,7 +91,7 @@ export interface QuitActionReturn {
 export interface OpenDialogActionReturn {
   type: 'dialog';
   dialog: 'help' | 'memory' | 'session' | 'settings' | 'theme' | 'pfc_reset' | 'pfc_tasks' |
-    'models_provider' | 'models_primary' | 'models_secondary' | 'mcp_servers';
+    'models_provider' | 'models_primary' | 'models_secondary' | 'mcp_servers' | 'skills';
   props?: Record<string, unknown>;
 }
 

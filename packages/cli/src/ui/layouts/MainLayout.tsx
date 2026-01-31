@@ -67,6 +67,8 @@ type ActiveDialog =
   | 'models_secondary'
   | 'mcp_servers'
   | 'mcp_server_detail'
+  | 'skills'
+  | 'skill_detail'
   | null;
 
 // Session action type
@@ -99,6 +101,13 @@ interface McpServerStatus {
   enabled: boolean;
   connected: boolean;
   tools: string[];
+}
+
+interface SkillStatus {
+  name: string;
+  description: string;
+  enabled: boolean;
+  available: boolean;
 }
 
 // Memory options for SelectDialog
@@ -235,6 +244,12 @@ export const MainLayout: React.FC = () => {
   const [isMcpServersLoading, setIsMcpServersLoading] = useState(false);
   const [mcpServersError, setMcpServersError] = useState<string | null>(null);
   const [selectedMcpServerName, setSelectedMcpServerName] = useState<string | null>(null);
+
+  // Skills state
+  const [skills, setSkills] = useState<SkillStatus[]>([]);
+  const [isSkillsLoading, setIsSkillsLoading] = useState(false);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
+  const [selectedSkillName, setSelectedSkillName] = useState<string | null>(null);
 
   const loadLlmProviders = useCallback(async (sessionId: string) => {
     setIsLlmProvidersLoading(true);
@@ -403,6 +418,139 @@ export const MainLayout: React.FC = () => {
     setActiveDialog('mcp_servers');
   }, []);
 
+  // Load skills for the current session
+  const loadSkills = useCallback(async (sessionId: string) => {
+    setIsSkillsLoading(true);
+    setSkillsError(null);
+    try {
+      const response = await apiClient.get<{ skills: SkillStatus[] }>(
+        `/api/skills-config?session_id=${sessionId}`
+      );
+      setSkills(response.skills ?? []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load skills';
+      setSkillsError(message);
+      setSkills([]);
+    } finally {
+      setIsSkillsLoading(false);
+    }
+  }, []);
+
+  // Skills options for SelectDialog (first-level menu)
+  const skillOptions = useMemo<SelectOption<string>[]>(() => {
+    if (skillsError) {
+      return [
+        {
+          key: 'error',
+          value: 'error',
+          label: `Error: ${skillsError}`,
+          description: 'Press Enter to retry',
+        },
+      ];
+    }
+
+    return skills.map((skill) => {
+      const statusIcon = skill.enabled ? '[ON]' : '[OFF]';
+      const availableIcon = skill.available ? '' : ' (not found)';
+
+      return {
+        key: skill.name,
+        value: skill.name,
+        label: `${statusIcon} ${skill.name}${availableIcon}`,
+        description: skill.description || undefined,
+      };
+    });
+  }, [skills, skillsError]);
+
+  // Get the selected skill details
+  const selectedSkill = useMemo(() => {
+    if (!selectedSkillName) return null;
+    return skills.find((s) => s.name === selectedSkillName) ?? null;
+  }, [skills, selectedSkillName]);
+
+  // Skills detail options (second-level menu)
+  const skillDetailOptions = useMemo<SelectOption<string>[]>(() => {
+    if (!selectedSkill) return [];
+
+    const nextState = selectedSkill.enabled ? 'OFF' : 'ON';
+
+    return [
+      {
+        key: 'toggle',
+        value: 'toggle',
+        label: 'Toggle Skill',
+        description: `Switch to ${nextState}`,
+      },
+      { key: 'back', value: 'back', label: 'Back to list', description: 'Return to skills list' },
+    ];
+  }, [selectedSkill]);
+
+  // Build description for skill detail dialog
+  const skillDetailDescription = useMemo(() => {
+    if (!selectedSkill) return '';
+
+    const lines: string[] = [];
+    lines.push(`Status: ${selectedSkill.enabled ? 'Enabled' : 'Disabled'}`);
+    lines.push(`Available: ${selectedSkill.available ? 'Yes' : 'No (skill file not found)'}`);
+    if (selectedSkill.description) {
+      lines.push(`\nDescription: ${selectedSkill.description}`);
+    }
+
+    return lines.join('\n');
+  }, [selectedSkill]);
+
+  // Handle skill selection (open detail dialog)
+  const handleSkillSelect = useCallback((skillName: string) => {
+    if (skillName === 'error') {
+      // Retry loading
+      if (appState.currentSessionId) {
+        loadSkills(appState.currentSessionId);
+      }
+      return;
+    }
+
+    setSelectedSkillName(skillName);
+    setActiveDialog('skill_detail');
+  }, [appState.currentSessionId, loadSkills]);
+
+  // Handle skill detail action
+  const handleSkillDetailSelect = useCallback(async (action: string) => {
+    if (action === 'back') {
+      setActiveDialog('skills');
+      return;
+    }
+
+    if (action === 'toggle' && selectedSkill && appState.currentSessionId) {
+      const newEnabled = !selectedSkill.enabled;
+
+      try {
+        await apiClient.post(`/api/skills-config?session_id=${appState.currentSessionId}`, {
+          skill_name: selectedSkill.name,
+          enabled: newEnabled,
+        });
+
+        // Update local state
+        setSkills((prev) =>
+          prev.map((s) => (s.name === selectedSkill.name ? { ...s, enabled: newEnabled } : s))
+        );
+
+        appActions.showNotification(
+          `Skill '${selectedSkill.name}' ${newEnabled ? 'enabled' : 'disabled'}`,
+          'success'
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to update skill';
+        appActions.showNotification(message, 'error');
+      }
+      // Stay on detail page so user can see the updated status
+    }
+  }, [appActions, appState.currentSessionId, selectedSkill]);
+
+  // Handle skill detail cancel (back to skills list)
+  const handleSkillDetailCancel = useCallback(() => {
+    setActiveDialog('skills');
+  }, []);
+
   const activeProviderId = selectedProviderId ?? currentLlmConfig?.provider ?? null;
 
   const activeProvider = useMemo(() => {
@@ -526,6 +674,21 @@ export const MainLayout: React.FC = () => {
 
     void loadMcpServers(appState.currentSessionId);
   }, [activeDialog, appState.currentSessionId, loadMcpServers]);
+
+  // Load skills when dialog opens
+  useEffect(() => {
+    if (activeDialog !== 'skills') {
+      return;
+    }
+
+    if (!appState.currentSessionId) {
+      setSkillsError('No active session. Create or restore a session first.');
+      setIsSkillsLoading(false);
+      return;
+    }
+
+    void loadSkills(appState.currentSessionId);
+  }, [activeDialog, appState.currentSessionId, loadSkills]);
 
   // Track session ID to detect session changes
   const previousSessionIdRef = useRef(appState.currentSessionId);
@@ -1094,6 +1257,8 @@ export const MainLayout: React.FC = () => {
           setActiveDialog('models_provider');
         } else if (result.dialog === 'mcp_servers') {
           setActiveDialog('mcp_servers');
+        } else if (result.dialog === 'skills') {
+          setActiveDialog('skills');
         }
         break;
 
@@ -1392,6 +1557,36 @@ export const MainLayout: React.FC = () => {
             options={mcpServerDetailOptions}
             onSelect={handleMcpServerDetailSelect}
             onCancel={handleMcpServerDetailCancel}
+            showNumbers={true}
+            maxItemsToShow={10}
+          />
+        )}
+
+        {/* Skills management dialog (first-level) */}
+        {activeDialog === 'skills' && (
+          <SelectDialog
+            title="Skills"
+            description="Select a skill to view details:"
+            options={skillOptions}
+            onSelect={handleSkillSelect}
+            onCancel={handleDialogCancel}
+            isLoading={isSkillsLoading}
+            loadingMessage="Loading skills..."
+            emptyMessage={skillsError || 'No skills configured.'}
+            showNumbers={true}
+            showDescriptions={true}
+            maxItemsToShow={10}
+          />
+        )}
+
+        {/* Skill detail dialog (second-level) */}
+        {activeDialog === 'skill_detail' && selectedSkill && (
+          <SelectDialog
+            title={`Skill: ${selectedSkill.name}`}
+            description={skillDetailDescription}
+            options={skillDetailOptions}
+            onSelect={handleSkillDetailSelect}
+            onCancel={handleSkillDetailCancel}
             showNumbers={true}
             maxItemsToShow={10}
           />

@@ -27,3 +27,6 @@ export { pfcTasksCommand } from './pfcTasksCommand.js';
 
 // MCP servers command for managing MCP server configurations
 export { mcpsCommand } from './mcpsCommand.js';
+
+// Skills command for managing skill configurations
+export { skillsCommand } from './skillsCommand.js';
