@@ -33,10 +33,16 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
     """
     provider_name = _normalize_provider_name(provider_name)
 
-    if provider_name in {"google", "google-gemini-cli"}:
+    if provider_name == "google":
         from backend.infrastructure.llm.providers.google.message_formatter import GoogleMessageFormatter
 
         return GoogleMessageFormatter
+    if provider_name == "google-gemini-cli":
+        from backend.infrastructure.llm.providers.google_gemini_cli.message_formatter import (
+            GoogleGeminiCliMessageFormatter,
+        )
+
+        return GoogleGeminiCliMessageFormatter
     elif provider_name == "anthropic":
         from backend.infrastructure.llm.providers.anthropic.message_formatter import AnthropicMessageFormatter
 
@@ -76,10 +82,16 @@ def get_context_manager_class(provider_name: str) -> Type[Any]:
     """
     provider_name = _normalize_provider_name(provider_name)
 
-    if provider_name in {"google", "google-gemini-cli"}:
+    if provider_name == "google":
         from backend.infrastructure.llm.providers.google.context_manager import GoogleContextManager
 
         return GoogleContextManager
+    if provider_name == "google-gemini-cli":
+        from backend.infrastructure.llm.providers.google_gemini_cli.context_manager import (
+            GoogleGeminiCliContextManager,
+        )
+
+        return GoogleGeminiCliContextManager
     elif provider_name == "anthropic":
         from backend.infrastructure.llm.providers.anthropic.context_manager import AnthropicContextManager
 

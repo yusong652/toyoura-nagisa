@@ -90,10 +90,7 @@ class GoogleMessageFormatter(BaseMessageFormatter):
 
                         # Handle tool_use blocks (for assistant messages with tool calls)
                         elif item.get("type") == "tool_use":
-                            function_call = types.FunctionCall(
-                                name=item.get("name"),
-                                args=item.get("input", {})
-                            )
+                            function_call = types.FunctionCall(name=item.get("name"), args=item.get("input", {}))
                             part = types.Part(function_call=function_call)
 
                             # IMPORTANT: Always restore thought_signature for tool_use
@@ -129,14 +126,14 @@ class GoogleMessageFormatter(BaseMessageFormatter):
                                 name=item.get("tool_name", "unknown"),
                                 response={
                                     "status": "error" if item.get("is_error") else "success",
-                                    "content": response_text
-                                }
+                                    "content": response_text,
+                                },
                             )
                             parts.append(types.Part(function_response=function_response))
 
                         elif item.get("type") == "image" and "inline_data" in item:
                             # Handle image content using unified processing
-                            blob = GoogleMessageFormatter._process_inline_data(item['inline_data'])
+                            blob = GoogleMessageFormatter._process_inline_data(item["inline_data"])
                             if blob:
                                 parts.append(types.Part(inline_data=blob))
                         elif "text" in item and item["text"]:
@@ -144,29 +141,28 @@ class GoogleMessageFormatter(BaseMessageFormatter):
                             parts.append(types.Part(text=item["text"]))
                         elif "inline_data" in item:
                             # Generic inline data (images, etc.)
-                            blob = GoogleMessageFormatter._process_inline_data(item['inline_data'])
+                            blob = GoogleMessageFormatter._process_inline_data(item["inline_data"])
                             if blob:
                                 parts.append(types.Part(inline_data=blob))
             else:
                 # Simple text message
                 parts.append(types.Part(text=str(msg.content)))
-            
+
             # Map role and add to contents if we have parts
             if parts:
-                mapped_role = GoogleMessageFormatter._map_role(msg.role) # type: ignore
+                mapped_role = GoogleMessageFormatter._map_role(msg.role)  # type: ignore
                 contents.append({"role": mapped_role, "parts": parts})
-        
+
         return contents
-    
-    
+
     @staticmethod
     def _map_role(role: str) -> str:
         """
         Map internal role names to Gemini API role names.
-        
+
         Args:
             role: Internal role name
-            
+
         Returns:
             Gemini API compatible role name
         """
@@ -178,53 +174,53 @@ class GoogleMessageFormatter(BaseMessageFormatter):
     def _process_inline_data(inline_data: Dict[str, Any]) -> Any:
         """
         Process inline_data, converting base64 strings to Gemini API Blob format.
-        
+
         Args:
             inline_data: Dictionary containing mime_type and data
-            
+
         Returns:
             types.Blob object, or None if processing fails
         """
         try:
             from google.genai import types
             import base64
-            
-            data_field = inline_data['data']
-            mime_type = inline_data.get('mime_type', 'image/png')
-            
+
+            data_field = inline_data["data"]
+            mime_type = inline_data.get("mime_type", "image/png")
+
             # If data is a string (base64), decode to bytes
             if isinstance(data_field, str):
                 data_field = base64.b64decode(data_field)
-            
+
             # Ensure data is in bytes format
             if not isinstance(data_field, bytes):
                 print(f"[WARNING] Invalid data format: expected bytes, got {type(data_field)}")
                 return None
-            
+
             return types.Blob(mime_type=mime_type, data=data_field)
-            
+
         except Exception as e:
             print(f"[WARNING] Failed to process inline_data: {e}")
             return None
-    
+
     @staticmethod
     def format_single_message(message: BaseMessage) -> Dict[str, Any]:
         """
         Format a single BaseMessage to Gemini API format.
-        
+
         Args:
             message: Single BaseMessage to format
-            
+
         Returns:
             Dict[str, Any]: Single message in Gemini API format
         """
         from google.genai import types
-        
+
         if message is None:
             return {}
-            
+
         parts = []
-        
+
         # Handle message content based on format
         if isinstance(message.content, list):
             # Multi-part message (text + optional multimodal content)
@@ -239,10 +235,7 @@ class GoogleMessageFormatter(BaseMessageFormatter):
 
                     # Handle tool_use blocks (for assistant messages with tool calls)
                     elif item.get("type") == "tool_use":
-                        function_call = types.FunctionCall(
-                            name=item.get("name"),
-                            args=item.get("input", {})
-                        )
+                        function_call = types.FunctionCall(name=item.get("name"), args=item.get("input", {}))
                         parts.append(types.Part(function_call=function_call))
 
                     # Handle tool_result blocks (for user messages with tool results)
@@ -265,14 +258,14 @@ class GoogleMessageFormatter(BaseMessageFormatter):
                             name=item.get("tool_name", "unknown"),
                             response={
                                 "status": "error" if item.get("is_error") else "success",
-                                "content": response_text
-                            }
+                                "content": response_text,
+                            },
                         )
                         parts.append(types.Part(function_response=function_response))
 
                     elif item.get("type") == "image" and "inline_data" in item:
                         # Handle image content using unified processing
-                        blob = GoogleMessageFormatter._process_inline_data(item['inline_data'])
+                        blob = GoogleMessageFormatter._process_inline_data(item["inline_data"])
                         if blob:
                             parts.append(types.Part(inline_data=blob))
                     elif "text" in item and item["text"]:
@@ -280,18 +273,18 @@ class GoogleMessageFormatter(BaseMessageFormatter):
                         parts.append(types.Part(text=item["text"]))
                     elif "inline_data" in item:
                         # Generic inline data (images, etc.)
-                        blob = GoogleMessageFormatter._process_inline_data(item['inline_data'])
+                        blob = GoogleMessageFormatter._process_inline_data(item["inline_data"])
                         if blob:
                             parts.append(types.Part(inline_data=blob))
         else:
             # Simple text message
             parts.append(types.Part(text=str(message.content)))
-        
+
         # Map role and return formatted message
         if parts:
-            mapped_role = GoogleMessageFormatter._map_role(message.role) # type: ignore
+            mapped_role = GoogleMessageFormatter._map_role(message.role)  # type: ignore
             return {"role": mapped_role, "parts": parts}
-        
+
         return {}
 
     @staticmethod
@@ -333,14 +326,8 @@ class GoogleMessageFormatter(BaseMessageFormatter):
                     response_data["content"] = text_content
 
         # Create function response part
-        function_response = types.FunctionResponse(
-            name=tool_name,
-            response=response_data
-        )
+        function_response = types.FunctionResponse(name=tool_name, response=response_data)
         parts.append(types.Part(function_response=function_response))
 
         # Return complete working context entry
-        return {
-            "role": "user",
-            "parts": parts
-        }
+        return {"role": "user", "parts": parts}

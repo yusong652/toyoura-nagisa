@@ -25,7 +25,10 @@ from backend.infrastructure.oauth.base.types import OAuthCredentials
 from backend.infrastructure.oauth.google.oauth_client import DEFAULT_PROJECT_ID
 from backend.infrastructure.oauth.google.token_manager import GoogleTokenManager
 from backend.infrastructure.llm.providers.google.config import GoogleConfig
-from backend.infrastructure.llm.providers.google.context_manager import GoogleContextManager
+from backend.infrastructure.llm.providers.google_gemini_cli.context_manager import (
+    GoogleGeminiCliContextManager,
+)
+from backend.infrastructure.llm.providers.google_gemini_cli.debug import GeminiCliDebugger
 from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
 from backend.infrastructure.llm.providers.google.tool_manager import GoogleToolManager
 
@@ -82,7 +85,7 @@ class GoogleGeminiCliClient(LLMClientBase):
         self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs: Any
     ) -> types.GenerateContentResponse:
         call_options = parse_call_options(kwargs)
-        debug = get_dev_config().debug_mode
+        debug = self._debug_enabled()
         timeout = call_options.timeout if call_options.timeout is not None else self.google_config.timeout
         max_retries = (
             call_options.max_retries if call_options.max_retries is not None else self.google_config.max_retries
@@ -100,11 +103,21 @@ class GoogleGeminiCliClient(LLMClientBase):
                 config=config,
                 project_id=project_id,
             )
+            if debug:
+                tools = api_config.get("tools") or []
+                GeminiCliDebugger.print_request(
+                    method="generateContent",
+                    payload=payload,
+                    model=model,
+                    project_id=project_id,
+                    tools_count=len(tools),
+                )
             response_data = await self._post_code_assist(
                 method="generateContent",
                 payload=payload,
                 access_token=credentials.access_token,
                 timeout=timeout,
+                debug=debug,
             )
             response = self._convert_code_assist_response(response_data)
             if not hasattr(response, "candidates") or not response.candidates:
@@ -124,7 +137,7 @@ class GoogleGeminiCliClient(LLMClientBase):
         self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs: Any
     ) -> AsyncGenerator[StreamingChunk, None]:
         call_options = parse_call_options(kwargs)
-        debug = get_dev_config().debug_mode
+        debug = self._debug_enabled()
         timeout = call_options.timeout if call_options.timeout is not None else self.google_config.timeout
         max_retries = (
             call_options.max_retries if call_options.max_retries is not None else self.google_config.max_retries
@@ -143,12 +156,22 @@ class GoogleGeminiCliClient(LLMClientBase):
                 config=config,
                 project_id=project_id,
             )
+            if debug:
+                tools = api_config.get("tools") or []
+                GeminiCliDebugger.print_request(
+                    method="streamGenerateContent",
+                    payload=payload,
+                    model=model,
+                    project_id=project_id,
+                    tools_count=len(tools),
+                )
 
             async for event in self._stream_code_assist(
                 method="streamGenerateContent",
                 payload=payload,
                 access_token=credentials.access_token,
                 timeout=timeout,
+                debug=debug,
             ):
                 response = self._convert_code_assist_response(event)
                 for chunk in processor.process_event(response):
@@ -166,7 +189,7 @@ class GoogleGeminiCliClient(LLMClientBase):
         return GoogleResponseProcessor()
 
     def _get_context_manager_class(self):
-        return GoogleContextManager
+        return GoogleGeminiCliContextManager
 
     def _get_provider_config(self) -> GoogleConfig:
         return self.google_config
@@ -485,6 +508,7 @@ class GoogleGeminiCliClient(LLMClientBase):
         payload: Dict[str, Any],
         access_token: str,
         timeout: Optional[float] = None,
+        debug: bool = False,
     ) -> Dict[str, Any]:
         url = f"{CODE_ASSIST_ENDPOINT}/{CODE_ASSIST_API_VERSION}:{method}"
         headers = self._build_headers(access_token)
@@ -512,6 +536,7 @@ class GoogleGeminiCliClient(LLMClientBase):
         payload: Dict[str, Any],
         access_token: str,
         timeout: Optional[float] = None,
+        debug: bool = False,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         url = f"{CODE_ASSIST_ENDPOINT}/{CODE_ASSIST_API_VERSION}:{method}"
         headers = self._build_headers(access_token)
@@ -550,6 +575,12 @@ class GoogleGeminiCliClient(LLMClientBase):
 
                 if buffer:
                     yield json.loads("\n".join(buffer))
+
+    def _debug_enabled(self) -> bool:
+        env_flag = os.getenv("GEMINI_CLI_DEBUG")
+        if env_flag:
+            return env_flag.strip().lower() in {"1", "true", "yes", "on"}
+        return get_dev_config().debug_mode
 
     async def _read_error_payload(self, response: aiohttp.ClientResponse) -> Dict[str, Any]:
         try:
