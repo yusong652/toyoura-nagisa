@@ -186,8 +186,23 @@ class GeminiCliDebugger:
 
             function_response = part.get("functionResponse")
             if isinstance(function_response, dict):
+                # Recursively handle parts if they exist
                 nested_parts = function_response.get("parts")
-                GeminiCliDebugger._censor_parts(nested_parts, max_len)
+
+                # Determine limit for tool responses (default 500 chars unless strictly lower)
+                tool_limit = 500
+                if max_len is not None and max_len < tool_limit:
+                    tool_limit = max_len
+
+                if nested_parts:
+                    GeminiCliDebugger._censor_parts(nested_parts, tool_limit)
+
+                # Also truncate content in 'response' dictionary if present
+                response_data = function_response.get("response")
+                if isinstance(response_data, dict):
+                    for key, value in response_data.items():
+                        if isinstance(value, str) and len(value) > tool_limit:
+                            response_data[key] = f"{value[:tool_limit]}... [truncated {len(value)} chars]"
 
     @staticmethod
     def _print_json(obj: Any) -> None:
