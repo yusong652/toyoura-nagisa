@@ -444,7 +444,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Check if empty
   const isEmpty = buffer.lines.length === 1 && buffer.lines[0] === '';
 
-  const { llmConfig, thinkingLevel } = useAppState();
+  const { llmConfig, thinkingLevel, thinkingLevelOptions } = useAppState();
 
   // Use visual cursor for correct cursor positioning in wrapped lines
   const [visualCursorRow, visualCursorCol] = buffer.visualCursor;
@@ -555,7 +555,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             <Box marginLeft={1}>
               <Text color={theme.text.muted}>│ </Text>
               <Text color={thinkingLevel !== 'default' ? '#a371f7' : theme.text.muted} dimColor>
-                Thinking {thinkingLevel}
+                Thinking {thinkingLevel}{thinkingLevelOptions.length > 1 ? ' (Ctrl+T)' : ''}
               </Text>
             </Box>
           </Box>

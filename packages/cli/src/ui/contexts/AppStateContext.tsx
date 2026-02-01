@@ -44,6 +44,8 @@ export interface AppState {
 
   // Thinking Level ("default" | "low" | "high")
   thinkingLevel: string;
+  // Available thinking level options (for UI hint)
+  thinkingLevelOptions: string[];
 
   // History (committed items - rendered in <Static>)
   history: HistoryItem[];
@@ -147,6 +149,7 @@ const defaultState: AppState = {
   contextWindow: null,
   memoryEnabled: false,
   thinkingLevel: 'default',
+  thinkingLevelOptions: [],
   history: [],
   pendingHistoryItems: [],
   streamingState: {

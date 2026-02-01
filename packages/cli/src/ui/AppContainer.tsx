@@ -564,6 +564,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     contextWindow,
     memoryEnabled,
     thinkingLevel,
+    thinkingLevelOptions,
     history: historyManager.history,
     pendingHistoryItems,
     streamingState: {
@@ -593,6 +594,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     contextWindow,
     memoryEnabled,
     thinkingLevel,
+    thinkingLevelOptions,
     historyManager.history,
     pendingHistoryItems,
     streamingStateEnum,
