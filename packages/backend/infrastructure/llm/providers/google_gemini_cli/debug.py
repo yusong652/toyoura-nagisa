@@ -204,6 +204,16 @@ class GeminiCliDebugger:
                         if isinstance(value, str) and len(value) > tool_limit:
                             response_data[key] = f"{value[:tool_limit]}... [truncated {len(value)} chars]"
 
+            function_call = part.get("functionCall")
+            if isinstance(function_call, dict):
+                args = function_call.get("args")
+                if isinstance(args, dict):
+                    for key in ["thought", "thoughtSignature", "_thought"]:
+                        if key in args and isinstance(args[key], str):
+                            val = args[key]
+                            if len(val) > 20:
+                                args[key] = f"{val[:20]}..."
+
     @staticmethod
     def _print_json(obj: Any) -> None:
         try:
