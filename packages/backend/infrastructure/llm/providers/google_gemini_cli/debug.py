@@ -90,7 +90,7 @@ class GeminiCliDebugger:
 
         system_instruction = request.get("systemInstruction")
         if isinstance(system_instruction, dict):
-            GeminiCliDebugger._censor_parts(system_instruction.get("parts"))
+            GeminiCliDebugger._censor_parts(system_instruction.get("parts"), max_len=100)
 
         return payload_copy
 
@@ -158,7 +158,7 @@ class GeminiCliDebugger:
         return None
 
     @staticmethod
-    def _censor_parts(parts: Any) -> None:
+    def _censor_parts(parts: Any, max_len: Optional[int] = None) -> None:
         if not isinstance(parts, list):
             return
 
@@ -167,8 +167,17 @@ class GeminiCliDebugger:
                 continue
             text = part.get("text")
             text_str = "" if text is None else str(text)
+
+            # Truncate system reminder first
             if "<system-reminder>" in text_str:
-                part["text"] = GeminiCliDebugger._truncate_system_reminder(text_str)
+                text_str = GeminiCliDebugger._truncate_system_reminder(text_str)
+
+            # Apply hard length limit if specified
+            if max_len is not None and len(text_str) > max_len:
+                text_str = f"{text_str[:max_len]}... [truncated {len(text_str)} chars]"
+
+            part["text"] = text_str
+
             inline_data = part.get("inlineData")
             if isinstance(inline_data, dict):
                 data = inline_data.get("data")
@@ -178,7 +187,7 @@ class GeminiCliDebugger:
             function_response = part.get("functionResponse")
             if isinstance(function_response, dict):
                 nested_parts = function_response.get("parts")
-                GeminiCliDebugger._censor_parts(nested_parts)
+                GeminiCliDebugger._censor_parts(nested_parts, max_len)
 
     @staticmethod
     def _print_json(obj: Any) -> None:
