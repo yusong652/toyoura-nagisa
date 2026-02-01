@@ -20,7 +20,7 @@ async def perform_web_search(
     provider_name = _get_provider_name(llm_client)
     max_uses_value: int = max_uses if max_uses is not None else get_default_max_uses(provider_name)
 
-    if provider_name == "google":
+    if provider_name in ["google", "google-gemini-cli"]:
         return await perform_google_search(llm_client, query, max_uses=max_uses_value)
     if provider_name == "anthropic":
         return await perform_anthropic_search(llm_client, query, max_uses=max_uses_value)
