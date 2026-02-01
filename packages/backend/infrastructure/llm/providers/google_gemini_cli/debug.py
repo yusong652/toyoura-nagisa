@@ -214,6 +214,13 @@ class GeminiCliDebugger:
                             if len(val) > 20:
                                 args[key] = f"{val[:20]}..."
 
+            # Also truncate top-level thought signatures (outside functionCall)
+            for key in ["thought", "thoughtSignature", "_thought"]:
+                if key in part and isinstance(part[key], str):
+                    val = part[key]
+                    if len(val) > 20:
+                        part[key] = f"{val[:20]}..."
+
     @staticmethod
     def _print_json(obj: Any) -> None:
         try:
