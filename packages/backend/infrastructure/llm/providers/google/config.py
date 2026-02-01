@@ -63,6 +63,12 @@ class GoogleConfig(BaseSettings):
     # API credentials (from environment variables)
     google_api_key: Optional[str] = Field(default=None, description="Google API key")
 
+    # OAuth settings (Gemini CLI / Vertex AI)
+    use_oauth: bool = Field(default=False, description="Use OAuth credentials instead of API key")
+    oauth_account_id: Optional[str] = Field(default=None, description="OAuth account ID to use")
+    vertex_project_id: Optional[str] = Field(default=None, description="Vertex AI project ID override")
+    vertex_location: Optional[str] = Field(default=None, description="Vertex AI location override")
+
     # Model selection (from environment variables, runtime overridable)
     model: str = Field(default="gemini-3-flash-preview", description="Default model")
     secondary_model: str = Field(default="gemini-3-flash-preview", description="Secondary model for SubAgent")
@@ -115,16 +121,10 @@ class GoogleConfig(BaseSettings):
                 # Gemini 3 models use thinking_level enum
                 level_map = {"low": types.ThinkingLevel.LOW, "high": types.ThinkingLevel.HIGH}
                 thinking_level = level_map.get(self.default_thinking_level, types.ThinkingLevel.HIGH)
-                params["thinking_config"] = types.ThinkingConfig(
-                    thinking_level=thinking_level,
-                    include_thoughts=True
-                )
+                params["thinking_config"] = types.ThinkingConfig(thinking_level=thinking_level, include_thoughts=True)
             elif self.model.startswith("gemini-2.5"):
                 # Gemini 2.5 models use thinking_budget
                 budget = GOOGLE_THINKING_LEVEL_TO_BUDGET.get(self.default_thinking_level, -1)
-                params["thinking_config"] = types.ThinkingConfig(
-                    thinking_budget=budget,
-                    include_thoughts=True
-                )
+                params["thinking_config"] = types.ThinkingConfig(thinking_budget=budget, include_thoughts=True)
 
         return params

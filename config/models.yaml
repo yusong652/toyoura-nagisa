@@ -123,6 +123,21 @@ providers:
           options: [default, low, high]
           default: default
 
+  # Google Gemini CLI (OAuth)
+  - provider: google-gemini-cli
+    name: Google Gemini CLI
+    description: Gemini CLI OAuth (Vertex AI)
+    models:
+      - id: gemini-3-flash-preview
+        name: Gemini 3.0 Flash (CLI OAuth)
+        description: Gemini 3.0 Flash via Gemini CLI OAuth
+        context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
   # Anthropic Claude
   - provider: anthropic
     name: Anthropic Claude

@@ -25,7 +25,9 @@ from backend.presentation.api import (
     llm_config,
     mcp_config,
     messages,
+    oauth,
     pfc_console,
+    quota,
     sessions,
     shell,
     skills_config,
@@ -135,6 +137,8 @@ app.include_router(pfc_console.router)
 app.include_router(llm_config.router)
 app.include_router(mcp_config.router)
 app.include_router(skills_config.router)
+app.include_router(oauth.router)
+app.include_router(quota.router)
 
 # Register WebSocket routes (cannot use include_router for WebSocket)
 register_websocket_routes(app)

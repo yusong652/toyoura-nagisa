@@ -23,6 +23,7 @@ class LLMFactory:
     def _register_default_clients(self):
         """Register default LLM client implementations."""
         from backend.infrastructure.llm.providers.google import GoogleClient
+        from backend.infrastructure.llm.providers.google_gemini_cli import GoogleGeminiCliClient
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         from backend.infrastructure.llm.providers.openai import OpenAIClient
         from backend.infrastructure.llm.providers.moonshot import MoonshotClient
@@ -31,6 +32,7 @@ class LLMFactory:
 
         self._clients = {
             "google": GoogleClient,
+            "google-gemini-cli": GoogleGeminiCliClient,
             "anthropic": AnthropicClient,
             "gpt": OpenAIClient,
             "openai": OpenAIClient,
@@ -39,13 +41,7 @@ class LLMFactory:
             "openrouter": OpenRouterClient,
         }
 
-
-    def create_client_with_config(
-        self,
-        provider: str,
-        model: str,
-        app: Optional[Any] = None
-    ) -> LLMClientBase:
+    def create_client_with_config(self, provider: str, model: str, app: Optional[Any] = None) -> LLMClientBase:
         """
         Create an LLM client with explicit configuration.
 
@@ -64,10 +60,7 @@ class LLMFactory:
             ValueError: If provider is not supported or API key is missing
         """
         if provider not in self._clients:
-            raise ValueError(
-                f"Unsupported LLM provider: '{provider}'. "
-                f"Supported: {list(self._clients.keys())}"
-            )
+            raise ValueError(f"Unsupported LLM provider: '{provider}'. Supported: {list(self._clients.keys())}")
 
         # Check cache for existing client instance
         # Include app ID in cache key to distinguish clients with/without app context
@@ -79,17 +72,12 @@ class LLMFactory:
         config = self._build_config(provider, model, app)
         logger.info(f"Creating {provider} client with model: {model}")
         client = self._clients[provider](**config)
-        
+
         # Store in cache
         self._client_cache[cache_key] = client
         return client
 
-    def _build_config(
-        self,
-        provider: str,
-        model: str,
-        app: Optional[Any]
-    ) -> Dict[str, Any]:
+    def _build_config(self, provider: str, model: str, app: Optional[Any]) -> Dict[str, Any]:
         """
         Build configuration for LLM client.
 
@@ -112,57 +100,49 @@ class LLMFactory:
 
         if provider == "google":
             from backend.infrastructure.llm.providers.google.config import GoogleConfig
+
             cfg = GoogleConfig(model=model)
-            return {
-                "config": cfg,
-                "extra_config": extra
-            }
+            return {"config": cfg, "extra_config": extra}
+        elif provider == "google-gemini-cli":
+            from backend.infrastructure.llm.providers.google.config import GoogleConfig
+
+            cfg = GoogleConfig(model=model, use_oauth=True)
+            return {"config": cfg, "extra_config": extra}
         elif provider == "anthropic":
             from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
+
             cfg = AnthropicConfig(model=model)
-            return {
-                "config": cfg,
-                "extra_config": extra
-            }
+            return {"config": cfg, "extra_config": extra}
         elif provider in ["openai", "gpt"]:
             from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
+
             cfg = OpenAIConfig(model=model)
             if not cfg.openai_api_key:
                 raise ValueError("OpenAI API key not configured")
-            return {
-                "config": cfg,
-                "extra_config": extra
-            }
+            return {"config": cfg, "extra_config": extra}
         elif provider == "moonshot":
             from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
+
             cfg = MoonshotConfig(model=model)
             if not cfg.moonshot_api_key:
                 raise ValueError("Moonshot API key not configured")
-            return {
-                "config": cfg,
-                "extra_config": extra
-            }
+            return {"config": cfg, "extra_config": extra}
         elif provider == "zhipu":
             from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
+
             cfg = ZhipuConfig(model=model)
             if not cfg.zhipu_api_key:
                 raise ValueError("Zhipu API key not configured")
-            return {
-                "config": cfg,
-                "extra_config": extra
-            }
+            return {"config": cfg, "extra_config": extra}
         elif provider == "openrouter":
             from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
+
             cfg = OpenRouterConfig(model=model)
             if not cfg.openrouter_api_key:
                 raise ValueError("OpenRouter API key not configured")
-            return {
-                "config": cfg,
-                "extra_config": extra
-            }
+            return {"config": cfg, "extra_config": extra}
 
         raise ValueError(f"Unknown provider: {provider}")
-
 
 
 # Global factory instance

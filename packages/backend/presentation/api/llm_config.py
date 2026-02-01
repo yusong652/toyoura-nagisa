@@ -150,14 +150,26 @@ def _get_env_api_key(provider: str) -> Optional[str]:
 
 def _check_api_key_configured(provider: str) -> bool:
     """
-    Check if API key is configured for a provider.
+    Check if API key or OAuth credentials are configured for a provider.
 
     Args:
         provider: Provider identifier
 
     Returns:
-        bool: True if API key/server URL is configured
+        bool: True if credentials are configured
     """
+    if provider == "google":
+        return bool(_get_env_api_key(provider))
+
+    if provider == "google-gemini-cli":
+        try:
+            from backend.infrastructure.oauth.base.types import OAuthProvider
+            from backend.infrastructure.storage import oauth_token_storage
+
+            return oauth_token_storage.has_accounts(OAuthProvider.GOOGLE)
+        except Exception:
+            return False
+
     return bool(_get_env_api_key(provider))
 
 

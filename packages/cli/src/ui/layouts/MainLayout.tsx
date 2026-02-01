@@ -30,6 +30,7 @@ import { TodoStatusIndicator } from '../components/TodoStatusIndicator.js';
 import { NotificationBanner } from '../components/NotificationBanner.js';
 import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js';
 import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
+import { QuotaDisplay } from '../components/QuotaDisplay.js';
 import { FullContextView } from '../components/FullContextView.js';
 import { BackgroundTaskMonitor } from '../components/BackgroundTaskMonitor.js';
 import { PfcTaskMonitor } from '../components/PfcTaskMonitor.js';
@@ -40,6 +41,8 @@ import { useShellCommand } from '../hooks/useShellCommand.js';
 import { usePfcConsoleCommand } from '../hooks/usePfcConsoleCommand.js';
 import { useTheme } from '../hooks/useTheme.js';
 import { useTextBuffer } from '../utils/text-buffer.js';
+import { waitForOAuthCallback } from '../utils/oauth.js';
+import { openBrowser } from '../utils/openBrowser.js';
 import { MessageType } from '../types.js';
 import { colors, theme, themeManager } from '../colors.js';
 import { themes, type ThemeName } from '../themes/index.js';
@@ -69,6 +72,9 @@ type ActiveDialog =
   | 'mcp_server_detail'
   | 'skills'
   | 'skill_detail'
+  | 'connects_providers'
+  | 'connects_google_menu'
+  | 'quota_display'
   | null;
 
 // Session action type
@@ -108,6 +114,35 @@ interface SkillStatus {
   description: string;
   enabled: boolean;
   available: boolean;
+}
+
+interface OAuthProviderInfo {
+  id: string;
+  name: string;
+  description?: string | null;
+}
+
+interface OAuthAccountInfo {
+  account_id: string;
+  provider: string;
+  email?: string | null;
+  is_default: boolean;
+  connected_at: number;
+}
+
+interface QuotaWindowInfo {
+  label: string;
+  used_percent: number;
+  remaining_percent: number;
+  remaining_fraction: number;
+}
+
+interface GoogleQuotaInfo {
+  provider: string;
+  account_id: string;
+  email?: string | null;
+  project_id?: string | null;
+  windows: QuotaWindowInfo[];
 }
 
 // Memory options for SelectDialog
@@ -250,6 +285,23 @@ export const MainLayout: React.FC = () => {
   const [isSkillsLoading, setIsSkillsLoading] = useState(false);
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const [selectedSkillName, setSelectedSkillName] = useState<string | null>(null);
+
+  // OAuth providers/accounts state
+  const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
+  const [isOauthProvidersLoading, setIsOauthProvidersLoading] = useState(false);
+  const [oauthProvidersError, setOauthProvidersError] = useState<string | null>(null);
+
+  const [googleAccounts, setGoogleAccounts] = useState<OAuthAccountInfo[]>([]);
+  const [isGoogleAccountsLoading, setIsGoogleAccountsLoading] = useState(false);
+  const [googleAccountsError, setGoogleAccountsError] = useState<string | null>(null);
+  const [googleMenuMode, setGoogleMenuMode] = useState<'root' | 'account'>('root');
+  const [selectedGoogleAccountId, setSelectedGoogleAccountId] = useState<string | null>(null);
+  const [isOAuthFlowRunning, setIsOAuthFlowRunning] = useState(false);
+
+  // Quota state
+  const [googleQuota, setGoogleQuota] = useState<GoogleQuotaInfo | null>(null);
+  const [isGoogleQuotaLoading, setIsGoogleQuotaLoading] = useState(false);
+  const [googleQuotaError, setGoogleQuotaError] = useState<string | null>(null);
 
   const loadLlmProviders = useCallback(async (sessionId: string) => {
     setIsLlmProvidersLoading(true);
@@ -436,6 +488,51 @@ export const MainLayout: React.FC = () => {
     }
   }, []);
 
+  const loadOauthProviders = useCallback(async () => {
+    setIsOauthProvidersLoading(true);
+    setOauthProvidersError(null);
+    try {
+      const response = await apiClient.get<{ providers: OAuthProviderInfo[] }>('/api/oauth/providers');
+      setOauthProviders(response.providers ?? []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load OAuth providers';
+      setOauthProvidersError(message);
+      setOauthProviders([]);
+    } finally {
+      setIsOauthProvidersLoading(false);
+    }
+  }, []);
+
+  const loadGoogleAccounts = useCallback(async () => {
+    setIsGoogleAccountsLoading(true);
+    setGoogleAccountsError(null);
+    try {
+      const response = await apiClient.get<{ accounts: OAuthAccountInfo[] }>('/api/oauth/google/accounts');
+      setGoogleAccounts(response.accounts ?? []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load Google accounts';
+      setGoogleAccountsError(message);
+      setGoogleAccounts([]);
+    } finally {
+      setIsGoogleAccountsLoading(false);
+    }
+  }, []);
+
+  const loadGoogleQuota = useCallback(async () => {
+    setIsGoogleQuotaLoading(true);
+    setGoogleQuotaError(null);
+    try {
+      const response = await apiClient.get<GoogleQuotaInfo>('/api/quota/google');
+      setGoogleQuota(response);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load Google quota';
+      setGoogleQuotaError(message);
+      setGoogleQuota(null);
+    } finally {
+      setIsGoogleQuotaLoading(false);
+    }
+  }, []);
+
   // Skills options for SelectDialog (first-level menu)
   const skillOptions = useMemo<SelectOption<string>[]>(() => {
     if (skillsError) {
@@ -499,6 +596,138 @@ export const MainLayout: React.FC = () => {
     return lines.join('\n');
   }, [selectedSkill]);
 
+  // OAuth providers options
+  const oauthProviderOptions = useMemo<SelectOption<string>[]>(() => {
+    if (oauthProvidersError) {
+      return [
+        {
+          key: 'error',
+          value: 'error',
+          label: `Error: ${oauthProvidersError}`,
+          description: 'Press Enter to retry',
+        },
+      ];
+    }
+
+    if (oauthProviders.length === 0) {
+      return [
+        {
+          key: 'none',
+          value: 'none',
+          label: 'No OAuth providers available',
+          description: 'Check backend configuration',
+          disabled: true,
+        },
+      ];
+    }
+
+    return oauthProviders.map((provider) => ({
+      key: provider.id,
+      value: provider.id,
+      label: provider.name,
+      description: provider.description || undefined,
+    }));
+  }, [oauthProviders, oauthProvidersError]);
+
+  const selectedGoogleAccount = useMemo(() => {
+    if (!selectedGoogleAccountId) return null;
+    return googleAccounts.find((account) => account.account_id === selectedGoogleAccountId) ?? null;
+  }, [googleAccounts, selectedGoogleAccountId]);
+
+  const googleMenuOptions = useMemo<SelectOption<string>[]>(() => {
+    if (googleAccountsError) {
+      return [
+        {
+          key: 'error',
+          value: 'error',
+          label: `Error: ${googleAccountsError}`,
+          description: 'Press Enter to retry',
+        },
+      ];
+    }
+
+    if (googleMenuMode === 'account' && selectedGoogleAccount) {
+      return [
+        {
+          key: 'set_default',
+          value: 'set_default',
+          label: 'Set as default',
+          description: 'Use this account for quota checks',
+        },
+        {
+          key: 'disconnect',
+          value: 'disconnect',
+          label: 'Disconnect account',
+          description: 'Remove OAuth tokens for this account',
+        },
+        {
+          key: 'back',
+          value: 'back',
+          label: 'Back to accounts',
+          description: 'Return to account list',
+        },
+      ];
+    }
+
+    const options: SelectOption<string>[] = [
+      {
+        key: 'connect',
+        value: 'connect',
+        label: 'Connect Google account',
+        description: isOAuthFlowRunning ? 'OAuth flow in progress' : 'Start Google OAuth flow',
+        disabled: isOAuthFlowRunning,
+      },
+    ];
+
+    if (googleAccounts.length === 0) {
+      options.push({
+        key: 'empty',
+        value: 'empty',
+        label: 'No connected accounts',
+        description: 'Connect an account to manage it',
+        disabled: true,
+      });
+    } else {
+      googleAccounts.forEach((account) => {
+        const badge = account.is_default ? '[default] ' : '';
+        const label = `${badge}${account.email || account.account_id}`;
+        options.push({
+          key: account.account_id,
+          value: `account:${account.account_id}`,
+          label,
+          description: account.email ? account.account_id : undefined,
+        });
+      });
+    }
+
+    options.push({
+      key: 'refresh',
+      value: 'refresh',
+      label: 'Refresh list',
+      description: 'Reload connected accounts',
+    });
+    options.push({
+      key: 'back',
+      value: 'back',
+      label: 'Back to providers',
+      description: 'Return to OAuth providers',
+    });
+
+    return options;
+  }, [googleAccounts, googleAccountsError, googleMenuMode, isOAuthFlowRunning, selectedGoogleAccount]);
+
+  const googleMenuDescription = useMemo(() => {
+    if (googleMenuMode === 'account' && selectedGoogleAccount) {
+      const email = selectedGoogleAccount.email || selectedGoogleAccount.account_id;
+      const defaultText = selectedGoogleAccount.is_default ? 'Yes' : 'No';
+      return `Account: ${email}\nDefault: ${defaultText}`;
+    }
+
+    return googleAccounts.length > 0
+      ? `Connected Google accounts: ${googleAccounts.length}`
+      : 'No Google accounts connected yet.';
+  }, [googleMenuMode, selectedGoogleAccount, googleAccounts.length]);
+
   // Handle skill selection (open detail dialog)
   const handleSkillSelect = useCallback((skillName: string) => {
     if (skillName === 'error') {
@@ -550,6 +779,161 @@ export const MainLayout: React.FC = () => {
   const handleSkillDetailCancel = useCallback(() => {
     setActiveDialog('skills');
   }, []);
+
+  const startGoogleOAuthFlow = useCallback(async () => {
+    if (isOAuthFlowRunning) {
+      appActions.showNotification('OAuth flow already in progress', 'info');
+      return;
+    }
+
+    setIsOAuthFlowRunning(true);
+
+    try {
+      const startData = await apiClient.post<{ auth_url: string; state: string; callback_url: string; expires_in: number }>(
+        '/api/oauth/google/start'
+      );
+
+      try {
+        await openBrowser(startData.auth_url);
+        appActions.showNotification('Opening browser for Google OAuth...', 'info');
+      } catch {
+        appActions.showNotification('Unable to open browser. Open the URL manually.', 'error');
+      }
+
+      appActions.addHistoryItem({
+        type: MessageType.INFO,
+        message: [
+          'Google OAuth started.',
+          '',
+          'Open this URL in your browser:',
+          startData.auth_url,
+          '',
+          `Waiting for callback on ${startData.callback_url}`,
+        ].join('\n'),
+      });
+
+      const timeoutMs = Math.max(60_000, (startData.expires_in || 300) * 1000);
+      const callbackResult = await waitForOAuthCallback({
+        expectedState: startData.state,
+        timeoutMs,
+      });
+
+      const account = await apiClient.post<OAuthAccountInfo>('/api/oauth/google/callback', {
+        code: callbackResult.code,
+        state: callbackResult.state,
+      });
+
+      const accountLabel = account.email || account.account_id;
+      appActions.showNotification(`Connected Google account: ${accountLabel}`, 'success');
+
+      await loadGoogleAccounts();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Google OAuth failed';
+      appActions.showNotification(message, 'error');
+    } finally {
+      setIsOAuthFlowRunning(false);
+    }
+  }, [appActions, isOAuthFlowRunning, loadGoogleAccounts]);
+
+  const handleOauthProviderSelect = useCallback((providerId: string) => {
+    if (providerId === 'error') {
+      void loadOauthProviders();
+      return;
+    }
+
+    if (providerId === 'none') {
+      return;
+    }
+
+    if (providerId === 'google') {
+      setGoogleMenuMode('root');
+      setSelectedGoogleAccountId(null);
+      setActiveDialog('connects_google_menu');
+      return;
+    }
+
+    appActions.showNotification(`Provider '${providerId}' is not supported yet`, 'error');
+  }, [appActions, loadOauthProviders]);
+
+  const handleGoogleMenuSelect = useCallback(async (value: string) => {
+    if (value === 'error') {
+      void loadGoogleAccounts();
+      return;
+    }
+
+    if (value === 'empty') {
+      return;
+    }
+
+    if (googleMenuMode === 'account') {
+      if (!selectedGoogleAccount) {
+        setGoogleMenuMode('root');
+        setSelectedGoogleAccountId(null);
+        return;
+      }
+
+      if (value === 'back') {
+        setGoogleMenuMode('root');
+        setSelectedGoogleAccountId(null);
+        return;
+      }
+
+      if (value === 'set_default') {
+        try {
+          await apiClient.post('/api/oauth/google/default', {
+            account_id: selectedGoogleAccount.account_id,
+          });
+          appActions.showNotification('Default Google account updated', 'success');
+          await loadGoogleAccounts();
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Failed to set default account';
+          appActions.showNotification(message, 'error');
+        }
+        return;
+      }
+
+      if (value === 'disconnect') {
+        try {
+          await apiClient.delete(`/api/oauth/google/accounts/${selectedGoogleAccount.account_id}`);
+          appActions.showNotification('Google account disconnected', 'success');
+          setGoogleMenuMode('root');
+          setSelectedGoogleAccountId(null);
+          await loadGoogleAccounts();
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Failed to disconnect account';
+          appActions.showNotification(message, 'error');
+        }
+      }
+      return;
+    }
+
+    if (value === 'connect') {
+      setActiveDialog(null);
+      void startGoogleOAuthFlow();
+      return;
+    }
+
+    if (value === 'refresh') {
+      void loadGoogleAccounts();
+      return;
+    }
+
+    if (value === 'back') {
+      setActiveDialog('connects_providers');
+      return;
+    }
+
+    if (value.startsWith('account:')) {
+      setSelectedGoogleAccountId(value.slice('account:'.length));
+      setGoogleMenuMode('account');
+    }
+  }, [
+    appActions,
+    googleMenuMode,
+    loadGoogleAccounts,
+    selectedGoogleAccount,
+    startGoogleOAuthFlow,
+  ]);
 
   const activeProviderId = selectedProviderId ?? currentLlmConfig?.provider ?? null;
 
@@ -689,6 +1073,35 @@ export const MainLayout: React.FC = () => {
 
     void loadSkills(appState.currentSessionId);
   }, [activeDialog, appState.currentSessionId, loadSkills]);
+
+  // Load OAuth providers when dialog opens
+  useEffect(() => {
+    if (activeDialog !== 'connects_providers') {
+      return;
+    }
+
+    void loadOauthProviders();
+  }, [activeDialog, loadOauthProviders]);
+
+  // Load Google accounts when dialog opens
+  useEffect(() => {
+    if (activeDialog !== 'connects_google_menu') {
+      setGoogleMenuMode('root');
+      setSelectedGoogleAccountId(null);
+      return;
+    }
+
+    void loadGoogleAccounts();
+  }, [activeDialog, loadGoogleAccounts]);
+
+  // Load Google quota when dialog opens
+  useEffect(() => {
+    if (activeDialog !== 'quota_display') {
+      return;
+    }
+
+    void loadGoogleQuota();
+  }, [activeDialog, loadGoogleQuota]);
 
   // Track session ID to detect session changes
   const previousSessionIdRef = useRef(appState.currentSessionId);
@@ -1259,6 +1672,12 @@ export const MainLayout: React.FC = () => {
           setActiveDialog('mcp_servers');
         } else if (result.dialog === 'skills') {
           setActiveDialog('skills');
+        } else if (result.dialog === 'connects_providers') {
+          setActiveDialog('connects_providers');
+        } else if (result.dialog === 'connects_google_menu') {
+          setActiveDialog('connects_google_menu');
+        } else if (result.dialog === 'quota_display') {
+          setActiveDialog('quota_display');
         }
         break;
 
@@ -1589,6 +2008,50 @@ export const MainLayout: React.FC = () => {
             onCancel={handleSkillDetailCancel}
             showNumbers={true}
             maxItemsToShow={10}
+          />
+        )}
+
+        {/* OAuth providers dialog */}
+        {activeDialog === 'connects_providers' && (
+          <SelectDialog
+            title="Connect OAuth Provider"
+            description="Select a provider to connect:"
+            options={oauthProviderOptions}
+            onSelect={handleOauthProviderSelect}
+            onCancel={handleDialogCancel}
+            isLoading={isOauthProvidersLoading}
+            loadingMessage="Loading providers..."
+            showNumbers={true}
+            showDescriptions={true}
+            maxItemsToShow={8}
+          />
+        )}
+
+        {/* Google accounts dialog */}
+        {activeDialog === 'connects_google_menu' && (
+          <SelectDialog
+            title="Google OAuth"
+            description={googleMenuDescription}
+            options={googleMenuOptions}
+            onSelect={handleGoogleMenuSelect}
+            onCancel={handleDialogCancel}
+            isLoading={isGoogleAccountsLoading}
+            loadingMessage="Loading Google accounts..."
+            showNumbers={true}
+            showDescriptions={true}
+            maxItemsToShow={10}
+          />
+        )}
+
+        {/* Quota display dialog */}
+        {activeDialog === 'quota_display' && (
+          <QuotaDisplay
+            title="Gemini Quota"
+            accountLabel={googleQuota?.email || googleQuota?.account_id || 'No account'}
+            windows={googleQuota?.windows ?? []}
+            isLoading={isGoogleQuotaLoading}
+            error={googleQuotaError}
+            onCancel={handleDialogCancel}
           />
         )}
 

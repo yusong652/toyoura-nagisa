@@ -8,7 +8,7 @@ execution) resides in the application layer (Agent, AgentService).
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Type, AsyncGenerator
+from typing import List, Optional, Dict, Any, Type, AsyncGenerator, Callable, cast
 from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
@@ -32,7 +32,7 @@ class LLMClientBase(ABC):
     - Thread-safe: Supports concurrent sessions without state conflicts
     - Provider-agnostic: Unified interface across Gemini, Anthropic, OpenAI, etc.
     """
-    
+
     def __init__(self, extra_config: Optional[Dict[str, Any]] = None):
         """
         Initialize LLM client base class.
@@ -59,25 +59,21 @@ class LLMClientBase(ABC):
         return processor.extract_text_content(response)
 
     def extract_web_search_sources(self, response: Any) -> List[Dict[str, Any]]:
-        processor = self._get_response_processor()
+        processor = cast(Any, self._get_response_processor())
         extractor = getattr(processor, "extract_web_search_sources", None)
-        if callable(extractor):
-            return extractor(response)
+        if not callable(extractor):
+            return []
+        result = extractor(response)
+        if isinstance(result, list):
+            return [item for item in result if isinstance(item, dict)]
         return []
 
-    def build_api_config(
-        self,
-        system_prompt: str,
-        tool_schemas: Optional[List[Any]] = None
-    ) -> Dict[str, Any]:
+    def build_api_config(self, system_prompt: str, tool_schemas: Optional[List[Any]] = None) -> Dict[str, Any]:
         return self._build_api_config(system_prompt, tool_schemas)
 
     @abstractmethod
     async def call_api_with_context(
-        self,
-        context_contents: List[Dict[str, Any]],
-        api_config: Dict[str, Any],
-        **kwargs
+        self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs
     ) -> Any:
         """
         Execute direct LLM API call with complete pre-formatted context and configuration.
@@ -130,10 +126,7 @@ class LLMClientBase(ABC):
 
     @abstractmethod
     async def call_api_with_context_streaming(
-        self,
-        context_contents: List[Dict[str, Any]],
-        api_config: Dict[str, Any],
-        **kwargs
+        self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs
     ) -> AsyncGenerator[StreamingChunk, None]:
         """
         Execute streaming LLM API call with real-time chunk delivery.
@@ -200,11 +193,7 @@ class LLMClientBase(ABC):
         pass
 
     @abstractmethod
-    def _build_api_config(
-        self,
-        system_prompt: str,
-        tool_schemas: Optional[List[Any]]
-    ) -> Dict[str, Any]:
+    def _build_api_config(self, system_prompt: str, tool_schemas: Optional[List[Any]]) -> Dict[str, Any]:
         """
         Build provider-specific API configuration.
 
@@ -222,7 +211,6 @@ class LLMClientBase(ABC):
                 - OpenAI: {'tools': [...], 'instructions': str}
         """
         pass
-
 
     @abstractmethod
     def _get_context_manager_class(self) -> Type[BaseContextManager]:
@@ -247,11 +235,12 @@ class LLMClientBase(ABC):
         if session_id not in self._session_context_managers:
             # Create new context manager for this session
             context_manager_class = self._get_context_manager_class()
-            provider_name = self.__class__.__name__.replace('Client', '').lower()
+            provider_name = getattr(self, "provider_name", None)
+            if not provider_name:
+                provider_name = self.__class__.__name__.replace("Client", "").lower()
 
             self._session_context_managers[session_id] = context_manager_class(
-                provider_name=provider_name,
-                session_id=session_id
+                provider_name=provider_name, session_id=session_id
             )
 
         return self._session_context_managers[session_id]

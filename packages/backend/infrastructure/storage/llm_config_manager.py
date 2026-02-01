@@ -82,13 +82,13 @@ def _get_system_default_config() -> Optional[Dict[str, Any]]:
         if not os.path.exists(MODELS_YAML_FILE):
             return None
 
-        with open(MODELS_YAML_FILE, 'r', encoding='utf-8') as f:
+        with open(MODELS_YAML_FILE, "r", encoding="utf-8") as f:
             models_config = yaml.safe_load(f)
 
         if not isinstance(models_config, dict):
             return None
 
-        default_config = models_config.get('default')
+        default_config = models_config.get("default")
         if not default_config:
             return None
 
@@ -134,7 +134,7 @@ def get_default_llm_config() -> Optional[Dict[str, Any]]:
     # Priority 1: User customization (data/default_llm.json)
     if os.path.exists(DEFAULT_LLM_CONFIG_FILE):
         try:
-            with open(DEFAULT_LLM_CONFIG_FILE, 'r', encoding='utf-8') as f:
+            with open(DEFAULT_LLM_CONFIG_FILE, "r", encoding="utf-8") as f:
                 config = json.load(f)
 
             # Validate required fields
@@ -188,15 +188,12 @@ def save_default_llm_config(
             os.makedirs(config_dir, exist_ok=True)
 
         # Build configuration
-        config: Dict[str, Any] = {
-            "provider": provider,
-            "model": model
-        }
+        config: Dict[str, Any] = {"provider": provider, "model": model}
         if secondary_model:
             config["secondary_model"] = secondary_model
 
         # Save to file
-        with open(DEFAULT_LLM_CONFIG_FILE, 'w', encoding='utf-8') as f:
+        with open(DEFAULT_LLM_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
 
         print(f"[INFO] Saved default LLM config: {provider}/{model}")
@@ -237,31 +234,37 @@ def clear_default_llm_config() -> bool:
 def get_provider_secondary_model(provider: str) -> Optional[str]:
     """
     Get secondary model for a provider from its specific configuration.
-    
+
     Args:
         provider: Provider identifier
-        
+
     Returns:
         Optional[str]: Secondary model identifier or None if not found
     """
     try:
         if provider == "google":
             from backend.infrastructure.llm.providers.google.config import GoogleConfig
+
             return GoogleConfig().secondary_model
         if provider == "anthropic":
             from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
+
             return AnthropicConfig().secondary_model
         if provider in ("openai", "gpt"):
             from backend.infrastructure.llm.providers.openai.config import OpenAIConfig
+
             return OpenAIConfig().secondary_model
         if provider == "moonshot":
             from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig
+
             return MoonshotConfig().secondary_model
         if provider == "zhipu":
             from backend.infrastructure.llm.providers.zhipu.config import ZhipuConfig
+
             return ZhipuConfig().secondary_model
         if provider == "openrouter":
             from backend.infrastructure.llm.providers.openrouter.config import OpenRouterConfig
+
             return OpenRouterConfig().secondary_model
     except Exception:
         pass
@@ -357,7 +360,12 @@ def normalize_llm_config(llm_config: Optional[Dict[str, Any]]) -> tuple[Optional
     model = llm_config.get("model")
     secondary_model = llm_config.get("secondary_model")
 
-    if not provider or not model or not is_provider_supported(provider) or not is_model_valid_for_provider(provider, model):
+    if (
+        not provider
+        or not model
+        or not is_provider_supported(provider)
+        or not is_model_valid_for_provider(provider, model)
+    ):
         return build_initial_llm_config(), True
 
     # Check secondary_model
@@ -403,14 +411,12 @@ def validate_llm_config(
         if not is_valid:
             print(f"Invalid config: {error}")
     """
-    from backend.infrastructure.llm.shared.models_registry import (
-        is_provider_supported,
-        is_model_valid_for_provider
-    )
+    from backend.infrastructure.llm.shared.models_registry import is_provider_supported, is_model_valid_for_provider
 
     # Check if provider is supported
     if not is_provider_supported(provider):
         from backend.infrastructure.llm.shared.models_registry import get_supported_provider_ids
+
         supported = get_supported_provider_ids()
         return False, f"Unsupported provider '{provider}'. Supported: {supported}"
 
@@ -419,9 +425,19 @@ def validate_llm_config(
         return False, f"Model '{model}' is not available for provider '{provider}'"
 
     if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
-        return False, (
-            f"Secondary model '{secondary_model}' is not available for provider '{provider}'"
-        )
+        return False, (f"Secondary model '{secondary_model}' is not available for provider '{provider}'")
+
+    if provider == "google-gemini-cli":
+        try:
+            from backend.infrastructure.oauth.base.types import OAuthProvider
+            from backend.infrastructure.storage import oauth_token_storage
+
+            if oauth_token_storage.has_accounts(OAuthProvider.GOOGLE):
+                return True, None
+        except Exception:
+            pass
+
+        return False, "Google OAuth not configured"
 
     # Check if API key exists for this provider
     if provider in _API_KEY_ENV_VARS:

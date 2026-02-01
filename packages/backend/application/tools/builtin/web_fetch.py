@@ -37,24 +37,18 @@ async def web_fetch(
             # Use GoogleClient wrapper instead of raw genai.Client
             google_client = GoogleClient(config=google_config)
         except Exception as e:
-            return error_response(
-                f"Gemini API not configured. web_fetch requires GOOGLE_API_KEY: {e}"
-            )
+            return error_response(f"Gemini API not configured. web_fetch requires GOOGLE_API_KEY: {e}")
 
         result = await fetch_url_content(google_client, url=url, prompt=prompt)
 
         # Check result status
         if result.status == "error":
-            return error_response(
-                f"Failed to fetch URL: {result.error}"
-            )
+            return error_response(f"Failed to fetch URL: {result.error}")
 
         # Build response
         sources_info = ""
         if result.sources:
-            sources_list = "\n".join(
-                f"- [{s['title']}]({s['url']})" for s in result.sources
-            )
+            sources_list = "\n".join(f"- [{s['title']}]({s['url']})" for s in result.sources)
             sources_info = f"\n\n**Sources:**\n{sources_list}"
 
         content_with_sources = result.content + sources_info
@@ -67,25 +61,19 @@ async def web_fetch(
 
         return success_response(
             message=f"Fetched content from {url}{token_info}",
-            llm_content={
-                "parts": [
-                    {"type": "text", "text": content_with_sources}
-                ]
-            },
+            llm_content={"parts": [{"type": "text", "text": content_with_sources}]},
             url=result.url,
             sources=result.sources,
             metadata=result.metadata,
         )
 
     except Exception as e:
-        return error_response(
-            f"Web fetch error: {str(e)}"
-        )
+        return error_response(f"Web fetch error: {str(e)}")
 
 
 def register_web_fetch_tool(registrar: ToolRegistrar):
     """Register the Web Fetch tool with the registrar."""
     registrar.tool(
         tags={"builtin", "web_fetch", "url", "fetch"},
-        annotations={"category": "builtin", "tags": ["builtin", "web_fetch", "url", "fetch"]}
+        annotations={"category": "builtin", "tags": ["builtin", "web_fetch", "url", "fetch"]},
     )(web_fetch)

@@ -166,8 +166,31 @@ def _load_providers_from_yaml() -> List[ProviderInfo]:
         return []
 
 
-# Initialize registry (YAML only)
-PROVIDERS_REGISTRY: List[ProviderInfo] = _load_providers_from_yaml()
+_PROVIDERS_REGISTRY: List[ProviderInfo] = []
+_PROVIDERS_MTIME: Optional[float] = None
+
+
+def _get_models_mtime() -> Optional[float]:
+    if not os.path.exists(MODELS_YAML_PATH):
+        return None
+    try:
+        return os.path.getmtime(MODELS_YAML_PATH)
+    except OSError:
+        return None
+
+
+def _ensure_registry_loaded() -> None:
+    global _PROVIDERS_REGISTRY, _PROVIDERS_MTIME
+
+    mtime = _get_models_mtime()
+    if _PROVIDERS_MTIME is None and _PROVIDERS_REGISTRY:
+        return
+
+    if mtime == _PROVIDERS_MTIME and _PROVIDERS_REGISTRY:
+        return
+
+    _PROVIDERS_REGISTRY = _load_providers_from_yaml()
+    _PROVIDERS_MTIME = mtime
 
 
 # =====================
@@ -187,7 +210,8 @@ def get_all_providers() -> List[ProviderInfo]:
         for provider in providers:
             print(f"{provider.name}: {len(provider.models)} models")
     """
-    return PROVIDERS_REGISTRY
+    _ensure_registry_loaded()
+    return _PROVIDERS_REGISTRY
 
 
 def get_provider_models(provider: str) -> Optional[List[ModelInfo]]:
@@ -205,7 +229,8 @@ def get_provider_models(provider: str) -> Optional[List[ModelInfo]]:
         if models:
             print(f"Google has {len(models)} models")
     """
-    for p in PROVIDERS_REGISTRY:
+    _ensure_registry_loaded()
+    for p in _PROVIDERS_REGISTRY:
         if p.provider == provider:
             return p.models
     return None
@@ -226,7 +251,8 @@ def get_provider_info(provider: str) -> Optional[ProviderInfo]:
         if info:
             print(f"{info.name}: {info.description}")
     """
-    for p in PROVIDERS_REGISTRY:
+    _ensure_registry_loaded()
+    for p in _PROVIDERS_REGISTRY:
         if p.provider == provider:
             return p
     return None
@@ -246,7 +272,8 @@ def is_provider_supported(provider: str) -> bool:
         if is_provider_supported("google"):
             print("Google is supported")
     """
-    return any(p.provider == provider for p in PROVIDERS_REGISTRY)
+    _ensure_registry_loaded()
+    return any(p.provider == provider for p in _PROVIDERS_REGISTRY)
 
 
 def is_model_valid_for_provider(provider: str, model: str) -> bool:
@@ -301,7 +328,8 @@ def get_supported_provider_ids() -> List[str]:
         providers = get_supported_provider_ids()
         # ["google", "anthropic", "openai", ...]
     """
-    return [p.provider for p in PROVIDERS_REGISTRY]
+    _ensure_registry_loaded()
+    return [p.provider for p in _PROVIDERS_REGISTRY]
 
 
 def get_model_thinking_config(provider: str, model: str) -> Optional[ThinkingConfig]:

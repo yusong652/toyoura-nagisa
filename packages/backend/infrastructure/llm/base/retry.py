@@ -5,7 +5,16 @@ from typing import AsyncGenerator, Awaitable, Callable, Optional, TypeVar
 T = TypeVar("T")
 
 
+class RateLimitError(Exception):
+    def __init__(self, message: str, retry_after: Optional[float] = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 def is_retryable_error(error: Exception) -> bool:
+    if isinstance(error, RateLimitError):
+        return True
+
     error_str = str(error).lower()
     error_type = type(error).__name__.lower()
 
@@ -18,6 +27,10 @@ def is_retryable_error(error: Exception) -> bool:
         "broken pipe",
         "eof",
         "read error",
+        "rate limit",
+        "resource_exhausted",
+        "retrydelay",
+        "429",
     ]
 
     for pattern in retryable_patterns:
@@ -55,7 +68,8 @@ async def run_with_retries(
             if not retryable or attempt >= max_retries:
                 raise
 
-            delay = base_delay * (2 ** attempt)
+            retry_after = getattr(exc, "retry_after", None)
+            delay = retry_after if isinstance(retry_after, (int, float)) else base_delay * (2**attempt)
             if debug:
                 print(f"[DEBUG] LLM retrying in {delay}s")
 
@@ -96,14 +110,13 @@ async def stream_with_retries(
         except Exception as exc:
             retryable = is_retryable_error(exc)
             if debug:
-                print(
-                    f"[DEBUG] LLM streaming failed (attempt {attempt + 1}/{max_retries + 1}): {exc}"
-                )
+                print(f"[DEBUG] LLM streaming failed (attempt {attempt + 1}/{max_retries + 1}): {exc}")
 
             if had_chunk or not retryable or attempt >= max_retries:
                 raise
 
-            delay = base_delay * (2 ** attempt)
+            retry_after = getattr(exc, "retry_after", None)
+            delay = retry_after if isinstance(retry_after, (int, float)) else base_delay * (2**attempt)
             if debug:
                 print(f"[DEBUG] LLM retrying stream in {delay}s")
 

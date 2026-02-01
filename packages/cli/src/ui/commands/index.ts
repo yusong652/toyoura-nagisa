@@ -30,3 +30,9 @@ export { mcpsCommand } from './mcpsCommand.js';
 
 // Skills command for managing skill configurations
 export { skillsCommand } from './skillsCommand.js';
+
+// OAuth connections command
+export { connectsCommand } from './connectsCommand.js';
+
+// Quota command for Google usage
+export { quotaCommand } from './quotaCommand.js';
