@@ -161,7 +161,8 @@ def _check_api_key_configured(provider: str) -> bool:
     if provider == "google":
         return bool(_get_env_api_key(provider))
 
-    if provider == "google-gemini-cli":
+    # OAuth-based providers
+    if provider in ("google-gemini-cli", "google-gemini-antigravity"):
         try:
             from backend.infrastructure.oauth.base.types import OAuthProvider
             from backend.infrastructure.storage import oauth_token_storage
