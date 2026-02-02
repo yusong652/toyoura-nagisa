@@ -24,6 +24,7 @@ class LLMFactory:
         """Register default LLM client implementations."""
         from backend.infrastructure.llm.providers.google import GoogleClient
         from backend.infrastructure.llm.providers.google_gemini_cli import GoogleGeminiCliClient
+        from backend.infrastructure.llm.providers.google_gemini_antigravity import GoogleGeminiAntigravityClient
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         from backend.infrastructure.llm.providers.openai import OpenAIClient
         from backend.infrastructure.llm.providers.moonshot import MoonshotClient
@@ -33,6 +34,7 @@ class LLMFactory:
         self._clients = {
             "google": GoogleClient,
             "google-gemini-cli": GoogleGeminiCliClient,
+            "google-gemini-antigravity": GoogleGeminiAntigravityClient,
             "anthropic": AnthropicClient,
             "gpt": OpenAIClient,
             "openai": OpenAIClient,
@@ -104,6 +106,11 @@ class LLMFactory:
             cfg = GoogleConfig(model=model)
             return {"config": cfg, "extra_config": extra}
         elif provider == "google-gemini-cli":
+            from backend.infrastructure.llm.providers.google.config import GoogleConfig
+
+            cfg = GoogleConfig(model=model, use_oauth=True)
+            return {"config": cfg, "extra_config": extra}
+        elif provider == "google-gemini-antigravity":
             from backend.infrastructure.llm.providers.google.config import GoogleConfig
 
             cfg = GoogleConfig(model=model, use_oauth=True)
