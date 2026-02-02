@@ -126,12 +126,57 @@ providers:
   # Google Gemini CLI (OAuth)
   - provider: google-gemini-cli
     name: Google Gemini CLI
-    description: Gemini CLI OAuth (Vertex AI)
+    description: Gemini CLI OAuth (Code Assist API)
     models:
+      - id: gemini-3-pro-preview
+        name: Gemini 3.0 Pro (CLI)
+        description: Gemini 3.0 Pro via Gemini CLI OAuth
+        context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
       - id: gemini-3-flash-preview
-        name: Gemini 3.0 Flash (CLI OAuth)
+        name: Gemini 3.0 Flash (CLI)
         description: Gemini 3.0 Flash via Gemini CLI OAuth
         context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
+  # Google Gemini Antigravity (OAuth with endpoint fallback)
+  - provider: google-gemini-antigravity
+    name: Google Antigravity
+    description: Antigravity OAuth with endpoint fallback (supports Gemini and Claude models)
+    models:
+      - id: gemini-3-pro-preview
+        name: Gemini 3.0 Pro (Antigravity)
+        description: Gemini 3.0 Pro via Antigravity OAuth
+        context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
+      - id: gemini-3-flash-preview
+        name: Gemini 3.0 Flash (Antigravity)
+        description: Gemini 3.0 Flash via Antigravity OAuth
+        context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
+      - id: claude-opus-4-5-vertex
+        name: Claude Opus 4.5 (Antigravity)
+        description: Claude Opus 4.5 via Antigravity OAuth (Vertex AI)
+        context_window: 200000
         multimodal: true
         thinking:
           mode: configurable
