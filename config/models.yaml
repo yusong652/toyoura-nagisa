@@ -29,9 +29,9 @@
 
 # System default configuration (used when user hasn't set custom config via frontend)
 default:
-  provider: google
-  model: gemini-3-flash-preview
-  secondary_model: gemini-3-flash-preview
+  provider: google-gemini-antigravity
+  model: gemini-3-flash
+  secondary_model: gemini-3-flash
 
 providers:
 
@@ -151,27 +151,31 @@ providers:
   # Google Gemini Antigravity (OAuth with endpoint fallback)
   - provider: google-gemini-antigravity
     name: Google Antigravity
-    description: Antigravity OAuth with endpoint fallback (supports Gemini and Claude models)
+    description: Antigravity OAuth (Vertex API)
     models:
-      - id: gemini-3-pro-preview
-        name: Gemini 3.0 Pro (Antigravity)
-        description: Gemini 3.0 Pro via Antigravity OAuth
+      - id: gemini-3-pro-low
+        name: Gemini 3.0 Pro Low (Antigravity)
+        description: Gemini 3.0 Pro low tier via Antigravity OAuth
         context_window: 1048576
         multimodal: true
         thinking:
-          mode: configurable
-          options: [default, low, high]
-          default: high
+          mode: always_on
 
-      - id: gemini-3-flash-preview
-        name: Gemini 3.0 Flash (Antigravity)
-        description: Gemini 3.0 Flash via Antigravity OAuth
+      - id: gemini-3-pro-high
+        name: Gemini 3.0 Pro High (Antigravity)
+        description: Gemini 3.0 Pro high tier via Antigravity OAuth
         context_window: 1048576
         multimodal: true
         thinking:
-          mode: configurable
-          options: [default, low, high]
-          default: high
+          mode: always_on
+
+      - id: gemini-3-flash
+        name: Gemini 3.0 Flash (Antigravity)
+        description: Gemini 3.0 Flash via Antigravity OAuth (alias)
+        context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: always_on
 
       - id: claude-opus-4-5-vertex
         name: Claude Opus 4.5 (Antigravity)

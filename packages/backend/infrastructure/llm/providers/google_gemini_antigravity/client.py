@@ -9,6 +9,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
+import secrets
 import uuid
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
@@ -32,9 +34,24 @@ from backend.infrastructure.llm.providers.google_gemini_cli.debug import GeminiC
 from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
 from backend.infrastructure.llm.providers.google.tool_manager import GoogleToolManager
 from backend.infrastructure.llm.providers.google_gemini_antigravity.constants import (
+    ANTIGRAVITY_ARCHES,
+    ANTIGRAVITY_API_CLIENT,
+    ANTIGRAVITY_CLIENT_METADATA,
+    ANTIGRAVITY_SYSTEM_INSTRUCTION,
+    ANTIGRAVITY_IDE_TYPES,
+    ANTIGRAVITY_OS_VERSIONS,
+    ANTIGRAVITY_PLATFORMS,
+    ANTIGRAVITY_SDK_CLIENTS,
+    ANTIGRAVITY_USER_AGENT,
+    ANTIGRAVITY_VERSION,
     CODE_ASSIST_API_VERSION,
     CODE_ASSIST_ENDPOINT_FALLBACKS,
+    CODE_ASSIST_ENDPOINT_LOAD_FALLBACKS,
+    CODE_ASSIST_ENDPOINT_PROD,
     DEFAULT_METADATA,
+    GEMINI_CLI_API_CLIENT,
+    GEMINI_CLI_CLIENT_METADATA,
+    GEMINI_CLI_USER_AGENT,
     GENERATION_CONFIG_KEYS,
 )
 
@@ -60,6 +77,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         self._user_tier: Optional[str] = None
         self._user_tier_name: Optional[str] = None
         self._current_endpoint_index: int = 0
+        self._fingerprint: Optional[Dict[str, Any]] = None
 
     def _get_current_endpoint(self) -> str:
         """Get the current endpoint to use."""
@@ -76,6 +94,16 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         """Reset to the first (primary) endpoint."""
         self._current_endpoint_index = 0
 
+    def _resolve_antigravity_model(self, model: str) -> str:
+        lower = model.lower()
+        if lower.startswith("gemini-3-pro-preview"):
+            return "gemini-3-pro-low"
+        if lower.startswith("gemini-3-flash-preview"):
+            return "gemini-3-flash"
+        if lower.startswith("gemini-3-pro") and not lower.endswith(("-low", "-high")):
+            return f"{model}-low"
+        return model
+
     async def call_api_with_context(
         self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs: Any
     ) -> types.GenerateContentResponse:
@@ -87,7 +115,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         )
 
         config = self._build_generate_config(api_config, call_options)
-        model = self.google_config.model
+        model = self._resolve_antigravity_model(self.google_config.model)
 
         async def _call_api():
             credentials, account_id = await self._get_credentials()
@@ -139,7 +167,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         )
 
         config = self._build_generate_config(api_config, call_options)
-        model = self.google_config.model
+        model = self._resolve_antigravity_model(self.google_config.model)
         processor = GoogleResponseProcessor.create_streaming_processor()
 
         async def _stream_once() -> AsyncGenerator[StreamingChunk, None]:
@@ -207,24 +235,43 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
             kwargs_api["temperature"] = call_options.temperature
         if call_options.max_tokens is not None:
             kwargs_api["max_output_tokens"] = call_options.max_tokens
+        else:
+            kwargs_api.pop("max_output_tokens", None)
         if call_options.top_p is not None:
             kwargs_api["top_p"] = call_options.top_p
         if call_options.top_k is not None:
             kwargs_api["top_k"] = call_options.top_k
 
-        if call_options.thinking_level == "default":
+        resolved_model = self._resolve_antigravity_model(self.google_config.model)
+        if resolved_model.startswith("gemini-3"):
+            tier = "low"
+            has_tier_suffix = False
+            if resolved_model.endswith("-high"):
+                tier = "high"
+                has_tier_suffix = True
+            elif resolved_model.endswith("-medium"):
+                tier = "high"
+                has_tier_suffix = True
+            elif resolved_model.endswith("-minimal"):
+                tier = "low"
+                has_tier_suffix = True
+            elif resolved_model.endswith("-low"):
+                tier = "low"
+                has_tier_suffix = True
+
+            if not has_tier_suffix and call_options.thinking_level and call_options.thinking_level != "default":
+                tier = call_options.thinking_level
+
+            thinking_level = {
+                "low": types.ThinkingLevel.LOW,
+                "high": types.ThinkingLevel.HIGH,
+            }.get(tier, types.ThinkingLevel.LOW)
+            kwargs_api["thinking_config"] = types.ThinkingConfig(thinking_level=thinking_level, include_thoughts=True)
+        elif call_options.thinking_level == "default":
             kwargs_api.pop("thinking_config", None)
         elif call_options.thinking_level is not None:
             model = self.google_config.model
-            if model.startswith("gemini-3"):
-                thinking_level = {
-                    "low": types.ThinkingLevel.LOW,
-                    "high": types.ThinkingLevel.HIGH,
-                }.get(call_options.thinking_level, types.ThinkingLevel.HIGH)
-                kwargs_api["thinking_config"] = types.ThinkingConfig(
-                    thinking_level=thinking_level, include_thoughts=True
-                )
-            elif model.startswith("gemini-2.5"):
+            if model.startswith("gemini-2.5"):
                 budget = GOOGLE_THINKING_LEVEL_TO_BUDGET.get(call_options.thinking_level, -1)
                 kwargs_api["thinking_config"] = types.ThinkingConfig(thinking_budget=budget, include_thoughts=True)
 
@@ -306,10 +353,13 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         if project_hint:
             payload["cloudaicompanionProject"] = project_hint
 
+        headers = self._build_load_headers(access_token)
         return await self._post_code_assist_with_fallback(
             method="loadCodeAssist",
             payload=payload,
             access_token=access_token,
+            headers_override=headers,
+            endpoints=CODE_ASSIST_ENDPOINT_LOAD_FALLBACKS,
         )
 
     async def _onboard_user(
@@ -352,10 +402,10 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         """Get operation status with endpoint fallback."""
         errors: List[str] = []
 
-        for endpoint in CODE_ASSIST_ENDPOINT_FALLBACKS:
+        headers = self._build_load_headers(access_token)
+        for endpoint in CODE_ASSIST_ENDPOINT_LOAD_FALLBACKS:
             try:
                 url = f"{endpoint}/{CODE_ASSIST_API_VERSION}/{name}"
-                headers = self._build_headers(access_token)
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url, headers=headers) as response:
                         if response.ok:
@@ -390,12 +440,70 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         return None
 
     def _build_headers(self, access_token: str) -> Dict[str, str]:
-        # Use standard headers for better compatibility with Google APIs
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "User-Agent": ANTIGRAVITY_USER_AGENT,
+            "X-Goog-Api-Client": ANTIGRAVITY_API_CLIENT,
+            "Client-Metadata": ANTIGRAVITY_CLIENT_METADATA,
+        }
+        headers.update(self._build_fingerprint_headers())
+        return headers
+
+    def _build_load_headers(self, access_token: str) -> Dict[str, str]:
         return {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
-            "User-Agent": "toyoura-nagisa/1.0",
-            "X-Goog-Api-Client": "gl-python/toyoura-nagisa",
+            "User-Agent": GEMINI_CLI_USER_AGENT,
+            "X-Goog-Api-Client": GEMINI_CLI_API_CLIENT,
+            "Client-Metadata": GEMINI_CLI_CLIENT_METADATA,
+        }
+
+    def _build_fingerprint_headers(self) -> Dict[str, str]:
+        fingerprint = self._get_fingerprint()
+        return {
+            "User-Agent": fingerprint["user_agent"],
+            "X-Goog-Api-Client": fingerprint["api_client"],
+            "Client-Metadata": json.dumps(fingerprint["client_metadata"], separators=(",", ":")),
+            "X-Goog-QuotaUser": fingerprint["quota_user"],
+            "X-Client-Device-Id": fingerprint["device_id"],
+        }
+
+    def _get_fingerprint(self) -> Dict[str, Any]:
+        if self._fingerprint is None:
+            self._fingerprint = self._generate_fingerprint()
+        return self._fingerprint
+
+    def _regenerate_fingerprint(self) -> None:
+        self._fingerprint = self._generate_fingerprint()
+
+    def _generate_fingerprint(self) -> Dict[str, Any]:
+        platform_key = random.choice(["darwin", "win32", "linux"])
+        arch = random.choice(ANTIGRAVITY_ARCHES)
+        os_version = random.choice(ANTIGRAVITY_OS_VERSIONS.get(platform_key, ANTIGRAVITY_OS_VERSIONS["linux"]))
+
+        if platform_key == "darwin":
+            platform_label = "MACOS"
+        elif platform_key == "win32":
+            platform_label = "WINDOWS"
+        elif platform_key == "linux":
+            platform_label = "LINUX"
+        else:
+            platform_label = random.choice(ANTIGRAVITY_PLATFORMS)
+
+        return {
+            "device_id": str(uuid.uuid4()),
+            "user_agent": f"antigravity/{ANTIGRAVITY_VERSION} {platform_key}/{arch}",
+            "api_client": random.choice(ANTIGRAVITY_SDK_CLIENTS),
+            "client_metadata": {
+                "ideType": random.choice(ANTIGRAVITY_IDE_TYPES),
+                "platform": platform_label,
+                "pluginType": "GEMINI",
+                "osVersion": os_version,
+                "arch": arch,
+                "sqmId": f"{{{str(uuid.uuid4()).upper()}}}",
+            },
+            "quota_user": f"device-{secrets.token_hex(8)}",
         }
 
     def _build_code_assist_payload(
@@ -416,13 +524,19 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
 
         generation_config = {k: config_dump[k] for k in GENERATION_CONFIG_KEYS if k in config_dump}
 
+        resolved_model = self._resolve_antigravity_model(model)
+        thinking_config = generation_config.get("thinkingConfig")
+        if resolved_model.startswith("gemini-3") and isinstance(thinking_config, dict):
+            thinking_level = thinking_config.get("thinkingLevel")
+            if isinstance(thinking_level, str):
+                thinking_config["thinkingLevel"] = thinking_level.lower()
+
         payload_contents = [self._dump_content(content) for content in contents]
 
         vertex_request: Dict[str, Any] = {
             "contents": payload_contents,
         }
-        if system_instruction is not None:
-            vertex_request["systemInstruction"] = self._normalize_system_instruction(system_instruction)
+        vertex_request["systemInstruction"] = self._inject_antigravity_system_instruction(system_instruction)
         if cached_content is not None:
             vertex_request["cachedContent"] = cached_content
         if tools is not None:
@@ -431,7 +545,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
             vertex_request["toolConfig"] = tool_config
         if labels is not None:
             vertex_request["labels"] = labels
-        if safety_settings is not None:
+        if safety_settings is not None and self._should_include_safety_settings(safety_settings, model):
             vertex_request["safetySettings"] = safety_settings
         if generation_config:
             vertex_request["generationConfig"] = generation_config
@@ -440,13 +554,16 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
             "model": model,
             "user_prompt_id": str(uuid.uuid4()),
             "request": vertex_request,
+            "requestType": "agent",
+            "userAgent": "antigravity",
+            "requestId": f"agent-{uuid.uuid4()}",
         }
         if project_id:
             payload["project"] = project_id
 
         session_id = self.extra_config.get("session_id")
         if session_id:
-            vertex_request["session_id"] = session_id
+            vertex_request["sessionId"] = session_id
 
         return payload
 
@@ -459,6 +576,53 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         if hasattr(system_instruction, "model_dump"):
             return system_instruction.model_dump(by_alias=True, mode="json", exclude_none=True)
         return system_instruction
+
+    def _inject_antigravity_system_instruction(self, system_instruction: Any) -> Dict[str, Any]:
+        normalized = None
+        if system_instruction is not None:
+            normalized = self._normalize_system_instruction(system_instruction)
+
+        if not isinstance(normalized, dict):
+            normalized = {"role": "user", "parts": []}
+
+        normalized["role"] = "user"
+        parts = normalized.get("parts")
+        if not isinstance(parts, list):
+            parts = []
+
+        if parts:
+            first_part = parts[0]
+            if isinstance(first_part, dict):
+                text = first_part.get("text")
+                if isinstance(text, str):
+                    first_part["text"] = f"{ANTIGRAVITY_SYSTEM_INSTRUCTION}\n\n{text}"
+                else:
+                    parts.insert(0, {"text": ANTIGRAVITY_SYSTEM_INSTRUCTION})
+            else:
+                parts.insert(0, {"text": ANTIGRAVITY_SYSTEM_INSTRUCTION})
+        else:
+            parts.append({"text": ANTIGRAVITY_SYSTEM_INSTRUCTION})
+
+        normalized["parts"] = parts
+        return normalized
+
+    def _should_include_safety_settings(self, safety_settings: Any, model: str) -> bool:
+        resolved_model = self._resolve_antigravity_model(model)
+        if "image" in resolved_model.lower():
+            return True
+        if not isinstance(safety_settings, list):
+            return True
+
+        for setting in safety_settings:
+            if not isinstance(setting, dict):
+                return True
+            threshold = setting.get("threshold")
+            if isinstance(threshold, dict):
+                threshold = threshold.get("threshold")
+            if threshold not in ("BLOCK_NONE", None, "HARM_BLOCK_THRESHOLD_UNSPECIFIED"):
+                return True
+
+        return False
 
     def _dump_content(self, content: Any) -> Dict[str, Any]:
         if isinstance(content, types.Content):
@@ -516,14 +680,19 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         access_token: str,
         timeout: Optional[float] = None,
         debug: bool = False,
+        headers_override: Optional[Dict[str, str]] = None,
+        endpoints: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """POST to Code Assist with endpoint fallback."""
         errors: List[str] = []
-        headers = self._build_headers(access_token)
+        rate_limit_message: Optional[str] = None
+        rate_limit_retry_after: Optional[float] = None
         timeout_cfg = aiohttp.ClientTimeout(total=timeout) if timeout else None
+        endpoint_list = endpoints or CODE_ASSIST_ENDPOINT_FALLBACKS
 
-        for endpoint in CODE_ASSIST_ENDPOINT_FALLBACKS:
+        for endpoint in endpoint_list:
             try:
+                headers = headers_override or self._build_headers(access_token)
                 url = f"{endpoint}/{CODE_ASSIST_API_VERSION}:{method}"
 
                 async with aiohttp.ClientSession(timeout=timeout_cfg) as session:
@@ -536,10 +705,13 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
                             payload_data = await self._read_error_payload(response)
                             retry_after = self._extract_retry_after(payload_data)
                             message = self._extract_error_message(payload_data)
-                            raise RateLimitError(
-                                f"Code Assist rate limited: {message}",
-                                retry_after=retry_after,
-                            )
+                            rate_limit_message = message
+                            if retry_after is not None:
+                                rate_limit_retry_after = retry_after
+                            errors.append(f"{endpoint}: 429 {message}")
+                            if headers_override is None:
+                                self._regenerate_fingerprint()
+                            continue
 
                         # Try next endpoint on 403/404/5xx
                         if response.status in (403, 404) or response.status >= 500:
@@ -560,6 +732,12 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
             except Exception as e:
                 errors.append(f"{endpoint}: {e}")
 
+        if rate_limit_message:
+            raise RateLimitError(
+                f"Code Assist rate limited: {rate_limit_message}",
+                retry_after=rate_limit_retry_after,
+            )
+
         raise ValueError(f"Code Assist request failed on all endpoints: {'; '.join(errors)}")
 
     async def _stream_code_assist_with_fallback(
@@ -569,14 +747,19 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         access_token: str,
         timeout: Optional[float] = None,
         debug: bool = False,
+        headers_override: Optional[Dict[str, str]] = None,
+        endpoints: Optional[List[str]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream from Code Assist with endpoint fallback."""
         errors: List[str] = []
-        headers = self._build_headers(access_token)
+        rate_limit_message: Optional[str] = None
+        rate_limit_retry_after: Optional[float] = None
         timeout_cfg = aiohttp.ClientTimeout(total=timeout) if timeout else None
+        endpoint_list = endpoints or CODE_ASSIST_ENDPOINT_FALLBACKS
 
-        for endpoint in CODE_ASSIST_ENDPOINT_FALLBACKS:
+        for endpoint in endpoint_list:
             try:
+                headers = headers_override or self._build_headers(access_token)
                 url = f"{endpoint}/{CODE_ASSIST_API_VERSION}:{method}"
 
                 async with aiohttp.ClientSession(timeout=timeout_cfg) as session:
@@ -591,10 +774,13 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
                                 payload_data = await self._read_error_payload(response)
                                 retry_after = self._extract_retry_after(payload_data)
                                 message = self._extract_error_message(payload_data)
-                                raise RateLimitError(
-                                    f"Code Assist rate limited: {message}",
-                                    retry_after=retry_after,
-                                )
+                                rate_limit_message = message
+                                if retry_after is not None:
+                                    rate_limit_retry_after = retry_after
+                                errors.append(f"{endpoint}: 429 {message}")
+                                if headers_override is None:
+                                    self._regenerate_fingerprint()
+                                continue
 
                             if response.status in (403, 404) or response.status >= 500:
                                 error_text = await response.text()
@@ -628,6 +814,12 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
                 raise
             except Exception as e:
                 errors.append(f"{endpoint}: {e}")
+
+        if rate_limit_message:
+            raise RateLimitError(
+                f"Code Assist rate limited: {rate_limit_message}",
+                retry_after=rate_limit_retry_after,
+            )
 
         raise ValueError(f"Code Assist streaming failed on all endpoints: {'; '.join(errors)}")
 

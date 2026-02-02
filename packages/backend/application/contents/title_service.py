@@ -11,6 +11,8 @@ from backend.infrastructure.storage.session_manager import (
     get_latest_n_messages,
 )
 from backend.domain.models.messages import BaseMessage, UserMessage
+from backend.infrastructure.storage.session_manager import get_session_llm_config
+from backend.domain.models.streaming import StreamingChunk
 from backend.domain.models.message_factory import extract_text_from_message
 from backend.infrastructure.llm.shared.constants import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
@@ -41,23 +43,63 @@ def _build_title_user_message(conversation_context: str) -> UserMessage:
     )
 
 
-async def _generate_title(llm_client: Any, latest_messages: List[BaseMessage]) -> Optional[str]:
+def _build_title_client(session_id: str, llm_client: Any) -> Any:
+    session_llm_config = get_session_llm_config(session_id)
+    if isinstance(session_llm_config, dict):
+        provider = session_llm_config.get("provider")
+        model = session_llm_config.get("secondary_model") or session_llm_config.get("model")
+        if provider and model:
+            try:
+                from backend.shared.utils.app_context import get_app, get_llm_factory
+
+                factory = get_llm_factory()
+                return factory.create_client_with_config(provider=provider, model=model, app=get_app())
+            except Exception as e:
+                print(f"[WARNING] Failed to build session secondary client for title generation: {e}")
+
+    try:
+        from backend.shared.utils.app_context import get_secondary_llm_client
+
+        return get_secondary_llm_client()
+    except Exception as e:
+        print(f"[WARNING] Failed to load secondary LLM client for title generation: {e}")
+        return llm_client
+
+
+async def _generate_title(
+    session_id: str,
+    llm_client: Any,
+    latest_messages: List[BaseMessage],
+) -> Optional[str]:
     conversation_context = _format_conversation_context(latest_messages)
     if not conversation_context:
         return None
 
     user_message = _build_title_user_message(conversation_context)
-    formatter_class = get_message_formatter_class(llm_client.provider_name.lower())
+
+    title_client = _build_title_client(session_id, llm_client)
+
+    formatter_class = get_message_formatter_class(title_client.provider_name.lower())
     context_contents = formatter_class.format_messages([user_message])
-    api_config = llm_client.build_api_config(DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT)
+    api_config = title_client.build_api_config(DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT)
 
-    response = await llm_client.call_api_with_context(
-        context_contents=context_contents,
-        api_config=api_config,
-        thinking_level="default",  # No thinking for title generation
-    )
-
-    title_response_text = llm_client.extract_text(response)
+    if "antigravity" in title_client.provider_name.lower():
+        collected: List[str] = []
+        async for chunk in title_client.call_api_with_context_streaming(
+            context_contents=context_contents,
+            api_config=api_config,
+            thinking_level="default",
+        ):
+            if isinstance(chunk, StreamingChunk) and chunk.chunk_type == "text":
+                collected.append(chunk.content)
+        title_response_text = "".join(collected).strip()
+    else:
+        response = await title_client.call_api_with_context(
+            context_contents=context_contents,
+            api_config=api_config,
+            thinking_level="default",  # No thinking for title generation
+        )
+        title_response_text = title_client.extract_text(response)
     return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
 
 
@@ -167,7 +209,7 @@ class TitleService:
                     "success": False
                 }
 
-            new_title = await _generate_title(llm_client, latest_messages)
+            new_title = await _generate_title(session_id, llm_client, latest_messages)
 
             if not new_title:
                 return {
