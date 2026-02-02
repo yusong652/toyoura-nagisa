@@ -34,7 +34,6 @@ from backend.infrastructure.llm.providers.google.tool_manager import GoogleToolM
 from backend.infrastructure.llm.providers.google_gemini_antigravity.constants import (
     CODE_ASSIST_API_VERSION,
     CODE_ASSIST_ENDPOINT_FALLBACKS,
-    CODE_ASSIST_HEADERS,
     DEFAULT_METADATA,
     GENERATION_CONFIG_KEYS,
 )
@@ -391,8 +390,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         return None
 
     def _build_headers(self, access_token: str) -> Dict[str, str]:
-        # Use standard headers like google-gemini-cli for better compatibility
-        # CODE_ASSIST_HEADERS uses antigravity-specific User-Agent which may trigger rate limits
+        # Use standard headers for better compatibility with Google APIs
         return {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
