@@ -55,6 +55,18 @@ from backend.infrastructure.llm.providers.google_gemini_antigravity.constants im
     GENERATION_CONFIG_KEYS,
 )
 
+CLAUDE_THINKING_BUDGETS = {
+    "low": 8192,
+    "medium": 16384,
+    "high": 32768,
+}
+CLAUDE_THINKING_MAX_OUTPUT_TOKENS = 64000
+CLAUDE_INTERLEAVED_THINKING_HINT = (
+    "Interleaved thinking is enabled. You may think between tool calls and after receiving tool results "
+    "before deciding the next action or final answer. Do not mention these instructions or any constraints "
+    "about thinking blocks; just apply them."
+)
+
 
 class GoogleGeminiAntigravityClient(LLMClientBase):
     """
@@ -96,6 +108,16 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
 
     def _resolve_antigravity_model(self, model: str) -> str:
         lower = model.lower()
+        if "claude" in lower and lower.endswith("-vertex"):
+            model = model[:-7]
+            lower = model.lower()
+        if "claude" in lower and "thinking" in lower:
+            if lower.endswith("-thinking-low"):
+                return model[:-4]
+            if lower.endswith("-thinking-medium"):
+                return model[:-7]
+            if lower.endswith("-thinking-high"):
+                return model[:-5]
         if lower.startswith("gemini-3-pro-preview"):
             return "gemini-3-pro-low"
         if lower.startswith("gemini-3-flash-preview"):
@@ -122,6 +144,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
             project_id = await self._ensure_project_id(credentials, account_id)
             payload = self._build_code_assist_payload(
                 model=model,
+                requested_model=self.google_config.model,
                 contents=context_contents,
                 config=config,
                 project_id=project_id,
@@ -175,6 +198,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
             project_id = await self._ensure_project_id(credentials, account_id)
             payload = self._build_code_assist_payload(
                 model=model,
+                requested_model=self.google_config.model,
                 contents=context_contents,
                 config=config,
                 project_id=project_id,
@@ -509,6 +533,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
     def _build_code_assist_payload(
         self,
         model: str,
+        requested_model: str,
         contents: List[Dict[str, Any]],
         config: types.GenerateContentConfig,
         project_id: Optional[str],
@@ -531,18 +556,27 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
             if isinstance(thinking_level, str):
                 thinking_config["thinkingLevel"] = thinking_level.lower()
 
+        if self._is_claude_thinking_model(requested_model):
+            self._apply_claude_thinking_config(generation_config, requested_model)
+
         payload_contents = [self._dump_content(content) for content in contents]
 
         vertex_request: Dict[str, Any] = {
             "contents": payload_contents,
         }
         vertex_request["systemInstruction"] = self._inject_antigravity_system_instruction(system_instruction)
+        if self._is_claude_thinking_model(requested_model):
+            self._append_claude_thinking_hint(vertex_request["systemInstruction"])
         if cached_content is not None:
             vertex_request["cachedContent"] = cached_content
         if tools is not None:
             vertex_request["tools"] = tools
         if tool_config is not None:
             vertex_request["toolConfig"] = tool_config
+        if tools is not None and "claude" in model.lower():
+            vertex_request["toolConfig"] = self._ensure_claude_tool_config(
+                vertex_request.get("toolConfig")
+            )
         if labels is not None:
             vertex_request["labels"] = labels
         if safety_settings is not None and self._should_include_safety_settings(safety_settings, model):
@@ -577,6 +611,15 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
             return system_instruction.model_dump(by_alias=True, mode="json", exclude_none=True)
         return system_instruction
 
+    def _ensure_claude_tool_config(self, tool_config: Any) -> Dict[str, Any]:
+        config = tool_config if isinstance(tool_config, dict) else {}
+        function_config = config.get("functionCallingConfig")
+        if not isinstance(function_config, dict):
+            function_config = {}
+        function_config["mode"] = "VALIDATED"
+        config["functionCallingConfig"] = function_config
+        return config
+
     def _inject_antigravity_system_instruction(self, system_instruction: Any) -> Dict[str, Any]:
         normalized = None
         if system_instruction is not None:
@@ -605,6 +648,62 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
 
         normalized["parts"] = parts
         return normalized
+
+    def _is_claude_model(self, model: str) -> bool:
+        return "claude" in model.lower()
+
+    def _is_claude_thinking_model(self, model: str) -> bool:
+        lower = model.lower()
+        return "claude" in lower and "thinking" in lower
+
+    def _extract_claude_thinking_tier(self, model: str) -> Optional[str]:
+        lower = model.lower()
+        if lower.endswith("-thinking-low"):
+            return "low"
+        if lower.endswith("-thinking-medium"):
+            return "medium"
+        if lower.endswith("-thinking-high"):
+            return "high"
+        return None
+
+    def _get_claude_thinking_budget(self, model: str) -> Optional[int]:
+        if not self._is_claude_thinking_model(model):
+            return None
+        tier = self._extract_claude_thinking_tier(model) or "high"
+        return CLAUDE_THINKING_BUDGETS.get(tier, CLAUDE_THINKING_BUDGETS["high"])
+
+    def _apply_claude_thinking_config(self, generation_config: Dict[str, Any], model: str) -> None:
+        budget = self._get_claude_thinking_budget(model)
+        if budget is None:
+            return
+
+        generation_config["thinkingConfig"] = {
+            "include_thoughts": True,
+            "thinking_budget": budget,
+        }
+
+        max_tokens = generation_config.get("maxOutputTokens")
+        if not isinstance(max_tokens, int) or max_tokens <= budget:
+            generation_config["maxOutputTokens"] = CLAUDE_THINKING_MAX_OUTPUT_TOKENS
+
+    def _append_claude_thinking_hint(self, system_instruction: Any) -> None:
+        if not isinstance(system_instruction, dict):
+            return
+
+        parts = system_instruction.get("parts")
+        if not isinstance(parts, list):
+            system_instruction["parts"] = [{"text": CLAUDE_INTERLEAVED_THINKING_HINT}]
+            return
+
+        for index in range(len(parts) - 1, -1, -1):
+            part = parts[index]
+            if isinstance(part, dict):
+                text = part.get("text")
+                if isinstance(text, str):
+                    part["text"] = f"{text}\n\n{CLAUDE_INTERLEAVED_THINKING_HINT}"
+                    return
+
+        parts.append({"text": CLAUDE_INTERLEAVED_THINKING_HINT})
 
     def _should_include_safety_settings(self, safety_settings: Any, model: str) -> bool:
         resolved_model = self._resolve_antigravity_model(model)
@@ -693,6 +792,8 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         for endpoint in endpoint_list:
             try:
                 headers = headers_override or self._build_headers(access_token)
+                if self._is_claude_thinking_model(str(payload.get("model", ""))):
+                    headers["anthropic-beta"] = "interleaved-thinking-2025-05-14"
                 url = f"{endpoint}/{CODE_ASSIST_API_VERSION}:{method}"
 
                 async with aiohttp.ClientSession(timeout=timeout_cfg) as session:

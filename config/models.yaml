@@ -177,15 +177,47 @@ providers:
         thinking:
           mode: always_on
 
-      - id: claude-opus-4-5-vertex
-        name: Claude Opus 4.5 (Antigravity)
-        description: Claude Opus 4.5 via Antigravity OAuth (Vertex AI)
+      - id: claude-opus-4-5-thinking-low
+        name: Claude Opus 4.5 Thinking Low (Antigravity)
+        description: Claude Opus 4.5 thinking low tier via Antigravity OAuth
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: always_on
+
+      - id: claude-opus-4-5-thinking-high
+        name: Claude Opus 4.5 Thinking High (Antigravity)
+        description: Claude Opus 4.5 thinking high tier via Antigravity OAuth
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: always_on
+
+      - id: claude-sonnet-4-5
+        name: Claude Sonnet 4.5 (Antigravity)
+        description: Claude Sonnet 4.5 via Antigravity OAuth
         context_window: 200000
         multimodal: true
         thinking:
           mode: configurable
           options: [default, low, high]
           default: high
+
+      - id: claude-sonnet-4-5-thinking-low
+        name: Claude Sonnet 4.5 Thinking Low (Antigravity)
+        description: Claude Sonnet 4.5 thinking low tier via Antigravity OAuth
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: always_on
+
+      - id: claude-sonnet-4-5-thinking-high
+        name: Claude Sonnet 4.5 Thinking High (Antigravity)
+        description: Claude Sonnet 4.5 thinking high tier via Antigravity OAuth
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: always_on
 
   # Anthropic Claude
   - provider: anthropic
