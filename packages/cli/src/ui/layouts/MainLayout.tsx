@@ -93,6 +93,8 @@ interface LlmProviderInfo {
   description?: string | null;
   models: LlmModelInfo[];
   api_key_configured: boolean;
+  auth_type?: 'api_key' | 'oauth';
+  auth_hint?: string | null;
 }
 
 interface SessionLlmConfig {
@@ -951,7 +953,10 @@ export const MainLayout: React.FC = () => {
         descriptionParts.push(provider.description);
       }
       if (!provider.api_key_configured) {
-        descriptionParts.push('API key not configured');
+        // Use auth_hint from API if available, otherwise fallback to generic message
+        const authMessage = provider.auth_hint || 
+          (provider.auth_type === 'oauth' ? 'Use /connects to authenticate' : 'API key not configured');
+        descriptionParts.push(authMessage);
       }
       return {
         key: provider.provider,

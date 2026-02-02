@@ -92,6 +92,8 @@ class ProviderInfo(BaseModel):
     description: str = Field(..., description="Provider description")
     models: List[ModelInfo] = Field(..., description="Available models")
     api_key_configured: bool = Field(..., description="Whether API key is configured")
+    auth_type: str = Field(default="api_key", description="Authentication type: 'api_key' or 'oauth'")
+    auth_hint: Optional[str] = Field(None, description="Hint for configuring authentication")
 
 
 class ProviderListData(BaseModel):
@@ -186,9 +188,24 @@ def _get_available_providers() -> List[ProviderInfo]:
     registry_providers = get_all_providers()
     result = []
 
+    # OAuth-based providers
+    OAUTH_PROVIDERS = {"google-gemini-cli", "google-gemini-antigravity"}
+
     for reg_provider in registry_providers:
         # Check API key configuration
         has_key = _check_api_key_configured(reg_provider.provider)
+
+        # Determine auth type and hint
+        is_oauth = reg_provider.provider in OAUTH_PROVIDERS
+        auth_type = "oauth" if is_oauth else "api_key"
+        auth_hint = None
+        if not has_key:
+            if is_oauth:
+                auth_hint = "Use /connects to authenticate with Google"
+            else:
+                env_var = _API_KEY_ENV_VARS.get(reg_provider.provider)
+                if env_var:
+                    auth_hint = f"Set {env_var} environment variable"
 
         # Convert registry models to API models
         api_models = []
@@ -217,6 +234,8 @@ def _get_available_providers() -> List[ProviderInfo]:
             description=reg_provider.description,
             models=api_models,
             api_key_configured=has_key,
+            auth_type=auth_type,
+            auth_hint=auth_hint,
         )
 
         result.append(provider_info)
