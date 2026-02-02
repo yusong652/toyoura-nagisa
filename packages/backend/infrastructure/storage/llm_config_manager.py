@@ -427,7 +427,8 @@ def validate_llm_config(
     if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
         return False, (f"Secondary model '{secondary_model}' is not available for provider '{provider}'")
 
-    if provider == "google-gemini-cli":
+    # OAuth-based providers (google-gemini-cli, google-gemini-antigravity)
+    if provider in ("google-gemini-cli", "google-gemini-antigravity"):
         try:
             from backend.infrastructure.oauth.base.types import OAuthProvider
             from backend.infrastructure.storage import oauth_token_storage
