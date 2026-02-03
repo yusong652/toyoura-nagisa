@@ -1,12 +1,11 @@
 """Web Fetch tool for retrieving and processing URL content."""
 
-from typing import Dict, Any
+from typing import Any, Dict, Optional
 
 from backend.application.tools.registrar import ToolRegistrar
 from backend.application.tools.context import ToolContext
 from pydantic import Field
 from backend.shared.utils.tool_result import success_response, error_response
-from backend.infrastructure.llm.providers.google import GoogleClient, GoogleConfig
 from backend.application.contents.web_fetch_service import fetch_url_content
 
 __all__ = ["web_fetch", "register_web_fetch_tool"]
@@ -15,31 +14,32 @@ __all__ = ["web_fetch", "register_web_fetch_tool"]
 async def web_fetch(
     context: ToolContext,
     url: str = Field(..., description="The URL to fetch content from"),
-    prompt: str = Field(..., description="The prompt to run on the fetched content"),
+    format: str = Field(
+        "markdown",
+        description="The format to return the content in (text, markdown, or html). Defaults to markdown.",
+    ),
+    timeout: Optional[float] = Field(None, description="Optional timeout in seconds (max 120)"),
 ) -> Dict[str, Any]:
     """
-    Fetches content from a specified URL and processes it using an AI model.
+    Fetches content from a specified URL and converts it to the requested format.
 
-    - Takes a URL and a prompt as input
-    - Fetches the URL content and processes it
-    - Processes the content with the prompt using a small, fast model
-    - Returns the model's response about the content
+    - Takes a URL and optional format as input
+    - Fetches the URL content, converts to requested format (markdown by default)
+    - Returns the content in the specified format
 
     Usage notes:
       - The URL must be a fully-formed valid URL
-      - The prompt should describe what information you want to extract from the page
+      - Format options: "markdown" (default), "text", or "html"
       - This tool is read-only and does not modify any files
       - Results may be summarized if the content is very large
     """
     try:
-        try:
-            google_config = GoogleConfig()
-            # Use GoogleClient wrapper instead of raw genai.Client
-            google_client = GoogleClient(config=google_config)
-        except Exception as e:
-            return error_response(f"Gemini API not configured. web_fetch requires GOOGLE_API_KEY: {e}")
+        _ = context
+        normalized_format = (format or "markdown").lower()
+        if normalized_format not in {"markdown", "text", "html"}:
+            return error_response("Invalid format. Use 'markdown', 'text', or 'html'.")
 
-        result = await fetch_url_content(google_client, url=url, prompt=prompt)
+        result = await fetch_url_content(url=url, output_format=normalized_format, timeout=timeout)
 
         # Check result status
         if result.status == "error":
@@ -53,14 +53,8 @@ async def web_fetch(
 
         content_with_sources = result.content + sources_info
 
-        # Token usage info for message
-        token_info = ""
-        if result.metadata and "token_usage" in result.metadata:
-            total = result.metadata["token_usage"].get("total_tokens", 0)
-            token_info = f" ({total} tokens)"
-
         return success_response(
-            message=f"Fetched content from {url}{token_info}",
+            message=f"Fetched content from {url}",
             llm_content={"parts": [{"type": "text", "text": content_with_sources}]},
             url=result.url,
             sources=result.sources,
