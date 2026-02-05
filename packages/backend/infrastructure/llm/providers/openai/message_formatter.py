@@ -95,17 +95,21 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
 
         role = message.role  # type: ignore
 
+        # Assistant messages use "output_text", user messages use "input_text"
+        text_type = "output_text" if role == "assistant" else "input_text"
+
         # Handle different content formats
         if not isinstance(message.content, list):
             # Simple text content
             content = str(message.content) if message.content else ""
             return {
                 "role": role,
-                "content": [{"type": "input_text", "text": content}]
+                "content": [{"type": text_type, "text": content}]
             }
 
         # Extract different block types
         text_parts = []
+        thinking_blocks = []
         tool_use_blocks = []
         tool_result_blocks = []
         has_images = False
@@ -114,8 +118,11 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
             if isinstance(block, dict):
                 block_type = block.get("type")
 
-                # Skip thinking blocks - OpenAI handles reasoning separately
+                # Collect thinking blocks → will become reasoning items
                 if block_type == "thinking":
+                    thinking_text = block.get("thinking", "")
+                    if thinking_text:
+                        thinking_blocks.append(block)
                     continue
 
                 # Collect tool_use blocks (from assistant messages)
@@ -144,6 +151,22 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
         # Build result based on content
         result_items = []
 
+        # Convert thinking blocks to reasoning items (before message)
+        # OpenAI Responses API uses separate "reasoning" items, not inside message content
+        if thinking_blocks and role == "assistant":
+            for tb in thinking_blocks:
+                reasoning_item: Dict[str, Any] = {
+                    "type": "reasoning",
+                    "summary": [{"type": "summary_text", "text": tb.get("thinking", "")}],
+                }
+                item_id = tb.get("id")
+                if item_id:
+                    reasoning_item["id"] = item_id
+                encrypted = tb.get("encrypted_content")
+                if encrypted:
+                    reasoning_item["encrypted_content"] = encrypted
+                result_items.append(reasoning_item)
+
         # Handle multimodal content (with images)
         if has_images:
             # Extract image parts directly
@@ -160,7 +183,7 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                 # For multimodal, prepend text before image parts
                 result_items.append({
                     "role": role,
-                    "content": [{"type": "input_text", "text": text_content}] + image_parts
+                    "content": [{"type": text_type, "text": text_content}] + image_parts
                 })
             elif image_parts:
                 result_items.append({
@@ -174,7 +197,7 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                 # Always include message if it has text or no tools
                 result_items.append({
                     "role": role,
-                    "content": [{"type": "input_text", "text": text_content}]
+                    "content": [{"type": text_type, "text": text_content}]
                 })
 
         # Add function_call items for tool_use blocks

@@ -292,31 +292,24 @@ class OpenAICodexClient(LLMClientBase):
         })
 
         # Handle thinking mode (reasoning effort for reasoning models)
-        # We explicitly check for 'default' and mapping values
+        # Resolution: call_options > config > "default" (which maps to "medium")
         effective_thinking_level = call_options.thinking_level or self.codex_config.reasoning_effort or "default"
-        
+
         # Ensure include list is initialized
         if "include" not in kwargs_api:
             kwargs_api["include"] = []
 
-        if effective_thinking_level != "default":
-            effort = OPENAI_THINKING_LEVEL_TO_EFFORT.get(effective_thinking_level)
-            if effort is not None:
-                kwargs_api["reasoning"] = {
-                    "effort": effort,
-                    "summary": "detailed"
-                }
-                # Ensure we include reasoning text in the response
-                for item in ["reasoning.encrypted_content", "reasoning.text"]:
-                    if item not in kwargs_api["include"]:
-                        kwargs_api["include"].append(item)
-        
-        # Always include reasoning.text and encrypted_content if model supports thinking and thinking is not explicitly disabled
-        # This ensures we get reasoning content even if effort is not explicitly set but thinking is enabled in config
-        if self.codex_config.reasoning_effort and "reasoning.text" not in kwargs_api["include"]:
-             for item in ["reasoning.encrypted_content", "reasoning.text"]:
-                if item not in kwargs_api["include"]:
-                    kwargs_api["include"].append(item)
+        # Map thinking level to OpenAI effort value
+        # "default" → "medium", "low" → "low", "high" → "high"
+        effort = OPENAI_THINKING_LEVEL_TO_EFFORT.get(effective_thinking_level)
+        if effort is not None:
+            kwargs_api["reasoning"] = {
+                "effort": effort,
+                "summary": "auto"
+            }
+            # Opt-in to reasoning output (matches codex-rs/opencode)
+            if "reasoning.encrypted_content" not in kwargs_api.get("include", []):
+                kwargs_api["include"].append("reasoning.encrypted_content")
 
 
         if debug:

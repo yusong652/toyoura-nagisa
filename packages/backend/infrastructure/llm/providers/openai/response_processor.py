@@ -152,16 +152,6 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
                     }
                 ))
 
-                result.append(StreamingChunk(
-                    chunk_type="thinking",
-                    content=str(delta),
-                    metadata={
-                        "item_id": getattr(event, 'item_id', None) or (event.get("item_id") if isinstance(event, dict) else None),
-                        "content_index": getattr(event, 'content_index', None) or (event.get("content_index") if isinstance(event, dict) else None),
-                        **usage_info
-                    }
-                ))
-
         # Text deltas
         if isinstance(event, ResponseTextDeltaEvent) or event_type == "response.output_text.delta":
             delta = getattr(event, 'delta', None)
@@ -383,10 +373,18 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
 
                     # Combine all reasoning text into single thinking block
                     if reasoning_texts:
-                        content_blocks.append({
+                        thinking_block: Dict[str, Any] = {
                             "type": "thinking",
                             "thinking": "\n".join(reasoning_texts)
-                        })
+                        }
+                        # Preserve id and encrypted_content for multi-turn reasoning
+                        item_id = getattr(item, "id", None)
+                        if item_id:
+                            thinking_block["id"] = item_id
+                        encrypted = getattr(item, "encrypted_content", None)
+                        if encrypted:
+                            thinking_block["encrypted_content"] = encrypted
+                        content_blocks.append(thinking_block)
 
                 # Extract text content
                 elif isinstance(item, ResponseOutputMessage):
@@ -454,12 +452,6 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
 
         context_items: List[Dict[str, Any]] = []
 
-        # Check if response contains function_call - reasoning is only needed for tool calling
-        has_function_calls = any(
-            item.model_dump(mode='json').get("type") == "function_call"
-            for item in response.output
-        )
-
         # Process each output item and convert to input format
         for item in response.output:
             # Convert Pydantic model to dict
@@ -475,6 +467,8 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                 content = item_dict.get("content", [])
 
                 # Extract text content from response.output format
+                # Assistant messages use "output_text", user messages use "input_text"
+                text_type = "output_text" if role == "assistant" else "input_text"
                 content_items = []
                 if isinstance(content, list):
                     for block in content:
@@ -482,18 +476,18 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                             block_type = block.get("type")
                             if block_type == "output_text":
                                 content_items.append({
-                                    "type": "input_text",
+                                    "type": text_type,
                                     "text": block.get("text", "")
                                 })
                             # Note: reasoning is handled as a separate ResponseItem
                         elif isinstance(block, str):
                             content_items.append({
-                                "type": "input_text",
+                                "type": text_type,
                                 "text": block
                             })
                 elif isinstance(content, str):
                     content_items.append({
-                        "type": "input_text",
+                        "type": text_type,
                         "text": content
                     })
 
@@ -502,35 +496,28 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                     "content": content_items
                 })
 
-            # Handle reasoning items - ONLY when response contains function_calls
-            # Reasoning is required for pairing with function_call in tool calling scenarios
-            # When response is just a message (final answer), reasoning should NOT be kept
-            # Note: We omit 'id' because if store=false, referring to it in subsequent calls fails
-            elif item_type == "reasoning" and has_function_calls:
-                summary_raw = item_dict.get("summary", [])
-                content_raw = item_dict.get("content", [])
-                
+            # Handle reasoning items - always include for context continuity
+            elif item_type == "reasoning":
+                summary_raw = item_dict.get("summary") or []
+
                 # Format summary items
                 summary_items = []
                 for s in summary_raw:
                     if isinstance(s, dict) and s.get("type") == "summary_text":
                         summary_items.append(s)
-                
-                # Format content items
-                content_items = []
-                for c in content_raw:
-                    if isinstance(c, dict):
-                        c_type = c.get("type")
-                        if c_type == "reasoning_text":
-                            content_items.append(c)
-                        elif c_type == "text":
-                            content_items.append(c)
-                
-                context_items.append({
+
+                reasoning_item: Dict[str, Any] = {
                     "type": "reasoning",
                     "summary": summary_items,
-                    "content": content_items
-                })
+                }
+                # Preserve id and encrypted_content for multi-turn (matches opencode)
+                item_id = item_dict.get("id")
+                if item_id:
+                    reasoning_item["id"] = item_id
+                encrypted = item_dict.get("encrypted_content")
+                if encrypted:
+                    reasoning_item["encrypted_content"] = encrypted
+                context_items.append(reasoning_item)
 
             # Handle function_call items
             elif item_type == "function_call":
