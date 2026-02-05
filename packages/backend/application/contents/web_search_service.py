@@ -9,6 +9,7 @@ from backend.infrastructure.llm.providers.anthropic.web_search import perform_an
 from backend.infrastructure.llm.providers.google.web_search import perform_google_search
 from backend.infrastructure.llm.providers.moonshot.web_search import perform_moonshot_search
 from backend.infrastructure.llm.providers.openai.web_search import perform_openai_search
+from backend.infrastructure.llm.providers.openai_codex.web_search import perform_openai_codex_search
 from backend.infrastructure.llm.providers.zhipu.web_search import perform_zhipu_search
 
 
@@ -26,6 +27,8 @@ async def perform_web_search(
         return await perform_anthropic_search(llm_client, query, max_uses=max_uses_value)
     if provider_name == "openai":
         return await perform_openai_search(llm_client, query, max_uses=max_uses_value)
+    if provider_name == "openai-codex":
+        return await perform_openai_codex_search(llm_client, query, max_uses=max_uses_value)
     if provider_name == "moonshot":
         return await perform_moonshot_search(llm_client, query, max_uses=max_uses_value)
     if provider_name == "zhipu":
