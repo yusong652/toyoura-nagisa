@@ -171,6 +171,7 @@ class OpenAIDebugger:
                     if isinstance(content, str):
                         summary["content"] = f"(string) {OpenAIDebugger._truncate_text(content, 80, 'text')}"
                     elif isinstance(content, list):
+                        role = summary.get("role")
                         summary["content"] = OpenAIDebugger._summarize_input_content(content, role == "assistant")
                     else:
                         summary["content"] = f"({type(content).__name__}) {content}"
