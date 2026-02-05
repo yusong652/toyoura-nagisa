@@ -13,6 +13,8 @@ def _normalize_provider_name(provider_name: str) -> str:
         return "google-gemini-cli"
     if provider_name == "googlegeminiantigravity":
         return "google-gemini-antigravity"
+    if provider_name in {"google-claude-antigravity", "googleclaudeantigravity"}:
+        return "google-gemini-antigravity"
     return provider_name
 
 
@@ -39,7 +41,7 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.google.message_formatter import GoogleMessageFormatter
 
         return GoogleMessageFormatter
-    if provider_name in {"google-gemini-cli", "google-gemini-antigravity"}:
+    if provider_name in {"google-gemini-cli", "google-gemini-antigravity", "google-claude-antigravity"}:
         from backend.infrastructure.llm.providers.google_gemini_cli.message_formatter import (
             GoogleGeminiCliMessageFormatter,
         )
@@ -88,7 +90,7 @@ def get_context_manager_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.google.context_manager import GoogleContextManager
 
         return GoogleContextManager
-    if provider_name in {"google-gemini-cli", "google-gemini-antigravity"}:
+    if provider_name in {"google-gemini-cli", "google-gemini-antigravity", "google-claude-antigravity"}:
         from backend.infrastructure.llm.providers.google_gemini_cli.context_manager import (
             GoogleGeminiCliContextManager,
         )
@@ -133,7 +135,7 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
     """
     provider_name = _normalize_provider_name(provider_name)
 
-    if provider_name in {"google", "google-gemini-cli", "google-gemini-antigravity"}:
+    if provider_name in {"google", "google-gemini-cli", "google-gemini-antigravity", "google-claude-antigravity"}:
         from backend.infrastructure.llm.providers.google.tool_manager import GoogleToolManager
 
         return GoogleToolManager
@@ -166,6 +168,7 @@ SUPPORTED_PROVIDERS = [
     "google",
     "google-gemini-cli",
     "google-gemini-antigravity",
+    "google-claude-antigravity",
     "anthropic",
     "openai",
     "openai-codex",

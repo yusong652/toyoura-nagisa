@@ -91,6 +91,9 @@ class GoogleMessageFormatter(BaseMessageFormatter):
                         # Handle tool_use blocks (for assistant messages with tool calls)
                         elif item.get("type") == "tool_use":
                             function_call = types.FunctionCall(name=item.get("name"), args=item.get("input", {}))
+                            tool_use_id = item.get("id") or item.get("tool_use_id") or item.get("tool_call_id")
+                            if tool_use_id:
+                                function_call.id = tool_use_id
                             part = types.Part(function_call=function_call)
 
                             # IMPORTANT: Always restore thought_signature for tool_use
@@ -236,6 +239,9 @@ class GoogleMessageFormatter(BaseMessageFormatter):
                     # Handle tool_use blocks (for assistant messages with tool calls)
                     elif item.get("type") == "tool_use":
                         function_call = types.FunctionCall(name=item.get("name"), args=item.get("input", {}))
+                        tool_use_id = item.get("id") or item.get("tool_use_id") or item.get("tool_call_id")
+                        if tool_use_id:
+                            function_call.id = tool_use_id
                         parts.append(types.Part(function_call=function_call))
 
                     # Handle tool_result blocks (for user messages with tool results)
