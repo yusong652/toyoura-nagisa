@@ -12,6 +12,8 @@ async def perform_openai_search(
     query: str,
     *,
     max_uses: int,
+    thinking_level: str | None = None,
+    session_id: str | None = None,
 ) -> Dict[str, Any]:
     tool_schemas = [{"type": "web_search"}]
-    return await perform_search(llm_client, query, tool_schemas)
+    return await perform_search(llm_client, query, tool_schemas, thinking_level=thinking_level, session_id=session_id)

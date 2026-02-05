@@ -14,6 +14,8 @@ async def perform_moonshot_search(
     query: str,
     *,
     max_uses: int,
+    thinking_level: str | None = None,
+    session_id: str | None = None,
 ) -> Dict[str, Any]:
     tool_schemas = [{"type": "builtin_function", "function": {"name": "$web_search"}}]
     context_contents = build_search_context(llm_client, query)
@@ -28,6 +30,7 @@ async def perform_moonshot_search(
             context_contents=context_contents,
             api_config=api_config,
             thinking_level="low",  # Explicitly disable thinking for web search
+            session_id=session_id,
         )
 
         if not response.choices:

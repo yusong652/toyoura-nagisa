@@ -17,22 +17,36 @@ async def perform_web_search(
     llm_client,
     query: str,
     max_uses: Optional[int] = None,
+    thinking_level: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     provider_name = _get_provider_name(llm_client)
     max_uses_value: int = max_uses if max_uses is not None else get_default_max_uses(provider_name)
 
     if provider_name in ["google", "google-gemini-cli"]:
-        return await perform_google_search(llm_client, query, max_uses=max_uses_value)
+        return await perform_google_search(
+            llm_client, query, max_uses=max_uses_value, thinking_level=thinking_level, session_id=session_id
+        )
     if provider_name == "anthropic":
-        return await perform_anthropic_search(llm_client, query, max_uses=max_uses_value)
+        return await perform_anthropic_search(
+            llm_client, query, max_uses=max_uses_value, thinking_level=thinking_level, session_id=session_id
+        )
     if provider_name == "openai":
-        return await perform_openai_search(llm_client, query, max_uses=max_uses_value)
+        return await perform_openai_search(
+            llm_client, query, max_uses=max_uses_value, thinking_level=thinking_level, session_id=session_id
+        )
     if provider_name == "openai-codex":
-        return await perform_openai_codex_search(llm_client, query, max_uses=max_uses_value)
+        return await perform_openai_codex_search(
+            llm_client, query, max_uses=max_uses_value, thinking_level=thinking_level, session_id=session_id
+        )
     if provider_name == "moonshot":
-        return await perform_moonshot_search(llm_client, query, max_uses=max_uses_value)
+        return await perform_moonshot_search(
+            llm_client, query, max_uses=max_uses_value, thinking_level=thinking_level, session_id=session_id
+        )
     if provider_name == "zhipu":
-        return await perform_zhipu_search(llm_client, query, max_uses=max_uses_value)
+        return await perform_zhipu_search(
+            llm_client, query, max_uses=max_uses_value, thinking_level=thinking_level, session_id=session_id
+        )
 
     return {
         "error": f"Unsupported LLM type: {provider_name}",

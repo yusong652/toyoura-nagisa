@@ -142,12 +142,14 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         async def _call_api():
             credentials, account_id = await self._get_credentials()
             project_id = await self._ensure_project_id(credentials, account_id)
+            effective_session_id = call_options.session_id or self.extra_config.get("session_id")
             payload = self._build_code_assist_payload(
                 model=model,
                 requested_model=self.google_config.model,
                 contents=context_contents,
                 config=config,
                 project_id=project_id,
+                session_id_override=effective_session_id,
             )
             if debug:
                 tools = api_config.get("tools") or []
@@ -196,12 +198,14 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         async def _stream_once() -> AsyncGenerator[StreamingChunk, None]:
             credentials, account_id = await self._get_credentials()
             project_id = await self._ensure_project_id(credentials, account_id)
+            effective_session_id = call_options.session_id or self.extra_config.get("session_id")
             payload = self._build_code_assist_payload(
                 model=model,
                 requested_model=self.google_config.model,
                 contents=context_contents,
                 config=config,
                 project_id=project_id,
+                session_id_override=effective_session_id,
             )
             if debug:
                 tools = api_config.get("tools") or []
@@ -537,6 +541,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         contents: List[Dict[str, Any]],
         config: types.GenerateContentConfig,
         project_id: Optional[str],
+        session_id_override: Optional[str] = None,
     ) -> Dict[str, Any]:
         config_dump = config.model_dump(by_alias=True, mode="json", exclude_none=True)
 
@@ -574,9 +579,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         if tool_config is not None:
             vertex_request["toolConfig"] = tool_config
         if tools is not None and "claude" in model.lower():
-            vertex_request["toolConfig"] = self._ensure_claude_tool_config(
-                vertex_request.get("toolConfig")
-            )
+            vertex_request["toolConfig"] = self._ensure_claude_tool_config(vertex_request.get("toolConfig"))
         if labels is not None:
             vertex_request["labels"] = labels
         if safety_settings is not None and self._should_include_safety_settings(safety_settings, model):
@@ -595,7 +598,7 @@ class GoogleGeminiAntigravityClient(LLMClientBase):
         if project_id:
             payload["project"] = project_id
 
-        session_id = self.extra_config.get("session_id")
+        session_id = session_id_override or self.extra_config.get("session_id")
         if session_id:
             vertex_request["sessionId"] = session_id
 

@@ -12,6 +12,8 @@ async def perform_anthropic_search(
     query: str,
     *,
     max_uses: int,
+    thinking_level: str | None = None,
+    session_id: str | None = None,
 ) -> Dict[str, Any]:
     tool_schemas = [
         {
@@ -20,4 +22,4 @@ async def perform_anthropic_search(
             "max_uses": max_uses,
         }
     ]
-    return await perform_search(llm_client, query, tool_schemas)
+    return await perform_search(llm_client, query, tool_schemas, thinking_level=thinking_level, session_id=session_id)

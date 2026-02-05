@@ -12,6 +12,8 @@ async def perform_zhipu_search(
     query: str,
     *,
     max_uses: int,
+    thinking_level: str | None = None,
+    session_id: str | None = None,
 ) -> Dict[str, Any]:
     tool_schemas = [
         {
@@ -27,4 +29,5 @@ async def perform_zhipu_search(
         query,
         tool_schemas,
         thinking_level="default",
+        session_id=session_id,
     )

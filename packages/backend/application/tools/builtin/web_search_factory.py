@@ -14,11 +14,15 @@ class WebSearchToolFactory:
         llm_type: str,
         query: str,
         max_uses: Optional[int] = None,
+        thinking_level: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         return await perform_web_search(
             llm_client=llm_client,
             query=query,
             max_uses=max_uses,
+            thinking_level=thinking_level,
+            session_id=session_id,
         )
 
     @staticmethod

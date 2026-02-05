@@ -70,6 +70,7 @@ async def perform_search(
     tool_schemas: List[Any],
     *,
     thinking_level: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     context_contents = build_search_context(llm_client, query)
     api_config = llm_client.build_api_config(DEFAULT_WEB_SEARCH_SYSTEM_PROMPT, tool_schemas)
@@ -78,6 +79,7 @@ async def perform_search(
         context_contents=context_contents,
         api_config=api_config,
         thinking_level=thinking_level,
+        session_id=session_id,
     )
 
     response_text = llm_client.extract_text(response)

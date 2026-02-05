@@ -11,6 +11,7 @@ class CallOptions:
     timeout: Optional[float] = None
     max_retries: Optional[int] = None
     thinking_level: Optional[str] = None  # "default", "low", or "high"
+    session_id: Optional[str] = None
 
 
 _STANDARD_OPTION_KEYS = {
@@ -21,6 +22,7 @@ _STANDARD_OPTION_KEYS = {
     "timeout",
     "max_retries",
     "thinking_level",
+    "session_id",
 }
 
 
@@ -41,4 +43,5 @@ def parse_call_options(kwargs: Dict[str, Any]) -> CallOptions:
         timeout=kwargs.get("timeout"),
         max_retries=kwargs.get("max_retries"),
         thinking_level=kwargs.get("thinking_level"),
+        session_id=kwargs.get("session_id"),
     )

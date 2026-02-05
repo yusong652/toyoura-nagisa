@@ -52,12 +52,7 @@ class OpenAICodexClient(LLMClientBase):
     - Zero additional cost (included with subscription)
     """
 
-    def __init__(
-        self,
-        config: OpenAICodexConfig,
-        extra_config: Optional[Dict[str, Any]] = None,
-        **kwargs
-    ):
+    def __init__(self, config: OpenAICodexConfig, extra_config: Optional[Dict[str, Any]] = None, **kwargs):
         """
         Initialize OpenAI Codex client.
 
@@ -79,31 +74,32 @@ class OpenAICodexClient(LLMClientBase):
         self._current_account_id: Optional[str] = None
         self._chatgpt_account_id: Optional[str] = None
 
-    async def _ensure_client(self) -> AsyncOpenAI:
+    async def _ensure_client(self, session_id: Optional[str] = None) -> AsyncOpenAI:
         """
         Ensure we have a valid async client with current OAuth credentials.
+
+        Args:
+            session_id: Optional session ID to include in headers
 
         Returns:
             Configured AsyncOpenAI client
         """
         # Get current credentials
-        account_id_override = (
-            self.codex_config.oauth_account_id
-            or os.getenv("OPENAI_OAUTH_ACCOUNT_ID")
-        )
+        account_id_override = self.codex_config.oauth_account_id or os.getenv("OPENAI_OAUTH_ACCOUNT_ID")
 
-        access_token, account_id = await self._token_manager.get_access_token(
-            account_id_override
-        )
-        chatgpt_account_id, _ = await self._token_manager.get_chatgpt_account_id(
-            account_id_override
-        )
+        access_token, account_id = await self._token_manager.get_access_token(account_id_override)
+        chatgpt_account_id, _ = await self._token_manager.get_chatgpt_account_id(account_id_override)
 
-        # Recreate client if account changed or first time
-        if self._async_client is None or self._current_account_id != account_id:
+        # Recreate client if account changed, session changed, or first time
+        if (
+            self._async_client is None
+            or self._current_account_id != account_id
+            or self.extra_config.get("session_id") != session_id
+        ):
             self._async_client = self._create_client(
                 access_token=access_token,
                 chatgpt_account_id=chatgpt_account_id,
+                session_id_override=session_id,
             )
             self._current_account_id = account_id
             self._chatgpt_account_id = chatgpt_account_id
@@ -114,6 +110,7 @@ class OpenAICodexClient(LLMClientBase):
         self,
         access_token: str,
         chatgpt_account_id: Optional[str],
+        session_id_override: Optional[str] = None,
     ) -> AsyncOpenAI:
         """
         Create an AsyncOpenAI client configured for Codex API.
@@ -121,6 +118,7 @@ class OpenAICodexClient(LLMClientBase):
         Args:
             access_token: OAuth access token
             chatgpt_account_id: ChatGPT account ID for subscription tracking
+            session_id_override: Optional session ID override
 
         Returns:
             Configured AsyncOpenAI client
@@ -145,6 +143,7 @@ class OpenAICodexClient(LLMClientBase):
             }
         }
         import json
+
         headers["x-codex-turn-metadata"] = json.dumps(metadata)
 
         # Add ChatGPT account ID if available (for organization subscriptions)
@@ -152,11 +151,12 @@ class OpenAICodexClient(LLMClientBase):
             headers["ChatGPT-Account-Id"] = chatgpt_account_id
 
         # Add session ID if available
-        session_id = self.extra_config.get("session_id")
+        session_id = session_id_override or self.extra_config.get("session_id")
         if session_id:
             headers["session_id"] = session_id
 
         # Create custom HTTP client with common headers
+
         http_client = httpx.AsyncClient(
             headers=headers,
             timeout=httpx.Timeout(self.codex_config.timeout, connect=30.0),
@@ -182,18 +182,15 @@ class OpenAICodexClient(LLMClientBase):
             os_name = "Windows"
         else:
             os_name = system
-            
+
         release = platform.release()
         arch = platform.machine()
-        
+
         # codex_cli_rs/1.0.0 (Mac OS 15.2.0; arm64) toyoura-nagisa/1.0.0
         return f"codex_cli_rs/1.0.0 ({os_name} {release}; {arch}) toyoura-nagisa/{VERSION}"
 
     async def call_api_with_context(
-        self,
-        context_contents: List[Dict[str, Any]],
-        api_config: Dict[str, Any],
-        **kwargs
+        self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs
     ) -> Response:
         """
         Execute a stateless OpenAI Codex API call with prepared context.
@@ -213,9 +210,7 @@ class OpenAICodexClient(LLMClientBase):
         # Collect all chunks from streaming call
         collected_chunks: List[StreamingChunk] = []
         async for chunk in self.call_api_with_context_streaming(
-            context_contents=context_contents,
-            api_config=api_config,
-            **kwargs
+            context_contents=context_contents, api_config=api_config, **kwargs
         ):
             collected_chunks.append(chunk)
 
@@ -230,11 +225,7 @@ class OpenAICodexClient(LLMClientBase):
         """Get OpenAI-specific context manager class."""
         return OpenAIContextManager
 
-    def _build_api_config(
-        self,
-        system_prompt: str,
-        tool_schemas: Optional[List[Any]]
-    ) -> Dict[str, Any]:
+    def _build_api_config(self, system_prompt: str, tool_schemas: Optional[List[Any]]) -> Dict[str, Any]:
         """
         Build OpenAI-specific API configuration.
 
@@ -255,25 +246,16 @@ class OpenAICodexClient(LLMClientBase):
         return self.codex_config
 
     async def call_api_with_context_streaming(
-        self,
-        context_contents: List[Dict[str, Any]],
-        api_config: Dict[str, Any],
-        **kwargs
+        self, context_contents: List[Dict[str, Any]], api_config: Dict[str, Any], **kwargs
     ) -> AsyncGenerator[StreamingChunk, None]:
         """
         Execute streaming Codex API call and yield standardized chunks.
         """
         call_options = parse_call_options(kwargs)
         debug = get_dev_config().debug_mode
-        timeout = (
-            call_options.timeout
-            if call_options.timeout is not None
-            else self.codex_config.timeout
-        )
+        timeout = call_options.timeout if call_options.timeout is not None else self.codex_config.timeout
         max_retries = (
-            call_options.max_retries
-            if call_options.max_retries is not None
-            else self.codex_config.max_retries
+            call_options.max_retries if call_options.max_retries is not None else self.codex_config.max_retries
         )
 
         tools = api_config.get("tools", []) or []
@@ -282,14 +264,19 @@ class OpenAICodexClient(LLMClientBase):
         input_items = context_contents
 
         kwargs_api = self.codex_config.build_api_params()
-        kwargs_api.update({
-            "instructions": instructions,
-            "input": input_items,
-            "tools": tools,
-            "tool_choice": "auto" if tools else None,
-            "parallel_tool_calls": True, # Match codex-rs default
-            "store": False,  # Explicitly set to False as required by Codex API
-        })
+        kwargs_api.update(
+            {
+                "instructions": instructions,
+                "input": input_items,
+                "tools": tools,
+                "tool_choice": "auto" if tools else None,
+                "parallel_tool_calls": True,  # Match codex-rs default
+                "store": False,  # Explicitly set to False as required by Codex API
+            }
+        )
+
+        # Add session ID if provided in call_options or extra_config
+        effective_session_id = call_options.session_id or self.extra_config.get("session_id")
 
         # Handle thinking mode (reasoning effort for reasoning models)
         # Resolution: call_options > config > "default" (which maps to "medium")
@@ -303,28 +290,21 @@ class OpenAICodexClient(LLMClientBase):
         # "default" → "medium", "low" → "low", "high" → "high"
         effort = OPENAI_THINKING_LEVEL_TO_EFFORT.get(effective_thinking_level)
         if effort is not None:
-            kwargs_api["reasoning"] = {
-                "effort": effort,
-                "summary": "auto"
-            }
+            kwargs_api["reasoning"] = {"effort": effort, "summary": "auto"}
             # Opt-in to reasoning output (matches codex-rs/opencode)
             if "reasoning.encrypted_content" not in kwargs_api.get("include", []):
                 kwargs_api["include"].append("reasoning.encrypted_content")
 
-
         if debug:
-            OpenAIDebugger.log_api_call_info(
-                tools_count=len(tools),
-                model=self.codex_config.model
-            )
+            OpenAIDebugger.log_api_call_info(tools_count=len(tools), model=self.codex_config.model)
             OpenAIDebugger.print_debug_request_payload(kwargs_api)
 
         async def _stream_once():
             final_response: Optional[Response] = None
 
             try:
-                # Ensure client with current OAuth token
-                client = await self._ensure_client()
+                # Ensure client with current OAuth token and session ID
+                client = await self._ensure_client(session_id=effective_session_id)
 
                 # Create stateful streaming processor
                 streaming_processor = self._get_response_processor().create_streaming_processor()
@@ -347,33 +327,27 @@ class OpenAICodexClient(LLMClientBase):
 
             if final_response:
                 # Extract usage metadata from final response
-                final_metadata: Dict[str, Any] = {
-                    "__openai_final_response": final_response
-                }
+                final_metadata: Dict[str, Any] = {"__openai_final_response": final_response}
 
                 if hasattr(final_response, "usage") and final_response.usage:
                     usage = final_response.usage
-                    final_metadata.update({
-                        "prompt_token_count": getattr(usage, "input_tokens", None),
-                        "candidates_token_count": getattr(usage, "output_tokens", None),
-                        "total_token_count": getattr(usage, "total_tokens", None),
-                    })
+                    final_metadata.update(
+                        {
+                            "prompt_token_count": getattr(usage, "input_tokens", None),
+                            "candidates_token_count": getattr(usage, "output_tokens", None),
+                            "total_token_count": getattr(usage, "total_tokens", None),
+                        }
+                    )
 
                     # Extract detailed token counts
-                    if (
-                        hasattr(usage, "output_tokens_details")
-                        and usage.output_tokens_details
-                    ):
+                    if hasattr(usage, "output_tokens_details") and usage.output_tokens_details:
                         final_metadata["reasoning_tokens"] = getattr(
                             usage.output_tokens_details,
                             "reasoning_tokens",
                             None,
                         )
 
-                    if (
-                        hasattr(usage, "input_tokens_details")
-                        and usage.input_tokens_details
-                    ):
+                    if hasattr(usage, "input_tokens_details") and usage.input_tokens_details:
                         final_metadata["cached_tokens"] = getattr(
                             usage.input_tokens_details,
                             "cached_tokens",
