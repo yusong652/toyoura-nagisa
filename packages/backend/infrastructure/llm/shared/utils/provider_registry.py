@@ -49,7 +49,7 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.anthropic.message_formatter import AnthropicMessageFormatter
 
         return AnthropicMessageFormatter
-    elif provider_name == "openai":
+    elif provider_name in {"openai", "openai-codex"}:
         from backend.infrastructure.llm.providers.openai.message_formatter import OpenAIMessageFormatter
 
         return OpenAIMessageFormatter
@@ -98,7 +98,7 @@ def get_context_manager_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.anthropic.context_manager import AnthropicContextManager
 
         return AnthropicContextManager
-    elif provider_name == "openai":
+    elif provider_name in {"openai", "openai-codex"}:
         from backend.infrastructure.llm.providers.openai.context_manager import OpenAIContextManager
 
         return OpenAIContextManager
@@ -141,7 +141,7 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.anthropic.tool_manager import AnthropicToolManager
 
         return AnthropicToolManager
-    elif provider_name == "openai":
+    elif provider_name in {"openai", "openai-codex"}:
         from backend.infrastructure.llm.providers.openai.tool_manager import OpenAIToolManager
 
         return OpenAIToolManager
@@ -168,6 +168,7 @@ SUPPORTED_PROVIDERS = [
     "google-gemini-antigravity",
     "anthropic",
     "openai",
+    "openai-codex",
     "moonshot",
     "zhipu",
     "openrouter",

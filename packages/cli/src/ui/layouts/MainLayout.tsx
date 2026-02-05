@@ -74,6 +74,7 @@ type ActiveDialog =
   | 'skill_detail'
   | 'connects_providers'
   | 'connects_google_menu'
+  | 'connects_openai_menu'
   | 'quota_display'
   | null;
 
@@ -300,6 +301,14 @@ export const MainLayout: React.FC = () => {
   const [selectedGoogleAccountId, setSelectedGoogleAccountId] = useState<string | null>(null);
   const [isOAuthFlowRunning, setIsOAuthFlowRunning] = useState(false);
 
+  // OpenAI OAuth accounts state
+  const [openaiAccounts, setOpenaiAccounts] = useState<OAuthAccountInfo[]>([]);
+  const [isOpenaiAccountsLoading, setIsOpenaiAccountsLoading] = useState(false);
+  const [openaiAccountsError, setOpenaiAccountsError] = useState<string | null>(null);
+  const [openaiMenuMode, setOpenaiMenuMode] = useState<'root' | 'account'>('root');
+  const [selectedOpenaiAccountId, setSelectedOpenaiAccountId] = useState<string | null>(null);
+  const [isOpenaiOAuthFlowRunning, setIsOpenaiOAuthFlowRunning] = useState(false);
+
   // Quota state
   const [googleQuota, setGoogleQuota] = useState<GoogleQuotaInfo | null>(null);
   const [isGoogleQuotaLoading, setIsGoogleQuotaLoading] = useState(false);
@@ -520,6 +529,21 @@ export const MainLayout: React.FC = () => {
     }
   }, []);
 
+  const loadOpenaiAccounts = useCallback(async () => {
+    setIsOpenaiAccountsLoading(true);
+    setOpenaiAccountsError(null);
+    try {
+      const response = await apiClient.get<{ accounts: OAuthAccountInfo[] }>('/api/oauth/openai/accounts');
+      setOpenaiAccounts(response.accounts ?? []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load OpenAI accounts';
+      setOpenaiAccountsError(message);
+      setOpenaiAccounts([]);
+    } finally {
+      setIsOpenaiAccountsLoading(false);
+    }
+  }, []);
+
   const loadGoogleQuota = useCallback(async () => {
     setIsGoogleQuotaLoading(true);
     setGoogleQuotaError(null);
@@ -730,6 +754,106 @@ export const MainLayout: React.FC = () => {
       : 'No Google accounts connected yet.';
   }, [googleMenuMode, selectedGoogleAccount, googleAccounts.length]);
 
+  // OpenAI menu helpers
+  const selectedOpenaiAccount = useMemo(() => {
+    if (!selectedOpenaiAccountId) return null;
+    return openaiAccounts.find((account) => account.account_id === selectedOpenaiAccountId) ?? null;
+  }, [openaiAccounts, selectedOpenaiAccountId]);
+
+  const openaiMenuOptions = useMemo<SelectOption<string>[]>(() => {
+    if (openaiAccountsError) {
+      return [
+        {
+          key: 'error',
+          value: 'error',
+          label: `Error: ${openaiAccountsError}`,
+          description: 'Press Enter to retry',
+        },
+      ];
+    }
+
+    if (openaiMenuMode === 'account' && selectedOpenaiAccount) {
+      return [
+        {
+          key: 'set_default',
+          value: 'set_default',
+          label: 'Set as default',
+          description: 'Use this account for Codex API',
+        },
+        {
+          key: 'disconnect',
+          value: 'disconnect',
+          label: 'Disconnect account',
+          description: 'Remove OAuth tokens for this account',
+        },
+        {
+          key: 'back',
+          value: 'back',
+          label: 'Back to accounts',
+          description: 'Return to account list',
+        },
+      ];
+    }
+
+    const options: SelectOption<string>[] = [
+      {
+        key: 'connect',
+        value: 'connect',
+        label: 'Connect OpenAI account',
+        description: isOpenaiOAuthFlowRunning ? 'OAuth flow in progress' : 'Start OpenAI OAuth flow (ChatGPT Pro/Plus)',
+        disabled: isOpenaiOAuthFlowRunning,
+      },
+    ];
+
+    if (openaiAccounts.length === 0) {
+      options.push({
+        key: 'empty',
+        value: 'empty',
+        label: 'No connected accounts',
+        description: 'Connect a ChatGPT Pro/Plus account',
+        disabled: true,
+      });
+    } else {
+      openaiAccounts.forEach((account) => {
+        const badge = account.is_default ? '[default] ' : '';
+        const label = `${badge}${account.email || account.account_id}`;
+        options.push({
+          key: account.account_id,
+          value: `account:${account.account_id}`,
+          label,
+          description: account.email ? account.account_id : undefined,
+        });
+      });
+    }
+
+    options.push({
+      key: 'refresh',
+      value: 'refresh',
+      label: 'Refresh list',
+      description: 'Reload connected accounts',
+    });
+    options.push({
+      key: 'back',
+      value: 'back',
+      label: 'Back to providers',
+      description: 'Return to OAuth providers',
+    });
+
+    return options;
+  }, [openaiAccounts, openaiAccountsError, openaiMenuMode, isOpenaiOAuthFlowRunning, selectedOpenaiAccount]);
+
+  const openaiMenuDescription = useMemo(() => {
+    if (openaiMenuMode === 'account' && selectedOpenaiAccount) {
+      const email = selectedOpenaiAccount.email || selectedOpenaiAccount.account_id;
+      const defaultText = selectedOpenaiAccount.is_default ? 'Yes' : 'No';
+      return `Account: ${email}\nDefault: ${defaultText}`;
+    }
+
+    return openaiAccounts.length > 0
+      ? `Connected OpenAI accounts: ${openaiAccounts.length}`
+      : 'No OpenAI accounts connected yet. Requires ChatGPT Pro/Plus subscription.';
+  }, [openaiMenuMode, selectedOpenaiAccount, openaiAccounts.length]);
+
   // Handle skill selection (open detail dialog)
   const handleSkillSelect = useCallback((skillName: string) => {
     if (skillName === 'error') {
@@ -837,6 +961,65 @@ export const MainLayout: React.FC = () => {
     }
   }, [appActions, isOAuthFlowRunning, loadGoogleAccounts]);
 
+  const startOpenaiOAuthFlow = useCallback(async () => {
+    if (isOpenaiOAuthFlowRunning) {
+      appActions.showNotification('OAuth flow already in progress', 'info');
+      return;
+    }
+
+    setIsOpenaiOAuthFlowRunning(true);
+
+    try {
+      const startData = await apiClient.post<{ auth_url: string; state: string; callback_url: string; expires_in: number }>(
+        '/api/oauth/openai/start'
+      );
+
+      try {
+        await openBrowser(startData.auth_url);
+        appActions.showNotification('Opening browser for OpenAI OAuth...', 'info');
+      } catch {
+        appActions.showNotification('Unable to open browser. Open the URL manually.', 'error');
+      }
+
+      appActions.addHistoryItem({
+        type: MessageType.INFO,
+        message: [
+          'OpenAI OAuth started.',
+          '',
+          'Open this URL in your browser:',
+          startData.auth_url,
+          '',
+          `Waiting for callback on ${startData.callback_url}`,
+          '',
+          'Note: You need a ChatGPT Pro/Plus subscription to use Codex models.',
+        ].join('\n'),
+      });
+
+      const timeoutMs = Math.max(60_000, (startData.expires_in || 300) * 1000);
+      const callbackResult = await waitForOAuthCallback({
+        expectedState: startData.state,
+        timeoutMs,
+        port: 1455,  // OpenAI uses port 1455 (matches Codex CLI registration)
+        path: '/auth/callback',  // OpenAI uses /auth/callback path
+      });
+
+      const account = await apiClient.post<OAuthAccountInfo>('/api/oauth/openai/callback', {
+        code: callbackResult.code,
+        state: callbackResult.state,
+      });
+
+      const accountLabel = account.email || account.account_id;
+      appActions.showNotification(`Connected OpenAI account: ${accountLabel}`, 'success');
+
+      await loadOpenaiAccounts();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'OpenAI OAuth failed';
+      appActions.showNotification(message, 'error');
+    } finally {
+      setIsOpenaiOAuthFlowRunning(false);
+    }
+  }, [appActions, isOpenaiOAuthFlowRunning, loadOpenaiAccounts]);
+
   const handleOauthProviderSelect = useCallback((providerId: string) => {
     if (providerId === 'error') {
       void loadOauthProviders();
@@ -851,6 +1034,13 @@ export const MainLayout: React.FC = () => {
       setGoogleMenuMode('root');
       setSelectedGoogleAccountId(null);
       setActiveDialog('connects_google_menu');
+      return;
+    }
+
+    if (providerId === 'openai') {
+      setOpenaiMenuMode('root');
+      setSelectedOpenaiAccountId(null);
+      setActiveDialog('connects_openai_menu');
       return;
     }
 
@@ -935,6 +1125,86 @@ export const MainLayout: React.FC = () => {
     loadGoogleAccounts,
     selectedGoogleAccount,
     startGoogleOAuthFlow,
+  ]);
+
+  const handleOpenaiMenuSelect = useCallback(async (value: string) => {
+    if (value === 'error') {
+      void loadOpenaiAccounts();
+      return;
+    }
+
+    if (value === 'empty') {
+      return;
+    }
+
+    if (openaiMenuMode === 'account') {
+      if (!selectedOpenaiAccount) {
+        setOpenaiMenuMode('root');
+        setSelectedOpenaiAccountId(null);
+        return;
+      }
+
+      if (value === 'back') {
+        setOpenaiMenuMode('root');
+        setSelectedOpenaiAccountId(null);
+        return;
+      }
+
+      if (value === 'set_default') {
+        try {
+          await apiClient.post('/api/oauth/openai/default', {
+            account_id: selectedOpenaiAccount.account_id,
+          });
+          appActions.showNotification('Default OpenAI account updated', 'success');
+          await loadOpenaiAccounts();
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Failed to set default account';
+          appActions.showNotification(message, 'error');
+        }
+        return;
+      }
+
+      if (value === 'disconnect') {
+        try {
+          await apiClient.delete(`/api/oauth/openai/accounts/${selectedOpenaiAccount.account_id}`);
+          appActions.showNotification('OpenAI account disconnected', 'success');
+          setOpenaiMenuMode('root');
+          setSelectedOpenaiAccountId(null);
+          await loadOpenaiAccounts();
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Failed to disconnect account';
+          appActions.showNotification(message, 'error');
+        }
+      }
+      return;
+    }
+
+    if (value === 'connect') {
+      setActiveDialog(null);
+      void startOpenaiOAuthFlow();
+      return;
+    }
+
+    if (value === 'refresh') {
+      void loadOpenaiAccounts();
+      return;
+    }
+
+    if (value === 'back') {
+      setActiveDialog('connects_providers');
+      return;
+    }
+
+    if (value.startsWith('account:')) {
+      setSelectedOpenaiAccountId(value.slice('account:'.length));
+      setOpenaiMenuMode('account');
+    }
+  }, [
+    appActions,
+    openaiMenuMode,
+    loadOpenaiAccounts,
+    selectedOpenaiAccount,
+    startOpenaiOAuthFlow,
   ]);
 
   const activeProviderId = selectedProviderId ?? currentLlmConfig?.provider ?? null;
@@ -1098,6 +1368,17 @@ export const MainLayout: React.FC = () => {
 
     void loadGoogleAccounts();
   }, [activeDialog, loadGoogleAccounts]);
+
+  // Load OpenAI accounts when dialog opens
+  useEffect(() => {
+    if (activeDialog !== 'connects_openai_menu') {
+      setOpenaiMenuMode('root');
+      setSelectedOpenaiAccountId(null);
+      return;
+    }
+
+    void loadOpenaiAccounts();
+  }, [activeDialog, loadOpenaiAccounts]);
 
   // Load Google quota when dialog opens
   useEffect(() => {
@@ -2042,6 +2323,22 @@ export const MainLayout: React.FC = () => {
             onCancel={handleDialogCancel}
             isLoading={isGoogleAccountsLoading}
             loadingMessage="Loading Google accounts..."
+            showNumbers={true}
+            showDescriptions={true}
+            maxItemsToShow={10}
+          />
+        )}
+
+        {/* OpenAI accounts dialog */}
+        {activeDialog === 'connects_openai_menu' && (
+          <SelectDialog
+            title="OpenAI OAuth"
+            description={openaiMenuDescription}
+            options={openaiMenuOptions}
+            onSelect={handleOpenaiMenuSelect}
+            onCancel={handleDialogCancel}
+            isLoading={isOpenaiAccountsLoading}
+            loadingMessage="Loading OpenAI accounts..."
             showNumbers={true}
             showDescriptions={true}
             maxItemsToShow={10}

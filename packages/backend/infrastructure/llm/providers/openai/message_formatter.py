@@ -101,7 +101,7 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
             content = str(message.content) if message.content else ""
             return {
                 "role": role,
-                "content": content
+                "content": [{"type": "input_text", "text": content}]
             }
 
         # Extract different block types
@@ -174,7 +174,7 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                 # Always include message if it has text or no tools
                 result_items.append({
                     "role": role,
-                    "content": text_content
+                    "content": [{"type": "input_text", "text": text_content}]
                 })
 
         # Add function_call items for tool_use blocks

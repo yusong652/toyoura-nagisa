@@ -83,7 +83,7 @@ async def _generate_title(
     context_contents = formatter_class.format_messages([user_message])
     api_config = title_client.build_api_config(DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT)
 
-    if "antigravity" in title_client.provider_name.lower():
+    if "antigravity" in title_client.provider_name.lower() or "openai-codex" in title_client.provider_name.lower():
         collected: List[str] = []
         async for chunk in title_client.call_api_with_context_streaming(
             context_contents=context_contents,

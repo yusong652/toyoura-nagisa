@@ -17,6 +17,7 @@ from openai.types.responses import (
     ResponseFunctionCallArgumentsDoneEvent,
     ResponseOutputItemAddedEvent,
     ResponseReasoningTextDeltaEvent,
+    ResponseReasoningTextDoneEvent,
     ResponseReasoningSummaryPartAddedEvent,
     ResponseReasoningSummaryTextDeltaEvent,
     ResponseTextDeltaEvent,
@@ -52,6 +53,11 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
         """
         result = []
 
+        # Get event type - handles both pydantic objects and dicts
+        event_type = getattr(event, "type", None)
+        if event_type is None and isinstance(event, dict):
+            event_type = event.get("type")
+
         # Extract usage metadata from event
         # Note: For Responses API, usage is in ResponseCompletedEvent.response.usage
         # For Chat Completions API (if used), usage might be in event.usage
@@ -85,68 +91,123 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
                     usage_info['cached_tokens'] = getattr(details, 'cached_tokens', None)
 
         # Thinking / reasoning summary events
-        if isinstance(event, ResponseReasoningSummaryTextDeltaEvent):
-            if hasattr(event, 'delta') and event.delta:
+        # We check both class type and raw event type string for robustness
+        is_reasoning_summary = (
+            isinstance(event, ResponseReasoningSummaryTextDeltaEvent) or 
+            event_type in ("response.reasoning_summary_text.delta", "response.reasoning_summary_text.done")
+        )
+        
+        if is_reasoning_summary:
+            delta = getattr(event, 'delta', None)
+            if delta is None and isinstance(event, dict):
+                delta = event.get("delta")
+                
+            if delta:
                 result.append(StreamingChunk(
                     chunk_type="thinking",
-                    content=event.delta,
+                    content=delta,
                     metadata={
-                        "item_id": getattr(event, 'item_id', None),
-                        "summary_index": getattr(event, 'summary_index', None),
+                        "item_id": getattr(event, 'item_id', None) or (event.get("item_id") if isinstance(event, dict) else None),
+                        "summary_index": getattr(event, 'summary_index', None) or (event.get("summary_index") if isinstance(event, dict) else None),
                         **usage_info
                     }
                 ))
 
-        elif isinstance(event, ResponseReasoningSummaryPartAddedEvent):
-            if hasattr(event, 'part'):
-                part_text = getattr(event.part, "text", "")
-                if part_text:
-                    result.append(StreamingChunk(
-                        chunk_type="thinking",
-                        content=part_text,
-                        metadata={
-                            "item_id": getattr(event, 'item_id', None),
-                            "summary_index": getattr(event, 'summary_index', None),
-                            **usage_info
-                        }
-                    ))
-
-        elif isinstance(event, ResponseReasoningTextDeltaEvent):
-            if hasattr(event, 'delta') and event.delta:
+        elif isinstance(event, ResponseReasoningSummaryPartAddedEvent) or event_type == "response.reasoning_summary_part.added":
+            part = getattr(event, 'part', None)
+            if part is None and isinstance(event, dict):
+                part = event.get("part")
+                
+            part_text = getattr(part, "text", "") if part else ""
+            if part_text:
                 result.append(StreamingChunk(
                     chunk_type="thinking",
-                    content=str(event.delta),
-                    metadata={"item_id": getattr(event, 'item_id', None), **usage_info}
+                    content=part_text,
+                    metadata={
+                        "item_id": getattr(event, 'item_id', None) or (event.get("item_id") if isinstance(event, dict) else None),
+                        "summary_index": getattr(event, 'summary_index', None) or (event.get("summary_index") if isinstance(event, dict) else None),
+                        **usage_info
+                    }
+                ))
+
+        # Full reasoning text deltas
+        is_reasoning_text = (
+            isinstance(event, (ResponseReasoningTextDeltaEvent, ResponseReasoningTextDoneEvent)) or 
+            event_type in ("response.reasoning_text.delta", "response.reasoning_text.done")
+        )
+        
+        if is_reasoning_text:
+            delta = getattr(event, 'delta', None)
+            if delta is None and isinstance(event, dict):
+                delta = event.get("delta")
+                
+            if delta:
+                result.append(StreamingChunk(
+                    chunk_type="thinking",
+                    content=str(delta),
+                    metadata={
+                        "item_id": getattr(event, 'item_id', None) or (event.get("item_id") if isinstance(event, dict) else None),
+                        "content_index": getattr(event, 'content_index', None) or (event.get("content_index") if isinstance(event, dict) else None),
+                        **usage_info
+                    }
+                ))
+
+                result.append(StreamingChunk(
+                    chunk_type="thinking",
+                    content=str(delta),
+                    metadata={
+                        "item_id": getattr(event, 'item_id', None) or (event.get("item_id") if isinstance(event, dict) else None),
+                        "content_index": getattr(event, 'content_index', None) or (event.get("content_index") if isinstance(event, dict) else None),
+                        **usage_info
+                    }
                 ))
 
         # Text deltas
-        if isinstance(event, ResponseTextDeltaEvent):
-            if hasattr(event, 'delta') and event.delta:
+        if isinstance(event, ResponseTextDeltaEvent) or event_type == "response.output_text.delta":
+            delta = getattr(event, 'delta', None)
+            if delta is None and isinstance(event, dict):
+                delta = event.get("delta")
+                
+            if delta:
                 result.append(StreamingChunk(
                     chunk_type="text",
-                    content=event.delta,
+                    content=delta,
                     metadata={
-                        "item_id": getattr(event, 'item_id', None),
-                        "content_index": getattr(event, 'content_index', None),
+                        "item_id": getattr(event, 'item_id', None) or (event.get("item_id") if isinstance(event, dict) else None),
+                        "content_index": getattr(event, 'content_index', None) or (event.get("content_index") if isinstance(event, dict) else None),
                         **usage_info
                     }
                 ))
 
         # Function call lifecycle - item added
-        if isinstance(event, ResponseOutputItemAddedEvent):
-            if hasattr(event, 'item'):
-                item = event.item
-                if isinstance(item, ResponseFunctionToolCall):
-                    call_id = item.call_id or item.id or item.name
+        if isinstance(event, ResponseOutputItemAddedEvent) or event_type == "response.output_item.added":
+            item = getattr(event, 'item', None)
+            if item is None and isinstance(event, dict):
+                item = event.get("item")
+                
+            if item:
+                # Handle both object and dict
+                if hasattr(item, "type"):
+                    item_type = item.type
+                else:
+                    item_type = item.get("type") if isinstance(item, dict) else None
+                    
+                if item_type == "function_call":
+                    # Extract fields handles both object and dict
+                    call_id = getattr(item, 'call_id', None) or (item.get("call_id") if isinstance(item, dict) else None)
+                    id_val = getattr(item, 'id', None) or (item.get("id") if isinstance(item, dict) else None)
+                    name = getattr(item, 'name', None) or (item.get("name") if isinstance(item, dict) else None)
+                    
+                    actual_call_id = call_id or id_val or name
                     info = {
-                        "call_id": call_id,
-                        "id": item.id or call_id,
-                        "name": item.name
+                        "call_id": actual_call_id,
+                        "id": id_val or actual_call_id,
+                        "name": name
                     }
                     # Map both id and call_id for lookup
-                    self.tool_call_index[call_id] = info
-                    if item.id:
-                        self.tool_call_index[item.id] = info
+                    self.tool_call_index[actual_call_id] = info
+                    if id_val:
+                        self.tool_call_index[id_val] = info
 
         # Function call arguments delta
         elif isinstance(event, ResponseFunctionCallArgumentsDeltaEvent):
@@ -414,42 +475,62 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                 content = item_dict.get("content", [])
 
                 # Extract text content from response.output format
+                content_items = []
                 if isinstance(content, list):
-                    if not content:
-                        content_value = ""
-                    else:
-                        # Extract only text content (skip reasoning)
-                        text_parts = []
-                        for block in content:
-                            if isinstance(block, dict) and block.get("type") == "output_text":
-                                text_parts.append(block.get("text", ""))
-                            elif isinstance(block, str):
-                                text_parts.append(block)
-                        content_value = "".join(text_parts)
+                    for block in content:
+                        if isinstance(block, dict):
+                            block_type = block.get("type")
+                            if block_type == "output_text":
+                                content_items.append({
+                                    "type": "input_text",
+                                    "text": block.get("text", "")
+                                })
+                            # Note: reasoning is handled as a separate ResponseItem
+                        elif isinstance(block, str):
+                            content_items.append({
+                                "type": "input_text",
+                                "text": block
+                            })
                 elif isinstance(content, str):
-                    content_value = content
-                else:
-                    content_value = str(content) if content else ""
+                    content_items.append({
+                        "type": "input_text",
+                        "text": content
+                    })
 
                 context_items.append({
                     "role": role,
-                    "content": content_value
+                    "content": content_items
                 })
 
             # Handle reasoning items - ONLY when response contains function_calls
             # Reasoning is required for pairing with function_call in tool calling scenarios
             # When response is just a message (final answer), reasoning should NOT be kept
-            # Historical reasoning is never loaded from DB (format_single_message skips thinking)
+            # Note: We omit 'id' because if store=false, referring to it in subsequent calls fails
             elif item_type == "reasoning" and has_function_calls:
-                summary = item_dict.get("summary", [])
-                reasoning_id = item_dict.get("id")
-
-                if reasoning_id:
-                    context_items.append({
-                        "type": "reasoning",
-                        "id": reasoning_id,
-                        "summary": summary if summary else []
-                    })
+                summary_raw = item_dict.get("summary", [])
+                content_raw = item_dict.get("content", [])
+                
+                # Format summary items
+                summary_items = []
+                for s in summary_raw:
+                    if isinstance(s, dict) and s.get("type") == "summary_text":
+                        summary_items.append(s)
+                
+                # Format content items
+                content_items = []
+                for c in content_raw:
+                    if isinstance(c, dict):
+                        c_type = c.get("type")
+                        if c_type == "reasoning_text":
+                            content_items.append(c)
+                        elif c_type == "text":
+                            content_items.append(c)
+                
+                context_items.append({
+                    "type": "reasoning",
+                    "summary": summary_items,
+                    "content": content_items
+                })
 
             # Handle function_call items
             elif item_type == "function_call":
@@ -470,11 +551,10 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                     arguments = str(arguments)
 
                 # Use correct IDs for input format:
-                # - id: fc_xxx (required for input[].id field)
                 # - call_id: call_xxx (used to match with function_call_output)
+                # - Note: We omit top-level 'id' to avoid 404s when store=false
                 context_items.append({
                     "type": "function_call",
-                    "id": item_dict.get("id"),           # fc_xxx - required by API
                     "call_id": item_dict.get("call_id"), # call_xxx - for matching results
                     "name": item_dict.get("name"),
                     "arguments": arguments

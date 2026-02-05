@@ -135,6 +135,10 @@ class OpenAIDebugger:
             simplified['max_output_tokens'] = kwargs['max_output_tokens']
         if 'top_p' in kwargs:
             simplified['top_p'] = kwargs['top_p']
+        if 'include' in kwargs:
+            simplified['include'] = kwargs['include']
+        if 'reasoning' in kwargs:
+            simplified['reasoning'] = kwargs['reasoning']
         
         # Instructions (system prompt) - truncate like Zhipu
         if kwargs.get('instructions'):

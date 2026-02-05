@@ -13,6 +13,7 @@ import time
 class OAuthProvider(str, Enum):
     """Supported OAuth providers."""
     GOOGLE = "google"
+    OPENAI = "openai"
 
 
 @dataclass

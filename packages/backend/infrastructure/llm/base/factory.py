@@ -27,6 +27,7 @@ class LLMFactory:
         from backend.infrastructure.llm.providers.google_gemini_antigravity import GoogleGeminiAntigravityClient
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         from backend.infrastructure.llm.providers.openai import OpenAIClient
+        from backend.infrastructure.llm.providers.openai_codex import OpenAICodexClient
         from backend.infrastructure.llm.providers.moonshot import MoonshotClient
         from backend.infrastructure.llm.providers.zhipu import ZhipuClient
         from backend.infrastructure.llm.providers.openrouter import OpenRouterClient
@@ -38,6 +39,7 @@ class LLMFactory:
             "anthropic": AnthropicClient,
             "gpt": OpenAIClient,
             "openai": OpenAIClient,
+            "openai-codex": OpenAICodexClient,
             "moonshot": MoonshotClient,
             "zhipu": ZhipuClient,
             "openrouter": OpenRouterClient,
@@ -126,6 +128,12 @@ class LLMFactory:
             cfg = OpenAIConfig(model=model)
             if not cfg.openai_api_key:
                 raise ValueError("OpenAI API key not configured")
+            return {"config": cfg, "extra_config": extra}
+        elif provider == "openai-codex":
+            from backend.infrastructure.llm.providers.openai_codex.config import OpenAICodexConfig
+
+            cfg = OpenAICodexConfig(model=model)
+            # Subscription compatible - no API key or verification needed
             return {"config": cfg, "extra_config": extra}
         elif provider == "moonshot":
             from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig

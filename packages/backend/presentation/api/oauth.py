@@ -77,7 +77,12 @@ async def list_providers() -> ApiResponse[OAuthProviderListData]:
                 id="google",
                 name="Google",
                 description="Google OAuth for Gemini and cloudcode-pa quota",
-            )
+            ),
+            OAuthProviderInfo(
+                id="openai",
+                name="OpenAI",
+                description="OpenAI OAuth for Codex API (ChatGPT Pro/Plus)",
+            ),
         ]
         return ApiResponse(
             success=True,
@@ -162,6 +167,102 @@ async def set_google_default(request: OAuthDefaultRequest) -> ApiResponse[OAuthA
 async def delete_google_account(account_id: str) -> ApiResponse[None]:
     try:
         success = oauth_service.delete_google_account(account_id)
+        if not success:
+            raise BadRequestError(message="Account not found")
+
+        return ApiResponse(
+            success=True,
+            message="Account disconnected",
+            data=None,
+        )
+    except BadRequestError:
+        raise
+    except Exception as e:
+        raise InternalServerError(message=f"Failed to delete account: {str(e)}")
+
+
+# ========== OpenAI OAuth Endpoints ==========
+
+
+@router.post("/openai/start", response_model=ApiResponse[OAuthStartData])
+async def start_openai_oauth() -> ApiResponse[OAuthStartData]:
+    """Start OpenAI OAuth flow for Codex API access."""
+    try:
+        auth_url, state, callback_url, expires_in = oauth_service.start_openai_oauth()
+        return ApiResponse(
+            success=True,
+            message="OAuth flow started",
+            data=OAuthStartData(
+                auth_url=auth_url,
+                state=state,
+                callback_url=callback_url,
+                expires_in=expires_in,
+            ),
+        )
+    except Exception as e:
+        raise InternalServerError(message=f"Failed to start OpenAI OAuth: {str(e)}")
+
+
+@router.post("/openai/callback", response_model=ApiResponse[OAuthAccountData])
+async def openai_oauth_callback(request: OAuthCallbackRequest) -> ApiResponse[OAuthAccountData]:
+    """Complete OpenAI OAuth flow and exchange code for tokens."""
+    try:
+        account = await oauth_service.complete_openai_oauth(request.code, request.state)
+        return ApiResponse(
+            success=True,
+            message="OAuth authentication completed",
+            data=_to_account_data(account),
+        )
+    except ValueError as e:
+        raise BadRequestError(message=str(e))
+    except Exception as e:
+        raise InternalServerError(message=f"Failed to complete OpenAI OAuth: {str(e)}")
+
+
+@router.get("/openai/accounts", response_model=ApiResponse[OAuthAccountListData])
+async def list_openai_accounts() -> ApiResponse[OAuthAccountListData]:
+    """List connected OpenAI OAuth accounts."""
+    try:
+        accounts = oauth_service.list_openai_accounts()
+        data = OAuthAccountListData(accounts=[_to_account_data(a) for a in accounts])
+        return ApiResponse(
+            success=True,
+            message="Retrieved OpenAI accounts",
+            data=data,
+        )
+    except Exception as e:
+        raise InternalServerError(message=f"Failed to list OpenAI accounts: {str(e)}")
+
+
+@router.post("/openai/default", response_model=ApiResponse[OAuthAccountData])
+async def set_openai_default(request: OAuthDefaultRequest) -> ApiResponse[OAuthAccountData]:
+    """Set the default OpenAI OAuth account."""
+    try:
+        success = oauth_service.set_openai_default_account(request.account_id)
+        if not success:
+            raise BadRequestError(message="Account not found")
+
+        accounts = oauth_service.list_openai_accounts()
+        updated = next((a for a in accounts if a.account_id == request.account_id), None)
+        if not updated:
+            raise InternalServerError(message="Default account update failed")
+
+        return ApiResponse(
+            success=True,
+            message="Default account updated",
+            data=_to_account_data(updated),
+        )
+    except BadRequestError:
+        raise
+    except Exception as e:
+        raise InternalServerError(message=f"Failed to set default account: {str(e)}")
+
+
+@router.delete("/openai/accounts/{account_id}", response_model=ApiResponse[None])
+async def delete_openai_account(account_id: str) -> ApiResponse[None]:
+    """Disconnect an OpenAI OAuth account."""
+    try:
+        success = oauth_service.delete_openai_account(account_id)
         if not success:
             raise BadRequestError(message="Account not found")
 

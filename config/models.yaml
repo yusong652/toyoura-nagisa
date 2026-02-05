@@ -219,6 +219,61 @@ providers:
         thinking:
           mode: always_on
 
+  # OpenAI Codex (OAuth - ChatGPT Pro/Plus subscription)
+  - provider: openai-codex
+    name: OpenAI Codex
+    description: OpenAI Codex via ChatGPT subscription (Pro/Plus)
+    models:
+      - id: gpt-5.1-codex
+        name: GPT-5.1 Codex
+        description: Standard Codex model (included with ChatGPT subscription)
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
+      - id: gpt-5.1-codex-mini
+        name: GPT-5.1 Codex Mini
+        description: Smaller, faster Codex model
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: default
+
+      - id: gpt-5.1-codex-max
+        name: GPT-5.1 Codex Max
+        description: Larger Codex model with extended context
+        context_window: 400000
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
+      - id: gpt-5.2
+        name: GPT-5.2 (Codex)
+        description: GPT-5.2 via Codex API
+        context_window: 400000
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
+      - id: gpt-5.2-codex
+        name: GPT-5.2 Codex
+        description: GPT-5.2 Codex variant
+        context_window: 400000
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
   # Anthropic Claude
   - provider: anthropic
     name: Anthropic Claude
