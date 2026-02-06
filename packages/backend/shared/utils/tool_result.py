@@ -32,7 +32,11 @@ __all__ = ["ToolResult", "success_response", "error_response", "user_rejected_re
 # Precompiled regex for ANSI escape sequences (color codes, cursor control, etc.)
 # Matches patterns like: \x1b[0m, \x1b[36m, \x1b[1;32m
 # This is safe because ANSI codes have a well-defined format and won't match user text
-ANSI_ESCAPE_PATTERN = re.compile(r'\x1b\[[0-9;]*m')
+ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
+
+# Tool output truncation (simple fallback guard)
+DEFAULT_MAX_LLM_CONTENT_CHARS = 50_000
+TRUNCATION_NOTICE_TEMPLATE = "\n\n... [TRUNCATED - showing {max_chars:,} of {total_chars:,} characters] ..."
 
 
 def strip_ansi_codes(text: str) -> str:
@@ -62,7 +66,95 @@ def strip_ansi_codes(text: str) -> str:
     """
     if not isinstance(text, str):
         return text
-    return ANSI_ESCAPE_PATTERN.sub('', text)
+    return ANSI_ESCAPE_PATTERN.sub("", text)
+
+
+def _truncate_text(
+    text: str,
+    max_chars: int,
+    total_chars: Optional[int] = None,
+    slice_chars: Optional[int] = None,
+) -> str:
+    slice_len = slice_chars if slice_chars is not None else max_chars
+    if len(text) <= slice_len:
+        return text
+    total = total_chars if total_chars is not None else len(text)
+    notice = TRUNCATION_NOTICE_TEMPLATE.format(max_chars=max_chars, total_chars=total)
+    return f"{text[:slice_len]}{notice}"
+
+
+def truncate_llm_content(content: Any, max_chars: int = DEFAULT_MAX_LLM_CONTENT_CHARS) -> Any:
+    if content is None:
+        return None
+
+    if isinstance(content, str):
+        return _truncate_text(content, max_chars)
+
+    if isinstance(content, dict):
+        parts = content.get("parts")
+        if isinstance(parts, list):
+            total_text_length = 0
+            for part in parts:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    total_text_length += len(part.get("text", ""))
+
+            if total_text_length <= max_chars:
+                return content
+
+            remaining = max_chars
+            truncated_parts = []
+            truncated = False
+
+            for part in parts:
+                if not isinstance(part, dict):
+                    if not truncated:
+                        truncated_parts.append(part)
+                    continue
+
+                if part.get("type") != "text":
+                    if not truncated:
+                        truncated_parts.append(part)
+                    continue
+
+                if truncated:
+                    continue
+
+                text = part.get("text", "")
+                if remaining <= 0:
+                    truncated = True
+                    truncated_parts.append(
+                        {
+                            **part,
+                            "text": TRUNCATION_NOTICE_TEMPLATE.format(
+                                max_chars=max_chars, total_chars=total_text_length
+                            ).lstrip(),
+                        }
+                    )
+                    continue
+
+                if len(text) <= remaining:
+                    truncated_parts.append({**part, "text": text})
+                    remaining -= len(text)
+                    continue
+
+                truncated_parts.append(
+                    {
+                        **part,
+                        "text": _truncate_text(
+                            text,
+                            max_chars,
+                            total_text_length,
+                            slice_chars=remaining,
+                        ),
+                    }
+                )
+                truncated = True
+
+            updated = content.copy()
+            updated["parts"] = truncated_parts
+            return updated
+
+    return content
 
 
 def clean_llm_content(content: Any) -> Any:
@@ -93,24 +185,24 @@ def clean_llm_content(content: Any) -> Any:
 
     # Handle simple string content
     if isinstance(content, str):
-        return strip_ansi_codes(content)
+        return truncate_llm_content(strip_ansi_codes(content))
 
     # Handle parts-based structure (recommended format)
     if isinstance(content, dict):
-        if 'parts' in content and isinstance(content['parts'], list):
+        if "parts" in content and isinstance(content["parts"], list):
             cleaned_parts = []
-            for part in content['parts']:
-                if isinstance(part, dict) and 'text' in part:
+            for part in content["parts"]:
+                if isinstance(part, dict) and "text" in part:
                     cleaned_part = part.copy()
-                    cleaned_part['text'] = strip_ansi_codes(part['text'])
+                    cleaned_part["text"] = strip_ansi_codes(part["text"])
                     cleaned_parts.append(cleaned_part)
                 else:
                     cleaned_parts.append(part)
 
             content = content.copy()
-            content['parts'] = cleaned_parts
+            content["parts"] = cleaned_parts
 
-    return content
+    return truncate_llm_content(content)
 
 
 class ToolResult(BaseModel):
@@ -169,21 +261,13 @@ class ToolResult(BaseModel):
     ```
     """
 
-    status: Literal["success", "error"] = Field(
-        ..., 
-        description="Operation outcome: 'success' or 'error'"
-    )
-    message: str = Field(
-        ..., 
-        description="Short user-facing summary suitable for display"
-    )
+    status: Literal["success", "error"] = Field(..., description="Operation outcome: 'success' or 'error'")
+    message: str = Field(..., description="Short user-facing summary suitable for display")
     llm_content: Optional[Any] = Field(
-        None, 
-        description="Structured content for LLM conversation history - must match docstring schema"
+        None, description="Structured content for LLM conversation history - must match docstring schema"
     )
     data: Optional[Dict[str, Any]] = Field(
-        None, 
-        description="Tool-specific payload and metadata for debugging/extension"
+        None, description="Tool-specific payload and metadata for debugging/extension"
     )
 
     # Allow tools to attach extra fields without breaking validation
@@ -193,6 +277,7 @@ class ToolResult(BaseModel):
 # -----------------------------------------------------------------------------
 # Convenience functions for creating tool responses
 # -----------------------------------------------------------------------------
+
 
 def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict[str, Any]:
     """Create a standardized success response for all tools.
@@ -292,11 +377,7 @@ def error_response(message: str, llm_content: Any = None, **data) -> Dict[str, A
     """
     # If no custom llm_content provided, use default <error> wrapped format
     if llm_content is None:
-        llm_content = {
-            "parts": [
-                {"type": "text", "text": f"<error>{message}</error>"}
-            ]
-        }
+        llm_content = {"parts": [{"type": "text", "text": f"<error>{message}</error>"}]}
 
     # Automatically clean ANSI codes from llm_content
     cleaned_content = clean_llm_content(llm_content)
@@ -309,10 +390,7 @@ def error_response(message: str, llm_content: Any = None, **data) -> Dict[str, A
     ).model_dump()
 
 
-def user_rejected_response(
-    user_message: Optional[str] = None,
-    include_stop_instruction: bool = True
-) -> Dict[str, Any]:
+def user_rejected_response(user_message: Optional[str] = None, include_stop_instruction: bool = True) -> Dict[str, Any]:
     """Create a standardized user rejection response for all tools.
 
     This function provides a unified way for tools to return user rejection responses,
@@ -360,11 +438,7 @@ def user_rejected_response(
             f"{stop_instruction}"
         )
     else:
-        text = (
-            "The user doesn't want to proceed with this tool use. "
-            "The tool use was rejected. "
-            f"{stop_instruction}"
-        )
+        text = f"The user doesn't want to proceed with this tool use. The tool use was rejected. {stop_instruction}"
 
     # Use error_response for consistent error formatting with <error> tags
     return error_response(text)

@@ -29,9 +29,9 @@
 
 # System default configuration (used when user hasn't set custom config via frontend)
 default:
-  provider: google
-  model: gemini-3-flash-preview
-  secondary_model: gemini-3-flash-preview
+  provider: google-gemini-antigravity
+  model: gemini-3-flash
+  secondary_model: gemini-3-flash
 
 providers:
 
@@ -126,12 +126,129 @@ providers:
   # Google Gemini CLI (OAuth)
   - provider: google-gemini-cli
     name: Google Gemini CLI
-    description: Gemini CLI OAuth (Vertex AI)
+    description: Gemini CLI OAuth (Code Assist API)
     models:
+      - id: gemini-3-pro-preview
+        name: Gemini 3.0 Pro (CLI)
+        description: Gemini 3.0 Pro via Gemini CLI OAuth
+        context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
       - id: gemini-3-flash-preview
-        name: Gemini 3.0 Flash (CLI OAuth)
+        name: Gemini 3.0 Flash (CLI)
         description: Gemini 3.0 Flash via Gemini CLI OAuth
         context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
+  # Google Gemini Antigravity (OAuth with endpoint fallback)
+  - provider: google-gemini-antigravity
+    name: Google Antigravity
+    description: Antigravity OAuth (Vertex API)
+    models:
+      - id: gemini-3-pro-low
+        name: Gemini 3.0 Pro Low (Antigravity)
+        description: Gemini 3.0 Pro low tier via Antigravity OAuth
+        context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: always_on
+
+      - id: gemini-3-pro-high
+        name: Gemini 3.0 Pro High (Antigravity)
+        description: Gemini 3.0 Pro high tier via Antigravity OAuth
+        context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: always_on
+
+      - id: gemini-3-flash
+        name: Gemini 3.0 Flash (Antigravity)
+        description: Gemini 3.0 Flash via Antigravity OAuth (alias)
+        context_window: 1048576
+        multimodal: true
+        thinking:
+          mode: always_on
+
+      - id: claude-opus-4-5-thinking-low
+        name: Claude Opus 4.5 Thinking Low (Antigravity)
+        description: Claude Opus 4.5 thinking low tier via Antigravity OAuth
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: always_on
+
+      - id: claude-opus-4-5-thinking-high
+        name: Claude Opus 4.5 Thinking High (Antigravity)
+        description: Claude Opus 4.5 thinking high tier via Antigravity OAuth
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: always_on
+
+      - id: claude-sonnet-4-5
+        name: Claude Sonnet 4.5 (Antigravity)
+        description: Claude Sonnet 4.5 via Antigravity OAuth
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
+      - id: claude-sonnet-4-5-thinking-low
+        name: Claude Sonnet 4.5 Thinking Low (Antigravity)
+        description: Claude Sonnet 4.5 thinking low tier via Antigravity OAuth
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: always_on
+
+      - id: claude-sonnet-4-5-thinking-high
+        name: Claude Sonnet 4.5 Thinking High (Antigravity)
+        description: Claude Sonnet 4.5 thinking high tier via Antigravity OAuth
+        context_window: 200000
+        multimodal: true
+        thinking:
+          mode: always_on
+
+  # OpenAI Codex (OAuth - ChatGPT Pro/Plus subscription)
+  - provider: openai-codex
+    name: OpenAI Codex
+    description: OpenAI Codex via ChatGPT subscription (Pro/Plus)
+    models:
+
+      - id: gpt-5.2
+        name: GPT-5.2 (Codex)
+        description: GPT-5.2 via Codex API
+        context_window: 400000
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
+      - id: gpt-5.2-codex
+        name: GPT-5.2 Codex
+        description: GPT-5.2 Codex variant
+        context_window: 400000
+        multimodal: true
+        thinking:
+          mode: configurable
+          options: [default, low, high]
+          default: high
+
+      - id: gpt-5.3-codex
+        name: GPT-5.3 Codex
+        description: GPT-5.3 Codex variant
+        context_window: 400000
         multimodal: true
         thinking:
           mode: configurable

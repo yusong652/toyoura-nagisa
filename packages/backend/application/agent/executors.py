@@ -55,7 +55,7 @@ class MainAgentExecutor:
             thinking_level = get_session_thinking_level(agent.session_id)
 
             stream = agent.llm_client.call_api_with_context_streaming(
-                working_contents, api_config, thinking_level=thinking_level
+                working_contents, api_config, thinking_level=thinking_level, session_id=agent.session_id
             )
             was_interrupted, response = await agent._get_streaming_processor().process_stream(
                 stream, agent._get_stream_state()
@@ -82,9 +82,7 @@ class MainAgentExecutor:
                 agent.session_id,
                 notification_session_id=agent._notification_session_id,
             )
-            execution_result = await tool_executor.execute_all(
-                tool_calls, agent._get_message_id(), agent.config.name
-            )
+            execution_result = await tool_executor.execute_all(tool_calls, agent._get_message_id(), agent.config.name)
 
             await tool_executor.save_results_to_context(tool_calls, execution_result.results, agent.context_manager)
             await tool_executor.save_results_to_database(tool_calls, execution_result.results)
@@ -147,6 +145,7 @@ class SubAgentExecutor:
                 context_contents=working_contents,
                 api_config=api_config,
                 thinking_level=thinking_level,
+                session_id=agent.session_id,
             )
 
             processor = agent.llm_client._get_response_processor()

@@ -24,8 +24,13 @@ class LLMFactory:
         """Register default LLM client implementations."""
         from backend.infrastructure.llm.providers.google import GoogleClient
         from backend.infrastructure.llm.providers.google_gemini_cli import GoogleGeminiCliClient
+        from backend.infrastructure.llm.providers.google_antigravity import (
+            GeminiAntigravityClient,
+            ClaudeAntigravityClient,
+        )
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         from backend.infrastructure.llm.providers.openai import OpenAIClient
+        from backend.infrastructure.llm.providers.openai_codex import OpenAICodexClient
         from backend.infrastructure.llm.providers.moonshot import MoonshotClient
         from backend.infrastructure.llm.providers.zhipu import ZhipuClient
         from backend.infrastructure.llm.providers.openrouter import OpenRouterClient
@@ -33,9 +38,12 @@ class LLMFactory:
         self._clients = {
             "google": GoogleClient,
             "google-gemini-cli": GoogleGeminiCliClient,
+            "google-gemini-antigravity": GeminiAntigravityClient,
+            "google-claude-antigravity": ClaudeAntigravityClient,
             "anthropic": AnthropicClient,
             "gpt": OpenAIClient,
             "openai": OpenAIClient,
+            "openai-codex": OpenAICodexClient,
             "moonshot": MoonshotClient,
             "zhipu": ZhipuClient,
             "openrouter": OpenRouterClient,
@@ -62,6 +70,12 @@ class LLMFactory:
         if provider not in self._clients:
             raise ValueError(f"Unsupported LLM provider: '{provider}'. Supported: {list(self._clients.keys())}")
 
+        client_class = self._clients[provider]
+        if provider == "google-gemini-antigravity" and "claude" in model.lower():
+            from backend.infrastructure.llm.providers.google_antigravity import ClaudeAntigravityClient
+
+            client_class = ClaudeAntigravityClient
+
         # Check cache for existing client instance
         # Include app ID in cache key to distinguish clients with/without app context
         cache_key = f"{provider}:{model}:{id(app) if app else 'None'}"
@@ -71,7 +85,7 @@ class LLMFactory:
 
         config = self._build_config(provider, model, app)
         logger.info(f"Creating {provider} client with model: {model}")
-        client = self._clients[provider](**config)
+        client = client_class(**config)
 
         # Store in cache
         self._client_cache[cache_key] = client
@@ -108,6 +122,11 @@ class LLMFactory:
 
             cfg = GoogleConfig(model=model, use_oauth=True)
             return {"config": cfg, "extra_config": extra}
+        elif provider in {"google-gemini-antigravity", "google-claude-antigravity"}:
+            from backend.infrastructure.llm.providers.google.config import GoogleConfig
+
+            cfg = GoogleConfig(model=model, use_oauth=True)
+            return {"config": cfg, "extra_config": extra}
         elif provider == "anthropic":
             from backend.infrastructure.llm.providers.anthropic.config import AnthropicConfig
 
@@ -119,6 +138,12 @@ class LLMFactory:
             cfg = OpenAIConfig(model=model)
             if not cfg.openai_api_key:
                 raise ValueError("OpenAI API key not configured")
+            return {"config": cfg, "extra_config": extra}
+        elif provider == "openai-codex":
+            from backend.infrastructure.llm.providers.openai_codex.config import OpenAICodexConfig
+
+            cfg = OpenAICodexConfig(model=model)
+            # Subscription compatible - no API key or verification needed
             return {"config": cfg, "extra_config": extra}
         elif provider == "moonshot":
             from backend.infrastructure.llm.providers.moonshot.config import MoonshotConfig

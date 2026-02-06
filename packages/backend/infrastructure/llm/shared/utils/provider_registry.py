@@ -11,6 +11,10 @@ from typing import Type, Any, Optional
 def _normalize_provider_name(provider_name: str) -> str:
     if provider_name == "googlegeminicli":
         return "google-gemini-cli"
+    if provider_name == "googlegeminiantigravity":
+        return "google-gemini-antigravity"
+    if provider_name in {"google-claude-antigravity", "googleclaudeantigravity"}:
+        return "google-gemini-antigravity"
     return provider_name
 
 
@@ -37,7 +41,7 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.google.message_formatter import GoogleMessageFormatter
 
         return GoogleMessageFormatter
-    if provider_name == "google-gemini-cli":
+    if provider_name in {"google-gemini-cli", "google-gemini-antigravity", "google-claude-antigravity"}:
         from backend.infrastructure.llm.providers.google_gemini_cli.message_formatter import (
             GoogleGeminiCliMessageFormatter,
         )
@@ -47,7 +51,7 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.anthropic.message_formatter import AnthropicMessageFormatter
 
         return AnthropicMessageFormatter
-    elif provider_name == "openai":
+    elif provider_name in {"openai", "openai-codex"}:
         from backend.infrastructure.llm.providers.openai.message_formatter import OpenAIMessageFormatter
 
         return OpenAIMessageFormatter
@@ -86,7 +90,7 @@ def get_context_manager_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.google.context_manager import GoogleContextManager
 
         return GoogleContextManager
-    if provider_name == "google-gemini-cli":
+    if provider_name in {"google-gemini-cli", "google-gemini-antigravity", "google-claude-antigravity"}:
         from backend.infrastructure.llm.providers.google_gemini_cli.context_manager import (
             GoogleGeminiCliContextManager,
         )
@@ -96,7 +100,7 @@ def get_context_manager_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.anthropic.context_manager import AnthropicContextManager
 
         return AnthropicContextManager
-    elif provider_name == "openai":
+    elif provider_name in {"openai", "openai-codex"}:
         from backend.infrastructure.llm.providers.openai.context_manager import OpenAIContextManager
 
         return OpenAIContextManager
@@ -131,7 +135,7 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
     """
     provider_name = _normalize_provider_name(provider_name)
 
-    if provider_name in {"google", "google-gemini-cli"}:
+    if provider_name in {"google", "google-gemini-cli", "google-gemini-antigravity", "google-claude-antigravity"}:
         from backend.infrastructure.llm.providers.google.tool_manager import GoogleToolManager
 
         return GoogleToolManager
@@ -139,7 +143,7 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
         from backend.infrastructure.llm.providers.anthropic.tool_manager import AnthropicToolManager
 
         return AnthropicToolManager
-    elif provider_name == "openai":
+    elif provider_name in {"openai", "openai-codex"}:
         from backend.infrastructure.llm.providers.openai.tool_manager import OpenAIToolManager
 
         return OpenAIToolManager
@@ -163,8 +167,11 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
 SUPPORTED_PROVIDERS = [
     "google",
     "google-gemini-cli",
+    "google-gemini-antigravity",
+    "google-claude-antigravity",
     "anthropic",
     "openai",
+    "openai-codex",
     "moonshot",
     "zhipu",
     "openrouter",

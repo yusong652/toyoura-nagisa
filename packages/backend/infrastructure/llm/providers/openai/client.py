@@ -139,10 +139,19 @@ class OpenAIClient(LLMClientBase):
             kwargs_api['timeout'] = call_options.timeout
 
         # Handle thinking mode (reasoning effort for reasoning models)
-        if call_options.thinking_level is not None:
+        # Standard OpenAI: "default" means use config-level reasoning_effort (already in build_api_params).
+        # Only override when explicitly set to "low" or "high".
+        if call_options.thinking_level is not None and call_options.thinking_level != "default":
             effort = OPENAI_THINKING_LEVEL_TO_EFFORT.get(call_options.thinking_level)
             if effort is not None:
                 kwargs_api["reasoning"] = {"effort": effort}
+
+        # When reasoning is enabled (via config or runtime override), add include parameter
+        if "reasoning" in kwargs_api:
+            if "include" not in kwargs_api:
+                kwargs_api["include"] = []
+            if "reasoning.encrypted_content" not in kwargs_api["include"]:
+                kwargs_api["include"].append("reasoning.encrypted_content")
 
         if debug:
             OpenAIDebugger.log_api_call_info(
@@ -253,10 +262,19 @@ class OpenAIClient(LLMClientBase):
             kwargs_api['timeout'] = call_options.timeout
 
         # Handle thinking mode (reasoning effort for reasoning models)
-        if call_options.thinking_level is not None:
+        # Standard OpenAI: "default" means use config-level reasoning_effort (already in build_api_params).
+        # Only override when explicitly set to "low" or "high".
+        if call_options.thinking_level is not None and call_options.thinking_level != "default":
             effort = OPENAI_THINKING_LEVEL_TO_EFFORT.get(call_options.thinking_level)
             if effort is not None:
                 kwargs_api["reasoning"] = {"effort": effort}
+
+        # When reasoning is enabled (via config or runtime override), add include parameter
+        if "reasoning" in kwargs_api:
+            if "include" not in kwargs_api:
+                kwargs_api["include"] = []
+            if "reasoning.encrypted_content" not in kwargs_api["include"]:
+                kwargs_api["include"].append("reasoning.encrypted_content")
 
         if debug:
             OpenAIDebugger.log_api_call_info(

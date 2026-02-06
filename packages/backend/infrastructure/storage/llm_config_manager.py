@@ -383,6 +383,51 @@ def normalize_llm_config(llm_config: Optional[Dict[str, Any]]) -> tuple[Optional
     return llm_config, updated
 
 
+def is_provider_configured(provider: str) -> tuple[bool, Optional[str]]:
+    """
+    Check if a provider is configured (API key or OAuth).
+
+    Args:
+        provider: Provider identifier
+
+    Returns:
+        tuple[bool, Optional[str]]: (is_configured, error_message)
+    """
+    # OAuth-based providers (google-gemini-cli, google-gemini-antigravity)
+    if provider in ("google-gemini-cli", "google-gemini-antigravity"):
+        try:
+            from backend.infrastructure.oauth.base.types import OAuthProvider
+            from backend.infrastructure.storage import oauth_token_storage
+
+            if oauth_token_storage.has_accounts(OAuthProvider.GOOGLE):
+                return True, None
+        except Exception:
+            pass
+
+        return False, "Google OAuth not configured"
+
+    # OAuth-based providers (openai-codex)
+    if provider == "openai-codex":
+        try:
+            from backend.infrastructure.oauth.base.types import OAuthProvider
+            from backend.infrastructure.storage import oauth_token_storage
+
+            if oauth_token_storage.has_accounts(OAuthProvider.OPENAI):
+                return True, None
+        except Exception:
+            pass
+
+        return False, "OpenAI OAuth not configured. Use /connects to authenticate with ChatGPT."
+
+    # Check if API key exists for this provider
+    if provider in _API_KEY_ENV_VARS:
+        if not _get_env_api_key(provider):
+            display_name = _API_KEY_DISPLAY_NAMES.get(provider, provider)
+            return False, f"{display_name} API key not configured"
+
+    return True, None
+
+
 def validate_llm_config(
     provider: str,
     model: str,
@@ -427,22 +472,5 @@ def validate_llm_config(
     if secondary_model and not is_model_valid_for_provider(provider, secondary_model):
         return False, (f"Secondary model '{secondary_model}' is not available for provider '{provider}'")
 
-    if provider == "google-gemini-cli":
-        try:
-            from backend.infrastructure.oauth.base.types import OAuthProvider
-            from backend.infrastructure.storage import oauth_token_storage
-
-            if oauth_token_storage.has_accounts(OAuthProvider.GOOGLE):
-                return True, None
-        except Exception:
-            pass
-
-        return False, "Google OAuth not configured"
-
-    # Check if API key exists for this provider
-    if provider in _API_KEY_ENV_VARS:
-        if not _get_env_api_key(provider):
-            display_name = _API_KEY_DISPLAY_NAMES.get(provider, provider)
-            return False, f"{display_name} API key not configured"
-
-    return True, None
+    # Check credentials
+    return is_provider_configured(provider)

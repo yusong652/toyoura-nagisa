@@ -8,23 +8,29 @@ export interface OAuthCallbackResult {
 interface WaitForOAuthCallbackOptions {
   expectedState: string;
   timeoutMs: number;
+  /** Optional port override (default: 8085 for Google, 1455 for OpenAI) */
+  port?: number;
+  /** Optional path override (default: /oauth2callback for Google, /auth/callback for OpenAI) */
+  path?: string;
 }
 
-const CALLBACK_PORT = 8085;
+const DEFAULT_CALLBACK_PORT = 8085;
+const DEFAULT_CALLBACK_PATH = '/oauth2callback';
 const CALLBACK_HOST = 'localhost';
-const CALLBACK_PATH = '/oauth2callback';
 
 export function waitForOAuthCallback({
   expectedState,
   timeoutMs,
+  port = DEFAULT_CALLBACK_PORT,
+  path = DEFAULT_CALLBACK_PATH,
 }: WaitForOAuthCallbackOptions): Promise<OAuthCallbackResult> {
   return new Promise((resolve, reject) => {
     let timeout: NodeJS.Timeout | null = null;
 
     const server = createServer((req, res) => {
       try {
-        const requestUrl = new URL(req.url ?? '/', `http://${CALLBACK_HOST}:${CALLBACK_PORT}`);
-        if (requestUrl.pathname !== CALLBACK_PATH) {
+        const requestUrl = new URL(req.url ?? '/', `http://${CALLBACK_HOST}:${port}`);
+        if (requestUrl.pathname !== path) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'text/plain');
           res.end('Not found');
@@ -64,7 +70,7 @@ export function waitForOAuthCallback({
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.end(
           '<!doctype html><html><head><meta charset="utf-8"/></head>' +
-            '<body><h2>Google OAuth complete</h2>' +
+            '<body><h2>OAuth Authentication Complete</h2>' +
             '<p>You can close this window and return to the terminal.</p></body></html>'
         );
 
@@ -95,7 +101,7 @@ export function waitForOAuthCallback({
       finish(err instanceof Error ? err : new Error('OAuth callback server error'));
     });
 
-    server.listen(CALLBACK_PORT, CALLBACK_HOST, () => {
+    server.listen(port, CALLBACK_HOST, () => {
       timeout = setTimeout(() => {
         finish(new Error('OAuth callback timeout'));
       }, timeoutMs);

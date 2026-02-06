@@ -1,4 +1,4 @@
-"""Anthropic web search provider."""
+"""OpenAI Codex web search provider."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Dict, Any
 from ..web_search.common import perform_search
 
 
-async def perform_anthropic_search(
+async def perform_openai_codex_search(
     llm_client,
     query: str,
     *,
@@ -15,11 +15,6 @@ async def perform_anthropic_search(
     thinking_level: str | None = None,
     session_id: str | None = None,
 ) -> Dict[str, Any]:
-    tool_schemas = [
-        {
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": max_uses,
-        }
-    ]
+    # Codex supports web_search tool type just like standard OpenAI
+    tool_schemas = [{"type": "web_search"}]
     return await perform_search(llm_client, query, tool_schemas, thinking_level=thinking_level, session_id=session_id)

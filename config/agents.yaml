@@ -36,6 +36,8 @@ main_agent:
       enabled: true
     - name: pfc-server-setup
       enabled: true
+    - name: moltbook
+      enabled: true
 
 subagents:
   pfc_explorer:

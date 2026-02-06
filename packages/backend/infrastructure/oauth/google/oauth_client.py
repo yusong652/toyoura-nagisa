@@ -40,6 +40,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/cloud-platform",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/cclog",
+    "https://www.googleapis.com/auth/experimentsandconfigs",
 ]
 
 # Default project ID if discovery fails
@@ -52,6 +54,7 @@ CALLBACK_TIMEOUT_SECONDS = 300
 @dataclass
 class PKCEPair:
     """PKCE verifier and challenge pair."""
+
     verifier: str
     challenge: str
 
@@ -59,6 +62,7 @@ class PKCEPair:
 @dataclass
 class OAuthStartResult:
     """Result of starting OAuth flow."""
+
     auth_url: str
     state: str
     pkce: PKCEPair
@@ -67,6 +71,7 @@ class OAuthStartResult:
 @dataclass
 class OAuthCallbackResult:
     """Result of OAuth callback processing."""
+
     code: str
     state: str
 
@@ -122,6 +127,7 @@ class GoogleOAuthClient:
         challenge_bytes = hashlib.sha256(verifier.encode("utf-8")).digest()
         # Base64url encoding without padding
         import base64
+
         challenge = base64.urlsafe_b64encode(challenge_bytes).decode("utf-8").rstrip("=")
 
         return PKCEPair(verifier=verifier, challenge=challenge)
@@ -209,12 +215,19 @@ class GoogleOAuthClient:
 
             # Get code and state
             code = request.query.get("code")
-            state = request.query.get("state")
+            state = request.query.get("state") or ""
 
             if not code:
                 result_future.set_exception(ValueError("Missing authorization code"))
                 return web.Response(
                     text="<html><body><h2>Error</h2><p>Missing authorization code</p></body></html>",
+                    content_type="text/html",
+                )
+
+            if not state:
+                result_future.set_exception(ValueError("Missing state parameter"))
+                return web.Response(
+                    text="<html><body><h2>Error</h2><p>Missing state parameter</p></body></html>",
                     content_type="text/html",
                 )
 

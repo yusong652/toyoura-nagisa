@@ -28,7 +28,7 @@ DEFAULT_THINKING_LEVEL = "high"
 # We map our levels to OpenAI's effort values
 
 OPENAI_THINKING_LEVEL_TO_EFFORT: Dict[str, Optional[str]] = {
-    "default": None,  # Don't pass reasoning param
+    "default": "medium",  # Codex default: medium effort (matches codex-rs/opencode)
     "low": "low",
     "high": "high",
 }

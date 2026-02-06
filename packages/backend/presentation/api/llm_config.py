@@ -20,11 +20,13 @@ from pydantic import BaseModel, Field
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import BadRequestError, InternalServerError
 from backend.infrastructure.storage.llm_config_manager import (
-    get_default_llm_config,
-    save_default_llm_config,
     clear_default_llm_config,
+    get_default_llm_config,
+    is_provider_configured,
+    save_default_llm_config,
     validate_llm_config,
 )
+
 from backend.infrastructure.storage.session_manager import (
     get_session_llm_config,
     update_session_llm_config,
@@ -92,6 +94,8 @@ class ProviderInfo(BaseModel):
     description: str = Field(..., description="Provider description")
     models: List[ModelInfo] = Field(..., description="Available models")
     api_key_configured: bool = Field(..., description="Whether API key is configured")
+    auth_type: str = Field(default="api_key", description="Authentication type: 'api_key' or 'oauth'")
+    auth_hint: Optional[str] = Field(None, description="Hint for configuring authentication")
 
 
 class ProviderListData(BaseModel):
@@ -119,58 +123,6 @@ class ThinkingConfigData(BaseModel):
 # =====================
 # Helper Functions
 # =====================
-_API_KEY_ENV_VARS = {
-    "google": "GOOGLE_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "gpt": "OPENAI_API_KEY",
-    "moonshot": "MOONSHOT_API_KEY",
-    "zhipu": "ZHIPU_API_KEY",
-    "openrouter": "OPENROUTER_API_KEY",
-}
-
-
-def _get_env_api_key(provider: str) -> Optional[str]:
-    env_var = _API_KEY_ENV_VARS.get(provider)
-    if not env_var:
-        return None
-
-    value = os.getenv(env_var)
-    if value is None and env_var.lower() != env_var:
-        value = os.getenv(env_var.lower())
-    if value is None and env_var.upper() != env_var:
-        value = os.getenv(env_var.upper())
-
-    if value is None:
-        return None
-
-    value = value.strip()
-    return value or None
-
-
-def _check_api_key_configured(provider: str) -> bool:
-    """
-    Check if API key or OAuth credentials are configured for a provider.
-
-    Args:
-        provider: Provider identifier
-
-    Returns:
-        bool: True if credentials are configured
-    """
-    if provider == "google":
-        return bool(_get_env_api_key(provider))
-
-    if provider == "google-gemini-cli":
-        try:
-            from backend.infrastructure.oauth.base.types import OAuthProvider
-            from backend.infrastructure.storage import oauth_token_storage
-
-            return oauth_token_storage.has_accounts(OAuthProvider.GOOGLE)
-        except Exception:
-            return False
-
-    return bool(_get_env_api_key(provider))
 
 
 def _get_available_providers() -> List[ProviderInfo]:
@@ -185,9 +137,21 @@ def _get_available_providers() -> List[ProviderInfo]:
     registry_providers = get_all_providers()
     result = []
 
+    # OAuth-based providers
+    OAUTH_PROVIDERS = {"google-gemini-cli", "google-gemini-antigravity", "openai-codex"}
+
     for reg_provider in registry_providers:
-        # Check API key configuration
-        has_key = _check_api_key_configured(reg_provider.provider)
+        # Check if provider is configured (centralized logic)
+        has_key, error_message = is_provider_configured(reg_provider.provider)
+
+        # Determine auth type
+        is_oauth = reg_provider.provider in OAUTH_PROVIDERS
+        auth_type = "oauth" if is_oauth else "api_key"
+
+        # Use error message as hint if not configured
+        auth_hint = error_message if not has_key else None
+
+        # Convert registry models to API models
 
         # Convert registry models to API models
         api_models = []
@@ -216,6 +180,8 @@ def _get_available_providers() -> List[ProviderInfo]:
             description=reg_provider.description,
             models=api_models,
             api_key_configured=has_key,
+            auth_type=auth_type,
+            auth_hint=auth_hint,
         )
 
         result.append(provider_info)
