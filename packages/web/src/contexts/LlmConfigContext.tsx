@@ -106,7 +106,7 @@ export const LlmConfigProvider: React.FC<LlmConfigProviderProps> = ({ children }
       if (!currentSessionId) return
 
       try {
-        const response = await fetch(`/api/llm-config/session/${currentSessionId}`)
+        const response = await fetch(`/api/llm-config?session_id=${encodeURIComponent(currentSessionId)}`)
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.data) {
@@ -163,7 +163,7 @@ export const LlmConfigProvider: React.FC<LlmConfigProviderProps> = ({ children }
       selectModel(modelId)
 
       // Send to backend
-      const response = await fetch(`/api/llm-config/session/${currentSessionId}`, {
+      const response = await fetch(`/api/llm-config?session_id=${encodeURIComponent(currentSessionId)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

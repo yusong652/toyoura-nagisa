@@ -3,9 +3,8 @@ Global LLM Configuration Manager
 
 Manages the default LLM provider and model configuration that applies to all new sessions.
 
-Configuration Sources (priority order):
-1. data/default_llm.json - User customization via frontend settings
-2. config/models.yaml (default section) - System default configuration
+Configuration Source:
+1. config/models.yaml (default section) - System default configuration
 
 Configuration Structure:
 {
@@ -15,21 +14,18 @@ Configuration Structure:
 }
 
 Design Principles:
-- Two-tier defaults: User preference overrides system default
-- User config stored in data/ directory (runtime data, not version controlled)
-- System default in config/models.yaml (version controlled)
+- Single source of truth for defaults: config/models.yaml
+- System default is version controlled
 - Simple: Only provider/model/secondary_model, no other parameters
-- Validation: Existing llm.py config validates providers and provides API keys
+- Validation: Existing model registry validates providers and models
 """
 
-import json
 import os
 import yaml
 from typing import Any, Dict, Optional
 
-# Configuration file paths
-# Note: run.py changes working directory to project root, so paths are relative to root
-DEFAULT_LLM_CONFIG_FILE = "data/default_llm.json"  # User customization (root/data/)
+# Configuration file path
+# Note: run.py changes working directory to project root, so path is relative to root
 MODELS_YAML_FILE = "config/models.yaml"  # System defaults (root/config/)
 
 _API_KEY_ENV_VARS = {
@@ -112,10 +108,9 @@ def get_default_llm_config() -> Optional[Dict[str, Any]]:
     """
     Get the global default LLM configuration.
 
-    Configuration priority:
-    1. User customization (data/default_llm.json) - highest priority
-    2. System default (config/models.yaml default section)
-    3. None if neither exists
+    Configuration source:
+    1. System default (config/models.yaml default section)
+    2. None if not defined
 
     Returns:
         Optional[Dict[str, Any]]: Configuration dict with keys:
@@ -131,104 +126,7 @@ def get_default_llm_config() -> Optional[Dict[str, Any]]:
         else:
             print("No default configuration available")
     """
-    # Priority 1: User customization (data/default_llm.json)
-    if os.path.exists(DEFAULT_LLM_CONFIG_FILE):
-        try:
-            with open(DEFAULT_LLM_CONFIG_FILE, "r", encoding="utf-8") as f:
-                config = json.load(f)
-
-            # Validate required fields
-            if not isinstance(config, dict):
-                print(f"[WARNING] Invalid user LLM config: not a dict")
-            elif "provider" not in config or "model" not in config:
-                print(f"[WARNING] Invalid user LLM config: missing provider or model")
-            else:
-                return config
-
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            print(f"[WARNING] Failed to load user LLM config: {e}")
-
-    # Priority 2: System default (config/models.yaml)
-    system_default = _get_system_default_config()
-    if system_default:
-        return system_default
-
-    # Priority 3: No configuration available
-    return None
-
-
-def save_default_llm_config(
-    provider: str,
-    model: str,
-    secondary_model: Optional[str] = None,
-) -> bool:
-    """
-    Save the global default LLM configuration.
-
-    Updates the default provider and model that will be used for all new sessions.
-    Creates the config directory and file if they don't exist.
-
-    Args:
-        provider: LLM provider name (e.g., "google", "anthropic", "openai")
-        model: Model identifier (e.g., "gemini-2.0-flash-exp", "claude-sonnet-4-5")
-        secondary_model: Optional subagent model identifier
-
-    Returns:
-        bool: True if save succeeded, False otherwise
-
-    Example:
-        success = save_default_llm_config("anthropic", "claude-sonnet-4-5")
-        if success:
-            print("Default LLM configuration updated")
-    """
-    try:
-        # Ensure config directory exists
-        config_dir = os.path.dirname(DEFAULT_LLM_CONFIG_FILE)
-        if config_dir:
-            os.makedirs(config_dir, exist_ok=True)
-
-        # Build configuration
-        config: Dict[str, Any] = {"provider": provider, "model": model}
-        if secondary_model:
-            config["secondary_model"] = secondary_model
-
-        # Save to file
-        with open(DEFAULT_LLM_CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-
-        print(f"[INFO] Saved default LLM config: {provider}/{model}")
-        return True
-
-    except Exception as e:
-        print(f"[ERROR] Failed to save default LLM config: {e}")
-        return False
-
-
-def clear_default_llm_config() -> bool:
-    """
-    Clear the global default LLM configuration.
-
-    Removes the configuration file, causing the system to fall back to
-    defaults from llm.py configuration.
-
-    Returns:
-        bool: True if cleared successfully, False otherwise
-
-    Example:
-        success = clear_default_llm_config()
-        if success:
-            print("Reverted to system default configuration")
-    """
-    try:
-        if os.path.exists(DEFAULT_LLM_CONFIG_FILE):
-            os.remove(DEFAULT_LLM_CONFIG_FILE)
-            print(f"[INFO] Cleared default LLM config")
-
-        return True
-
-    except Exception as e:
-        print(f"[ERROR] Failed to clear default LLM config: {e}")
-        return False
+    return _get_system_default_config()
 
 
 def get_provider_secondary_model(provider: str) -> Optional[str]:
@@ -277,9 +175,8 @@ def build_initial_llm_config() -> Optional[Dict[str, Any]]:
     Build default LLM configuration for new sessions.
 
     Logic priority:
-    1. User customization (data/default_llm.json)
-    2. System default (config/models.yaml)
-    3. First available provider from registry (fallback)
+    1. System default (config/models.yaml)
+    2. First available provider from registry (fallback)
 
     Returns:
         Optional[Dict[str, Any]]: Initial configuration dict
@@ -291,7 +188,7 @@ def build_initial_llm_config() -> Optional[Dict[str, Any]]:
         is_provider_supported,
     )
 
-    # Try user/system default first
+    # Try system default first
     default_config = get_default_llm_config()
     if isinstance(default_config, dict):
         provider = default_config.get("provider")

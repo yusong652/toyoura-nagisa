@@ -2,17 +2,16 @@
 LLM Configuration API.
 
 Provides endpoints for managing LLM provider and model configuration.
-Global defaults are stored in config/default_llm.json and apply to all new sessions.
+System defaults are defined in config/models.yaml and apply to all new sessions.
 Session overrides are stored in session metadata when a session_id is provided.
 
 Routes:
-    GET /api/llm-config - Get current LLM configuration (global or session)
-    POST /api/llm-config - Update LLM configuration (global or session)
-    DELETE /api/llm-config - Clear LLM configuration (global or session)
+    GET /api/llm-config - Get current LLM configuration (default or session)
+    POST /api/llm-config - Update session LLM configuration (session_id required)
+    DELETE /api/llm-config - Clear session LLM configuration (session_id required)
     GET /api/llm-config/providers - Get available providers and models
 """
 
-import os
 from typing import List, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -20,10 +19,8 @@ from pydantic import BaseModel, Field
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import BadRequestError, InternalServerError
 from backend.infrastructure.storage.llm_config_manager import (
-    clear_default_llm_config,
     get_default_llm_config,
     is_provider_configured,
-    save_default_llm_config,
     validate_llm_config,
 )
 
@@ -199,8 +196,8 @@ async def get_llm_config(
     """
     Get current LLM configuration.
 
-    Returns the session override if session_id is provided, otherwise the global default.
-    If no configuration is set, returns null (system defaults from llm.py will be used).
+    Returns the session override if session_id is provided, otherwise the system default
+    from config/models.yaml.
 
     Returns:
         ApiResponse containing LLMConfigData or null
@@ -217,13 +214,11 @@ async def get_llm_config(
             if config:
                 return ApiResponse(
                     success=True,
-                    message="No session LLM override (using global defaults)",
+                    message="No session LLM override (using system defaults)",
                     data=LLMConfigData(**config),
                 )
 
-            return ApiResponse(
-                success=True, message="No custom LLM configuration set (using system defaults)", data=None
-            )
+            return ApiResponse(success=True, message="No LLM configuration set", data=None)
 
         config = get_default_llm_config()
 
@@ -232,7 +227,7 @@ async def get_llm_config(
                 success=True, message="Retrieved default LLM configuration", data=LLMConfigData(**config)
             )
 
-        return ApiResponse(success=True, message="No custom LLM configuration set (using system defaults)", data=None)
+        return ApiResponse(success=True, message="No LLM configuration set", data=None)
 
     except Exception as e:
         raise InternalServerError(message=f"Failed to get LLM configuration: {str(e)}")
@@ -246,9 +241,8 @@ async def update_llm_config(
     """
     Update LLM configuration.
 
-    Sets the session override when session_id is provided, otherwise updates the
-    global default provider and model for new sessions. The configuration is
-    validated before being saved.
+    Sets the session override. session_id is required.
+    The configuration is validated before being saved.
 
     Args:
         request: LLMConfigUpdateRequest with provider and model
@@ -269,47 +263,31 @@ async def update_llm_config(
         if not is_valid:
             raise BadRequestError(message=f"Invalid LLM configuration: {error_message}")
 
-        if session_id:
-            success = update_session_llm_config(
-                session_id,
-                request.provider,
-                request.model,
-                request.secondary_model,
-            )
-            if not success:
-                raise BadRequestError(message=f"Session not found: {session_id}")
+        if not session_id:
+            raise BadRequestError(message="session_id is required for updating LLM configuration")
 
-            # Notify frontend about the change
-            from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-
-            llm_config = {
-                "provider": request.provider,
-                "model": request.model,
-                "secondary_model": request.secondary_model,
-            }
-            await WebSocketNotificationService.send_session_llm_config_update(session_id, llm_config)
-
-            return ApiResponse(
-                success=True,
-                message=f"Updated session LLM to {request.provider}/{request.model}",
-                data=LLMConfigData(
-                    provider=request.provider,
-                    model=request.model,
-                    secondary_model=request.secondary_model,
-                ),
-            )
-
-        success = save_default_llm_config(
+        success = update_session_llm_config(
+            session_id,
             request.provider,
             request.model,
             request.secondary_model,
         )
         if not success:
-            raise InternalServerError(message="Failed to save LLM configuration")
+            raise BadRequestError(message=f"Session not found: {session_id}")
+
+        # Notify frontend about the change
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+
+        llm_config = {
+            "provider": request.provider,
+            "model": request.model,
+            "secondary_model": request.secondary_model,
+        }
+        await WebSocketNotificationService.send_session_llm_config_update(session_id, llm_config)
 
         return ApiResponse(
             success=True,
-            message=f"Updated default LLM to {request.provider}/{request.model}",
+            message=f"Updated session LLM to {request.provider}/{request.model}",
             data=LLMConfigData(
                 provider=request.provider,
                 model=request.model,
@@ -330,33 +308,28 @@ async def clear_llm_config(
     """
     Clear LLM configuration.
 
-    Removes the session override when session_id is provided; otherwise clears the
-    global default and reverts to defaults from llm.py.
+    Removes the session override. session_id is required.
 
     Returns:
         ApiResponse confirming the deletion
     """
     try:
-        if session_id:
-            success = clear_session_llm_config(session_id)
-            if not success:
-                raise BadRequestError(message=f"Session not found: {session_id}")
+        if not session_id:
+            raise BadRequestError(message="session_id is required for clearing LLM configuration")
 
-            # Notify frontend about the change
-            from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-
-            await WebSocketNotificationService.send_session_llm_config_update(session_id, {})
-
-            return ApiResponse(success=True, message="Cleared session LLM override", data=None)
-
-        success = clear_default_llm_config()
+        success = clear_session_llm_config(session_id)
         if not success:
-            raise InternalServerError(message="Failed to clear LLM configuration")
+            raise BadRequestError(message=f"Session not found: {session_id}")
 
-        return ApiResponse(
-            success=True, message="Cleared custom LLM configuration (reverted to system defaults)", data=None
-        )
+        # Notify frontend about the change
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
+        await WebSocketNotificationService.send_session_llm_config_update(session_id, {})
+
+        return ApiResponse(success=True, message="Cleared session LLM override", data=None)
+
+    except BadRequestError:
+        raise
     except Exception as e:
         raise InternalServerError(message=f"Failed to clear LLM configuration: {str(e)}")
 

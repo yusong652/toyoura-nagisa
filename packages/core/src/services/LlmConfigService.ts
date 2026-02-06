@@ -48,11 +48,11 @@ export class LlmConfigService {
    * Update LLM configuration.
    * 
    * @param config - New configuration
-   * @param sessionId - Optional session ID for session override
+   * @param sessionId - Session ID for session override
    * @returns Promise resolving to updated configuration
    */
-  async updateLlmConfig(config: LlmConfigUpdateData, sessionId?: string): Promise<LlmConfigUpdateData> {
-    const url = sessionId ? `/api/llm-config?session_id=${sessionId}` : '/api/llm-config'
+  async updateLlmConfig(config: LlmConfigUpdateData, sessionId: string): Promise<LlmConfigUpdateData> {
+    const url = `/api/llm-config?session_id=${sessionId}`
     return await apiClient.post<LlmConfigUpdateData>(url, config)
   }
 
