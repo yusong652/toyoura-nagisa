@@ -22,7 +22,7 @@ from backend.infrastructure.pfc.python_api import (
 )
 from backend.infrastructure.pfc.shared.query import APISearch
 from backend.shared.utils.tool_result import success_response, error_response
-from .utils import SearchQuery, SearchLimit
+from .utils import PythonAPISearchQuery, SearchLimit
 
 
 def register_pfc_query_python_api_tool(registrar: ToolRegistrar):
@@ -34,7 +34,7 @@ def register_pfc_query_python_api_tool(registrar: ToolRegistrar):
     )
     async def pfc_query_python_api(
         context: ToolContext,
-        query: SearchQuery,
+        query: PythonAPISearchQuery,
         limit: SearchLimit = 10,
     ) -> Dict[str, Any]:
         """Search PFC Python SDK documentation by keywords (like grep).

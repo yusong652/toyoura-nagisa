@@ -431,7 +431,7 @@ class BaseToolManager(ABC):
         try:
             # Step 0: Validate edit prerequisite (must read file before editing)
             if tool_name == "edit":
-                file_path = tool_args.get("file_path", "")
+                file_path = tool_args.get("path", "")
                 if file_path:
                     from backend.shared.utils.tool_result import error_response
 
@@ -468,7 +468,7 @@ class BaseToolManager(ABC):
             # Step 3: Track successful write operations as "read" for edit prerequisite
             # This allows edit tool to modify files that were just written
             if tool_name == "write" and tool_result.get("status") == "success":
-                file_path = tool_args.get("file_path", "")
+                file_path = tool_args.get("path", "")
                 if file_path:
                     self._track_read_file(session_id, file_path)
 

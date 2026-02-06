@@ -124,7 +124,7 @@ class TestToolClassification:
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
         tool_calls = [
-            {"id": "call_1", "name": "read", "arguments": {"file_path": "/test"}},
+            {"id": "call_1", "name": "read", "arguments": {"path": "/test"}},
             {"id": "call_2", "name": "bash", "arguments": {"command": "rm -rf /"}},
             {"id": "call_3", "name": "glob", "arguments": {"pattern": "*.py"}},
         ]
@@ -178,7 +178,7 @@ class TestToolExecution:
         # Arrange
         executor = ToolExecutor(mock_tool_manager, sample_session_id)
         tool_calls = [
-            {"id": "call_1", "name": "read", "arguments": {"file_path": "/file1"}},
+            {"id": "call_1", "name": "read", "arguments": {"path": "/file1"}},
             {"id": "call_2", "name": "glob", "arguments": {"pattern": "*.py"}},
         ]
         mock_tool_manager.handle_function_call.return_value = {"status": "success"}

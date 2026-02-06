@@ -6,21 +6,23 @@ Uses shared task_status_formatter for consistent output format.
 """
 
 import asyncio
+from typing import Dict, Any
 
 from backend.application.tools.registrar import ToolRegistrar
 from backend.application.tools.context import ToolContext
 # from fastmcp.server.context import Context
-from typing import Dict, Any
 from backend.infrastructure.pfc import get_pfc_client
 from backend.shared.utils.tool_result import success_response, error_response
 from .utils import (
     create_task_status_data,
     format_task_status_for_llm,
     TaskId,
-    OutputOffset,
+    SkipNewestLines,
     OutputLimit,
     FilterText,
     WaitSeconds,
+    DEFAULT_OUTPUT_LINES,
+    MIN_WAIT_SECONDS,
 )
 
 
@@ -39,10 +41,10 @@ def register_pfc_task_status_tool(registrar: ToolRegistrar):
     async def pfc_check_task_status(
         context: ToolContext,
         task_id: TaskId,
-        offset: OutputOffset = 0,
-        limit: OutputLimit = 20,
+        skip_newest: SkipNewestLines = 0,
+        limit: OutputLimit = DEFAULT_OUTPUT_LINES,
         filter: FilterText = None,
-        wait_seconds: WaitSeconds = 1,
+        wait_seconds: WaitSeconds = MIN_WAIT_SECONDS,
     ) -> Dict[str, Any]:
         """
         Check script status and retrieve output - works for both running and completed tasks.
@@ -52,6 +54,7 @@ def register_pfc_task_status_tool(registrar: ToolRegistrar):
 
         Pagination helps manage long outputs efficiently. All scripts (foreground/background)
         are tracked and persisted. Use pfc_list_tasks to find task IDs.
+        Use skip_newest for paging older output chunks.
 
         Optional filtering allows focusing on specific output (e.g., errors, warnings).
 
@@ -106,7 +109,7 @@ def register_pfc_task_status_tool(registrar: ToolRegistrar):
             # Format using shared formatter
             formatted = format_task_status_for_llm(
                 data=task_data,
-                offset=offset,
+                skip_newest=skip_newest,
                 limit=limit,
                 filter_text=filter,
             )

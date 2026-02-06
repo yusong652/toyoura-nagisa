@@ -9,7 +9,7 @@ Modeled after gemini-cli's file management tools for consistency and interoperab
 
 import errno
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from datetime import datetime
 
 from pydantic import Field
@@ -36,7 +36,7 @@ MAX_CONTENT_SIZE_CHARS = MAX_CONTENT_SIZE_BYTES // 2  # Conservative estimate fo
 
 async def write(
     context: ToolContext,
-    file_path: str = Field(
+    path: str = Field(
         ...,
         description="The absolute path to the file to write"
     ),
@@ -69,18 +69,18 @@ async def write(
 
     # Normalize path separators for cross-platform compatibility
     # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
-    if not file_path or not file_path.strip():
-        return error_response("file_path is required and cannot be empty")
+    if not path or not path.strip():
+        return error_response("path is required and cannot be empty")
 
     # Keep original path for LLM-friendly error messages (forward slashes)
-    original_path_for_display = path_to_llm_format(file_path.strip())
-    file_path = normalize_path_separators(file_path.strip())
+    original_path_for_display = path_to_llm_format(path.strip())
+    path = normalize_path_separators(path.strip())
 
     # Get workspace root dynamically based on current session
     workspace_root = await get_workspace_root_async(context)
 
     # Validate path security against dynamic workspace
-    abs_path = validate_path_in_workspace(file_path, workspace_root)
+    abs_path = validate_path_in_workspace(path, workspace_root)
     if abs_path is None:
         return error_response(f"Path is outside of workspace: {original_path_for_display}")
 

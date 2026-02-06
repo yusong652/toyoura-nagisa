@@ -104,7 +104,7 @@ class ConfirmationStrategy:
         tool_args: Dict
     ) -> ConfirmationInfo:
         """Build confirmation info for file edit."""
-        file_path = tool_args.get("file_path", "unknown")
+        file_path = tool_args.get("path", "unknown")
         command = f"Edit file: {file_path}"
         description = tool_args.get("description")
 
@@ -139,7 +139,7 @@ class ConfirmationStrategy:
         tool_args: Dict
     ) -> ConfirmationInfo:
         """Build confirmation info for file write."""
-        file_path = tool_args.get("file_path", "unknown")
+        file_path = tool_args.get("path", "unknown")
         command = f"Write file: {file_path}"
         description = tool_args.get("description")
 

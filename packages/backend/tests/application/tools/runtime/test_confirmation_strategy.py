@@ -90,7 +90,7 @@ class TestConfirmationStrategy:
         strategy = ConfirmationStrategy(mock_tool_manager)
 
         # Act
-        requires = strategy.requires_confirmation("edit", {"file_path": "test.py"})
+        requires = strategy.requires_confirmation("edit", {"path": "test.py"})
 
         # Assert
         assert requires is True
@@ -101,7 +101,7 @@ class TestConfirmationStrategy:
         strategy = ConfirmationStrategy(mock_tool_manager)
 
         # Act
-        requires = strategy.requires_confirmation("write", {"file_path": "new.py"})
+        requires = strategy.requires_confirmation("write", {"path": "new.py"})
 
         # Assert
         assert requires is True
@@ -112,7 +112,7 @@ class TestConfirmationStrategy:
         strategy = ConfirmationStrategy(mock_tool_manager)
 
         # Act
-        requires = strategy.requires_confirmation("read", {"file_path": "test.py"})
+        requires = strategy.requires_confirmation("read", {"path": "test.py"})
 
         # Assert
         assert requires is False
@@ -173,7 +173,7 @@ class TestConfirmationStrategy:
             "id": "call_456",
             "name": "edit",
             "arguments": {
-                "file_path": "/path/to/file.py",
+                "path": "/path/to/file.py",
                 "description": "Fix bug"
             }
         }
@@ -211,7 +211,7 @@ class TestConfirmationStrategy:
             "id": "call_789",
             "name": "write",
             "arguments": {
-                "file_path": "/path/to/new.py",
+                "path": "/path/to/new.py",
                 "description": "Create new file"
             }
         }

@@ -176,7 +176,7 @@ def mock_tool_manager():
 @pytest.fixture
 def sample_tool_call() -> Dict[str, Any]:
     """Sample tool call data."""
-    return {"id": f"call_{uuid.uuid4().hex[:8]}", "name": "read", "arguments": {"file_path": "/path/to/file.txt"}}
+    return {"id": f"call_{uuid.uuid4().hex[:8]}", "name": "read", "arguments": {"path": "/path/to/file.txt"}}
 
 
 @pytest.fixture

@@ -12,7 +12,7 @@ from pydantic import Field
 from backend.infrastructure.pfc import get_pfc_client
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.shared.utils.time_utils import format_time_range
-from .utils import OutputOffset, TaskListLimit
+from .utils import SkipNewestTasks, TaskListLimit, DEFAULT_TASK_LIST_LIMIT
 
 
 def register_pfc_list_tasks_tool(registrar: ToolRegistrar):
@@ -33,8 +33,8 @@ def register_pfc_list_tasks_tool(registrar: ToolRegistrar):
             default=None,
             description="Filter by session ID (None = all sessions)"
         )] = None,
-        offset: OutputOffset = 0,
-        limit: TaskListLimit = 32,
+        skip_newest: SkipNewestTasks = 0,
+        limit: TaskListLimit = DEFAULT_TASK_LIST_LIMIT,
     ) -> Dict[str, Any]:
         """
         List tracked PFC tasks with pagination support.
@@ -42,9 +42,9 @@ def register_pfc_list_tasks_tool(registrar: ToolRegistrar):
         Returns overview of script tasks (running, completed, failed) tracked by PFC server.
         Supports filtering by session and pagination for large task histories.
 
-        Pagination pattern (same as pfc_check_task_status):
-        - offset=0, limit=32: Most recent 32 tasks
-        - offset=32, limit=32: Next 32 tasks (older)
+        Pagination pattern:
+        - skip_newest=0, limit=32: Most recent 32 tasks
+        - skip_newest=32, limit=32: Next 32 tasks (older)
 
         Note:
             - Shows tasks submitted via pfc_execute_task
@@ -64,7 +64,7 @@ def register_pfc_list_tasks_tool(registrar: ToolRegistrar):
             # Query task list with pagination
             result = await client.list_tasks(
                 session_id=session_id,
-                offset=offset,
+                offset=skip_newest,
                 limit=limit
             )
 
@@ -78,7 +78,7 @@ def register_pfc_list_tasks_tool(registrar: ToolRegistrar):
             if total_count == 0:
                 task_summary = "No tasks currently tracked."
             elif displayed_count == 0:
-                task_summary = f"No tasks at offset {offset}. Total tasks available: {total_count}."
+                task_summary = f"No tasks at skip_newest {skip_newest}. Total tasks available: {total_count}."
             else:
                 task_lines = []
                 for task in data:
@@ -137,10 +137,10 @@ def register_pfc_list_tasks_tool(registrar: ToolRegistrar):
 
                 # Build navigation hints
                 nav_hints = []
-                if offset > 0:
-                    nav_hints.append(f"newer: offset={max(0, offset - (limit or 20))}")
+                if skip_newest > 0:
+                    nav_hints.append(f"newer: skip_newest={max(0, skip_newest - limit)}")
                 if has_more:
-                    nav_hints.append(f"older: offset={offset + displayed_count}")
+                    nav_hints.append(f"older: skip_newest={skip_newest + displayed_count}")
                 nav_hint = " | ".join(nav_hints) if nav_hints else "all tasks shown"
 
                 # Build session filter info (truncate session_id to 8 chars)
@@ -151,7 +151,7 @@ def register_pfc_list_tasks_tool(registrar: ToolRegistrar):
                     filter_info = "**FILTER**: None (all sessions)"
 
                 task_summary = (
-                    f"Tasks: {total_count} total | Showing: {displayed_count} ({'most recent' if offset == 0 else f'offset {offset}'})\n"
+                    f"Tasks: {total_count} total | Showing: {displayed_count} ({'most recent' if skip_newest == 0 else f'skip_newest {skip_newest}'})\n"
                     f"{filter_info}\n"
                     f"Your session: {caller_session_id_display}\n\n" +
                     "\n\n".join(task_lines) +

@@ -55,7 +55,7 @@ class FormattedTaskStatus:
 
 def paginate_output(
     output: str,
-    offset: int = 0,
+    skip_newest: int = 0,
     limit: int = DEFAULT_OUTPUT_LINES,
     filter_text: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
@@ -64,7 +64,7 @@ def paginate_output(
 
     Args:
         output: Raw output text
-        offset: Skip N newest lines (0=most recent)
+        skip_newest: Skip N newest lines (0=most recent)
         limit: Lines to display
         filter_text: Optional text filter
 
@@ -87,14 +87,14 @@ def paginate_output(
         lines = [line for line in lines if filter_text in line]
         total_lines = len(lines)
 
-    # Apply pagination (offset from end, newest first)
-    start_idx = max(0, total_lines - limit - offset)
-    end_idx = max(0, total_lines - offset)
+    # Apply pagination from the tail (newest-first navigation)
+    start_idx = max(0, total_lines - limit - skip_newest)
+    end_idx = max(0, total_lines - skip_newest)
     paginated_lines = lines[start_idx:end_idx]
 
     # Build pagination info
     has_earlier = start_idx > 0
-    has_later = offset > 0
+    has_later = skip_newest > 0
     line_range = f"{start_idx + 1}-{end_idx}" if paginated_lines else "0-0"
 
     pagination = {
@@ -102,6 +102,7 @@ def paginate_output(
         "line_range": line_range,
         "has_earlier": has_earlier,
         "has_later": has_later,
+        "skip_newest": skip_newest,
     }
 
     return "\n".join(paginated_lines), pagination
@@ -113,7 +114,7 @@ def paginate_output(
 
 def format_task_status_for_llm(
     data: TaskStatusData,
-    offset: int = 0,
+    skip_newest: int = 0,
     limit: int = DEFAULT_OUTPUT_LINES,
     filter_text: Optional[str] = None,
 ) -> FormattedTaskStatus:
@@ -124,7 +125,7 @@ def format_task_status_for_llm(
 
     Args:
         data: Task status data
-        offset: Output pagination offset
+        skip_newest: Skip newest output lines before pagination
         limit: Output pagination limit
         filter_text: Optional output filter
 
@@ -134,7 +135,7 @@ def format_task_status_for_llm(
     # Paginate output
     output_text, pagination = paginate_output(
         data.output or "",
-        offset=offset,
+        skip_newest=skip_newest,
         limit=limit,
         filter_text=filter_text,
     )
@@ -145,9 +146,9 @@ def format_task_status_for_llm(
     else:
         nav_parts = []
         if pagination["has_later"]:
-            nav_parts.append(f"offset={max(0, offset - limit)} for newer")
+            nav_parts.append(f"skip_newest={max(0, skip_newest - limit)} for newer")
         if pagination["has_earlier"]:
-            nav_parts.append(f"offset={offset + limit} for older")
+            nav_parts.append(f"skip_newest={skip_newest + limit} for older")
         nav_hint = " | ".join(nav_parts) if nav_parts else "all shown"
 
     # Build filter info

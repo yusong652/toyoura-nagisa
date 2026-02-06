@@ -227,9 +227,10 @@ async def grep(
         ...,
         description="The regular expression pattern to search for in file contents",
     ),
-    path: Optional[str] = Field(
-        None,
-        description="File or directory to search in (defaults to workspace root if not specified)",
+    path: str = Field(
+        ".",
+        min_length=1,
+        description="File or directory to search in. If omitted, defaults to workspace root. Must be a non-empty string.",
     ),
     glob: Optional[str] = Field(
         None,
@@ -246,27 +247,25 @@ async def grep(
     case_insensitive: bool = Field(
         False,
         description="Case insensitive search",
-        alias="-i"
     ),
     show_line_numbers: bool = Field(
         False,
         description="Show line numbers in output. Requires output_mode: \"content\".",
-        alias="-n"
     ),
     context_after: Optional[int] = Field(
         None,
+        ge=0,
         description="Number of lines to show after each match. Requires output_mode: \"content\".",
-        alias="-A"
     ),
     context_before: Optional[int] = Field(
         None,
+        ge=0,
         description="Number of lines to show before each match. Requires output_mode: \"content\".",
-        alias="-B"
     ),
     context_both: Optional[int] = Field(
         None,
+        ge=0,
         description="Number of lines to show before and after each match. Requires output_mode: \"content\".",
-        alias="-C"
     ),
     head_limit: Optional[int] = Field(
         None,
@@ -290,6 +289,24 @@ async def grep(
     if output_mode not in valid_modes:
         return error_response(f"Invalid output_mode. Must be one of: {', '.join(valid_modes)}")
 
+    # Validate content-only options
+    if output_mode != "content":
+        content_only_options = []
+        if show_line_numbers:
+            content_only_options.append("show_line_numbers")
+        if context_after is not None:
+            content_only_options.append("context_after")
+        if context_before is not None:
+            content_only_options.append("context_before")
+        if context_both is not None:
+            content_only_options.append("context_both")
+
+        if content_only_options:
+            return error_response(
+                "These options require output_mode='content': "
+                + ", ".join(content_only_options)
+            )
+
     # Compile regex
     try:
         flags = re.IGNORECASE if case_insensitive else 0
@@ -298,7 +315,7 @@ async def grep(
         return error_response(f"Invalid regex pattern: {e}")
 
     # Determine search path (no workspace restriction for read operations)
-    if path:
+    if path != ".":
         original_path_for_display = path_to_llm_format(path.strip())
         path = normalize_path_separators(path.strip())
 

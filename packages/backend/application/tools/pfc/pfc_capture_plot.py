@@ -55,9 +55,9 @@ def register_pfc_capture_plot_tool(registrar: ToolRegistrar):
     async def pfc_capture_plot(
         context: ToolContext,
         output_path: PlotOutputPath,
-        size: Annotated[List[int], Field(min_length=2, max_length=2)] = Field(
+        size: Annotated[List[Annotated[int, Field(ge=1)]], Field(min_length=2, max_length=2)] = Field(
             default=list(DEFAULT_IMAGE_SIZE),
-            description="Image size [width, height] in pixels."
+            description="Image size [width, height] in pixels (both must be >= 1)."
         ),
         include_ball: bool = Field(
             default=True,
@@ -80,12 +80,13 @@ def register_pfc_capture_plot_tool(registrar: ToolRegistrar):
                 "force-unbalanced, moment-contact, moment-applied, moment-unbalanced. "
                 "Scalar: radius, damp, density, mass. "
                 "Text: id, group. "
-                "Extra: extra-1, extra-2, ... (custom attributes)."
+                "Extra: extra-1, extra-2, ... (custom attributes). "
+                "Aliases with underscore/space are auto-normalized (e.g., force_contact -> force-contact)."
             )
         ),
-        ball_color_by_quantity: Optional[VectorQuantityType] = Field(
-            default=None,
-            description="Vector component filter (ignored for scalars)."
+        ball_color_by_quantity: VectorQuantityType = Field(
+            default="mag",
+            description="Vector component filter (mag/x/y/z, default: mag; ignored for scalars)."
         ),
         include_wall: bool = Field(
             default=True,
@@ -97,12 +98,13 @@ def register_pfc_capture_plot_tool(registrar: ToolRegistrar):
                 "Wall coloring attribute. "
                 "Vector: position, velocity, displacement, force-contact. "
                 "Text: name, group. "
-                "Extra: extra-1, extra-2, ... (custom attributes)."
+                "Extra: extra-1, extra-2, ... (custom attributes). "
+                "Aliases with underscore/space are auto-normalized (e.g., force_contact -> force-contact)."
             )
         ),
-        wall_color_by_quantity: Optional[VectorQuantityType] = Field(
-            default=None,
-            description="Vector component filter for wall coloring."
+        wall_color_by_quantity: VectorQuantityType = Field(
+            default="mag",
+            description="Vector component filter for wall coloring (default: mag)."
         ),
         wall_transparency: int = Field(
             default=DEFAULT_WALL_TRANSPARENCY,
@@ -121,12 +123,13 @@ def register_pfc_capture_plot_tool(registrar: ToolRegistrar):
                 "Vector: force. "
                 "Text: id, group, contact-type, model-name. "
                 "Property: fric, kn, ks, dp_nratio, dp_sratio, emod, kratio, rr_fric, rr_kr, rr_slip. "
-                "Extra: extra-1, extra-2, ... (custom attributes)."
+                "Extra: extra-1, extra-2, ... (custom attributes). "
+                "Aliases with underscore/space are auto-normalized (e.g., contact_type -> contact-type)."
             )
         ),
-        contact_color_by_quantity: Optional[VectorQuantityType] = Field(
-            default=None,
-            description="Vector component filter for contact coloring."
+        contact_color_by_quantity: VectorQuantityType = Field(
+            default="mag",
+            description="Vector component filter for contact coloring (default: mag)."
         ),
         contact_scale_by_force: bool = Field(
             default=True,
@@ -216,11 +219,11 @@ def register_pfc_capture_plot_tool(registrar: ToolRegistrar):
                 wall_transparency=wall_transparency,
                 ball_shape=ball_shape,
                 ball_color_by=ball_color_by,
-                ball_color_by_quantity=ball_color_by_quantity or "mag",
+                ball_color_by_quantity=ball_color_by_quantity,
                 wall_color_by=wall_color_by,
-                wall_color_by_quantity=wall_color_by_quantity or "mag",
+                wall_color_by_quantity=wall_color_by_quantity,
                 contact_color_by=contact_color_by,
-                contact_color_by_quantity=contact_color_by_quantity or "mag",
+                contact_color_by_quantity=contact_color_by_quantity,
                 contact_scale_by_force=contact_scale_by_force,
                 ball_cut=ball_cut,
                 wall_cut=wall_cut,

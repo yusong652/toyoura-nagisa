@@ -17,3 +17,6 @@ DEFAULT_TEMPERATURE = 0.7
 
 # Default temperature for web search
 DEFAULT_WEB_SEARCH_TEMPERATURE = 0.1
+
+# Backend-controlled cap for web search tool invocations
+DEFAULT_WEB_SEARCH_MAX_USES = 5

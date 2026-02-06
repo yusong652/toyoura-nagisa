@@ -107,8 +107,8 @@ class OpenAICodexConfig(BaseSettings):
         if reasoning_config:
             params["reasoning"] = reasoning_config
             # Opt-in to reasoning output items
-            # Matching codex-rs: vec!["reasoning.encrypted_content".to_string()]
-            params["include"] = ["reasoning.encrypted_content", "reasoning.text"]
+            # Matching codex-rs/opencode: include encrypted continuity payload only
+            params["include"] = ["reasoning.encrypted_content"]
 
         return params
 

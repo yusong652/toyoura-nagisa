@@ -11,7 +11,6 @@ async def perform_google_search(
     llm_client,
     query: str,
     *,
-    max_uses: int,
     thinking_level: str | None = None,
     session_id: str | None = None,
 ) -> Dict[str, Any]:

@@ -1,6 +1,6 @@
 """Web Fetch tool for retrieving and processing URL content."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Literal
 
 from backend.application.tools.registrar import ToolRegistrar
 from backend.application.tools.context import ToolContext
@@ -14,11 +14,19 @@ __all__ = ["web_fetch", "register_web_fetch_tool"]
 async def web_fetch(
     context: ToolContext,
     url: str = Field(..., description="The URL to fetch content from"),
-    format: str = Field(
+    format: Literal["markdown", "text", "html"] = Field(
         "markdown",
-        description="The format to return the content in (text, markdown, or html). Defaults to markdown.",
+        description="The format to return the content in. Allowed values: text, markdown, html. Default: markdown.",
     ),
-    timeout: Optional[float] = Field(None, description="Optional timeout in seconds (max 120)"),
+    timeout: Optional[int] = Field(
+        None,
+        ge=1000,
+        le=120000,
+        description=(
+            "Optional timeout in milliseconds (1000-120000). "
+            "If omitted or null, backend default timeout is used."
+        ),
+    ),
 ) -> Dict[str, Any]:
     """
     Fetches content from a specified URL and converts it to the requested format.
@@ -29,17 +37,14 @@ async def web_fetch(
 
     Usage notes:
       - The URL must be a fully-formed valid URL
-      - Format options: "markdown" (default), "text", or "html"
+      - Format options: "text", "markdown", "html" (default: "markdown")
       - This tool is read-only and does not modify any files
       - Results may be summarized if the content is very large
     """
     try:
         _ = context
-        normalized_format = (format or "markdown").lower()
-        if normalized_format not in {"markdown", "text", "html"}:
-            return error_response("Invalid format. Use 'markdown', 'text', or 'html'.")
-
-        result = await fetch_url_content(url=url, output_format=normalized_format, timeout=timeout)
+        timeout_seconds = timeout / 1000.0 if timeout is not None else None
+        result = await fetch_url_content(url=url, output_format=format, timeout=timeout_seconds)
 
         # Check result status
         if result.status == "error":

@@ -130,7 +130,7 @@ def _validate_uniqueness(content: str, old_string: str, replace_all: bool) -> Tu
 
 async def edit(
     context: ToolContext,
-    file_path: str = Field(
+    path: str = Field(
         ...,
         min_length=1,
         description="The absolute path to the file to modify",
@@ -168,13 +168,13 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
     # Parameter validation and normalization
     # ------------------------------------------------------------------
 
-    # file_path is pre-validated by Pydantic (min_length=1)
+    # path is pre-validated by Pydantic (min_length=1)
 
     # Normalize path separators for cross-platform compatibility
     # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
     # Keep original path for LLM-friendly error messages (forward slashes)
-    original_path_for_display = path_to_llm_format(file_path.strip())
-    file_path = normalize_path_separators(file_path.strip())
+    original_path_for_display = path_to_llm_format(path.strip())
+    path = normalize_path_separators(path.strip())
 
     # Check if old_string and new_string are the same
     if old_string == new_string:
@@ -190,7 +190,7 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
     workspace_root = await get_workspace_root_async(context)
 
     # Validate file path is within workspace
-    validated_path = validate_path_in_workspace(file_path, workspace_root)
+    validated_path = validate_path_in_workspace(path, workspace_root)
     if validated_path is None:
         return error_response(f"File path is outside workspace: {original_path_for_display}")
 
@@ -216,7 +216,7 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
 
         # Read current file content
         if not target_file.exists():
-            return error_response(f"File not found: {file_path}")
+            return error_response(f"File not found: {path}")
 
         try:
             with target_file.open('r', encoding=TEXT_CHARSET_DEFAULT, errors='replace') as f:

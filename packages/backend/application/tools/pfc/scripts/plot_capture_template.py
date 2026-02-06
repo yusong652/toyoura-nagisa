@@ -47,13 +47,60 @@ BallShapeType = Literal["sphere", "arrow"]
 
 # Pattern for extra-N attributes (e.g., extra-1, extra-2)
 EXTRA_PATTERN = re.compile(r"^extra-\d+$", re.IGNORECASE)
+EXTRA_FLEX_PATTERN = re.compile(r"^extra[\s_-]*(\d+)$", re.IGNORECASE)
+SEPARATOR_PATTERN = re.compile(r"[\s_-]+")
+
+# Schema type for custom extra-N attributes
+ExtraColorByType = Annotated[str, Field(pattern=r"^extra-\d+$")]
+
+BALL_COLOR_BY_ALIASES: Dict[str, str] = {
+    "forcecontact": "force-contact",
+    "forceapplied": "force-applied",
+    "forceunbalanced": "force-unbalanced",
+    "momentcontact": "moment-contact",
+    "momentapplied": "moment-applied",
+    "momentunbalanced": "moment-unbalanced",
+}
+
+WALL_COLOR_BY_ALIASES: Dict[str, str] = {
+    "forcecontact": "force-contact",
+}
+
+CONTACT_COLOR_BY_ALIASES: Dict[str, str] = {
+    "contacttype": "contact-type",
+    "modelname": "model-name",
+    "dpnratio": "dp_nratio",
+    "dpsratio": "dp_sratio",
+    "rrfric": "rr_fric",
+    "rrkr": "rr_kr",
+    "rrslip": "rr_slip",
+}
+
+
+def _canonicalize_color_by(value: str, alias_map: Dict[str, str]) -> str:
+    """Normalize separators/case and map known aliases to canonical names."""
+    normalized = value.strip().lower()
+    compact = SEPARATOR_PATTERN.sub("", normalized)
+
+    if compact in alias_map:
+        return alias_map[compact]
+
+    extra_match = EXTRA_FLEX_PATTERN.match(normalized)
+    if extra_match:
+        return f"extra-{int(extra_match.group(1))}"
+
+    return normalized
 
 
 def _validate_ball_color_by(value: Optional[str]) -> Optional[str]:
-    """Validate ball_color_by accepts Literal values or extra-N pattern."""
+    """Validate ball_color_by accepts canonical values or aliases."""
     if value is None:
         return None
-    v = value.lower()
+    if not isinstance(value, str):
+        return value
+
+    v = _canonicalize_color_by(value, BALL_COLOR_BY_ALIASES)
+
     # Check if it's a known attribute
     if v in (
         "position", "velocity", "displacement", "spin",
@@ -61,10 +108,10 @@ def _validate_ball_color_by(value: Optional[str]) -> Optional[str]:
         "moment-contact", "moment-applied", "moment-unbalanced",
         "radius", "damp", "density", "mass", "id", "group",
     ):
-        return value
+        return v
     # Check extra-N pattern
     if EXTRA_PATTERN.match(v):
-        return value
+        return v
     raise ValueError(
         f"Invalid ball_color_by: '{value}'. "
         f"Valid: position, velocity, displacement, spin, force-contact, force-applied, "
@@ -73,14 +120,18 @@ def _validate_ball_color_by(value: Optional[str]) -> Optional[str]:
 
 
 def _validate_wall_color_by(value: Optional[str]) -> Optional[str]:
-    """Validate wall_color_by accepts Literal values or extra-N pattern."""
+    """Validate wall_color_by accepts canonical values or aliases."""
     if value is None:
         return None
-    v = value.lower()
+    if not isinstance(value, str):
+        return value
+
+    v = _canonicalize_color_by(value, WALL_COLOR_BY_ALIASES)
+
     if v in ("position", "velocity", "displacement", "force-contact", "name", "group"):
-        return value
+        return v
     if EXTRA_PATTERN.match(v):
-        return value
+        return v
     raise ValueError(
         f"Invalid wall_color_by: '{value}'. "
         f"Valid: position, velocity, displacement, force-contact, name, group, extra-1, extra-2, ..."
@@ -88,18 +139,22 @@ def _validate_wall_color_by(value: Optional[str]) -> Optional[str]:
 
 
 def _validate_contact_color_by(value: Optional[str]) -> Optional[str]:
-    """Validate contact_color_by accepts Literal values or extra-N pattern."""
+    """Validate contact_color_by accepts canonical values or aliases."""
     if value is None:
         return None
-    v = value.lower()
+    if not isinstance(value, str):
+        return value
+
+    v = _canonicalize_color_by(value, CONTACT_COLOR_BY_ALIASES)
+
     if v in (
         "force", "id", "group", "contact-type", "model-name",
         "fric", "kn", "ks", "dp_nratio", "dp_sratio",
         "emod", "kratio", "rr_fric", "rr_kr", "rr_slip",
     ):
-        return value
+        return v
     if EXTRA_PATTERN.match(v):
-        return value
+        return v
     raise ValueError(
         f"Invalid contact_color_by: '{value}'. "
         f"Valid: force, id, group, contact-type, model-name, fric, kn, ks, extra-1, extra-2, ..."
@@ -107,9 +162,9 @@ def _validate_contact_color_by(value: Optional[str]) -> Optional[str]:
 
 
 # Validated types for tool parameters (supports Literal values + extra-N pattern)
-ValidatedBallColorBy = Annotated[Optional[str], BeforeValidator(_validate_ball_color_by)]
-ValidatedWallColorBy = Annotated[Optional[str], BeforeValidator(_validate_wall_color_by)]
-ValidatedContactColorBy = Annotated[Optional[str], BeforeValidator(_validate_contact_color_by)]
+ValidatedBallColorBy = Annotated[Optional[Union[BallColorByType, ExtraColorByType]], BeforeValidator(_validate_ball_color_by)]
+ValidatedWallColorBy = Annotated[Optional[Union[WallColorByType, ExtraColorByType]], BeforeValidator(_validate_wall_color_by)]
+ValidatedContactColorBy = Annotated[Optional[Union[ContactColorByType, ExtraColorByType]], BeforeValidator(_validate_contact_color_by)]
 
 
 class CutPlane(BaseModel):

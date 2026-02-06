@@ -139,7 +139,7 @@ def register_pfc_task_tool(registrar: ToolRegistrar):
 
                 formatted = format_task_status_for_llm(
                     data=task_data,
-                    offset=0,
+                    skip_newest=0,
                     limit=DEFAULT_OUTPUT_LINES,
                 )
 
@@ -257,7 +257,7 @@ def register_pfc_task_tool(registrar: ToolRegistrar):
 
             formatted = format_task_status_for_llm(
                 data=task_data,
-                offset=0,
+                skip_newest=0,
                 limit=DEFAULT_OUTPUT_LINES,
             )
 

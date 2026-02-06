@@ -5,21 +5,13 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, List
 
 from backend.domain.models.messages import BaseMessage, UserMessage
-from backend.infrastructure.llm.shared.constants import DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
+from backend.infrastructure.llm.shared.constants import DEFAULT_WEB_SEARCH_SYSTEM_PROMPT, DEFAULT_WEB_SEARCH_MAX_USES
 from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
 
 
-_DEFAULT_MAX_USES: Dict[str, int] = {
-    "google": 10,
-    "anthropic": 10,
-    "openai": 5,
-    "moonshot": 1,
-    "zhipu": 1,
-}
-
-
-def get_default_max_uses(provider_name: str) -> int:
-    return _DEFAULT_MAX_USES.get(provider_name, 5)
+def get_web_search_max_uses() -> int:
+    """Backend-controlled max web search tool invocations per request."""
+    return DEFAULT_WEB_SEARCH_MAX_USES
 
 
 def format_search_result(

@@ -5,6 +5,7 @@ Provides unified validation models with consistent error messages and reusable f
 Centralizes validation logic that was previously scattered across tool implementations.
 """
 
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Annotated, Optional
 from pydantic import Field
 from pydantic.functional_validators import AfterValidator
@@ -91,10 +92,12 @@ def validate_script_path(value: str) -> str:
 
 
 def validate_output_path(value: str) -> str:
-    """Validate output path: non-empty, ends with .png."""
+    """Validate output path: absolute, non-empty, ends with .png."""
     stripped = value.strip()
     if not stripped:
         raise ValueError("output_path is required and cannot be empty")
+    if not (PurePosixPath(stripped).is_absolute() or PureWindowsPath(stripped).is_absolute()):
+        raise ValueError("output_path must be an absolute path")
     if not stripped.lower().endswith('.png'):
         raise ValueError("output_path must end with .png")
     return stripped
@@ -153,13 +156,26 @@ PlotOutputPath = Annotated[
     )
 ]
 
-# Output offset for pagination
-OutputOffset = Annotated[
+# Skip newest tasks for pagination (task list)
+SkipNewestTasks = Annotated[
     int,
     Field(
         default=0,
         ge=0,
-        description="Skip N newest lines (0=most recent, 10=skip 10 newest)"
+        description="Skip N newest tasks before selecting the page (0=latest page)."
+    )
+]
+
+# Skip newest output lines for reverse-tail pagination
+SkipNewestLines = Annotated[
+    int,
+    Field(
+        default=0,
+        ge=0,
+        description=(
+            "Skip N newest output lines before selecting the page. "
+            "0 = latest page, 64 = one page older when limit=64."
+        )
     )
 ]
 
@@ -191,7 +207,7 @@ WaitSeconds = Annotated[
         ge=MIN_WAIT_SECONDS,
         le=MAX_WAIT_SECONDS,
         description=(
-            "Wait N seconds before checking status (0-3600s). "
+            f"Wait N seconds before checking status ({MIN_WAIT_SECONDS}-{MAX_WAIT_SECONDS}s). "
             "Use to avoid frequent polling. Example: wait_seconds=30 for long simulations"
         )
     )
@@ -205,7 +221,7 @@ TimeoutMs = Annotated[
         ge=MIN_TIMEOUT_MS,
         le=MAX_TIMEOUT_MS,
         description=(
-            "Timeout in milliseconds (None = no limit). "
+            "Timeout in milliseconds (omit or null = no limit). "
             "Only applies when run_in_background=False. "
             "Recommended: 60000-120000ms for testing."
         )
@@ -227,12 +243,12 @@ RunInBackground = Annotated[
 
 # Task list limit
 TaskListLimit = Annotated[
-    Optional[int],
+    int,
     Field(
         default=DEFAULT_TASK_LIST_LIMIT,
         ge=1,
         le=MAX_TASK_LIST_LIMIT,
-        description=f"Max tasks to return (default: {DEFAULT_TASK_LIST_LIMIT}, max: {MAX_TASK_LIST_LIMIT}, None = all)"
+        description=f"Max tasks to return (default: {DEFAULT_TASK_LIST_LIMIT}, max: {MAX_TASK_LIST_LIMIT})"
     )
 ]
 
@@ -246,6 +262,20 @@ SearchQuery = Annotated[
         description=(
             "Search keywords for PFC commands. Examples: 'ball create', "
             "'contact property', 'model solve'. Case-insensitive."
+        )
+    )
+]
+
+# Python API search query
+PythonAPISearchQuery = Annotated[
+    str,
+    AfterValidator(validate_non_empty_string),
+    Field(
+        ...,
+        min_length=1,
+        description=(
+            "Search keywords for PFC Python SDK API. Examples: 'ball pos', "
+            "'contact force', 'model solve'. Case-insensitive."
         )
     )
 ]

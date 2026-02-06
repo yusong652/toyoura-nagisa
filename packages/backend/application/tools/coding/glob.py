@@ -6,7 +6,7 @@ Returns matching file and directory paths sorted by modification time.
 
 import glob as glob_module
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from pydantic import Field
 from backend.application.tools.registrar import ToolRegistrar
@@ -79,9 +79,10 @@ async def glob(
         min_length=1,
         description="The glob pattern to match files against. Supports **, *, ?, and brace expansion {a,b,c}",
     ),
-    path: Optional[str] = Field(
-        None,
-        description="The directory to search in. If not specified, defaults to workspace root. IMPORTANT: Omit this field for default behavior. DO NOT pass null or empty string.",
+    path: str = Field(
+        ".",
+        min_length=1,
+        description="The directory to search in. If omitted, defaults to workspace root. Must be a non-empty string.",
     ),
 ) -> Dict[str, Any]:
     """Fast file and directory pattern matching tool.
@@ -94,7 +95,7 @@ async def glob(
     # pattern is pre-validated by Pydantic (min_length=1)
 
     # Determine search directory (no workspace restriction for read operations)
-    if path:
+    if path != ".":
         # Normalize path separators for cross-platform compatibility
         original_path_for_display = path_to_llm_format(path.strip())
         path = normalize_path_separators(path.strip())

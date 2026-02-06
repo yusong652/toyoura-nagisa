@@ -273,11 +273,22 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
         # Get workspace directory based on agent profile
         workspace = await get_workspace_for_profile(agent_profile, session_id)
 
-        # Validate \"only one in_progress\" rule (enforced at runtime)
+        # Validate in_progress rule (enforced at runtime)
+        # - At most one in_progress
+        # - At least one in_progress when list is non-empty and not all completed
         in_progress_count = sum(1 for todo in todos if todo.get("status") == "in_progress")
+        all_completed = bool(todos) and all(todo.get("status") == "completed" for todo in todos)
+
         if in_progress_count > 1:
             return error_response(
                 f"Only ONE task can be in_progress at a time (found {in_progress_count}). Please ensure exactly one task is marked as in_progress.",
+                in_progress_count=in_progress_count
+            )
+
+        if todos and not all_completed and in_progress_count == 0:
+            return error_response(
+                "Exactly ONE task must be in_progress when there are active todos. "
+                "Mark one task as in_progress, or mark all tasks as completed to clear the list.",
                 in_progress_count=in_progress_count
             )
 
@@ -290,7 +301,7 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
 
         # Auto-clear logic (Claude Code compatible):
         # If all todos are completed, automatically clear the list
-        if todos_dict and all(todo.get("status") == "completed" for todo in todos_dict):
+        if all_completed:
             logger.info(f"All {len(todos_dict)} todos completed - auto-clearing shared workspace list")
             todos_dict = []
 

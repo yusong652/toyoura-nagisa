@@ -19,6 +19,7 @@ __all__ = [
     # Temperature settings
     "DEFAULT_TITLE_GENERATION_TEMPERATURE",
     "DEFAULT_WEB_SEARCH_TEMPERATURE",
+    "DEFAULT_WEB_SEARCH_MAX_USES",
     
     # Prompt text
     "TITLE_GENERATION_REQUEST_TEXT",

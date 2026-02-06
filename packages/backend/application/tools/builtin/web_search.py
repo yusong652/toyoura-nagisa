@@ -18,16 +18,12 @@ async def web_search(
         ...,
         description="Search query to find current information on the web (e.g., 'latest AI developments', 'Python 3.12 features', 'current news about climate change')",
     ),
-    max_uses: int = Field(
-        5, description="Maximum number of search tool uses (ignored for Gemini due to API limitations)"
-    ),
 ) -> Dict[str, Any]:
     """
     Search the web for current information using appropriate LLM provider.
 
-    Automatically detects the LLM client type (Gemini or Anthropic) and uses
-    the appropriate web search implementation. Retrieves up-to-date information
-    from the web with source citations and comprehensive response text.
+    Routes to provider-specific web search implementation based on current
+    session LLM client. Retrieves up-to-date information with source citations.
     """
     try:
         # Get LLM client from session context or fallback to global
@@ -43,23 +39,15 @@ async def web_search(
         if not llm_client:
             return error_response("LLM client not available")
 
-        # Auto-detect LLM type
-        try:
-            llm_type = WebSearchToolFactory.detect_llm_type(llm_client)
-        except ValueError as e:
-            return error_response(f"Unable to detect LLM type: {str(e)}")
-
         # Get thinking level from session if available
         from backend.infrastructure.storage.session_manager import get_session_thinking_level
 
         thinking_level = get_session_thinking_level(session_id)
 
-        # Use WebSearchToolFactory to perform search with detected client type
+        # Use WebSearchToolFactory to perform provider-specific web search
         search_result = await WebSearchToolFactory.perform_web_search(
             llm_client=llm_client,
-            llm_type=llm_type,
             query=query,
-            max_uses=max_uses,
             thinking_level=thinking_level,
             session_id=session_id,
         )
@@ -75,8 +63,6 @@ async def web_search(
 
         text_content = response_text if response_text else f"No results found for query: {query}"
 
-        # Get LLM type for message
-        llm_type = WebSearchToolFactory.detect_llm_type(llm_client)
         message = f"Found {len(sources)} sources for '{query}'"
 
         # Store full search result in data for reference

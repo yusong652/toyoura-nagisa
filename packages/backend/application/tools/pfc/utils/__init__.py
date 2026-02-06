@@ -27,7 +27,8 @@ from .models import (
     TaskDescription,
     ScriptPath,
     PlotOutputPath,
-    OutputOffset,
+    SkipNewestTasks,
+    SkipNewestLines,
     OutputLimit,
     FilterText,
     WaitSeconds,
@@ -35,6 +36,7 @@ from .models import (
     RunInBackground,
     TaskListLimit,
     SearchQuery,
+    PythonAPISearchQuery,
     SearchLimit,
 )
 
@@ -69,7 +71,8 @@ __all__ = [
     "TaskDescription",
     "ScriptPath",
     "PlotOutputPath",
-    "OutputOffset",
+    "SkipNewestTasks",
+    "SkipNewestLines",
     "OutputLimit",
     "FilterText",
     "WaitSeconds",
@@ -77,6 +80,7 @@ __all__ = [
     "RunInBackground",
     "TaskListLimit",
     "SearchQuery",
+    "PythonAPISearchQuery",
     "SearchLimit",
     # From task_status_formatter
     "TaskStatusData",
