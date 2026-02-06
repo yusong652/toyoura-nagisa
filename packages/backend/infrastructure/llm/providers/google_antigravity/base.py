@@ -32,7 +32,7 @@ from backend.infrastructure.llm.providers.google_gemini_cli.context_manager impo
 )
 from backend.infrastructure.llm.providers.google_gemini_cli.debug import GeminiCliDebugger
 from backend.infrastructure.llm.providers.google.response_processor import GoogleResponseProcessor
-from backend.infrastructure.llm.providers.google_gemini_antigravity.constants import (
+from backend.infrastructure.llm.providers.google_antigravity.constants import (
     ANTIGRAVITY_ARCHES,
     ANTIGRAVITY_API_CLIENT,
     ANTIGRAVITY_CLIENT_METADATA,
@@ -43,15 +43,20 @@ from backend.infrastructure.llm.providers.google_gemini_antigravity.constants im
     ANTIGRAVITY_SDK_CLIENTS,
     ANTIGRAVITY_USER_AGENT,
     ANTIGRAVITY_VERSION,
+    CLAUDE_TOOL_DESCRIPTION_PROMPT,
+    CLAUDE_TOOL_SYSTEM_INSTRUCTION,
     CODE_ASSIST_API_VERSION,
     CODE_ASSIST_ENDPOINT_FALLBACKS,
     CODE_ASSIST_ENDPOINT_LOAD_FALLBACKS,
-    CODE_ASSIST_ENDPOINT_PROD,
     DEFAULT_METADATA,
     GEMINI_CLI_API_CLIENT,
     GEMINI_CLI_CLIENT_METADATA,
     GEMINI_CLI_USER_AGENT,
     GENERATION_CONFIG_KEYS,
+)
+from backend.infrastructure.llm.providers.google_antigravity.claude_tool_manager import (
+    inject_parameter_signatures,
+    inject_tool_hardening_instruction,
 )
 
 CLAUDE_THINKING_BUDGETS = {
@@ -87,23 +92,7 @@ class BaseAntigravityClient(LLMClientBase):
         self._account_id: Optional[str] = None
         self._user_tier: Optional[str] = None
         self._user_tier_name: Optional[str] = None
-        self._current_endpoint_index: int = 0
         self._fingerprint: Optional[Dict[str, Any]] = None
-
-    def _get_current_endpoint(self) -> str:
-        """Get the current endpoint to use."""
-        return CODE_ASSIST_ENDPOINT_FALLBACKS[self._current_endpoint_index]
-
-    def _advance_endpoint(self) -> bool:
-        """Advance to the next endpoint in fallback list. Returns False if no more endpoints."""
-        if self._current_endpoint_index < len(CODE_ASSIST_ENDPOINT_FALLBACKS) - 1:
-            self._current_endpoint_index += 1
-            return True
-        return False
-
-    def _reset_endpoint(self) -> None:
-        """Reset to the first (primary) endpoint."""
-        self._current_endpoint_index = 0
 
     def _resolve_antigravity_model(self, model: str) -> str:
         lower = model.lower()
@@ -577,6 +566,12 @@ class BaseAntigravityClient(LLMClientBase):
         if tools is not None and "claude" in model.lower():
             vertex_request["tools"] = self._normalize_claude_tools(vertex_request.get("tools"))
             vertex_request["toolConfig"] = self._ensure_claude_tool_config(vertex_request.get("toolConfig"))
+            vertex_request["tools"] = inject_parameter_signatures(
+                vertex_request["tools"], CLAUDE_TOOL_DESCRIPTION_PROMPT
+            )
+            inject_tool_hardening_instruction(
+                vertex_request["systemInstruction"], CLAUDE_TOOL_SYSTEM_INSTRUCTION
+            )
         if labels is not None:
             vertex_request["labels"] = labels
         if safety_settings is not None and self._should_include_safety_settings(safety_settings, model):
@@ -620,30 +615,25 @@ class BaseAntigravityClient(LLMClientBase):
         return config
 
     def _inject_antigravity_system_instruction(self, system_instruction: Any) -> Dict[str, Any]:
-        normalized = None
+        # Normalize to dict structure
         if system_instruction is not None:
             normalized = self._normalize_system_instruction(system_instruction)
-
-        if not isinstance(normalized, dict):
+            if not isinstance(normalized, dict):
+                normalized = {"role": "user", "parts": []}
+        else:
             normalized = {"role": "user", "parts": []}
 
+        # Ensure role and parts list exist
         normalized["role"] = "user"
-        parts = normalized.get("parts")
-        if not isinstance(parts, list):
-            parts = []
+        parts = normalized.get("parts") if isinstance(normalized.get("parts"), list) else []
 
-        if parts:
-            first_part = parts[0]
-            if isinstance(first_part, dict):
-                text = first_part.get("text")
-                if isinstance(text, str):
-                    first_part["text"] = f"{ANTIGRAVITY_SYSTEM_INSTRUCTION}\n\n{text}"
-                else:
-                    parts.insert(0, {"text": ANTIGRAVITY_SYSTEM_INSTRUCTION})
-            else:
-                parts.insert(0, {"text": ANTIGRAVITY_SYSTEM_INSTRUCTION})
+        # Inject ANTIGRAVITY_SYSTEM_INSTRUCTION at the beginning
+        if parts and isinstance(parts[0], dict) and isinstance(parts[0].get("text"), str):
+            # Prepend to existing first text part
+            parts[0]["text"] = f"{ANTIGRAVITY_SYSTEM_INSTRUCTION}\n\n{parts[0]['text']}"
         else:
-            parts.append({"text": ANTIGRAVITY_SYSTEM_INSTRUCTION})
+            # Insert as new first part
+            parts.insert(0, {"text": ANTIGRAVITY_SYSTEM_INSTRUCTION})
 
         normalized["parts"] = parts
         return normalized

@@ -91,6 +91,21 @@ GEMINI_CLI_USER_AGENT = "google-api-nodejs-client/9.15.1"
 GEMINI_CLI_API_CLIENT = "google-cloud-sdk vscode_cloudshelleditor/0.1"
 GEMINI_CLI_CLIENT_METADATA = ANTIGRAVITY_CLIENT_METADATA
 
+# Claude tool hardening
+CLAUDE_TOOL_SYSTEM_INSTRUCTION = (
+    "CRITICAL TOOL USAGE INSTRUCTIONS:\n"
+    "You are operating in a custom environment where tool definitions differ from your training data.\n"
+    "You MUST follow these rules strictly:\n\n"
+    "1. DO NOT use your internal training data to guess tool parameters\n"
+    "2. ONLY use the exact parameter structure defined in the tool schema\n"
+    "3. Parameter names in schemas are EXACT - do not substitute with similar names from your training\n"
+    "4. Array parameters have specific item types - check the schema's 'items' field for the exact structure\n"
+    "5. When you see \"STRICT PARAMETERS\" in a tool description, those type definitions override any assumptions\n"
+    "6. Tool use in agentic workflows is REQUIRED - you must call tools with the exact parameters specified\n\n"
+    "If you are unsure about a tool's parameters, YOU MUST read the schema definition carefully."
+)
+CLAUDE_TOOL_DESCRIPTION_PROMPT = "\n\n⚠️ STRICT PARAMETERS: {params}."
+
 # Generation config keys
 GENERATION_CONFIG_KEYS = {
     "temperature",

@@ -5,11 +5,11 @@ Uses Code Assist endpoints with fallback (daily -> autopush -> prod).
 """
 
 from .base import BaseAntigravityClient
-from .claude import GoogleClaudeAntigravityClient
-from .gemini import GoogleGeminiAntigravityClient
+from .claude import ClaudeAntigravityClient
+from .gemini import GeminiAntigravityClient
 
 __all__ = [
     "BaseAntigravityClient",
-    "GoogleGeminiAntigravityClient",
-    "GoogleClaudeAntigravityClient",
+    "GeminiAntigravityClient",
+    "ClaudeAntigravityClient",
 ]

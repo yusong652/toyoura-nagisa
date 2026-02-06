@@ -51,7 +51,7 @@ class TodoItem(BaseModel):
 
 async def todo_write(
     context: ToolContext,
-    todos: List[Dict[str, Any]] = Field(
+    todos: List[TodoItem] = Field(
         ...,
         description="Array of todo objects. Each object MUST have: content (imperative form, e.g. 'Run tests'), activeForm (present continuous, e.g. 'Running tests'), status ('pending'|'in_progress'|'completed')"
     )

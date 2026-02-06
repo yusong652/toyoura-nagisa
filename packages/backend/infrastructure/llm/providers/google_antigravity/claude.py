@@ -10,10 +10,10 @@ from typing import Any, Dict, List
 from google.genai import types
 
 from .base import BaseAntigravityClient
-from .claude_tool_manager import GoogleClaudeAntigravityToolManager
+from .claude_tool_manager import ClaudeAntigravityToolManager
 
 
-class GoogleClaudeAntigravityClient(BaseAntigravityClient):
+class ClaudeAntigravityClient(BaseAntigravityClient):
     """
     Claude Antigravity client using Code Assist endpoints.
 
@@ -24,7 +24,7 @@ class GoogleClaudeAntigravityClient(BaseAntigravityClient):
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.provider_name = "google-claude-antigravity"
-        self.tool_manager = GoogleClaudeAntigravityToolManager()
+        self.tool_manager = ClaudeAntigravityToolManager()
 
     def _resolve_antigravity_model(self, model: str) -> str:
         lower = model.lower()
@@ -167,48 +167,11 @@ class GoogleClaudeAntigravityClient(BaseAntigravityClient):
         return next_part
 
     def _build_generate_config(self, api_config: Dict[str, Any], call_options: Any) -> types.GenerateContentConfig:
-        kwargs_api = self.google_config.build_api_params()
+        # Get base config with standard parameter handling
+        config = super()._build_generate_config(api_config, call_options)
+        kwargs_api = config.model_dump(by_alias=True, mode="json", exclude_none=True)
 
-        system_prompt = api_config.get("system_prompt", "")
-        tool_schemas = api_config.get("tools", [])
-
-        if system_prompt:
-            kwargs_api["systemInstruction"] = system_prompt
-        if tool_schemas:
-            kwargs_api["tools"] = tool_schemas
-
-        if call_options.temperature is not None:
-            kwargs_api["temperature"] = call_options.temperature
-        if call_options.max_tokens is not None:
-            kwargs_api["max_output_tokens"] = call_options.max_tokens
-        else:
-            kwargs_api.pop("max_output_tokens", None)
-        if call_options.top_p is not None:
-            kwargs_api["top_p"] = call_options.top_p
-        if call_options.top_k is not None:
-            kwargs_api["top_k"] = call_options.top_k
-
-        kwargs_api.pop("thinking_config", None)
+        # Claude doesn't support thinking_config - remove it
         kwargs_api.pop("thinkingConfig", None)
-
-        if "max_output_tokens" in kwargs_api:
-            kwargs_api["maxOutputTokens"] = kwargs_api.pop("max_output_tokens")
-        if "top_p" in kwargs_api:
-            kwargs_api["topP"] = kwargs_api.pop("top_p")
-        if "top_k" in kwargs_api:
-            kwargs_api["topK"] = kwargs_api.pop("top_k")
-        if "safety_settings" in kwargs_api:
-            safety_settings = kwargs_api.pop("safety_settings")
-            if isinstance(safety_settings, list):
-                cleaned_settings = []
-                for setting in safety_settings:
-                    if hasattr(setting, "model_dump"):
-                        cleaned_settings.append(setting.model_dump(by_alias=True, mode="json", exclude_none=True))
-                    elif isinstance(setting, dict):
-                        cleaned_settings.append(setting)
-                safety_settings = cleaned_settings
-            kwargs_api["safetySettings"] = safety_settings
-        if "system_instruction" in kwargs_api:
-            kwargs_api["systemInstruction"] = kwargs_api.pop("system_instruction")
 
         return types.GenerateContentConfig(**kwargs_api)

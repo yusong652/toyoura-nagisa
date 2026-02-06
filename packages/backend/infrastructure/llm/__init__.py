@@ -11,9 +11,9 @@ from backend.domain.models.response_models import LLMResponse
 
 from backend.infrastructure.llm.providers.google import GoogleClient
 from backend.infrastructure.llm.providers.google_gemini_cli import GoogleGeminiCliClient
-from backend.infrastructure.llm.providers.google_gemini_antigravity import (
-    GoogleGeminiAntigravityClient,
-    GoogleClaudeAntigravityClient,
+from backend.infrastructure.llm.providers.google_antigravity import (
+    GeminiAntigravityClient,
+    ClaudeAntigravityClient,
 )
 from backend.infrastructure.llm.providers.anthropic import AnthropicClient
 from backend.infrastructure.llm.providers.openai import OpenAIClient
@@ -33,8 +33,8 @@ __all__ = [
     # Specific client implementations
     "GoogleClient",
     "GoogleGeminiCliClient",
-    "GoogleGeminiAntigravityClient",
-    "GoogleClaudeAntigravityClient",
+    "GeminiAntigravityClient",
+    "ClaudeAntigravityClient",
     "AnthropicClient",
     "OpenAIClient",
     "MoonshotClient",

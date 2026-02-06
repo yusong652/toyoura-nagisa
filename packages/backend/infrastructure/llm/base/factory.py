@@ -24,9 +24,9 @@ class LLMFactory:
         """Register default LLM client implementations."""
         from backend.infrastructure.llm.providers.google import GoogleClient
         from backend.infrastructure.llm.providers.google_gemini_cli import GoogleGeminiCliClient
-        from backend.infrastructure.llm.providers.google_gemini_antigravity import (
-            GoogleGeminiAntigravityClient,
-            GoogleClaudeAntigravityClient,
+        from backend.infrastructure.llm.providers.google_antigravity import (
+            GeminiAntigravityClient,
+            ClaudeAntigravityClient,
         )
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         from backend.infrastructure.llm.providers.openai import OpenAIClient
@@ -38,8 +38,8 @@ class LLMFactory:
         self._clients = {
             "google": GoogleClient,
             "google-gemini-cli": GoogleGeminiCliClient,
-            "google-gemini-antigravity": GoogleGeminiAntigravityClient,
-            "google-claude-antigravity": GoogleClaudeAntigravityClient,
+            "google-gemini-antigravity": GeminiAntigravityClient,
+            "google-claude-antigravity": ClaudeAntigravityClient,
             "anthropic": AnthropicClient,
             "gpt": OpenAIClient,
             "openai": OpenAIClient,
@@ -72,9 +72,9 @@ class LLMFactory:
 
         client_class = self._clients[provider]
         if provider == "google-gemini-antigravity" and "claude" in model.lower():
-            from backend.infrastructure.llm.providers.google_gemini_antigravity import GoogleClaudeAntigravityClient
+            from backend.infrastructure.llm.providers.google_antigravity import ClaudeAntigravityClient
 
-            client_class = GoogleClaudeAntigravityClient
+            client_class = ClaudeAntigravityClient
 
         # Check cache for existing client instance
         # Include app ID in cache key to distinguish clients with/without app context
