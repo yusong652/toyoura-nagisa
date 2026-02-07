@@ -107,10 +107,10 @@ Query Tools      Small-Scale Test   Full Simulation
 ```
 
 **Key Components**:
-- **Main Thread Executor**: Queue-based execution ensuring thread safety (`services/pfc-server/server/execution/main_thread.py`)
-- **Task Manager**: Non-blocking lifecycle tracking (`services/pfc-server/server/tasks/manager.py`)
-- **Script Executor**: Real-time output capture for progress monitoring (`services/pfc-server/server/execution/script.py`)
-- **Interrupt/Diagnostic Signals**: Callback-based execution for non-blocking diagnostics during simulation cycles (`services/pfc-server/server/signals/`)
+- **Main Thread Executor**: Queue-based execution ensuring thread safety (`pfc-mcp/pfc-bridge/server/execution/main_thread.py`)
+- **Task Manager**: Non-blocking lifecycle tracking (`pfc-mcp/pfc-bridge/server/tasks/manager.py`)
+- **Script Executor**: Real-time output capture for progress monitoring (`pfc-mcp/pfc-bridge/server/execution/script.py`)
+- **Interrupt/Diagnostic Signals**: Callback-based execution for non-blocking diagnostics during simulation cycles (`pfc-mcp/pfc-bridge/server/signals/`)
 - **Documentation System**: Command syntax + Python usage examples (`packages/backend/infrastructure/pfc/commands/`)
 
 **PFC Tools Workflow (Script-Only)**:
@@ -128,9 +128,9 @@ Query Tools      Small-Scale Test   Full Simulation
 - This branch is automatically managed; working on it will break git snapshot creation
 - If accidentally on this branch, switch back: `git checkout master`
 
-**Detailed Documentation**: See `services/pfc-server/README.md` for implementation details, thread-safety architecture, and usage examples.
+**Detailed Documentation**: See `pfc-mcp/pfc-bridge/README.md` for implementation details, thread-safety architecture, and usage examples.
 
-**Backend Integration**: `packages/backend/application/tools/pfc/` + `packages/backend/infrastructure/pfc/websocket_client.py`
+**Backend Integration**: `config/mcp_servers.yaml` + `packages/backend/infrastructure/mcp/client.py`
 
 ## Development Commands
 
@@ -189,22 +189,22 @@ npm run preview
 
 ### PFC Integration Development
 
-**Important**: pfc-server is NOT a UV workspace member. It runs in PFC's embedded Python environment with separate dependencies.
+**Important**: pfc-bridge is NOT a UV workspace member. It runs in PFC's embedded Python environment with separate dependencies.
 
 ```bash
-# 1. Install pfc-server dependencies in PFC's Python environment
+# 1. Install pfc-bridge dependencies in PFC's Python environment
 #    (Run in PFC GUI IPython console)
 pip install websockets==9.1
 
 # 2. Start PFC WebSocket server (in PFC GUI Python console)
-exec(open(r'C:\Dev\Han\toyoura-nagisa\services\pfc-server\start_server.py', encoding='utf-8').read())
+exec(open(r'C:\Dev\Han\toyoura-nagisa\pfc-mcp\pfc-bridge\start_bridge.py', encoding='utf-8').read())
 
-# 3. Test integration from toyoura-nagisa environment (with PFC server running)
-uv run python examples/pfc_integration/DEMo.py
+# 3. Verify integration from toyoura-nagisa (with PFC server running)
+#    Use PFC tools in app/backend (e.g., pfc_list_tasks, then a small pfc_execute_task)
 ```
 
 **Why separate?**
-- pfc-server requires `websockets==9.1` (PFC Python environment constraint)
+- pfc-bridge requires `websockets==9.1` (PFC Python environment constraint)
 - toyoura-nagisa requires `websockets>=15.0.1` (modern features)
 - Different runtime environments → separate dependency management
 
@@ -269,20 +269,21 @@ toyoura-nagisa/
 │   ├── memory_db/
 │   ├── pfc_workspace/
 │   └── workspace/
-├── services/
-│   └── pfc-server/                  # Independent PFC WebSocket service
-│       ├── server/
-│       │   ├── execution/
-│       │   ├── handlers/
-│       │   ├── services/
-│       │   ├── signals/
-│       │   ├── tasks/
-│       │   ├── utils/
-│       │   └── server.py
-│       ├── examples/
-│       ├── workspace_template/
-│       ├── start_server.py
-│       └── README.md
+├── pfc-mcp/
+│   ├── src/pfc_mcp/                 # MCP server package
+│   ├── pfc-bridge/                  # Independent PFC WebSocket bridge runtime
+│   │   ├── server/
+│   │   │   ├── execution/
+│   │   │   ├── handlers/
+│   │   │   ├── services/
+│   │   │   ├── signals/
+│   │   │   ├── tasks/
+│   │   │   ├── utils/
+│   │   │   └── server.py
+│   │   ├── workspace_template/
+│   │   ├── start_bridge.py
+│   │   └── README.md
+│   └── README.md
 ├── data/                            # Session data + oauth tokens
 ├── memory_db/                       # ChromaDB storage
 ├── tests/                           # Root test suite
@@ -325,11 +326,10 @@ The frontend uses standard React testing practices with Vite.
 
 ### PFC Integration Testing
 ```bash
-# Comprehensive integration test (with PFC server running)
-uv run python examples/pfc_integration/DEMo.py
-
-# Tests: normal tasks, long tasks, status queries, WebSocket
-#        responsiveness, task completion, main thread execution
+# Start PFC server first, then verify with tool calls:
+# 1) pfc_list_tasks        (connectivity and task store)
+# 2) pfc_execute_task      (small foreground/background script)
+# 3) pfc_check_task_status (progress and completion states)
 ```
 
 ## Common Issues & Quick Fixes
@@ -351,12 +351,12 @@ uv run python examples/pfc_integration/DEMo.py
 - Memory cleanup on session deletion
 
 ### PFC Integration
-- **Not a workspace member**: pfc-server runs in PFC's Python environment
+- **Not a workspace member**: pfc-bridge runs in PFC's Python environment
 - **Dependency installation**: Run `pip install websockets==9.1` in PFC GUI
 - **Server port**: Runs on port 9001 (WebSocket)
 - **Startup**: Must be started in PFC GUI before using PFC tools
 - **Long tasks**: Return task_id immediately for non-blocking operation
-- **Troubleshooting**: Check `services/pfc-server/README.md`
+- **Troubleshooting**: Check `pfc-mcp/pfc-bridge/README.md`
 
 ## Code Modification Guidelines
 
@@ -369,7 +369,7 @@ When using batch commands (sed, find, etc.):
 
 - `.claude/guides/typescript-guide.md` - TypeScript/React patterns
 - `.claude/guides/code-standards.md` - Code quality standards
-- `services/pfc-server/README.md` - PFC integration details
+- `pfc-mcp/pfc-bridge/README.md` - PFC integration details
 
 ## Git Commit Format
 

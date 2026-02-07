@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
-import { useSession } from '../session/SessionContext'
+import { useSession } from './session/SessionContext'
 
 // Types based on backend API
 export interface ModelInfo {

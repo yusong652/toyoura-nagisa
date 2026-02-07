@@ -50,11 +50,15 @@ if __name__ == "__main__":
         # Include .md files for prompt template changes
         reload_kwargs["reload_includes"] = ["*.py", "*.md"]
 
-    uvicorn.run(
-        "backend.app:app",
-        host=dev_config.host,
-        port=dev_config.port,
-        reload=dev_config.enable_reload,
-        timeout_graceful_shutdown=2,  # Fast shutdown for development
-        **reload_kwargs,
-    )
+    try:
+        uvicorn.run(
+            "backend.app:app",
+            host=dev_config.host,
+            port=dev_config.port,
+            reload=dev_config.enable_reload,
+            timeout_graceful_shutdown=2,  # Fast shutdown for development
+            **reload_kwargs,
+        )
+    except KeyboardInterrupt:
+        # Graceful user-initiated shutdown (avoid noisy traceback on Ctrl+C).
+        pass

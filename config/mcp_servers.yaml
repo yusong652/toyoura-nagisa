@@ -42,9 +42,9 @@ servers:
     command: uv
     args:
       - "run"
-      - "python"
-      - "-m"
-      - "pfc_mcp.server"
+      - "--package"
+      - "pfc-mcp"
+      - "pfc-mcp"
     enabled: true
     description: Control ITASCA PFC simulations via MCP
 

@@ -34,6 +34,7 @@ class MCPServerConfig:
                  If False, users must enable via /mcps command.
                  Note: Server is always connected regardless of this flag.
         description: Human-readable description
+        missing_env_vars: Missing env vars required by args/env templates
     """
 
     name: str
@@ -42,6 +43,7 @@ class MCPServerConfig:
     env: dict[str, str] | None = None
     enabled: bool = True
     description: str = ""
+    missing_env_vars: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -406,6 +408,12 @@ async def initialize_mcp_clients(configs: list[MCPServerConfig]) -> None:
     """
     manager = get_mcp_client_manager()
     for config in configs:
+        if config.missing_env_vars:
+            missing_vars = ", ".join(config.missing_env_vars)
+            logger.warning(
+                f"[{config.name}] Skipping MCP server initialization due to missing environment variables: {missing_vars}"
+            )
+            continue
         await manager.add_server(config)
 
 
@@ -448,15 +456,24 @@ def load_mcp_configs_from_yaml(yaml_path: str | None = None) -> list[MCPServerCo
     if not config_data or "servers" not in config_data:
         return []
 
+    pattern = re.compile(r"\$\{([^}]+)\}")
+
+    def find_missing_env_vars(value: str) -> set[str]:
+        """Find env vars referenced by ${VAR_NAME} that are unset or empty."""
+        missing_vars: set[str] = set()
+        for match in pattern.finditer(value):
+            var_name = match.group(1)
+            if not os.getenv(var_name):
+                missing_vars.add(var_name)
+        return missing_vars
+
     def expand_env_vars(value: str) -> str:
         """Expand ${VAR_NAME} patterns with environment variables."""
-        pattern = r"\$\{([^}]+)\}"
-
         def replace(match: re.Match) -> str:
             var_name = match.group(1)
             return os.getenv(var_name, "")
 
-        return re.sub(pattern, replace, value)
+        return pattern.sub(replace, value)
 
     def expand_in_list(items: list) -> list:
         """Expand env vars in a list of strings."""
@@ -474,13 +491,24 @@ def load_mcp_configs_from_yaml(yaml_path: str | None = None) -> list[MCPServerCo
 
         # Expand environment variables in args
         args = server.get("args", [])
+        missing_env_vars: set[str] = set()
+
+        for arg in args:
+            if isinstance(arg, str):
+                missing_env_vars.update(find_missing_env_vars(arg))
+
+        env = server.get("env")
+        if isinstance(env, dict):
+            for value in env.values():
+                if isinstance(value, str):
+                    missing_env_vars.update(find_missing_env_vars(value))
+
         if args:
             args = expand_in_list(args)
             # Filter out empty args (from missing env vars)
             args = [arg for arg in args if arg]
 
         # Expand environment variables in env dict
-        env = server.get("env")
         if env:
             env = expand_in_dict(env)
 
@@ -491,6 +519,7 @@ def load_mcp_configs_from_yaml(yaml_path: str | None = None) -> list[MCPServerCo
             env=env,
             enabled=server.get("enabled", True),
             description=server.get("description", ""),
+            missing_env_vars=sorted(missing_env_vars),
         )
         configs.append(config)
 

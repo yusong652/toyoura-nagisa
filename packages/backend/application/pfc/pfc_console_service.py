@@ -5,7 +5,7 @@ Provides foreground execution with Ctrl+B support.
 
 Flow (aligned with user bash):
 1. Create task via TaskManager
-2. Send to pfc-server with run_in_background=False (synchronous)
+2. Send to pfc-bridge with run_in_background=False (synchronous)
 3. Register with ForegroundRegistry for Ctrl+B signal
 4. asyncio.wait() on WebSocket response OR Ctrl+B signal
 5. Return result or MoveToBackgroundRequest

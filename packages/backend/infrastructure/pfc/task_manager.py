@@ -36,7 +36,7 @@ class PfcTask:
     # PFC-specific fields
     git_commit: Optional[str] = None      # Version snapshot hash
     source: str = "agent"                 # "agent" or "user_console"
-    pfc_server_task_id: Optional[str] = None  # Task ID from pfc-server (for reference)
+    bridge_task_id: Optional[str] = None      # Task ID from pfc-bridge (for reference)
 
     # Result data
     result: Optional[Any] = None          # Script return value
@@ -105,9 +105,9 @@ class PfcTaskManager:
     - Incremental output tracking
     - System reminders generation
 
-    Key difference from bash: Tasks are remote (pfc-server),
+    Key difference from bash: Tasks are remote (pfc-bridge),
     not local subprocesses. This manager tracks state and
-    coordinates with pfc-server via WebSocket.
+    coordinates with pfc-bridge via WebSocket.
     """
 
     # Configuration constants
@@ -206,7 +206,7 @@ class PfcTaskManager:
         self,
         task_id: str,
         status: str,
-        pfc_server_task_id: Optional[str] = None,
+        bridge_task_id: Optional[str] = None,
         result: Optional[Any] = None,
         error: Optional[str] = None,
     ) -> bool:
@@ -215,7 +215,7 @@ class PfcTaskManager:
         Args:
             task_id: Task ID to update
             status: New status
-            pfc_server_task_id: Optional pfc-server task ID for reference
+            bridge_task_id: Optional pfc-bridge task ID for reference
             result: Optional result data
             error: Optional error message
 
@@ -229,8 +229,8 @@ class PfcTaskManager:
 
             task.status = status
 
-            if pfc_server_task_id:
-                task.pfc_server_task_id = pfc_server_task_id
+            if bridge_task_id:
+                task.bridge_task_id = bridge_task_id
 
             if result is not None:
                 task.result = result
@@ -278,7 +278,7 @@ class PfcTaskManager:
     def set_output(self, task_id: str, output: str) -> bool:
         """Set full output for a task (replaces existing).
 
-        Used when receiving complete output from pfc-server.
+        Used when receiving complete output from pfc-bridge.
 
         Args:
             task_id: Task ID to update
@@ -601,11 +601,11 @@ class PfcTaskManager:
                 if task.is_terminal and task.last_accessed < cutoff_time:
                     tasks_to_remove.append(task_id)
 
-                # Mark stale running tasks (pfc-server may have restarted)
+                # Mark stale running tasks (pfc-bridge may have restarted)
                 elif (task.status in ("pending", "submitted", "running") and
                       task.start_time < datetime.now() - timedelta(hours=self.TASK_TIMEOUT_HOURS)):
                     task.status = "failed"
-                    task.error = "Task timed out (pfc-server may have restarted)"
+                    task.error = "Task timed out (pfc-bridge may have restarted)"
                     task.end_time = datetime.now()
 
             # Remove old tasks

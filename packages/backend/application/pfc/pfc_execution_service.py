@@ -4,7 +4,7 @@ Application layer service coordinating PFC task execution:
 - Foreground-to-background conversion (ctrl+b)
 - Task state queries
 - Foreground execution lifecycle management
-- Integration with pfc-server
+- Integration with pfc-bridge
 
 Bridges presentation layer (WebSocket handlers, MCP tools) and infrastructure layer
 (PfcForegroundTaskRegistry, PfcTaskManager, PfcTaskNotificationService).

@@ -186,11 +186,11 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
             request.session_id
         )
 
-        # Generate task_id before sending to pfc-server
+        # Generate task_id before sending to pfc-bridge
         task_manager = get_pfc_task_manager()
         task_id = task_manager.create_task(
             session_id=request.session_id,
-            script_path="user_console",  # Will be updated by pfc-server
+            script_path="user_console",  # Will be updated by pfc-bridge
             description=request.code[:50] + "..." if len(request.code) > 50 else request.code,
             source="user_console",
         )
@@ -202,7 +202,7 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
             task_manager.update_status(task_id, "failed", error=str(e))
             return ApiResponse(
                 success=False,
-                message=f"PFC server not available: {e}. Please start PFC server in PFC GUI.",
+                message=f"PFC bridge not available: {e}. Please start pfc-bridge in PFC GUI.",
                 error_code="PFC_NOT_CONNECTED",
                 data=ExecuteData(connected=False, context="")
             )
@@ -370,7 +370,7 @@ async def list_pfc_tasks(
     """List all PFC tasks with pagination.
 
     This endpoint provides a user-facing view of PFC task history,
-    reusing pfc-server's persistent task storage.
+    reusing pfc-bridge's persistent task storage.
     """
     try:
         try:

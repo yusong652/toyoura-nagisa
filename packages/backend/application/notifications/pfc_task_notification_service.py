@@ -533,7 +533,7 @@ class PfcTaskNotificationService:
         Send notification when foreground task is moved to background (ctrl+b or timeout).
 
         This is the FIRST frontend notification for this task (foreground mode has no UI).
-        Queries pfc-server for latest output to provide complete status.
+        Queries pfc-bridge for latest output to provide complete status.
 
         Args:
             session_id: WebSocket session ID
@@ -550,7 +550,7 @@ class PfcTaskNotificationService:
 
         script_name = os.path.basename(script_path)
 
-        # Query pfc-server for latest output (first notification needs complete data)
+        # Query pfc-bridge for latest output (first notification needs complete data)
         recent_lines: List[str] = []
         has_more = False
         actual_elapsed = elapsed_seconds

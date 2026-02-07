@@ -126,12 +126,12 @@ packages/backend/infrastructure/pfc/
 
 ---
 
-### 3. pfc-server 合并分析
+### 3. pfc-bridge 归属分析
 
-#### 当前 pfc-server 架构
+#### 当前 pfc-bridge 架构（已迁移到 pfc-mcp）
 
 ```
-services/pfc-server/           # 独立 WebSocket 服务，运行在 PFC GUI 的 Python 环境中
+pfc-mcp/pfc-bridge/            # 独立 WebSocket 服务，运行在 PFC GUI 的 Python 环境中
 ├── server/
 │   ├── server.py              # PFCWebSocketServer (WebSocket 入口)
 │   ├── execution/
@@ -146,11 +146,11 @@ services/pfc-server/           # 独立 WebSocket 服务，运行在 PFC GUI 的
 │   │   └── diagnostic.py      # 诊断信号处理
 │   └── services/
 │       └── user_console.py    # 用户控制台
-└── start_server.py            # PFC GUI 启动入口
+└── start_bridge.py            # PFC GUI 启动入口
 ```
 
 **关键约束**:
-- pfc-server **必须** 运行在 PFC GUI 的 Python 环境中（使用 `itasca` SDK）
+- pfc-bridge **必须** 运行在 PFC GUI 的 Python 环境中（使用 `itasca` SDK）
 - 依赖 `websockets==9.1`（PFC 嵌入 Python 环境限制）
 - 通过 `exec(open(...).read())` 在 PFC GUI IPython 控制台中启动
 
@@ -164,7 +164,7 @@ pfc-mcp (项目仓库)
 │   ├── docs/                # 文档基础设施
 │   └── client/              # WebSocket Client → 连接 pfc-bridge
 ├── pfc-bridge/              # Bridge Server (PFC GUI Python 环境, websockets==9.1)
-│   ├── server/              # 当前 pfc-server 代码重命名
+│   ├── server/              # bridge runtime server 实现
 │   └── start_bridge.py      # PFC GUI 启动入口
 └── README.md
 ```
@@ -236,7 +236,7 @@ pfc-mcp/
 │       └── config.py               # 配置 (bridge URL, 超时等)
 │
 ├── pfc-bridge/                     # PFC GUI Bridge (独立环境)
-│   ├── server/                     # 当前 services/pfc-server/server/ 内容
+│   ├── server/                     # pfc-bridge server 实现
 │   │   ├── server.py
 │   │   ├── execution/
 │   │   ├── handlers/
@@ -341,7 +341,7 @@ Backend: pfc_console.py (REST API)
     ├── StatusMonitor.add_user_pfc_python_context()
     └── 返回 ExecuteData (含 LLM context with caveat)
     ↓
-pfc-server: handle_user_console()
+pfc-bridge: handle_user_console()
     ├── UserConsoleManager.create_script()  → workspace/.user_console/console_001.py
     └── ScriptRunner.run()                  → PFC SDK 主线程执行
     ↓
@@ -360,9 +360,9 @@ CLI 还有 Ctrl+B 支持:
 | REST API | `presentation/api/pfc_console.py` | Web 前端入口，5 个端点 |
 | Console Service | `application/pfc/pfc_console_service.py` | CLI 前端入口，Ctrl+B 支持 |
 | WebSocket Client | `infrastructure/pfc/client.py` → `send_user_console()` | 通信层 |
-| Console Handler | `pfc-server/handlers/console_handlers.py` | 消息处理 |
-| UserConsoleManager | `pfc-server/services/user_console.py` | 脚本创建/管理 |
-| ScriptRunner | `pfc-server/execution/script.py` | 脚本执行 |
+| Console Handler | `pfc-mcp/pfc-bridge/server/handlers/console_handlers.py` | 消息处理 |
+| UserConsoleManager | `pfc-mcp/pfc-bridge/server/services/user_console.py` | 脚本创建/管理 |
+| ScriptRunner | `pfc-mcp/pfc-bridge/server/execution/script.py` | 脚本执行 |
 
 #### 问题：如果不迁移，toyoura-nagisa 仍直连 pfc-bridge
 
@@ -589,7 +589,7 @@ pfc-mcp/
 - 不提前删除 toyoura-nagisa 内部 PFC 代码；待 Phase 3 + Phase 4.1~4.6 验证通过后，再执行 4.7~4.9 的物理删除
 - 原则：先切流验证，再删旧链路（避免在 bridge/console 未稳定前丢失回滚路径）
 
-- [ ] 4.1 在 `config/mcp_servers.yaml` 中配置 pfc-mcp server:
+- [x] 4.1 在 `config/mcp_servers.yaml` 中配置 pfc-mcp server:
   ```yaml
   servers:
     - name: pfc-mcp
@@ -612,10 +612,16 @@ pfc-mcp/
   - `PfcTaskNotificationService._polling_loop()` → 改用 MCP 调用 `pfc_check_task_status` 轮询
   - `PfcTaskManager` 内存层保持不变（session-scoped 快速层）
   - 验证: backend 重启后不重复通知（依赖 pfc-bridge 持久化的 `checked` 标记）
-- [ ] 4.7 移除 `packages/backend/application/tools/pfc/` (内部 PFC 工具)
+- [x] 4.7 移除 `packages/backend/application/tools/pfc/` (内部 PFC 工具)
 - [ ] 4.8 移除 `packages/backend/infrastructure/pfc/` (文档基础设施 + WebSocket Client)
-- [ ] 4.9 移除 `services/pfc-server/` (bridge 已在 pfc-mcp 项目中)
-- [ ] 4.10 更新 CLAUDE.md、agents.yaml、相关文档
+- [x] 4.9 移除 `services/pfc-server/` (bridge 已在 pfc-mcp 项目中)
+- [x] 4.10 更新 CLAUDE.md、agents.yaml、相关文档
+
+已完成 (2026-02-08):
+- `services/pfc-server/` 已物理移除
+- `packages/backend/application/tools/pfc/` 已物理移除
+- skill 已从 `pfc-server-setup` 重命名为 `pfc-bridge-setup`（`config/agents.yaml` 已同步）
+- 主文档/指南已切换到 `pfc-mcp/pfc-bridge` 路径（历史归档文档除外）
 
 **验收**: toyoura-nagisa 不再包含任何 PFC 特定代码，所有 PFC 功能（含 User Console）通过 MCP 协议获得
 

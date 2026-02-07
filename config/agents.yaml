@@ -34,7 +34,7 @@ main_agent:
   skills:
     - name: pfc-package-management
       enabled: true
-    - name: pfc-server-setup
+    - name: pfc-bridge-setup
       enabled: true
     - name: moltbook
       enabled: true
