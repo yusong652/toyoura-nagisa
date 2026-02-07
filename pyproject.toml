@@ -91,6 +91,7 @@ dev-dependencies = [
 [tool.uv.workspace]
 members = [
     "packages/backend",
+    "pfc-mcp",
 ]
 # Note: services/pfc-server is NOT a workspace member
 # It runs in PFC's embedded Python environment with its own dependencies
@@ -121,6 +122,7 @@ exclude = [
     "node_modules",
     "_third_party",
     "services/pfc-server",  # Separate service with different deps
+    "pfc-mcp",  # Standalone MCP server (separate linting)
 ]
 
 [tool.ruff.lint]
