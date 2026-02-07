@@ -1,7 +1,7 @@
 # PFC-MCP 外部项目提取方案
 
 **Created**: 2026-02-07
-**Status**: Phase 1 Complete / Phase 2 Pending
+**Status**: Phase 1 Complete / Phase 2 In Progress (Core Complete, Integration Pending)
 **Branch**: `feature/pfc-mcp-extraction-plan`
 **Prerequisite**: P0 FastMCP 解耦已完成（内部工具已直接调用，MCP 仅用于外部工具接入）
 
@@ -525,17 +525,30 @@ pfc-mcp/
 
 **目标**: 实现 bridge 通信和任务执行工具
 
-- [ ] 2.1 搬移 pfc-bridge 代码 (从 `services/pfc-server/`)
-- [ ] 2.2 重命名和调整 import 路径
-- [ ] 2.3 实现 `bridge/client.py` — WebSocket Client (基于现有 `infrastructure/pfc/client.py`，去除 toyoura-nagisa 依赖)
-- [ ] 2.4 实现 `bridge/task_manager.py` — 简化版任务管理器 (去除 foreground handle、notification service)
-- [ ] 2.5 实现 6 个执行工具:
+- [x] 2.1 搬移 pfc-bridge 代码 (从 `services/pfc-server/`)
+- [x] 2.2 重命名和调整 import 路径
+- [x] 2.3 实现 `bridge/client.py` — WebSocket Client (基于现有 `infrastructure/pfc/client.py`，去除 toyoura-nagisa 依赖)
+- [x] 2.4 实现 `bridge/task_manager.py` — 简化版任务管理器 (去除 foreground handle、notification service)
+- [x] 2.5 实现 5 个执行工具:
   - `pfc_execute_task` — 简化: 仅 background 模式 (MCP 是无状态的，没有 foreground/ctrl+b 概念)
   - `pfc_execute_code` — User Console 支持: 接收 Python 代码字符串，交由 bridge 执行
   - `pfc_check_task_status`
   - `pfc_list_tasks` — 返回中包含 `checked` 字段
   - `pfc_interrupt_task`
 - [ ] 2.6 集成测试: 连接实际 PFC Bridge 执行任务和 console 代码
+
+已完成 (2026-02-08):
+- `pfc-mcp/src/pfc_mcp/bridge/client.py`：新增无 toyoura-nagisa 依赖的 WebSocket bridge client（重连、请求响应、重试）
+- `pfc-mcp/src/pfc_mcp/bridge/task_manager.py`：新增 MCP 侧简化任务管理器（6-char task_id）
+- 执行工具已注册到 `pfc_mcp.server`：`pfc_execute_task`、`pfc_execute_code`、`pfc_check_task_status`、`pfc_list_tasks`、`pfc_interrupt_task`
+- `pfc-mcp/pfc-bridge/` 已引入 bridge runtime 代码（`server/`、`start_bridge.py`、`workspace_template/`、`config_example.py`、`requirements.txt`）
+- smoke 验证通过：`from pfc_mcp.server import mcp` + 工具注册列表包含 10 个工具（5 docs + 5 execution）
+- `pfc-mcp/tests/test_phase2_tools.py`：新增 Phase 2 单测（工具注册、状态映射、路径校验）
+- `uv run pytest pfc-mcp/tests/test_phase2_tools.py --no-cov`：3 passed（仓库全局 coverage gate 不适用于该局部测试）
+- `uv run python -m compileall pfc-mcp/src/pfc_mcp pfc-mcp/pfc-bridge`：语法检查通过
+
+进行中:
+- 2.6 集成测试待完成：需真实 PFC GUI + bridge 在线环境（本地 dry-run 已完成）
 
 **验收**: 能通过 MCP 协议执行 PFC 仿真、console 代码、并查询状态
 
@@ -556,6 +569,10 @@ pfc-mcp/
 ### Phase 4: toyoura-nagisa 侧清理 (0.5 周)
 
 **目标**: toyoura-nagisa 通过 MCP Client 接入 pfc-mcp
+
+**清理时机约束**:
+- 不提前删除 toyoura-nagisa 内部 PFC 代码；待 Phase 3 + Phase 4.1~4.6 验证通过后，再执行 4.7~4.9 的物理删除
+- 原则：先切流验证，再删旧链路（避免在 bridge/console 未稳定前丢失回滚路径）
 
 - [ ] 4.1 在 `config/mcp_servers.yaml` 中配置 pfc-mcp server:
   ```yaml
@@ -725,6 +742,14 @@ async def get_reminders(self, agent_profile="pfc_expert"):
 
 **替代方案**: `pfc_execute_code` 默认异步（返回 task_id），toyoura-nagisa 自行 poll。但这会让简单的 `> ball.count()` 也需要两次 MCP 调用（execute + check_status），体验更差。
 
+### D7: pfc-bridge 目录位置
+
+**决策**: **`pfc-bridge/` 与 `src/` 并列，不放入 `src/pfc_mcp/`**
+
+- `src/pfc_mcp/` 是可打包发布的 MCP server 包
+- `pfc-bridge/` 是 PFC GUI 环境独立运行时（`itasca` + `websockets==9.1`）
+- 分离可避免 bridge 运行时依赖污染主包，并保持部署语义清晰（MCP server / bridge 双进程）
+
 ---
 
 ## 风险与缓解
@@ -751,5 +776,5 @@ async def get_reminders(self, agent_profile="pfc_expert"):
 
 ---
 
-**Document Version**: 1.1
+**Document Version**: 1.2
 **Last Updated**: 2026-02-08
