@@ -309,29 +309,75 @@ class BaseToolManager(ABC):
             mcp_manager = get_mcp_client_manager()
             result = await mcp_manager.call_tool(tool_name, tool_args)
 
-            if result.get("status") == "success":
-                # Convert MCP result to internal ToolResult format
-                content_parts = result.get("content", [])
+            content_parts = result.get("content", [])
+            structured = result.get("structuredContent")
+            structured_payload = structured
+            if isinstance(structured, dict) and isinstance(structured.get("result"), dict):
+                structured_payload = structured.get("result")
 
-                # Extract text content for llm_content
-                text_parts = []
-                for part in content_parts:
-                    if part.get("type") == "text":
-                        text_parts.append({"type": "text", "text": part.get("text", "")})
+            structured_status = None
+            structured_message = None
+            structured_display = None
+
+            if isinstance(structured_payload, dict):
+                raw_status = structured_payload.get("status")
+                if isinstance(raw_status, str):
+                    structured_status = raw_status.strip().lower()
+
+                raw_message = structured_payload.get("message")
+                if isinstance(raw_message, str) and raw_message.strip():
+                    structured_message = raw_message.strip()
+
+                raw_display = structured_payload.get("display")
+                if isinstance(raw_display, str) and raw_display.strip():
+                    structured_display = raw_display.strip()
+
+            if result.get("status") == "success":
+                # Prefer explicit structured status from MCP tool results.
+                if structured_status and structured_status not in {"success", "ok", "completed"}:
+                    message = structured_message or f"MCP tool '{tool_name}' failed"
+                    llm_content = (
+                        {"parts": [{"type": "text", "text": structured_display}]}
+                        if structured_display
+                        else ({"parts": content_parts} if content_parts else {"parts": [{"type": "text", "text": message}]})
+                    )
+                    return error_response(
+                        message,
+                        llm_content=llm_content,
+                        server=result.get("server"),
+                        content=content_parts,
+                        structuredContent=structured,
+                    )
+
+                # Convert MCP result to internal ToolResult format
+                llm_content = (
+                    {"parts": [{"type": "text", "text": structured_display}]}
+                    if structured_display
+                    else ({"parts": content_parts} if content_parts else None)
+                )
 
                 return success_response(
                     message=f"MCP tool '{tool_name}' executed successfully",
-                    llm_content={"parts": text_parts} if text_parts else None,
+                    llm_content=llm_content,
                     data={
                         "server": result.get("server"),
                         "content": content_parts,
-                        "structuredContent": result.get("structuredContent"),
+                        "structuredContent": structured,
                     },
                 )
             else:
+                message = result.get("message") or structured_message or f"MCP tool '{tool_name}' failed"
+                llm_content = (
+                    {"parts": [{"type": "text", "text": structured_display}]}
+                    if structured_display
+                    else ({"parts": content_parts} if content_parts else {"parts": [{"type": "text", "text": message}]})
+                )
                 return error_response(
-                    result.get("message", f"MCP tool '{tool_name}' failed"),
-                    llm_content={"parts": [{"type": "text", "text": result.get("message", "Unknown error")}]},
+                    message,
+                    llm_content=llm_content,
+                    server=result.get("server"),
+                    content=content_parts,
+                    structuredContent=structured,
                 )
 
         except Exception as e:

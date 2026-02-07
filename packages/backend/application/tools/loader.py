@@ -54,33 +54,11 @@ class ToolRegistryCollector:
 def _register_all_tools(collector: ToolRegistryCollector) -> None:
     from backend.application.tools.builtin import register_builtin_tools
     from backend.application.tools.coding import register_coding_tools
-    from backend.application.tools.pfc import (
-        register_pfc_task_tool,
-        register_pfc_task_status_tool,
-        register_pfc_list_tasks_tool,
-        register_pfc_interrupt_task_tool,
-        register_pfc_query_python_api_tool,
-        register_pfc_query_command_tool,
-        register_pfc_browse_commands_tool,
-        register_pfc_browse_reference_tool,
-        register_pfc_browse_python_api_tool,
-        register_pfc_capture_plot_tool,
-    )
     from backend.application.tools.planning import register_planning_tools
     from backend.application.tools.agent import register_agent_tools
 
     register_builtin_tools(collector)
     register_coding_tools(collector)
-    register_pfc_task_tool(collector)
-    register_pfc_task_status_tool(collector)
-    register_pfc_list_tasks_tool(collector)
-    register_pfc_interrupt_task_tool(collector)
-    register_pfc_browse_commands_tool(collector)
-    register_pfc_browse_reference_tool(collector)
-    register_pfc_browse_python_api_tool(collector)
-    register_pfc_query_python_api_tool(collector)
-    register_pfc_query_command_tool(collector)
-    register_pfc_capture_plot_tool(collector)
     register_planning_tools(collector)
     register_agent_tools(collector)
 

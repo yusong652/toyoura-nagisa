@@ -37,13 +37,16 @@ servers:
   #   enabled: false
   #   description: Control Blender 3D via MCP
 
-  # PFC MCP - ITASCA PFC control (future, requires pfc-server running)
-  # - name: pfc-mcp
-  #   command: uvx
-  #   args:
-  #     - "pfc-mcp"
-  #   enabled: false
-  #   description: Control ITASCA PFC simulations via MCP
+  # PFC MCP - ITASCA PFC control via external MCP server
+  - name: pfc-mcp
+    command: uv
+    args:
+      - "run"
+      - "python"
+      - "-m"
+      - "pfc_mcp.server"
+    enabled: true
+    description: Control ITASCA PFC simulations via MCP
 
 # Example: Custom MCP server
 # - name: my-custom-server

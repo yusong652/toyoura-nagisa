@@ -1,7 +1,7 @@
 # PFC-MCP 外部项目提取方案
 
 **Created**: 2026-02-07
-**Status**: Phase 1 Complete / Phase 2 In Progress (Core Complete, Integration Pending)
+**Status**: Phase 1 Complete / Phase 2-3 Code Complete (Real PFC E2E Pending)
 **Branch**: `feature/pfc-mcp-extraction-plan`
 **Prerequisite**: P0 FastMCP 解耦已完成（内部工具已直接调用，MCP 仅用于外部工具接入）
 
@@ -531,7 +531,7 @@ pfc-mcp/
 - [x] 2.4 实现 `bridge/task_manager.py` — 简化版任务管理器 (去除 foreground handle、notification service)
 - [x] 2.5 实现 5 个执行工具:
   - `pfc_execute_task` — 简化: 仅 background 模式 (MCP 是无状态的，没有 foreground/ctrl+b 概念)
-  - `pfc_execute_code` — User Console 支持: 接收 Python 代码字符串，交由 bridge 执行
+  - `pfc_execute_code` — User Console 支持: 接收 Python 代码字符串，交由 bridge 执行（当前实现保留，但暂不对 LLM 暴露）
   - `pfc_check_task_status`
   - `pfc_list_tasks` — 返回中包含 `checked` 字段
   - `pfc_interrupt_task`
@@ -540,9 +540,10 @@ pfc-mcp/
 已完成 (2026-02-08):
 - `pfc-mcp/src/pfc_mcp/bridge/client.py`：新增无 toyoura-nagisa 依赖的 WebSocket bridge client（重连、请求响应、重试）
 - `pfc-mcp/src/pfc_mcp/bridge/task_manager.py`：新增 MCP 侧简化任务管理器（6-char task_id）
-- 执行工具已注册到 `pfc_mcp.server`：`pfc_execute_task`、`pfc_execute_code`、`pfc_check_task_status`、`pfc_list_tasks`、`pfc_interrupt_task`
+- 执行工具实现已完成：`pfc_execute_task`、`pfc_execute_code`、`pfc_check_task_status`、`pfc_list_tasks`、`pfc_interrupt_task`
+- LLM 暴露策略：`pfc_execute_code` 暂不注册到 `pfc_mcp.server`，仅保留实现（后续改为 backend 轮询等待）
 - `pfc-mcp/pfc-bridge/` 已引入 bridge runtime 代码（`server/`、`start_bridge.py`、`workspace_template/`、`config_example.py`、`requirements.txt`）
-- smoke 验证通过：`from pfc_mcp.server import mcp` + 工具注册列表包含 10 个工具（5 docs + 5 execution）
+- smoke 验证通过：`from pfc_mcp.server import mcp` + 工具注册列表包含 10 个工具（5 docs + 4 execution + 1 diagnostic）
 - `pfc-mcp/tests/test_phase2_tools.py`：新增 Phase 2 单测（工具注册、状态映射、路径校验）
 - `uv run pytest pfc-mcp/tests/test_phase2_tools.py --no-cov`：3 passed（仓库全局 coverage gate 不适用于该局部测试）
 - `uv run python -m compileall pfc-mcp/src/pfc_mcp pfc-mcp/pfc-bridge`：语法检查通过
@@ -556,15 +557,29 @@ pfc-mcp/
 
 **目标**: 实现 capture_plot，完善配置和错误处理
 
-- [ ] 3.1 搬移脚本模板 (`scripts/plot_capture_template.py`)
-- [ ] 3.2 实现 `pfc_capture_plot` 工具
+- [x] 3.1 搬移脚本模板 (`scripts/plot_capture_template.py`)
+- [x] 3.2 实现 `pfc_capture_plot` 工具
   - 关键: MCP 支持 `ImageContent`，可直接返回截图 base64
   - 替代当前"返回路径 + 让 LLM 用 read() 加载"的模式
-- [ ] 3.3 配置系统: bridge URL、超时、workspace 路径
-- [ ] 3.4 错误处理: bridge 断连重试、优雅错误消息
-- [ ] 3.5 完善 README
+- [x] 3.3 配置系统: bridge URL、超时、workspace 路径
+- [x] 3.4 错误处理: bridge 断连重试、优雅错误消息
+- [x] 3.5 完善 README
 
-**验收**: 所有 10 个工具可用，配置清晰，错误处理健壮
+已完成 (2026-02-08):
+- 新增 `pfc-mcp/src/pfc_mcp/scripts/plot_capture.py` + `scripts/__init__.py`（plot capture 脚本生成与颜色参数规范化）
+- 新增 `pfc-mcp/src/pfc_mcp/tools/capture_plot.py`（返回 `ImageContent` + `TextContent`）
+- `pfc-mcp/src/pfc_mcp/bridge/client.py` 增加 `execute_diagnostic()`
+- `pfc-mcp/src/pfc_mcp/config.py` 增加诊断相关配置：`PFC_MCP_DIAGNOSTIC_TIMEOUT_MS`、`PFC_MCP_DIAGNOSTIC_FILE_WAIT_S`
+- `pfc-mcp/src/pfc_mcp/server.py` 与 `tools/__init__.py` 已注册 `pfc_capture_plot`
+- 新增 `pfc-mcp/README.md`（组件边界、配置、运行与测试说明）
+- 测试通过：
+  - `uv run pytest pfc-mcp/tests/test_phase3_capture_plot.py --no-cov`（含 mock bridge 端到端）
+  - `uv run pytest pfc-mcp/tests/test_phase2_tools.py --no-cov`
+
+待完成:
+- 真实 PFC GUI + bridge 在线环境端到端验证（与 Phase 2.6 合并执行）
+
+**验收**: 对 LLM 暴露的 10 个工具可用，配置清晰，错误处理健壮
 
 ### Phase 4: toyoura-nagisa 侧清理 (0.5 周)
 
@@ -776,5 +791,5 @@ async def get_reminders(self, agent_profile="pfc_expert"):
 
 ---
 
-**Document Version**: 1.2
+**Document Version**: 1.3
 **Last Updated**: 2026-02-08

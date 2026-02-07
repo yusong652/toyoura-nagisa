@@ -215,6 +215,7 @@ class MCPClient:
 
         try:
             result = await self._session.call_tool(tool_name, arguments)
+            is_error = bool(getattr(result, "isError", False))
 
             # Extract content from result
             content_parts = []
@@ -237,10 +238,21 @@ class MCPClient:
                         }
                     )
 
+            error_message = None
+            if is_error:
+                for part in content_parts:
+                    if part.get("type") == "text":
+                        error_message = part.get("text", "")
+                        if error_message:
+                            break
+                if not error_message:
+                    error_message = f"MCP tool '{tool_name}' returned error"
+
             return {
-                "status": "success",
+                "status": "error" if is_error else "success",
                 "server": self.name,
                 "tool": tool_name,
+                "message": error_message,
                 "content": content_parts,
                 "structuredContent": result.structuredContent if hasattr(result, "structuredContent") else None,
             }
