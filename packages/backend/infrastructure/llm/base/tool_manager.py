@@ -331,7 +331,25 @@ class BaseToolManager(ABC):
 
             if result.get("status") == "success":
                 # Prefer explicit structured status from MCP tool results.
-                if structured_status and structured_status not in {"success", "ok", "completed"}:
+                # Some MCP tools use domain statuses like running/pending/completed for successful queries,
+                # so only treat known failure-like statuses as errors.
+                failure_statuses = {
+                    "error",
+                    "failed",
+                    "failure",
+                    "bridge_unavailable",
+                    "not_found",
+                    "unsupported_mode",
+                    "submission_failed",
+                    "interrupt_failed",
+                    "list_failed",
+                    "workspace_unavailable",
+                    "diagnostic_failed",
+                    "output_unavailable",
+                    "timeout",
+                }
+
+                if structured_status and structured_status in failure_statuses:
                     message = structured_message or f"MCP tool '{tool_name}' failed"
                     llm_content = (
                         {"parts": [{"type": "text", "text": structured_display}]}

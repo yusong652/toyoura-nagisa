@@ -472,7 +472,9 @@ class PfcTaskNotificationService:
                 )
                 return None
 
-            parsed = self._parse_task_status_text(extract_mcp_text(status_result))
+            parsed = self._parse_task_status_structured(status_result)
+            if not parsed:
+                parsed = self._parse_task_status_text(extract_mcp_text(status_result))
             if not parsed:
                 return None
 
@@ -513,6 +515,41 @@ class PfcTaskNotificationService:
                 e,
             )
             return None
+
+    def _parse_task_status_structured(self, result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Parse structuredContent from pfc_check_task_status when available."""
+        structured = result.get("structuredContent")
+        if not isinstance(structured, dict):
+            return None
+
+        payload: Dict[str, Any] | None
+        nested_result = structured.get("result")
+        if isinstance(nested_result, dict):
+            payload = nested_result
+        else:
+            payload = structured
+
+        if not isinstance(payload, dict):
+            return None
+
+        raw_status = payload.get("status")
+        if not isinstance(raw_status, str) or not raw_status.strip():
+            return None
+
+        output = payload.get("output")
+        if output is None:
+            output = ""
+
+        error = payload.get("error")
+        if isinstance(error, str) and error.strip().lower() in {"none", "n/a"}:
+            error = None
+
+        return {
+            "status": self._normalize_status(raw_status),
+            "error": error if isinstance(error, str) else None,
+            "result": payload.get("result"),
+            "output": str(output),
+        }
 
     def _parse_task_status_text(self, text: str) -> Optional[Dict[str, Any]]:
         """Parse pfc_check_task_status textual response."""
