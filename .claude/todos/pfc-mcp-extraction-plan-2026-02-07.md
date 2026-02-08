@@ -1,7 +1,7 @@
 # PFC-MCP 外部项目提取方案
 
 **Created**: 2026-02-07
-**Status**: Phase 1 Complete / Phase 2-3 Code Complete (Real PFC E2E Pending)
+**Status**: ARCHIVED — Phase 1-3 Done, remaining items superseded by Phase 5 (`pfc-mcp-phase5-orthogonalization-2026-02-08.md`)
 **Branch**: `feature/pfc-mcp-extraction-plan`
 **Prerequisite**: P0 FastMCP 解耦已完成（内部工具已直接调用，MCP 仅用于外部工具接入）
 
