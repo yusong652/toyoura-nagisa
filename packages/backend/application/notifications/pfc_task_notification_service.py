@@ -16,6 +16,7 @@ monitors one active task at a time.
 import asyncio
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from typing import Dict, Optional, List, Any, TYPE_CHECKING
@@ -190,6 +191,7 @@ class PfcTaskNotificationService:
                     tasks = [
                         {
                             "task_id": t.task_id,
+                            "bridge_task_id": t.bridge_task_id,
                             "status": t.status,
                             "name": os.path.basename(t.script_path),
                             "entry_script": t.script_path,
@@ -202,9 +204,13 @@ class PfcTaskNotificationService:
                         for t in local_tasks
                     ]
 
-                    # Find running task (PFC only supports single task)
+                    # Find active task (PFC only supports single task)
                     running_task = next(
-                        (t for t in tasks if t.get("status") == "running"),
+                        (
+                            t
+                            for t in tasks
+                            if t.get("status") in ("pending", "submitted", "running")
+                        ),
                         None
                     )
 
@@ -280,6 +286,12 @@ class PfcTaskNotificationService:
             return
 
         try:
+            # Sync latest status/output from MCP first
+            sync_result = await self._sync_task_from_mcp(task_info)
+            if sync_result and sync_result.get("is_terminal"):
+                await self._handle_task_completion(session_id, task_info)
+                return
+
             # Get detailed output from local task manager
             from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
             task_manager = get_pfc_task_manager()
@@ -426,6 +438,157 @@ class PfcTaskNotificationService:
             logger.debug(f"Sent PFC task update for session {session_id}")
         else:
             logger.debug(f"Session {session_id} not connected, skipping notification")
+
+    async def _sync_task_from_mcp(self, task_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Sync local task state from pfc_check_task_status MCP result."""
+        local_task_id = task_info.get("task_id")
+        if not local_task_id:
+            return None
+
+        remote_task_id = task_info.get("bridge_task_id") or local_task_id
+
+        try:
+            from backend.infrastructure.mcp.client import get_mcp_client_manager
+            from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
+            from backend.shared.utils.mcp_utils import extract_mcp_text
+
+            mcp_manager = get_mcp_client_manager()
+            status_result = await mcp_manager.call_tool(
+                "pfc_check_task_status",
+                {
+                    "task_id": remote_task_id,
+                    "wait_seconds": 1,
+                    "limit": 200,
+                    "skip_newest": 0,
+                },
+            )
+
+            if status_result.get("status") == "error":
+                logger.warning(
+                    "pfc_check_task_status failed for local=%s remote=%s: %s",
+                    local_task_id,
+                    remote_task_id,
+                    status_result.get("message", "unknown error"),
+                )
+                return None
+
+            parsed = self._parse_task_status_text(extract_mcp_text(status_result))
+            if not parsed:
+                return None
+
+            normalized_status = parsed["status"]
+            if normalized_status == "not_found":
+                # If bridge_task_id was never captured, avoid false failure on local task id mismatch.
+                if not task_info.get("bridge_task_id"):
+                    logger.warning(
+                        "Skipping not_found sync for local=%s because bridge_task_id is missing",
+                        local_task_id,
+                    )
+                    return None
+                normalized_status = "failed"
+                parsed["error"] = parsed.get("error") or "Remote task not found on pfc-bridge"
+
+            task_manager = get_pfc_task_manager()
+            task_manager.update_status(
+                local_task_id,
+                normalized_status,
+                error=parsed.get("error"),
+                result=parsed.get("result"),
+            )
+
+            output = parsed.get("output")
+            if isinstance(output, str):
+                task_manager.set_output(local_task_id, output)
+
+            return {
+                "status": normalized_status,
+                "is_terminal": normalized_status in ("completed", "failed", "interrupted"),
+            }
+
+        except Exception as e:
+            logger.warning(
+                "Failed to sync task status from MCP for local=%s remote=%s: %s",
+                local_task_id,
+                remote_task_id,
+                e,
+            )
+            return None
+
+    def _parse_task_status_text(self, text: str) -> Optional[Dict[str, Any]]:
+        """Parse pfc_check_task_status textual response."""
+        if not text:
+            return None
+
+        status = "running"
+        error: Optional[str] = None
+        result: Optional[str] = None
+        output_lines: List[str] = []
+        in_output = False
+
+        for raw_line in text.splitlines():
+            line = raw_line.rstrip("\r")
+            stripped = line.strip()
+            lowered = stripped.lower()
+
+            if lowered.startswith("- status:"):
+                raw_status = stripped.split(":", 1)[1].strip().lower()
+                status = self._normalize_status(raw_status)
+                continue
+
+            if lowered.startswith("- error:"):
+                candidate = stripped.split(":", 1)[1].strip()
+                if candidate and candidate.lower() not in {"none", "n/a"}:
+                    error = candidate
+                continue
+
+            if lowered.startswith("- result:"):
+                candidate = stripped.split(":", 1)[1].strip()
+                if candidate and candidate.lower() not in {"none", "n/a"}:
+                    result = candidate
+                continue
+
+            if lowered.startswith("output ") or stripped == "Output:" or "=== Script Output" in line:
+                in_output = True
+                continue
+
+            if in_output and lowered.startswith("next:"):
+                break
+
+            if in_output:
+                output_lines.append(line)
+
+        output_text = "\n".join(output_lines).strip()
+        if output_text == "(no output)":
+            output_text = ""
+
+        return {
+            "status": status,
+            "error": error,
+            "result": result,
+            "output": output_text,
+        }
+
+    def _normalize_status(self, status: str) -> str:
+        """Normalize bridge/MCP task status into local task status."""
+        status = (status or "").strip().lower()
+        if status in {"success", "completed"}:
+            return "completed"
+        if status in {"error", "failed"}:
+            return "failed"
+        if status == "interrupted":
+            return "interrupted"
+        if status == "pending":
+            return "pending"
+        if status in {"running", "submitted"}:
+            return "running"
+        if status == "not_found":
+            return "not_found"
+
+        if re.search(r"\b(success|completed)\b", status):
+            return "completed"
+        if re.search(r"\b(error|failed)\b", status):
+            return "failed"
+        return "running"
 
     def _get_recent_lines(self, output: str) -> List[str]:
         """
