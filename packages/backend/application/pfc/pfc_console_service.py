@@ -5,20 +5,23 @@ Provides foreground execution with Ctrl+B support.
 
 Flow (aligned with user bash):
 1. Create task via TaskManager
-2. Send to pfc-bridge with run_in_background=False (synchronous)
+2. Submit to pfc-bridge via MCP (run_in_background=True)
 3. Register with ForegroundRegistry for Ctrl+B signal
-4. asyncio.wait() on WebSocket response OR Ctrl+B signal
+4. Poll for completion via MCP OR Ctrl+B signal
 5. Return result or MoveToBackgroundRequest
 """
 
 import asyncio
+import logging
 from typing import Optional, Union
 from pathlib import Path
 from dataclasses import dataclass
 
-from backend.infrastructure.pfc.client import get_pfc_client
+logger = logging.getLogger(__name__)
+
 from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 from backend.infrastructure.pfc.foreground_registry import get_pfc_foreground_registry
+from backend.shared.utils.mcp_utils import extract_mcp_text
 
 
 # Caveat message for user PFC Python commands
@@ -152,12 +155,9 @@ class PfcConsoleService:
         )
         self._task_manager.update_status(task_id, "submitted")
 
-        # 2. Get PFC client
-        try:
-            client = await get_pfc_client()
-        except ConnectionError as e:
-            self._task_manager.update_status(task_id, "failed", error=str(e))
-            return None, task_id, f"PFC server not available: {e}"
+        # 2. Get MCP client manager
+        from backend.infrastructure.mcp.client import get_mcp_client_manager
+        mcp_manager = get_mcp_client_manager()
 
         # 3. Create handle and register for Ctrl+B
         handle = PfcConsoleForegroundHandle(
@@ -171,76 +171,108 @@ class PfcConsoleService:
         self._task_manager.update_status(task_id, "running")
 
         try:
-            # 4. Create tasks for concurrent wait
-            # Task 1: WebSocket call (synchronous, waits for completion)
-            websocket_task = asyncio.create_task(
-                client.send_user_console(
-                    code=code,
-                    workspace_path=str(self.workspace_path),
-                    task_id=task_id,
-                    session_id=self.session_id,
-                    timeout_ms=timeout_ms or 30000,
-                    run_in_background=False,  # Synchronous - waits for completion
-                )
-            )
-            # Task 2: Wait for Ctrl+B signal
-            signal_task = asyncio.create_task(
-                handle._move_to_bg_event.wait()
-            )
+            # 4. Submit via MCP with run_in_background=True, then poll locally
+            try:
+                result = await mcp_manager.call_tool("pfc_execute_code", {
+                    "code": code,
+                    "timeout": timeout_ms // 1000 if timeout_ms else 30,
+                    "run_in_background": True,
+                })
+                if result.get("status") == "error":
+                    raise ConnectionError(result.get("message", "MCP tool call failed"))
+            except ConnectionError as e:
+                self._task_manager.update_status(task_id, "failed", error=str(e))
+                return None, task_id, f"PFC server not available: {e}"
 
+            # Extract bridge task_id from response
+            text = extract_mcp_text(result)
+            bridge_task_id = None
+            for line in text.splitlines():
+                if line.strip().startswith("- task_id:"):
+                    bridge_task_id = line.split(":", 1)[1].strip()
+                    break
+
+            self._task_manager.update_status(task_id, "running", bridge_task_id=bridge_task_id)
+
+            # 5. Poll for completion with Ctrl+B signal
+            poll_task_id = bridge_task_id or task_id
+            signal_task = asyncio.create_task(handle._move_to_bg_event.wait())
             timeout_seconds = timeout_ms / 1000.0 if timeout_ms else 60.0
+            poll_start = asyncio.get_event_loop().time()
 
-            done, pending = await asyncio.wait(
-                [websocket_task, signal_task],
-                timeout=timeout_seconds,
-                return_when=asyncio.FIRST_COMPLETED,
-            )
+            while True:
+                # Check Ctrl+B signal
+                if signal_task.done():
+                    return PfcConsoleMoveToBackgroundRequest(
+                        task_id=task_id, reason="user_request"
+                    ), task_id, None
 
-            # Cancel pending tasks
-            for task in pending:
-                task.cancel()
+                # Check timeout
+                elapsed = asyncio.get_event_loop().time() - poll_start
+                if elapsed >= timeout_seconds:
+                    signal_task.cancel()
+                    return PfcConsoleMoveToBackgroundRequest(
+                        task_id=task_id, reason="timeout"
+                    ), task_id, None
+
+                # Poll task status via MCP
                 try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+                    status_result = await mcp_manager.call_tool("pfc_check_task_status", {
+                        "task_id": poll_task_id,
+                        "wait_seconds": 1,
+                    })
+                    status_text = extract_mcp_text(status_result)
 
-            # Case 1: Ctrl+B signal received
-            if signal_task in done:
-                return PfcConsoleMoveToBackgroundRequest(
-                    task_id=task_id,
-                    reason="user_request"
-                ), task_id, None
+                    # Parse status from text response
+                    is_terminal = False
+                    parsed_status = "running"
+                    for line in status_text.splitlines():
+                        stripped = line.strip().lower()
+                        if "status:" in stripped:
+                            if "completed" in stripped or "success" in stripped:
+                                parsed_status = "completed"
+                                is_terminal = True
+                            elif "failed" in stripped or "error" in stripped:
+                                parsed_status = "failed"
+                                is_terminal = True
+                            elif "interrupted" in stripped:
+                                parsed_status = "interrupted"
+                                is_terminal = True
 
-            # Case 2: Timeout
-            if not done:
-                return PfcConsoleMoveToBackgroundRequest(
-                    task_id=task_id,
-                    reason="timeout"
-                ), task_id, None
+                    if is_terminal:
+                        signal_task.cancel()
+                        # Extract output from status text
+                        output = ""
+                        error = None
+                        output_section = False
+                        output_lines = []
+                        for line in status_text.splitlines():
+                            if "Output:" in line or "=== Script Output" in line:
+                                output_section = True
+                                continue
+                            if output_section:
+                                output_lines.append(line)
+                            elif line.strip().startswith("- error:"):
+                                error = line.split(":", 1)[1].strip()
 
-            # Case 3: WebSocket completed
-            result = websocket_task.result()
+                        output = "\n".join(output_lines).strip()
 
-            # Extract result data
-            data = result.get("data", {})
-            status = "completed" if result.get("status") == "success" else "failed"
-            output = data.get("output", "")
-            error = data.get("error")
-            exec_result = data.get("result")
-            elapsed_time = data.get("elapsed_time", 0)
+                        self._task_manager.update_status(task_id, parsed_status, error=error)
+                        if output:
+                            self._task_manager.set_output(task_id, output)
 
-            self._task_manager.update_status(task_id, status, result=exec_result, error=error)
-            if output:
-                self._task_manager.set_output(task_id, output)
+                        return PfcConsoleExecutionResult(
+                            task_id=task_id,
+                            status=parsed_status,
+                            output=output,
+                            error=error,
+                            elapsed_time=elapsed,
+                        ), task_id, None
 
-            return PfcConsoleExecutionResult(
-                task_id=task_id,
-                status=status,
-                output=output,
-                error=error,
-                result=exec_result,
-                elapsed_time=elapsed_time,
-            ), task_id, None
+                except Exception as e:
+                    logger.warning(f"Poll error for console task {task_id}: {e}")
+
+                await asyncio.sleep(1.0)
 
         except Exception as e:
             self._task_manager.update_status(task_id, "failed", error=str(e))

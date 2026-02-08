@@ -6,7 +6,6 @@ Defines core methods that all Tool Managers must implement to ensure consistency
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 import inspect
 from typing import Any, Dict, Optional
 
@@ -244,8 +243,6 @@ class BaseToolManager(ABC):
         Returns:
             Dict[str, Any]: ToolResult dictionary
         """
-        from backend.shared.utils.tool_result import error_response
-
         # Check if this is an MCP tool
         if tool_name in self._mcp_tool_mapping:
             return await self._execute_mcp_tool(tool_name, tool_args)
@@ -353,17 +350,26 @@ class BaseToolManager(ABC):
                 llm_content = (
                     {"parts": [{"type": "text", "text": structured_display}]}
                     if structured_display
-                    else ({"parts": content_parts} if content_parts else None)
+                    else (
+                        {"parts": content_parts}
+                        if content_parts
+                        else {
+                            "parts": [
+                                {
+                                    "type": "text",
+                                    "text": f"MCP tool '{tool_name}' executed successfully",
+                                }
+                            ]
+                        }
+                    )
                 )
 
                 return success_response(
                     message=f"MCP tool '{tool_name}' executed successfully",
                     llm_content=llm_content,
-                    data={
-                        "server": result.get("server"),
-                        "content": content_parts,
-                        "structuredContent": structured,
-                    },
+                    server=result.get("server"),
+                    content=content_parts,
+                    structuredContent=structured,
                 )
             else:
                 message = result.get("message") or structured_message or f"MCP tool '{tool_name}' failed"

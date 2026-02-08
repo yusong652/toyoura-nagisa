@@ -1,11 +1,10 @@
 """
 PFC Monitor - PFC simulation task tracking.
 
-Monitors PFC simulation tasks with intelligent notification tracking.
-Queries pfc-bridge for persistent task data.
+Monitors PFC simulation tasks via local PfcTaskManager.
+No direct PFC server communication needed.
 """
 
-import asyncio
 import logging
 from typing import List
 from .base_monitor import BaseMonitor
@@ -17,122 +16,47 @@ class PfcMonitor(BaseMonitor):
     """
     Monitor for PFC simulation tasks.
 
-    Implements persistent notification tracking via pfc-bridge:
-    1. Unnotified completed/failed tasks → One-time completion notification + mark as notified
-    2. Running tasks → Continuous status reminders
-    3. Already notified completed/failed tasks → Excluded (no reminder)
-
-    Note: This monitor requires agent_profile for profile-based filtering.
-    Task state is persisted in pfc-bridge.
+    Uses local PfcTaskManager for task state, avoiding
+    direct WebSocket communication with pfc-bridge.
     """
 
     async def get_reminders(self, agent_profile = "pfc_expert") -> List[str]:
         """
         Get reminders for PFC simulation tasks.
 
-        Only queries PFC if agent_profile is 'pfc', to avoid unnecessary
-        connection attempts for other profiles.
+        Only queries if agent_profile starts with 'pfc'.
 
         Args:
-            agent_profile: Agent profile type. Only 'pfc' profile will query PFC server.
+            agent_profile: Agent profile type.
 
         Returns:
-            List[str]: PFC task reminders (completion alerts + running task status)
+            List[str]: PFC task reminders
         """
-        # Skip PFC query if not in PFC profile
-        if agent_profile != 'pfc':
+        if not agent_profile.startswith("pfc"):
             return []
 
         try:
-            from backend.infrastructure.pfc import get_pfc_client
-            from backend.shared.utils.time_utils import format_time_range
+            from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 
-            # Get WebSocket client (auto-connects if needed)
-            client = await get_pfc_client()
+            task_manager = get_pfc_task_manager()
+            reminders = task_manager.get_system_reminders(self.session_id)
 
-            # Query recent tasks (all sessions, limit=3)
-            result = await client.list_tasks(
-                session_id=None,  # No filter - see all tasks
-                offset=0,
-                limit=3
+            if not reminders:
+                return []
+
+            wrapped = [
+                f"<system-reminder>\n{reminder}\n</system-reminder>"
+                for reminder in reminders
+            ]
+
+            wrapped.append(
+                "<system-reminder>\n"
+                "You can check detailed output using pfc_check_task_status tool.\n"
+                "</system-reminder>"
             )
 
-            if result.get("status") != "success":
-                return []
-
-            tasks = result.get("data", [])
-            if not tasks:
-                return []
-
-            wrapped_reminders = []
-            completion_notifications = []
-            tasks_to_mark = []  # Track tasks that need to be marked as notified
-
-            # Step 1: Separate tasks by status and notification state
-            for task in tasks:
-                task_id = task.get("task_id", "unknown")
-                status = task.get("status", "unknown")
-                notified = task.get("notified", False)
-                description = task.get("description", "No description")
-                script_path = task.get("script_path", task.get("name", "unknown"))
-                start_time = task.get("start_time")
-                end_time = task.get("end_time")
-                task_session_id = task.get("session_id", "unknown")
-
-                # Format time range
-                time_info = format_time_range(start_time, end_time)
-
-                # Build session marker
-                task_session_display = task_session_id[:8] if task_session_id != "unknown" else "unknown"
-                if task_session_id == self.session_id:
-                    session_marker = " (your task)"
-                else:
-                    session_marker = f" (session: {task_session_display})"
-
-                # Handle completed/failed/interrupted tasks
-                if status in ["completed", "failed", "interrupted"]:
-                    if not notified:
-                        # Generate one-time completion notification
-                        notification = (
-                            f"PFC Task {task_id}{session_marker} {status}: "
-                            f"{script_path}, {time_info} - {description}. "
-                            f"Use pfc_check_task_status('{task_id}') to see results."
-                        )
-                        completion_notifications.append(notification)
-                        tasks_to_mark.append(task_id)
-                    # else: already notified, skip (no reminder)
-
-                # Handle running tasks
-                elif status == "running":
-                    reminder = (
-                        f"PFC Task {task_id}{session_marker}: "
-                        f"status=running, script={script_path}, {time_info}. "
-                        f"Description: {description}"
-                    )
-                    wrapped_reminders.append(f"<system-reminder>\n{reminder}\n</system-reminder>")
-
-            # Step 2: Wrap completion notifications and add them first (higher priority)
-            if completion_notifications:
-                wrapped_reminders = [
-                    f"<system-reminder>\n{notification}\n</system-reminder>"
-                    for notification in completion_notifications
-                ] + wrapped_reminders
-
-            # Step 3: Mark tasks as notified in PFC server (async, fire-and-forget)
-            for task_id in tasks_to_mark:
-                try:
-                    asyncio.create_task(client.mark_task_notified(task_id))
-                except Exception as e:
-                    logger.warning(f"Failed to mark task {task_id} as notified: {e}")
-
-            # Add tool usage hint once at the end (not repeated for each task)
-            if wrapped_reminders:
-                tool_hint = "<system-reminder>\nYou can check detailed output using pfc_check_task_status tool.\n</system-reminder>"
-                wrapped_reminders.append(tool_hint)
-
-            return wrapped_reminders
+            return wrapped
 
         except Exception as e:
-            # PFC server may not be available or not running
             logger.debug(f"Failed to get PFC reminders: {e}")
             return []

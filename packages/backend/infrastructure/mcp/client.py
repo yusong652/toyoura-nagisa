@@ -7,6 +7,7 @@ This module provides a client for connecting to MCP servers
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any, TYPE_CHECKING
@@ -114,36 +115,47 @@ class MCPClient:
             logger.warning(f"[{self.name}] Already connected")
             return True
 
-        try:
-            server_params = StdioServerParameters(
-                command=self.config.command,
-                args=self.config.args,
-                env=self.config.env,
-            )
+        last_error: Exception | None = None
+        max_attempts = 2
 
-            # Create stdio client connection
-            # Note: We need to manage the context manually for long-lived connections
-            self._stdio_context = stdio_client(server_params)
-            self._read_stream, self._write_stream = await self._stdio_context.__aenter__()
+        for attempt in range(1, max_attempts + 1):
+            try:
+                server_params = StdioServerParameters(
+                    command=self.config.command,
+                    args=self.config.args,
+                    env=self.config.env,
+                    encoding="utf-8",
+                    encoding_error_handler="replace",
+                )
 
-            # Create session
-            self._session_context = ClientSession(self._read_stream, self._write_stream)
-            self._session = await self._session_context.__aenter__()
+                # Create stdio client connection
+                # Note: We need to manage the context manually for long-lived connections
+                self._stdio_context = stdio_client(server_params)
+                self._read_stream, self._write_stream = await self._stdio_context.__aenter__()
 
-            # Initialize the connection
-            await self._session.initialize()
+                # Create session
+                self._session_context = ClientSession(self._read_stream, self._write_stream)
+                self._session = await self._session_context.__aenter__()
 
-            # Load available tools
-            await self._load_tools()
+                # Initialize the connection
+                await self._session.initialize()
 
-            self._connected = True
-            logger.info(f"[{self.name}] Connected successfully, {len(self._tools)} tools available")
-            return True
+                # Load available tools
+                await self._load_tools()
 
-        except Exception as e:
-            logger.error(f"[{self.name}] Connection failed: {e}")
-            await self.disconnect()
-            return False
+                self._connected = True
+                logger.info(f"[{self.name}] Connected successfully, {len(self._tools)} tools available")
+                return True
+
+            except Exception as e:
+                last_error = e
+                logger.warning(f"[{self.name}] Connection attempt {attempt}/{max_attempts} failed: {e}")
+                await self.disconnect()
+                if attempt < max_attempts:
+                    await asyncio.sleep(0.3)
+
+        logger.error(f"[{self.name}] Connection failed: {last_error}")
+        return False
 
     async def disconnect(self) -> None:
         """Disconnect from the MCP server."""

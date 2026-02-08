@@ -80,3 +80,4 @@ async def load_tool_registry() -> None:
             metadata={"annotations": entry.annotations, "source": "internal"},
         )
         TOOL_REGISTRY.register(tool_def, overwrite=True)
+

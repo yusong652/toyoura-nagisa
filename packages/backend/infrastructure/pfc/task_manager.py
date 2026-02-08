@@ -468,6 +468,13 @@ class PfcTaskManager:
             # Apply pagination
             return tasks[offset:offset + limit]
 
+    def clear_all_tasks(self) -> int:
+        """Clear all tasks from local state. Returns count of cleared tasks."""
+        with self._lock:
+            count = len(self.tasks)
+            self.tasks.clear()
+            return count
+
     def has_active_tasks(self, session_id: str) -> bool:
         """Check if session has any active (non-terminal) tasks.
 

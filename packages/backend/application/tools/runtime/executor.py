@@ -11,6 +11,7 @@ Confirmation outcomes:
 - reject_and_tell: Don't execute but continue with user's instruction injected
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
 
@@ -40,6 +41,16 @@ class ClassifiedTools:
 
     non_confirm: List[Tuple[int, Dict]] = field(default_factory=list)  # (index, tool_call)
     confirm: List[Tuple[int, Dict]] = field(default_factory=list)  # (index, tool_call)
+
+
+@dataclass
+class PfcExecuteTaskHookState:
+    """State carried across pfc_execute_task pre/post hooks."""
+
+    local_task_id: str
+    entry_script: str
+    description: str
+    git_commit: Optional[str] = None
 
 
 class ToolExecutor:
@@ -210,12 +221,222 @@ class ToolExecutor:
 
     async def _execute_single_tool(self, tool_call: Dict, message_id: str) -> Dict[str, Any]:
         """Execute a single tool without confirmation."""
+        tool_name = tool_call.get("name", "unknown")
+        tool_args = tool_call.get("arguments", {})
+
+        hook_state = await self._run_pre_tool_hook(tool_name, tool_args)
         result = await self.tool_manager.handle_function_call(tool_call, self.session_id, message_id)
         if result is None:
             from backend.shared.utils.tool_result import error_response
 
             return error_response("Tool execution returned no result")
+
+        result = self._normalize_tool_result(result, tool_name)
+        result = await self._run_post_tool_hook(tool_name, tool_args, result, hook_state)
+        return self._normalize_tool_result(result, tool_name)
+
+    async def _run_pre_tool_hook(self, tool_name: str, tool_args: Dict[str, Any]) -> Any:
+        """Run tool-specific pre-execution hook."""
+        try:
+            if tool_name == "pfc_execute_task":
+                return await self._pre_pfc_execute_task(tool_args)
+        except Exception as exc:
+            print(f"[ToolExecutor] Pre-hook failed for {tool_name}: {exc}")
+        return None
+
+    async def _run_post_tool_hook(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        result: Dict[str, Any],
+        hook_state: Any,
+    ) -> Dict[str, Any]:
+        """Run tool-specific post-execution hook."""
+        try:
+            if tool_name == "pfc_execute_task":
+                return await self._post_pfc_execute_task(tool_args, result, hook_state)
+        except Exception as exc:
+            print(f"[ToolExecutor] Post-hook failed for {tool_name}: {exc}")
         return result
+
+    async def _pre_pfc_execute_task(self, tool_args: Dict[str, Any]) -> Optional[PfcExecuteTaskHookState]:
+        """Best-effort local tracking setup before MCP pfc_execute_task call."""
+        from backend.infrastructure.pfc.git_version import get_git_manager
+        from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
+
+        task_manager = get_pfc_task_manager()
+        entry_script = str(tool_args.get("entry_script", "") or "")
+        description = str(tool_args.get("description", "") or "")
+
+        git_commit = None
+        try:
+            git_manager = get_git_manager(entry_script)
+            if git_manager.is_git_available():
+                git_commit = git_manager.create_execution_commit(
+                    task_id="pre-submit",
+                    description=description,
+                    entry_script=entry_script,
+                )
+        except Exception as exc:
+            print(f"[ToolExecutor] pfc_execute_task git snapshot skipped: {exc}")
+
+        local_task_id = task_manager.create_task(
+            session_id=self.session_id,
+            script_path=entry_script,
+            description=description,
+            git_commit=git_commit,
+            source="agent",
+        )
+        task_manager.update_status(local_task_id, "submitted")
+
+        return PfcExecuteTaskHookState(
+            local_task_id=local_task_id,
+            entry_script=entry_script,
+            description=description,
+            git_commit=git_commit,
+        )
+
+    async def _post_pfc_execute_task(
+        self,
+        _tool_args: Dict[str, Any],
+        result: Dict[str, Any],
+        hook_state: Any,
+    ) -> Dict[str, Any]:
+        """Update local PFC task tracking after MCP pfc_execute_task call."""
+        if not isinstance(hook_state, PfcExecuteTaskHookState):
+            return result
+
+        from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
+
+        task_manager = get_pfc_task_manager()
+        local_task_id = hook_state.local_task_id
+
+        if result.get("status") == "error":
+            error_message = result.get("message") or "MCP pfc_execute_task failed"
+            task_manager.update_status(local_task_id, "failed", error=error_message)
+        else:
+            bridge_task_id = self._extract_bridge_task_id(result)
+            task_manager.update_status(local_task_id, "running", bridge_task_id=bridge_task_id)
+
+        return self._enrich_pfc_result_data(result, hook_state)
+
+    def _normalize_tool_result(self, result: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
+        """Ensure tool result always contains llm_content.parts."""
+        if not isinstance(result, dict):
+            return {
+                "status": "error",
+                "message": f"Tool '{tool_name}' returned invalid result type",
+                "llm_content": {
+                    "parts": [{"type": "text", "text": f"Tool '{tool_name}' returned invalid result type"}]
+                },
+            }
+
+        llm_content = result.get("llm_content")
+        if isinstance(llm_content, str):
+            normalized = result.copy()
+            normalized["llm_content"] = {"parts": [{"type": "text", "text": llm_content}]}
+            return normalized
+
+        if isinstance(llm_content, dict) and isinstance(llm_content.get("parts"), list):
+            return result
+
+        fallback_text = result.get("message")
+        if not isinstance(fallback_text, str) or not fallback_text:
+            fallback_text = f"Tool '{tool_name}' returned without llm_content"
+
+        normalized = result.copy()
+        normalized["llm_content"] = {"parts": [{"type": "text", "text": fallback_text}]}
+        return normalized
+
+    def _extract_bridge_task_id(self, result: Dict[str, Any]) -> Optional[str]:
+        """Extract bridge task_id from normalized ToolResult."""
+        structured_task_id = self._extract_task_id_from_structured(result)
+        if structured_task_id:
+            return structured_task_id
+
+        text = self._extract_result_text(result)
+        if not text:
+            return None
+
+        match = re.search(r"(?mi)^-\s*task_id:\s*([^\s]+)\s*$", text)
+        return match.group(1).strip() if match else None
+
+    def _extract_task_id_from_structured(self, result: Dict[str, Any]) -> Optional[str]:
+        """Extract task_id from MCP structuredContent payload when available."""
+        data = result.get("data")
+        if not isinstance(data, dict):
+            return None
+
+        data_payload = data
+        nested_payload = data_payload.get("data")
+        if not isinstance(data_payload.get("structuredContent"), dict) and isinstance(nested_payload, dict):
+            data_payload = nested_payload
+
+        structured = data_payload.get("structuredContent")
+        if not isinstance(structured, dict):
+            return None
+
+        payload = structured.get("result") if isinstance(structured.get("result"), dict) else structured
+        candidates = [payload]
+        if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+            candidates.append(payload.get("data"))
+
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            for key in ("task_id", "taskId", "id"):
+                value = candidate.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        return None
+
+    def _extract_result_text(self, result: Dict[str, Any]) -> str:
+        """Extract concatenated text from llm_content/data content parts."""
+        texts: List[str] = []
+
+        llm_content = result.get("llm_content")
+        if isinstance(llm_content, dict):
+            parts = llm_content.get("parts")
+            if isinstance(parts, list):
+                for part in parts:
+                    if isinstance(part, dict) and part.get("type") == "text":
+                        text = part.get("text")
+                        if isinstance(text, str) and text:
+                            texts.append(text)
+
+        data = result.get("data")
+        if isinstance(data, dict):
+            data_payload = data
+            nested_payload = data_payload.get("data")
+            if not isinstance(data_payload.get("content"), list) and isinstance(nested_payload, dict):
+                data_payload = nested_payload
+
+            content = data_payload.get("content")
+            if isinstance(content, list):
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "text":
+                        text = part.get("text")
+                        if isinstance(text, str) and text:
+                            texts.append(text)
+
+        return "\n".join(texts)
+
+    def _enrich_pfc_result_data(self, result: Dict[str, Any], hook_state: PfcExecuteTaskHookState) -> Dict[str, Any]:
+        """Attach local tracking metadata to pfc_execute_task tool result."""
+        enriched = result.copy()
+        existing_data = enriched.get("data")
+        data = existing_data.copy() if isinstance(existing_data, dict) else {}
+
+        pfc_tracking = {
+            "local_task_id": hook_state.local_task_id,
+            "bridge_task_id": self._extract_bridge_task_id(result),
+            "git_commit": hook_state.git_commit,
+            "entry_script": hook_state.entry_script,
+        }
+        data["pfc_tracking"] = {k: v for k, v in pfc_tracking.items() if v}
+
+        enriched["data"] = data
+        return enriched
 
     async def _execute_with_confirmation(
         self, tool_call: Dict, message_id: str

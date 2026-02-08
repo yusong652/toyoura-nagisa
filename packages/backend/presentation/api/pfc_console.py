@@ -17,10 +17,10 @@ from pydantic import BaseModel, Field
 
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import InternalServerError
-from backend.infrastructure.pfc.client import get_pfc_client
 from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 from backend.infrastructure.monitoring.status_monitor import get_status_monitor
 from backend.shared.utils.workspace import get_workspace_for_profile
+from backend.shared.utils.mcp_utils import extract_mcp_text
 
 router = APIRouter(prefix="/api/pfc/console", tags=["pfc-console"])
 
@@ -140,21 +140,18 @@ def _format_pfc_python_context(
 # =====================
 @router.get("/status", response_model=ApiResponse[ConnectionStatusData])
 async def check_connection_status() -> ApiResponse[ConnectionStatusData]:
-    """Check PFC server connection status."""
+    """Check PFC server connection status via MCP."""
     try:
-        client = await get_pfc_client()
-        if client.connected:
-            return ApiResponse(
-                success=True,
-                message="Connected to PFC server",
-                data=ConnectionStatusData(connected=True)
-            )
-        else:
-            return ApiResponse(
-                success=True,
-                message="Not connected to PFC server",
-                data=ConnectionStatusData(connected=False)
-            )
+        from backend.infrastructure.mcp.client import get_mcp_client_manager
+        mcp_manager = get_mcp_client_manager()
+        result = await mcp_manager.call_tool("pfc_list_tasks", {"limit": 1})
+        if result.get("status") == "error":
+            raise ConnectionError(result.get("message", "MCP tool call failed"))
+        return ApiResponse(
+            success=True,
+            message="Connected to PFC server",
+            data=ConnectionStatusData(connected=True)
+        )
     except ConnectionError:
         return ApiResponse(
             success=True,
@@ -186,19 +183,28 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
             request.session_id
         )
 
-        # Generate task_id before sending to pfc-bridge
+        # Create local task tracking
         task_manager = get_pfc_task_manager()
         task_id = task_manager.create_task(
             session_id=request.session_id,
-            script_path="user_console",  # Will be updated by pfc-bridge
+            script_path="user_console",
             description=request.code[:50] + "..." if len(request.code) > 50 else request.code,
             source="user_console",
         )
 
+        from backend.infrastructure.mcp.client import get_mcp_client_manager
+        mcp_manager = get_mcp_client_manager()
+        timeout_s = (request.timeout_ms or 30000) // 1000
+
         try:
-            client = await get_pfc_client()
+            mcp_result = await mcp_manager.call_tool("pfc_execute_code", {
+                "code": request.code,
+                "timeout": timeout_s,
+                "run_in_background": False,
+            })
+            if mcp_result.get("status") == "error":
+                raise ConnectionError(mcp_result.get("message", "MCP tool call failed"))
         except ConnectionError as e:
-            # Update task status on failure
             task_manager.update_status(task_id, "failed", error=str(e))
             return ApiResponse(
                 success=False,
@@ -207,39 +213,42 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
                 data=ExecuteData(connected=False, context="")
             )
 
-        result = await client.send_user_console(
-            code=request.code,
-            workspace_path=str(workspace_path),
-            task_id=task_id,
-            session_id=request.session_id,
-            timeout_ms=request.timeout_ms or 30000,
-        )
+        # Parse MCP text response
+        text = extract_mcp_text(mcp_result)
 
-        status = result.get("status", "error")
-        message = result.get("message", "")
-        data = result.get("data") or {}
+        # Extract fields from MCP response text
+        output = ""
+        error_msg = None
+        elapsed_time = None
+        output_section = False
+        output_lines = []
 
-        # Update task status based on result
-        task_status = "completed" if status == "success" else "failed"
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("- status:"):
+                status_val = stripped.split(":", 1)[1].strip().lower()
+            elif stripped.startswith("- error:"):
+                error_msg = stripped.split(":", 1)[1].strip()
+                if error_msg == "None" or error_msg == "":
+                    error_msg = None
+            elif "Output:" in line or "=== Script Output" in line:
+                output_section = True
+                continue
+            elif output_section:
+                output_lines.append(line)
+
+        output = "\n".join(output_lines).strip()
+
+        # Update task status
+        is_error = error_msg is not None
+        task_status = "failed" if is_error else "completed"
         task_manager.update_status(
             task_id,
             task_status,
-            result=data.get("result"),
-            error=data.get("error") if status == "error" else None,
+            error=error_msg,
         )
-        # Update output
-        output_text = data.get("output", "")
-        if output_text:
-            task_manager.set_output(task_id, output_text)
-
-        # Response uses the task_id we generated (not from server)
-        script_name = data.get("script_name", "")
-        script_path = data.get("script_path", "")
-        code_preview = data.get("code_preview", "")
-        output = data.get("output", "")
-        script_result = data.get("result")
-        elapsed_time = data.get("elapsed_time")
-        error_msg = data.get("error") if status == "error" else None
+        if output:
+            task_manager.set_output(task_id, output)
 
         context = _format_pfc_python_context(
             code=request.code,
@@ -256,21 +265,13 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
             error=error_msg or ""
         )
 
-        # Execution completed (even if Python code raised an error).
-        # Error details are in error field (traceback), output is stdout only.
-        # Only infrastructure errors (connection, timeout) should set success=False.
         return ApiResponse(
             success=True,
-            message="Code executed" if status == "success" else (error_msg or message or "Execution completed with errors"),
+            message="Code executed" if not is_error else (error_msg or "Execution completed with errors"),
             data=ExecuteData(
                 task_id=task_id,
-                script_name=script_name,
-                script_path=script_path,
-                code_preview=code_preview,
                 output=output,
                 error=error_msg,
-                result=script_result,
-                elapsed_time=elapsed_time,
                 context=context,
                 connected=True,
             )
@@ -305,59 +306,24 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
 
 @router.post("/reset", response_model=ApiResponse[ResetData])
 async def reset_workspace(request: ResetRequest) -> ApiResponse[ResetData]:
-    """Reset workspace state for testing.
+    """Reset local task state for testing.
 
-    WARNING: This permanently deletes:
-    - User console scripts and counter
-    - All task history (memory + disk)
-    - Git pfc-executions branch (all execution snapshots)
-
+    WARNING: This permanently deletes all local task history.
     Use only for development/testing to get a clean slate.
     """
     try:
-        workspace_path = await get_workspace_for_profile(
-            request.agent_profile,
-            request.session_id
-        )
+        task_manager = get_pfc_task_manager()
+        cleared = task_manager.clear_all_tasks()
 
-        try:
-            client = await get_pfc_client()
-        except ConnectionError as e:
-            return ApiResponse(
-                success=False,
-                message=f"PFC server not available: {e}. Please start PFC server in PFC GUI.",
-                error_code="PFC_NOT_CONNECTED",
-                data=ResetData(connected=False)
-            )
-
-        result = await client.reset_workspace(
-            workspace_path=str(workspace_path)
-        )
-
-        status = result.get("status", "error")
-        message = result.get("message", "")
-        data = result.get("data") or {}
-
-        success = (status == "success")
         return ApiResponse(
-            success=success,
-            message=message,
-            error_code=None if success else "RESET_ERROR",
+            success=True,
+            message=f"Cleared {cleared} task(s) from local state",
             data=ResetData(
-                user_console=data.get("user_console"),
-                tasks=data.get("tasks"),
-                git=data.get("git"),
+                tasks={"cleared_count": cleared},
                 connected=True,
             )
         )
 
-    except ConnectionError as e:
-        return ApiResponse(
-            success=False,
-            message=f"Connection to PFC server lost: {e}",
-            error_code="PFC_CONNECTION_LOST",
-            data=ResetData(connected=False)
-        )
     except Exception as e:
         raise InternalServerError(message=f"Unexpected error: {e}")
 
@@ -367,75 +333,41 @@ async def list_pfc_tasks(
     limit: int = Query(default=20, ge=1, le=100, description="Maximum results"),
     offset: int = Query(default=0, ge=0, description="Offset for pagination")
 ) -> ApiResponse[TasksListData]:
-    """List all PFC tasks with pagination.
-
-    This endpoint provides a user-facing view of PFC task history,
-    reusing pfc-bridge's persistent task storage.
-    """
+    """List all PFC tasks with pagination from local task manager."""
     try:
-        try:
-            client = await get_pfc_client()
-        except ConnectionError as e:
-            return ApiResponse(
-                success=False,
-                message=f"PFC server not available: {e}. Please start PFC server in PFC GUI.",
-                error_code="PFC_NOT_CONNECTED",
-                data=TasksListData(connected=False)
-            )
-
-        result = await client.list_tasks(
-            session_id=None,
-            offset=offset,
-            limit=limit,
-        )
-
-        status = result.get("status", "error")
-        message = result.get("message", "")
-        data = result.get("data", [])
-        pagination = result.get("pagination", {})
-
-        if status != "success":
-            return ApiResponse(
-                success=False,
-                message=message,
-                error_code="LIST_ERROR",
-                data=TasksListData(connected=True)
-            )
+        task_manager = get_pfc_task_manager()
+        all_tasks = task_manager.list_tasks(offset=offset, limit=limit)
 
         tasks = []
-        for task in data:
+        for t in all_tasks:
             tasks.append(TaskItem(
-                task_id=task.get("task_id", ""),
-                session_id=task.get("session_id", ""),
-                status=task.get("status", "unknown"),
-                entry_script=task.get("entry_script", task.get("script_path", task.get("name", "unknown"))),
-                description=task.get("description", ""),
-                start_time=task.get("start_time"),
-                end_time=task.get("end_time"),
-                elapsed_time=task.get("elapsed_time"),
-                git_commit=task.get("git_commit"),
-                historical=task.get("historical", False),
+                task_id=t.task_id,
+                session_id=t.session_id,
+                status=t.status,
+                entry_script=t.script_path,
+                description=t.description or "",
+                start_time=t.start_time.timestamp() if t.start_time else None,
+                end_time=t.end_time.timestamp() if t.end_time else None,
+                elapsed_time=t.elapsed_seconds,
+                git_commit=t.git_commit,
+                historical=False,
             ))
+
+        total = task_manager.list_tasks(offset=0, limit=9999)
+        total_count = len(total)
 
         return ApiResponse(
             success=True,
-            message=message or f"Retrieved {len(tasks)} task(s)",
+            message=f"Retrieved {len(tasks)} task(s)",
             data=TasksListData(
                 tasks=tasks,
-                total_count=pagination.get("total_count", len(tasks)),
-                displayed_count=pagination.get("displayed_count", len(tasks)),
-                has_more=pagination.get("has_more", False),
+                total_count=total_count,
+                displayed_count=len(tasks),
+                has_more=(offset + limit) < total_count,
                 connected=True,
             )
         )
 
-    except ConnectionError as e:
-        return ApiResponse(
-            success=False,
-            message=f"Connection to PFC server lost: {e}",
-            error_code="PFC_CONNECTION_LOST",
-            data=TasksListData(connected=False)
-        )
     except Exception as e:
         raise InternalServerError(message=f"Unexpected error: {e}")
 
@@ -445,22 +377,12 @@ async def get_task_status(
     task_id: str,
     session_id: Optional[str] = Query(default=None, description="Session ID for context injection")
 ) -> ApiResponse[TaskStatusData]:
-    """Get detailed status of a specific PFC task."""
+    """Get detailed status of a specific PFC task from local task manager."""
     try:
-        try:
-            client = await get_pfc_client()
-        except ConnectionError as e:
-            return ApiResponse(
-                success=False,
-                message=f"PFC server not available: {e}. Please start PFC server in PFC GUI.",
-                error_code="PFC_NOT_CONNECTED",
-                data=TaskStatusData(task_id=task_id, status="error", connected=False)
-            )
+        task_manager = get_pfc_task_manager()
+        task = task_manager.get_task(task_id)
 
-        result = await client.check_task_status(task_id)
-        status = result.get("status", "error")
-
-        if status == "not_found":
+        if task is None:
             return ApiResponse(
                 success=False,
                 message=f"Task not found: {task_id}",
@@ -468,61 +390,39 @@ async def get_task_status(
                 data=TaskStatusData(task_id=task_id, status="not_found", connected=True)
             )
 
-        data = result.get("data", {})
-
-        status_map = {
-            "running": "running",
-            "success": "completed",
-            "error": "failed",
-            "interrupted": "interrupted",
-        }
-
-        mapped_status = status_map.get(status) or status
-        entry_script = data.get("entry_script", data.get("script_path"))
-        description = data.get("description")
-        output = data.get("output")
-        error = data.get("error")
-        elapsed_time = data.get("elapsed_time")
-        git_commit = data.get("git_commit")
+        output = "\n".join(task.output_lines) if task.output_lines else None
 
         if session_id:
             status_monitor = get_status_monitor(session_id)
             status_monitor.add_user_pfc_task_context(
                 task_id=task_id,
-                status=mapped_status,
-                entry_script=entry_script,
-                description=description,
+                status=task.status,
+                entry_script=task.script_path,
+                description=task.description,
                 output=output,
-                error=error,
-                elapsed_time=elapsed_time,
-                git_commit=git_commit,
+                error=task.error,
+                elapsed_time=task.elapsed_seconds,
+                git_commit=task.git_commit,
             )
 
         return ApiResponse(
             success=True,
-            message=result.get("message", f"Task {task_id}: {mapped_status}"),
+            message=f"Task {task_id}: {task.status}",
             data=TaskStatusData(
                 task_id=task_id,
-                status=mapped_status,
-                entry_script=entry_script,
-                description=description,
+                status=task.status,
+                entry_script=task.script_path,
+                description=task.description,
                 output=output,
-                result=data.get("result"),
-                start_time=data.get("start_time"),
-                end_time=data.get("end_time"),
-                elapsed_time=elapsed_time,
-                git_commit=git_commit,
-                error=error,
+                result=task.result,
+                start_time=task.start_time.timestamp() if task.start_time else None,
+                end_time=task.end_time.timestamp() if task.end_time else None,
+                elapsed_time=task.elapsed_seconds,
+                git_commit=task.git_commit,
+                error=task.error,
                 connected=True,
             )
         )
 
-    except ConnectionError as e:
-        return ApiResponse(
-            success=False,
-            message=f"Connection to PFC server lost: {e}",
-            error_code="PFC_CONNECTION_LOST",
-            data=TaskStatusData(task_id=task_id, status="error", connected=False)
-        )
     except Exception as e:
         raise InternalServerError(message=f"Unexpected error: {e}")

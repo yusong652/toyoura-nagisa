@@ -15,6 +15,7 @@ monitors one active task at a time.
 """
 import asyncio
 import logging
+import os
 import time
 from dataclasses import dataclass
 from typing import Dict, Optional, List, Any, TYPE_CHECKING
@@ -160,7 +161,7 @@ class PfcTaskNotificationService:
         Main polling loop for a session.
 
         Unified polling for both foreground and background tasks:
-        - Polls PFC server for task status
+        - Polls PFC server for task status via MCP
         - Sends real-time updates to frontend via WebSocket
         - Signals foreground handles when their tasks complete
 
@@ -169,36 +170,37 @@ class PfcTaskNotificationService:
         Args:
             session_id: Session ID to poll for
         """
-        from backend.infrastructure.pfc import get_pfc_client
+        from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 
         try:
             consecutive_empty = 0  # Count consecutive polls with no running task
+            task_manager = get_pfc_task_manager()
 
             while True:
                 try:
                     # Get foreground task_ids for this session (for proactive completion check)
-                    # This handles fast-completing tasks that finish before first poll
                     fg_task_ids = {
                         ctx.task_id for ctx in self._foreground_contexts.values()
                         if ctx.session_id == session_id
                     }
                     has_foreground = len(fg_task_ids) > 0
 
-                    # Get PFC client
-                    client = await get_pfc_client()
-
-                    # Query tasks for this session
-                    result = await client.list_tasks(
-                        session_id=session_id,
-                        limit=5
-                    )
-
-                    if result.get("status") != "success":
-                        logger.warning(f"Failed to list PFC tasks: {result.get('message')}")
-                        await asyncio.sleep(self.POLLING_INTERVAL_SECONDS)
-                        continue
-
-                    tasks = result.get("data", [])
+                    # Get tasks from local task manager
+                    local_tasks = task_manager.list_tasks(session_id=session_id, limit=5)
+                    tasks = [
+                        {
+                            "task_id": t.task_id,
+                            "status": t.status,
+                            "name": os.path.basename(t.script_path),
+                            "entry_script": t.script_path,
+                            "description": t.description,
+                            "source": t.source,
+                            "git_commit": t.git_commit,
+                            "start_time": t.start_time.timestamp() if t.start_time else None,
+                            "end_time": t.end_time.timestamp() if t.end_time else None,
+                        }
+                        for t in local_tasks
+                    ]
 
                     # Find running task (PFC only supports single task)
                     running_task = next(
@@ -212,18 +214,17 @@ class PfcTaskNotificationService:
                     if running_task:
                         consecutive_empty = 0
                         self._last_task_id[session_id] = running_task.get("task_id")
-                        await self._process_running_task(session_id, running_task, client)
+                        await self._process_running_task(session_id, running_task)
                     else:
                         # No running task - check completions
                         handled_task_ids = set()
 
                         # 1. Check foreground tasks proactively (handles fast-completing tasks)
-                        # These tasks may have completed before we ever saw them as "running"
                         for task in tasks:
                             task_id = task.get("task_id")
                             status = task.get("status")
                             if task_id in fg_task_ids and status not in ("running", "pending"):
-                                await self._handle_task_completion(session_id, task, client)
+                                await self._handle_task_completion(session_id, task)
                                 handled_task_ids.add(task_id)
 
                         # 2. Check last_task_id for background tasks (original logic)
@@ -233,7 +234,7 @@ class PfcTaskNotificationService:
                                 None
                             )
                             if completed_task:
-                                await self._handle_task_completion(session_id, completed_task, client)
+                                await self._handle_task_completion(session_id, completed_task)
 
                         self._last_task_id[session_id] = None
                         consecutive_empty += 1
@@ -263,7 +264,6 @@ class PfcTaskNotificationService:
         self,
         session_id: str,
         task_info: Dict[str, Any],
-        client: Any
     ) -> None:
         """
         Process a running task - get output, update foreground handle, and optionally push to frontend.
@@ -273,25 +273,22 @@ class PfcTaskNotificationService:
 
         Args:
             session_id: Session ID
-            task_info: Task info from list_tasks
-            client: PFC WebSocket client
+            task_info: Task info from local task manager
         """
         task_id = task_info.get("task_id")
         if not task_id:
             return
 
         try:
-            # Get detailed status with output
-            status_result = await client.check_task_status(task_id)
-
-            if status_result.get("status") == "not_found":
-                logger.warning(f"Task {task_id} not found")
+            # Get detailed output from local task manager
+            from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
+            task_manager = get_pfc_task_manager()
+            task = task_manager.get_task(task_id)
+            if not task:
                 return
 
-            # Extract data
-            data = status_result.get("data", {})
-            current_output = data.get("current_output") or data.get("output") or ""
-            elapsed_time = data.get("elapsed_time", 0)
+            current_output = "\n".join(task.output_lines) if task.output_lines else ""
+            elapsed_time = task.elapsed_seconds
 
             # Check if this is a foreground task
             fg_ctx = self._foreground_contexts.get(task_id)
@@ -330,7 +327,6 @@ class PfcTaskNotificationService:
         self,
         session_id: str,
         task_info: Dict[str, Any],
-        client: Any
     ) -> None:
         """
         Handle task completion - signal foreground handle and send frontend notification.
@@ -338,55 +334,30 @@ class PfcTaskNotificationService:
         This is the unified completion handler for both foreground and background tasks:
         - For foreground: signals the handle to unblock pfc_execute_task.wait()
         - For all tasks: sends final status notification to frontend
-        - Updates backend PfcTaskManager to sync terminal state (fixes concurrent task count)
 
         Args:
             session_id: Session ID
-            task_info: Task info from list_tasks
-            client: PFC WebSocket client
+            task_info: Task info from local task manager
         """
         task_id = task_info.get("task_id")
         if not task_id:
             return
 
         try:
-            # Get detailed status with final output
-            status_result = await client.check_task_status(task_id)
-
-            if status_result.get("status") == "not_found":
-                logger.warning(f"Task {task_id} not found for final status")
-                return
-
-            # Extract data
-            data = status_result.get("data", {})
-            current_output = data.get("current_output") or data.get("output") or ""
-            elapsed_time = data.get("elapsed_time", 0)
-            error = data.get("error")
-            result = data.get("result")
-            git_commit = task_info.get("git_commit") or data.get("git_commit")
-
-            # Map server status to display status
-            server_status = task_info.get("status", "completed")
-            status_map = {
-                "success": "completed",
-                "error": "failed",
-                "interrupted": "interrupted",
-            }
-            mapped_status = status_map.get(server_status, server_status)
-
-            # Update backend PfcTaskManager to sync terminal state
-            # This is critical for correct concurrent task counting
+            # Get data from local task manager (already synced)
             from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
             task_manager = get_pfc_task_manager()
-            task_manager.update_status(
-                task_id,
-                mapped_status,
-                result=result,
-                error=error,
-            )
-            if current_output:
-                task_manager.set_output(task_id, current_output)
-            logger.debug(f"Updated PfcTaskManager status for task {task_id}: {mapped_status}")
+            task = task_manager.get_task(task_id)
+            if not task:
+                return
+
+            current_output = "\n".join(task.output_lines) if task.output_lines else ""
+            elapsed_time = task.elapsed_seconds
+            error = task.error
+            result = task.result
+            git_commit = task.git_commit
+
+            mapped_status = task.status
 
             # Get recent lines
             recent_lines = self._get_recent_lines(current_output)
@@ -545,23 +516,20 @@ class PfcTaskNotificationService:
             git_commit: Optional git commit hash
             source: Task source ("agent" or "user_console")
         """
-        import os
-        from backend.infrastructure.pfc import get_pfc_client
-
         script_name = os.path.basename(script_path)
 
-        # Query pfc-bridge for latest output (first notification needs complete data)
+        # Get latest output from local task manager
         recent_lines: List[str] = []
         has_more = False
         actual_elapsed = elapsed_seconds
 
         try:
-            client = await get_pfc_client()
-            status_result = await client.check_task_status(task_id)
-            if status_result.get("status") not in ("not_found", "error"):
-                data = status_result.get("data", {})
-                current_output = data.get("current_output") or data.get("output") or ""
-                actual_elapsed = data.get("elapsed_time", elapsed_seconds)
+            from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
+            task_manager = get_pfc_task_manager()
+            task = task_manager.get_task(task_id)
+            if task:
+                current_output = "\n".join(task.output_lines) if task.output_lines else ""
+                actual_elapsed = task.elapsed_seconds
                 recent_lines = self._get_recent_lines(current_output)
                 total_lines = len(current_output.split('\n')) if current_output else 0
                 has_more = total_lines > self.RECENT_OUTPUT_LINES
