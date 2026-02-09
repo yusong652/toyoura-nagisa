@@ -1,7 +1,7 @@
 # PFC-MCP Phase 5 实施复盘（2026-02-09）
 
 **Created**: 2026-02-09  
-**Status**: In Progress (Review Updated)
+**Status**: In Progress (Review Updated, 2026-02-10)
 
 ---
 
@@ -11,7 +11,7 @@
 
 1. Git 快照职责已从 `pfc-bridge` 抽离到 `toyoura-nagisa`。
 2. 后端已移除对 `backend.infrastructure.pfc.client` 的直连依赖（该文件已删除）。
-3. `pfc_execute_code` 已接入并注册到 `pfc-mcp`，Console 主链路经 MCP 运行。
+3. User Console 主链路已统一到 `pfc_execute_task` + `pfc_check_task_status`，`pfc_execute_code` 已从 MCP 侧移除。
 
 仍需继续收敛的关键项：
 
@@ -29,7 +29,7 @@
 | Step 2: toyoura 侧 Git 快照集成 | DONE | `packages/backend/infrastructure/pfc/git_version.py` 已落地；`ToolExecutor` 在 `pfc_execute_task` 前置 hook 创建快照并写入本地 `PfcTaskManager`。 |
 | Step 3: Backend MCP 迁移 - PfcMonitor | PARTIAL | 已去除直连 client，改为读取本地任务管理器；但并未按原计划直接在 Monitor 内调用 `pfc_list_tasks`。 |
 | Step 4: Backend MCP 迁移 - NotificationService | PARTIAL | 已通过 MCP 调 `pfc_check_task_status` 同步状态；任务列表仍主要来自本地管理器。 |
-| Step 5: Backend MCP 迁移 - User Console | DONE | `pfc_execute_code` 已注册并接入；Ctrl+B 通过本地前台句柄 + 轮询模式工作。 |
+| Step 5: Backend MCP 迁移 - User Console | DONE | 已改为 `pfc_execute_task` 提交 + `pfc_check_task_status` 轮询；`pfc_execute_code` 工具已删除（server 注册、tools 导出、bridge client 接口已清理）。 |
 | Step 6: Notified -> Checked | PARTIAL | `pfc-mcp` 工具层已兼容 `checked/notified`；但 bridge 仍保留 `mark_task_notified` handler 与 `notified` 存储字段。 |
 | Step 7: 清理 infrastructure/pfc | PARTIAL | `client.py` 已删除且无残留 import；`foreground_handle.py`/`foreground_registry.py` 仍保留（已转本地控制流职责）。 |
 | Step 8: Workspace 路径检测 | PARTIAL | 已不依赖旧 client；但统一 workspace 真源策略（配置优先级 + MCP 回退 + 结构化失败）尚未完整收敛。 |
@@ -49,6 +49,8 @@
 - [ ] 完成 `notified -> checked` 语义迁移（bridge 侧仍有 `mark_task_notified`）
 - [ ] 轮询效率与状态确定性继续优化（`wait_seconds` 仍默认阻塞等待）
 - [x] 结果适配层部分收敛：后端已统一 MCP tool result 归一化并保证 `llm_content.parts`
+- [x] MCP 工具错误语义修正：`is_error` 仅由调用层失败决定，不再由 task status（如 `failed`）反推
+- [x] `pfc_check_task_status` 上下文注入修正：LLM 优先消费 `display`，避免回退到整段 JSON payload
 - [ ] CLI 展示节流与提示文案统一（尚未看到完整落地）
 
 ### P2
@@ -64,6 +66,14 @@
 2. **再统一 workspace 策略**：按 `PFC_MCP_WORKSPACE_PATH -> get_working_directory -> 结构化错误` 统一后端与工具层行为。
 3. **收敛轮询模型**：减少/移除 MCP 主动等待，状态标准化尽量上提到 `pfc-mcp`，后端仅做映射。
 4. **最后补测试和文档**：先补 contract tests，再更新 bridge/toyoura 两侧文档，防止回归。
+
+---
+
+## 本轮新增完成项（2026-02-10）
+
+1. **移除 MCP Console 重叠工具**：`pfc_execute_code` 已从 `pfc-mcp` 完整移除（实现、注册、导出、bridge client 接口、README 文案）。
+2. **统一执行参数语义**：`pfc_execute_task` 不再暴露前台参数，执行模型收敛为后台提交 + 状态轮询。
+3. **修复结果污染问题**：`pfc-bridge` 执行脚本前清理全局 `result`，避免上一任务结果串到下一次 `check_status` 的 `result` 字段。
 
 ---
 
