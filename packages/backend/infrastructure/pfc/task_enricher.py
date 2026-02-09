@@ -40,6 +40,7 @@ def enrich_pfc_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, Any]:
 
 # ---- check_task_status ----
 
+
 def _enrich_check_status(result: Dict[str, Any], tm: "PfcTaskManager") -> None:
     structured = _find_structured_content(result)
     task_id = structured.get("task_id") if structured else None
@@ -55,6 +56,7 @@ def _enrich_check_status(result: Dict[str, Any], tm: "PfcTaskManager") -> None:
 
 
 # ---- list_tasks ----
+
 
 def _enrich_list_tasks(result: Dict[str, Any], tm: "PfcTaskManager") -> None:
     structured = _find_structured_content(result)
@@ -77,6 +79,7 @@ def _enrich_list_tasks(result: Dict[str, Any], tm: "PfcTaskManager") -> None:
 
 # ---- display helpers ----
 
+
 def _append_display_line(result: Dict[str, Any], line: str, after_pattern: str) -> None:
     """Insert *line* after the first display line matching *after_pattern*."""
     text = _get_display_text(result)
@@ -88,7 +91,6 @@ def _append_display_line(result: Dict[str, Any], line: str, after_pattern: str) 
             lines.insert(i + 1, line)
             _set_display_text(result, "\n".join(lines))
             return
-    # Fallback: append at the end of metadata section (before output)
     lines.append(line)
     _set_display_text(result, "\n".join(lines))
 
@@ -118,6 +120,7 @@ def _enrich_list_display(result: Dict[str, Any], additions: List[Tuple[str, str]
 
 # ---- structured content navigation ----
 
+
 def _find_structured_content(result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Locate the structuredContent dict inside a ToolResult."""
     data = result.get("data")
@@ -135,7 +138,13 @@ def _find_structured_content(result: Dict[str, Any]) -> Optional[Dict[str, Any]]
 
 
 def _get_display_text(result: Dict[str, Any]) -> Optional[str]:
-    """Get the LLM-visible display text from llm_content."""
+    """Get display text, preferring structured display over llm_content."""
+    structured = _find_structured_content(result)
+    if isinstance(structured, dict):
+        display = structured.get("display")
+        if isinstance(display, str) and display:
+            return display
+
     llm = result.get("llm_content")
     if isinstance(llm, dict):
         parts = llm.get("parts")
@@ -145,9 +154,18 @@ def _get_display_text(result: Dict[str, Any]) -> Optional[str]:
 
 
 def _set_display_text(result: Dict[str, Any], text: str) -> None:
-    """Set the LLM-visible display text in llm_content."""
+    """Set display text in structured payload and mirror it to llm_content."""
+    structured = _find_structured_content(result)
+    if isinstance(structured, dict):
+        structured["display"] = text
+
     llm = result.get("llm_content")
     if isinstance(llm, dict):
         parts = llm.get("parts")
-        if isinstance(parts, list) and parts:
-            parts[0]["text"] = text
+        if isinstance(parts, list):
+            if parts:
+                parts[0]["text"] = text
+            else:
+                parts.append({"type": "text", "text": text})
+    else:
+        result["llm_content"] = {"parts": [{"type": "text", "text": text}]}

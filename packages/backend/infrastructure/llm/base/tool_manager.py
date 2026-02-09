@@ -184,10 +184,7 @@ class BaseToolManager(ABC):
                     # Track this tool as MCP for execution routing
                     self._mcp_tool_mapping[tool_schema.name] = server_name
                 elif get_dev_config().debug_mode:
-                    print(
-                        f"[DEBUG] MCP tool '{tool_schema.name}' from {server_name} "
-                        f"skipped (internal tool exists)"
-                    )
+                    print(f"[DEBUG] MCP tool '{tool_schema.name}' from {server_name} skipped (internal tool exists)")
 
         except Exception as e:
             # Always log MCP errors for debugging
@@ -308,63 +305,37 @@ class BaseToolManager(ABC):
 
             content_parts = result.get("content", [])
             structured = result.get("structuredContent")
-            structured_payload = structured
-            if isinstance(structured, dict) and isinstance(structured.get("result"), dict):
-                structured_payload = structured.get("result")
+            structured_payload = structured if isinstance(structured, dict) else None
+            nested_result_payload = (
+                structured.get("result")
+                if isinstance(structured, dict) and isinstance(structured.get("result"), dict)
+                else None
+            )
 
-            structured_status = None
             structured_message = None
             structured_display = None
 
             if isinstance(structured_payload, dict):
-                raw_status = structured_payload.get("status")
-                if isinstance(raw_status, str):
-                    structured_status = raw_status.strip().lower()
-
                 raw_message = structured_payload.get("message")
+                if not (isinstance(raw_message, str) and raw_message.strip()) and isinstance(
+                    nested_result_payload, dict
+                ):
+                    raw_message = nested_result_payload.get("message")
                 if isinstance(raw_message, str) and raw_message.strip():
                     structured_message = raw_message.strip()
 
                 raw_display = structured_payload.get("display")
+                if not (isinstance(raw_display, str) and raw_display.strip()) and isinstance(
+                    nested_result_payload, dict
+                ):
+                    raw_display = nested_result_payload.get("display")
                 if isinstance(raw_display, str) and raw_display.strip():
                     structured_display = raw_display.strip()
 
             if result.get("status") == "success":
-                # Prefer explicit structured status from MCP tool results.
-                # Some MCP tools use domain statuses like running/pending/completed for successful queries,
-                # so only treat known failure-like statuses as errors.
-                failure_statuses = {
-                    "error",
-                    "failed",
-                    "failure",
-                    "bridge_unavailable",
-                    "not_found",
-                    "unsupported_mode",
-                    "submission_failed",
-                    "interrupt_failed",
-                    "list_failed",
-                    "workspace_unavailable",
-                    "diagnostic_failed",
-                    "output_unavailable",
-                    "timeout",
-                }
-
-                if structured_status and structured_status in failure_statuses:
-                    message = structured_message or f"MCP tool '{tool_name}' failed"
-                    llm_content = (
-                        {"parts": [{"type": "text", "text": structured_display}]}
-                        if structured_display
-                        else ({"parts": content_parts} if content_parts else {"parts": [{"type": "text", "text": message}]})
-                    )
-                    return error_response(
-                        message,
-                        llm_content=llm_content,
-                        server=result.get("server"),
-                        content=content_parts,
-                        structuredContent=structured,
-                    )
-
-                # Convert MCP result to internal ToolResult format
+                # Convert MCP result to internal ToolResult format.
+                # Tool-level error semantics are decided by MCP call status (isError),
+                # not by domain-specific fields inside structured payloads.
                 llm_content = (
                     {"parts": [{"type": "text", "text": structured_display}]}
                     if structured_display
@@ -390,7 +361,12 @@ class BaseToolManager(ABC):
                     structuredContent=structured,
                 )
             else:
-                message = result.get("message") or structured_message or f"MCP tool '{tool_name}' failed"
+                message = (
+                    result.get("message")
+                    or structured_message
+                    or structured_display
+                    or f"MCP tool '{tool_name}' failed"
+                )
                 llm_content = (
                     {"parts": [{"type": "text", "text": structured_display}]}
                     if structured_display

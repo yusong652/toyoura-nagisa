@@ -120,17 +120,17 @@ if current_strain >= next_save_strain:
 
 ## Task Execution
 
-| Phase          | Settings                               | Purpose                              |
-|----------------|----------------------------------------|--------------------------------------|
-| **Test**       | `run_in_background=False`, small scale | Quick validation, immediate feedback |
-| **Production** | `run_in_background=True`, full scale   | Long simulations, non-blocking       |
+| Phase          | Settings                         | Purpose                              |
+|----------------|----------------------------------|--------------------------------------|
+| **Test**       | Small scale script               | Quick validation, immediate feedback |
+| **Production** | Full scale script                | Long simulations, non-blocking       |
 
 **Example workflow**:
 
 ```text
-1. pfc_execute_task(script, run_in_background=False)  → Test with 100 balls
+1. pfc_execute_task(script)                           → Test with 100 balls
 2. [Fix issues if any]
-3. pfc_execute_task(script, run_in_background=True)   → Production with 10000 balls
+3. pfc_execute_task(script)                           → Production with 10000 balls
 4. pfc_check_task_status(task_id)                     → Monitor progress
 ```
 

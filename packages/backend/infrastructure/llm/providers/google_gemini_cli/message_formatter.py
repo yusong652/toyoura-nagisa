@@ -104,9 +104,10 @@ class GoogleGeminiCliMessageFormatter(GoogleMessageFormatter):
                     text_parts.append(text_content)
 
         if result.get("status") == "error":
+            error_text = "\n".join(text_parts).strip()
             response_data: Dict[str, Any] = {
                 "error": {
-                    "message": result.get("message") or "Tool execution failed",
+                    "message": error_text or result.get("message") or "Tool execution failed",
                     "isError": True,
                 }
             }
