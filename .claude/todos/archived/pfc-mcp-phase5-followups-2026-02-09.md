@@ -21,8 +21,8 @@
     2. MCP `get_working_directory`（可用时）
     3. 安全回退（拒绝执行并返回结构化错误）
 
-- [ ] **本地任务持久化语义与 bridge 任务映射补强**
-  - 确保 `local_task_id <-> bridge_task_id` 一定可追踪
+- [ ] **本地任务持久化语义补强**
+  - 确保 task_id 在重启后仍可追踪（统一 ID 空间，无 local/remote 映射）
   - 任务恢复后可继续轮询并正确推送终态与输出
 
 - [ ] **PFC 轮询与 Agent 查询互不干扰验证**
@@ -36,6 +36,12 @@
 - [ ] **完成 notified -> checked 语义迁移**
   - bridge 中去掉 `mark_task_notified` 路由和相关字段
   - `pfc_check_task_status` 查询终态时隐式标记 `checked`
+- [ ] **优化后端轮询效率与状态确定性**
+  - **状态模型标准化**：在 pfc-mcp 内部使用严格的 Status Enum，外部输出统一的规范化字符串（Success, Running, Failed...），从后端移除正则表达式猜测逻辑。
+  - **分段式双截断策略 (Dual Truncation)**：
+    - **MCP 层**：维持工具的“无状态”快照语义，仅对过长的总输出进行长度截断（Snapshot Truncation），确保单次调用响应不超时，并优先保证多客户端可见。
+    - **后端服务层**：实施“窗口截断”渲染逻辑，通过分页/滚动加载决定最终展示内容。
+  - **减少同步阻塞延迟**：移除或大幅减小轮询请求中的主动等待参数 (wait_seconds)，改由应用层控制流控制。
 
 - [ ] **后端结果适配层进一步收敛**
   - 抽离 MCP raw -> internal ToolResult adapter（避免散落在多处）
