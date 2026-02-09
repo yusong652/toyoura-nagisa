@@ -4,8 +4,8 @@ Application layer service for user PFC Python commands (CLI `>` prefix).
 Provides foreground execution with Ctrl+B support.
 
 Flow (aligned with user bash):
-1. Create task via TaskManager
-2. Submit to pfc-bridge via MCP (run_in_background=True)
+1. Submit via MCP pfc_execute_code (run_in_background=True)
+2. Create local task with returned task_id
 3. Register with ForegroundRegistry for Ctrl+B signal
 4. Poll for completion via MCP OR Ctrl+B signal
 5. Return result or MoveToBackgroundRequest
@@ -146,20 +146,42 @@ class PfcConsoleService:
         if not code:
             return None, "", None
 
-        # 1. Create task
-        task_id = self._task_manager.create_task(
+        # 1. Submit via MCP — get task_id
+        from backend.infrastructure.mcp.client import get_mcp_client_manager
+        mcp_manager = get_mcp_client_manager()
+
+        try:
+            result = await mcp_manager.call_tool("pfc_execute_code", {
+                "code": code,
+                "timeout": timeout_ms // 1000 if timeout_ms else 30,
+                "run_in_background": True,
+            })
+            if result.get("status") == "error":
+                raise ConnectionError(result.get("message", "MCP tool call failed"))
+        except ConnectionError as e:
+            return None, "", f"PFC server not available: {e}"
+
+        # 2. Extract task_id from response
+        text = extract_mcp_text(result)
+        task_id = None
+        for line in text.splitlines():
+            if line.strip().startswith("- task_id:"):
+                task_id = line.split(":", 1)[1].strip()
+                break
+        if not task_id:
+            return None, "", "Failed to extract task_id from MCP response"
+
+        # 3. Create local task
+        self._task_manager.create_task(
+            task_id=task_id,
             session_id=self.session_id,
             script_path="user_console",
             description=code[:50] + "..." if len(code) > 50 else code,
             source="user_console",
         )
-        self._task_manager.update_status(task_id, "submitted")
+        self._task_manager.update_status(task_id, "running")
 
-        # 2. Get MCP client manager
-        from backend.infrastructure.mcp.client import get_mcp_client_manager
-        mcp_manager = get_mcp_client_manager()
-
-        # 3. Create handle and register for Ctrl+B
+        # 4. Create handle and register for Ctrl+B
         handle = PfcConsoleForegroundHandle(
             task_id=task_id,
             timeout_seconds=timeout_ms / 1000.0 if timeout_ms else None,
@@ -168,34 +190,8 @@ class PfcConsoleService:
         registry = get_pfc_foreground_registry()
         registry.register(self.session_id, handle)
 
-        self._task_manager.update_status(task_id, "running")
-
         try:
-            # 4. Submit via MCP with run_in_background=True, then poll locally
-            try:
-                result = await mcp_manager.call_tool("pfc_execute_code", {
-                    "code": code,
-                    "timeout": timeout_ms // 1000 if timeout_ms else 30,
-                    "run_in_background": True,
-                })
-                if result.get("status") == "error":
-                    raise ConnectionError(result.get("message", "MCP tool call failed"))
-            except ConnectionError as e:
-                self._task_manager.update_status(task_id, "failed", error=str(e))
-                return None, task_id, f"PFC server not available: {e}"
-
-            # Extract bridge task_id from response
-            text = extract_mcp_text(result)
-            bridge_task_id = None
-            for line in text.splitlines():
-                if line.strip().startswith("- task_id:"):
-                    bridge_task_id = line.split(":", 1)[1].strip()
-                    break
-
-            self._task_manager.update_status(task_id, "running", bridge_task_id=bridge_task_id)
-
             # 5. Poll for completion with Ctrl+B signal
-            poll_task_id = bridge_task_id or task_id
             signal_task = asyncio.create_task(handle._move_to_bg_event.wait())
             timeout_seconds = timeout_ms / 1000.0 if timeout_ms else 60.0
             poll_start = asyncio.get_event_loop().time()
@@ -218,7 +214,7 @@ class PfcConsoleService:
                 # Poll task status via MCP
                 try:
                     status_result = await mcp_manager.call_tool("pfc_check_task_status", {
-                        "task_id": poll_task_id,
+                        "task_id": task_id,
                         "wait_seconds": 1,
                     })
                     status_text = extract_mcp_text(status_result)

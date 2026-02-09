@@ -47,7 +47,6 @@ class ClassifiedTools:
 class PfcExecuteTaskHookState:
     """State carried across pfc_execute_task pre/post hooks."""
 
-    local_task_id: str
     entry_script: str
     description: str
     git_commit: Optional[str] = None
@@ -254,17 +253,18 @@ class ToolExecutor:
         """Run tool-specific post-execution hook."""
         try:
             if tool_name == "pfc_execute_task":
-                return await self._post_pfc_execute_task(tool_args, result, hook_state)
+                result = await self._post_pfc_execute_task(tool_args, result, hook_state)
+            from backend.infrastructure.pfc.task_enricher import should_enrich, enrich_pfc_result
+            if should_enrich(tool_name):
+                result = enrich_pfc_result(tool_name, result)
         except Exception as exc:
             print(f"[ToolExecutor] Post-hook failed for {tool_name}: {exc}")
         return result
 
     async def _pre_pfc_execute_task(self, tool_args: Dict[str, Any]) -> Optional[PfcExecuteTaskHookState]:
-        """Best-effort local tracking setup before MCP pfc_execute_task call."""
+        """Create git snapshot before MCP pfc_execute_task call. Task creation deferred to post-hook."""
         from backend.infrastructure.pfc.git_version import get_git_manager
-        from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 
-        task_manager = get_pfc_task_manager()
         entry_script = str(tool_args.get("entry_script", "") or "")
         description = str(tool_args.get("description", "") or "")
 
@@ -280,17 +280,7 @@ class ToolExecutor:
         except Exception as exc:
             print(f"[ToolExecutor] pfc_execute_task git snapshot skipped: {exc}")
 
-        local_task_id = task_manager.create_task(
-            session_id=self.session_id,
-            script_path=entry_script,
-            description=description,
-            git_commit=git_commit,
-            source="agent",
-        )
-        task_manager.update_status(local_task_id, "submitted")
-
         return PfcExecuteTaskHookState(
-            local_task_id=local_task_id,
             entry_script=entry_script,
             description=description,
             git_commit=git_commit,
@@ -302,23 +292,31 @@ class ToolExecutor:
         result: Dict[str, Any],
         hook_state: Any,
     ) -> Dict[str, Any]:
-        """Update local PFC task tracking after MCP pfc_execute_task call."""
+        """Create local PFC task after MCP pfc_execute_task returns task_id."""
         if not isinstance(hook_state, PfcExecuteTaskHookState):
             return result
 
-        from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
+        task_id = self._extract_task_id(result)
 
-        task_manager = get_pfc_task_manager()
-        local_task_id = hook_state.local_task_id
+        if task_id:
+            from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 
-        if result.get("status") == "error":
-            error_message = result.get("message") or "MCP pfc_execute_task failed"
-            task_manager.update_status(local_task_id, "failed", error=error_message)
-        else:
-            bridge_task_id = self._extract_bridge_task_id(result)
-            task_manager.update_status(local_task_id, "running", bridge_task_id=bridge_task_id)
+            task_manager = get_pfc_task_manager()
+            task_manager.create_task(
+                task_id=task_id,
+                session_id=self.session_id,
+                script_path=hook_state.entry_script,
+                description=hook_state.description,
+                git_commit=hook_state.git_commit,
+                source="agent",
+            )
+            if result.get("status") == "error":
+                task_manager.update_status(task_id, "failed",
+                                           error=result.get("message") or "MCP pfc_execute_task failed")
+            else:
+                task_manager.update_status(task_id, "running")
 
-        return self._enrich_pfc_result_data(result, hook_state)
+        return self._enrich_pfc_result_data(result, hook_state, task_id)
 
     def _normalize_tool_result(self, result: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         """Ensure tool result always contains llm_content.parts."""
@@ -348,11 +346,11 @@ class ToolExecutor:
         normalized["llm_content"] = {"parts": [{"type": "text", "text": fallback_text}]}
         return normalized
 
-    def _extract_bridge_task_id(self, result: Dict[str, Any]) -> Optional[str]:
-        """Extract bridge task_id from normalized ToolResult."""
-        structured_task_id = self._extract_task_id_from_structured(result)
-        if structured_task_id:
-            return structured_task_id
+    def _extract_task_id(self, result: Dict[str, Any]) -> Optional[str]:
+        """Extract task_id from MCP pfc_execute_task result."""
+        from_structured = self._extract_task_id_from_structured(result)
+        if from_structured:
+            return from_structured
 
         text = self._extract_result_text(result)
         if not text:
@@ -421,15 +419,19 @@ class ToolExecutor:
 
         return "\n".join(texts)
 
-    def _enrich_pfc_result_data(self, result: Dict[str, Any], hook_state: PfcExecuteTaskHookState) -> Dict[str, Any]:
+    def _enrich_pfc_result_data(
+        self,
+        result: Dict[str, Any],
+        hook_state: PfcExecuteTaskHookState,
+        task_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Attach local tracking metadata to pfc_execute_task tool result."""
         enriched = result.copy()
         existing_data = enriched.get("data")
         data = existing_data.copy() if isinstance(existing_data, dict) else {}
 
         pfc_tracking = {
-            "local_task_id": hook_state.local_task_id,
-            "bridge_task_id": self._extract_bridge_task_id(result),
+            "task_id": task_id,
             "git_commit": hook_state.git_commit,
             "entry_script": hook_state.entry_script,
         }
