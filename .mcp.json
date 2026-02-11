@@ -2,11 +2,10 @@
   "mcpServers": {
     "pfc-mcp": {
       "type": "stdio",
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "run",
-        "--directory",
-        "pfc-mcp",
+        "--from",
+        "git+ssh://git@github.com/yusong652/pfc-mcp.git",
         "pfc-mcp"
       ],
       "env": {}

@@ -39,11 +39,10 @@ servers:
 
   # PFC MCP - ITASCA PFC control via external MCP server
   - name: pfc-mcp
-    command: uv
+    command: uvx
     args:
-      - "run"
-      - "--package"
-      - "pfc-mcp"
+      - "--from"
+      - "git+ssh://git@github.com/yusong652/pfc-mcp.git"
       - "pfc-mcp"
     enabled: true
     description: Control ITASCA PFC simulations via MCP

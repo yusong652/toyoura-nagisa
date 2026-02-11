@@ -134,10 +134,10 @@ For ITASCA PFC simulations:
 
 2. **Manual start**: In PFC GUI IPython console:
    ```python
-   %run /path/to/pfc-mcp/pfc-bridge/start_bridge.py
+   %run /path/to/standalone/pfc-mcp/pfc-bridge/start_bridge.py
    ```
 
-See `pfc-mcp/pfc-bridge/README.md` for detailed setup.
+Standalone repository: `https://github.com/yusong652/pfc-mcp`
 
 ## 🤝 Contributing
 

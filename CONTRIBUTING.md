@@ -205,14 +205,14 @@ toyoura-nagisa/
 │       ├── config/          # Configuration management
 │       ├── shared/          # Shared utilities
 │       └── tests/           # Test suite
-├── pfc-mcp/
-│   ├── src/pfc_mcp/         # MCP server package
-│   └── pfc-bridge/          # PFC WebSocket bridge runtime
 ├── .github/
 │   └── workflows/           # CI/CD workflows
 ├── pytest.ini               # Pytest configuration
 └── pyproject.toml           # Project dependencies and tools
 ```
+
+External dependency:
+- `https://github.com/yusong652/pfc-mcp` - standalone MCP server + PFC bridge runtime
 
 ## Getting Help
 

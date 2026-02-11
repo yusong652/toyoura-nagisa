@@ -1,6 +1,6 @@
 ---
 name: pfc-doc-curator
-description: Curate and enhance PFC (Particle Flow Code) documentation for toyoura-nagisa. Use when working with PFC command docs, Python SDK docs, or when user mentions updating/adding/improving PFC documentation in packages/backend/infrastructure/pfc/resources/.
+description: Curate and enhance PFC (Particle Flow Code) documentation for standalone pfc-mcp. Use when working with PFC command docs, Python SDK docs, or when user mentions updating/adding/improving PFC documentation in pfc-mcp/src/pfc_mcp/docs/resources/.
 ---
 
 # PFC Documentation Curator
@@ -22,7 +22,7 @@ See [STRUCTURE.md](STRUCTURE.md) for the full target structure.
 ### Quick Reference
 
 ```
-packages/backend/infrastructure/pfc/resources/
+pfc-mcp/src/pfc_mcp/docs/resources/
 ├── command_docs/           # PFC command documentation
 │   ├── index.json          # Master command index
 │   ├── commands/           # Individual command docs

@@ -92,8 +92,6 @@ packages/web/.vite/
 frontend/node_modules/
 frontend/.vite/
 
-# PFC bridge examples (user-specific test files)
-pfc-mcp/pfc-bridge/examples/
 # Legacy path (kept for backwards compatibility)
 pfc-bridge/examples/
 

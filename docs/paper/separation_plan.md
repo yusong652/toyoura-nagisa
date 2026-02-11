@@ -87,9 +87,10 @@ tools/builtin/
 └── web_fetch.py
 ```
 
-#### 6. PFC Bridge (`pfc-mcp/pfc-bridge/`)
+#### 6. PFC Bridge (standalone `pfc-mcp` repository)
 ```
-pfc-mcp/pfc-bridge/
+pfc-mcp (external repo):
+└── pfc-bridge/
 ├── server/              # WebSocket bridge runtime
 ├── workspace_template/  # Workspace bootstrap assets
 ├── start_bridge.py      # PFC GUI startup entry

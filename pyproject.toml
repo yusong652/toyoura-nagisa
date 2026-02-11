@@ -91,11 +91,8 @@ dev-dependencies = [
 [tool.uv.workspace]
 members = [
     "packages/backend",
-    "pfc-mcp",
 ]
-# Note: pfc-mcp/pfc-bridge is NOT a workspace member
-# It runs in PFC's embedded Python environment with its own dependencies
-# Install in PFC environment: pip install websockets==9.1
+# pfc-mcp is now a standalone repository: https://github.com/yusong652/pfc-mcp
 
 [project.optional-dependencies]
 dev = [
@@ -121,8 +118,6 @@ exclude = [
     "dist",
     "node_modules",
     "_third_party",
-    "pfc-mcp/pfc-bridge",  # Separate bridge runtime with different deps
-    "pfc-mcp",  # Standalone MCP server (separate linting)
 ]
 
 [tool.ruff.lint]
@@ -179,4 +174,3 @@ disallow_any_explicit = false
 [[tool.mypy.overrides]]
 module = "backend.tests.*"
 ignore_errors = true
-
