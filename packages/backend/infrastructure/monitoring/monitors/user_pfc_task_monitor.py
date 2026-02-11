@@ -8,18 +8,64 @@ Uses shared task_status_formatter for consistent output format.
 """
 
 import logging
+from dataclasses import dataclass
 from typing import List, Optional
 from .base_monitor import BaseMonitor
-from backend.application.tools.pfc.utils import (
-    TaskStatusData,
-    format_task_status_for_context,
-)
 
 logger = logging.getLogger(__name__)
 
 # Context message for LLM awareness of user task queries
 CONTEXT_MESSAGE = """The user just checked the status of a PFC task.
 This indicates they want to know about this task's progress or results."""
+
+CONTEXT_INJECTION_MAX_CHARS = 2000
+
+
+@dataclass
+class TaskStatusData:
+    """Structured task status data for user context injection."""
+
+    task_id: str
+    status: str
+    entry_script: Optional[str] = None
+    description: Optional[str] = None
+    output: Optional[str] = None
+    error: Optional[str] = None
+    elapsed_time: Optional[float] = None
+    git_commit: Optional[str] = None
+
+
+def format_task_status_for_context(data: TaskStatusData) -> str:
+    """Format task status for XML-like context injection."""
+
+    output = data.output or ""
+    if len(output) > CONTEXT_INJECTION_MAX_CHARS:
+        output = (
+            f"... (truncated, showing last {CONTEXT_INJECTION_MAX_CHARS} chars)\n"
+            f"{output[-CONTEXT_INJECTION_MAX_CHARS:]}"
+        )
+
+    elapsed_str = f"{data.elapsed_time:.1f}s" if data.elapsed_time else "n/a"
+    git_str = data.git_commit[:8] if data.git_commit else "n/a"
+
+    lines = [
+        "<pfc-task-status>",
+        f"<task_id>{data.task_id}</task_id>",
+        f"<status>{data.status}</status>",
+        f"<entry_script>{data.entry_script or 'n/a'}</entry_script>",
+        f"<description>{data.description or 'n/a'}</description>",
+        f"<elapsed>{elapsed_str}</elapsed>",
+        f"<git>{git_str}</git>",
+    ]
+
+    if output:
+        lines.append(f"<output>\n{output}\n</output>")
+
+    if data.error:
+        lines.append(f"<error>{data.error}</error>")
+
+    lines.append("</pfc-task-status>")
+    return "\n".join(lines)
 
 
 class UserPfcTaskMonitor(BaseMonitor):

@@ -1,20 +1,26 @@
 """PFC Task Manager for toyoura-nagisa.
 
-Manages PFC simulation task lifecycle on the backend side:
-- Task ID generation (6-char UUID, matching bash pattern)
-- Task status tracking (source of truth)
-- Incremental output management
-- Session isolation
-- System reminders generation
+Manages PFC simulation task lifecycle on the backend side.  Uses the same
+task_id returned by pfc-mcp — single ID space, no local generation.
+
+Persisted (data/pfc_tasks.json):
+  task_id, status, git_commit, timestamps, description, source, error, result
+
+Not persisted (in-memory, re-synced from pfc-mcp via polling):
+  output_lines, last_output_position
 
 Follows the same pattern as BackgroundProcessManager for bash tasks.
 """
 
-import uuid
+import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from pathlib import Path
 from threading import Lock, Thread
 from typing import Dict, Set, Optional, List, Literal, Any
+
+logger = logging.getLogger(__name__)
 
 
 # Output buffer limits (matching bash tool)
@@ -25,7 +31,7 @@ MAX_BUFFER_LINES = 10000
 @dataclass
 class PfcTask:
     """Represents a PFC simulation task with full lifecycle tracking."""
-    task_id: str                          # 6-char UUID, backend-generated
+    task_id: str                          # Task ID from pfc-mcp (6-char hex)
     session_id: str
     script_path: str
     description: Optional[str]
@@ -36,13 +42,12 @@ class PfcTask:
     # PFC-specific fields
     git_commit: Optional[str] = None      # Version snapshot hash
     source: str = "agent"                 # "agent" or "user_console"
-    pfc_server_task_id: Optional[str] = None  # Task ID from pfc-server (for reference)
 
     # Result data
     result: Optional[Any] = None          # Script return value
     error: Optional[str] = None           # Error message if failed
 
-    # Output management - Incremental tracking for efficiency
+    # Output management - in-memory only, re-synced from pfc-mcp on polling
     output_lines: List[str] = field(default_factory=list)
     last_output_position: int = 0         # Track last returned position
 
@@ -100,14 +105,16 @@ class PfcTaskManager:
     Manages PFC task lifecycle on the backend side.
 
     Mirrors BackgroundProcessManager pattern:
-    - Task ID generation (6-char UUID)
+    - Single ID space (task_id from pfc-mcp, no local generation)
     - Session isolation
-    - Incremental output tracking
+    - Incremental output tracking (in-memory, re-synced via MCP polling)
+    - Git commit tracking (backend-only metadata, not in pfc-mcp)
     - System reminders generation
+    - JSON persistence for metadata (output not persisted)
 
-    Key difference from bash: Tasks are remote (pfc-server),
-    not local subprocesses. This manager tracks state and
-    coordinates with pfc-server via WebSocket.
+    Key difference from bash: Tasks are remote (pfc-mcp),
+    not local subprocesses. This manager tracks metadata and
+    enriches MCP results with backend-only fields like git_commit.
     """
 
     # Configuration constants
@@ -116,11 +123,15 @@ class PfcTaskManager:
     TASK_TIMEOUT_HOURS = 24  # PFC simulations can run for a long time
     CLEANUP_INTERVAL_MINUTES = 30
 
+    PERSIST_FILENAME = "pfc_tasks.json"
+
     def __init__(self):
         """Initialize the PFC task manager."""
         self.tasks: Dict[str, PfcTask] = {}
         self.session_tasks: Dict[str, Set[str]] = {}  # session_id -> task_ids
         self._lock = Lock()
+        self._persist_path = self._resolve_persist_path()
+        self._load_persisted()
         self._cleanup_thread: Optional[Thread] = None
         self._start_cleanup_thread()
 
@@ -140,12 +151,9 @@ class PfcTaskManager:
             except Exception as e:
                 print(f"[PfcTaskManager] Cleanup worker error: {e}")
 
-    def _generate_task_id(self) -> str:
-        """Generate a unique 6-character task ID (matches bash pattern)."""
-        return str(uuid.uuid4()).replace('-', '')[:6]
-
     def create_task(
         self,
+        task_id: str,
         session_id: str,
         script_path: str,
         description: Optional[str] = None,
@@ -154,7 +162,11 @@ class PfcTaskManager:
     ) -> str:
         """Create and register a new PFC task.
 
+        Uses the task_id returned by pfc-mcp directly — single ID space,
+        no local/remote mapping needed.
+
         Args:
+            task_id: Task ID from pfc-mcp response
             session_id: Session ID for task isolation
             script_path: Path to the script being executed
             description: Optional description for the task
@@ -162,7 +174,7 @@ class PfcTaskManager:
             source: Task source ("agent" or "user_console")
 
         Returns:
-            task_id: The assigned 6-character task ID
+            task_id: The registered task ID
         """
         with self._lock:
             # Check limits
@@ -176,11 +188,6 @@ class PfcTaskManager:
             ])
             if session_count >= self.MAX_TASKS_PER_SESSION:
                 raise ValueError(f"Maximum {self.MAX_TASKS_PER_SESSION} concurrent PFC tasks per session")
-
-            # Generate unique task ID
-            task_id = self._generate_task_id()
-            while task_id in self.tasks:
-                task_id = self._generate_task_id()
 
             # Create task
             task = PfcTask(
@@ -200,13 +207,13 @@ class PfcTaskManager:
                 self.session_tasks[session_id] = set()
             self.session_tasks[session_id].add(task_id)
 
+            self._persist()
             return task_id
 
     def update_status(
         self,
         task_id: str,
         status: str,
-        pfc_server_task_id: Optional[str] = None,
         result: Optional[Any] = None,
         error: Optional[str] = None,
     ) -> bool:
@@ -215,7 +222,6 @@ class PfcTaskManager:
         Args:
             task_id: Task ID to update
             status: New status
-            pfc_server_task_id: Optional pfc-server task ID for reference
             result: Optional result data
             error: Optional error message
 
@@ -229,9 +235,6 @@ class PfcTaskManager:
 
             task.status = status
 
-            if pfc_server_task_id:
-                task.pfc_server_task_id = pfc_server_task_id
-
             if result is not None:
                 task.result = result
 
@@ -242,6 +245,7 @@ class PfcTaskManager:
             if status in ("completed", "failed", "interrupted"):
                 task.end_time = datetime.now()
 
+            self._persist()
             return True
 
     def append_output(self, task_id: str, output_lines: List[str]) -> bool:
@@ -278,7 +282,7 @@ class PfcTaskManager:
     def set_output(self, task_id: str, output: str) -> bool:
         """Set full output for a task (replaces existing).
 
-        Used when receiving complete output from pfc-server.
+        Used when receiving complete output from pfc-mcp.
 
         Args:
             task_id: Task ID to update
@@ -468,6 +472,13 @@ class PfcTaskManager:
             # Apply pagination
             return tasks[offset:offset + limit]
 
+    def clear_all_tasks(self) -> int:
+        """Clear all tasks from local state. Returns count of cleared tasks."""
+        with self._lock:
+            count = len(self.tasks)
+            self.tasks.clear()
+            return count
+
     def has_active_tasks(self, session_id: str) -> bool:
         """Check if session has any active (non-terminal) tasks.
 
@@ -601,11 +612,11 @@ class PfcTaskManager:
                 if task.is_terminal and task.last_accessed < cutoff_time:
                     tasks_to_remove.append(task_id)
 
-                # Mark stale running tasks (pfc-server may have restarted)
+                # Mark stale running tasks (PFC server may have restarted)
                 elif (task.status in ("pending", "submitted", "running") and
                       task.start_time < datetime.now() - timedelta(hours=self.TASK_TIMEOUT_HOURS)):
                     task.status = "failed"
-                    task.error = "Task timed out (pfc-server may have restarted)"
+                    task.error = "Task timed out (PFC server may have restarted)"
                     task.end_time = datetime.now()
 
             # Remove old tasks
@@ -619,6 +630,91 @@ class PfcTaskManager:
                     self.session_tasks[session_id].discard(task_id)
                     if not self.session_tasks[session_id]:
                         del self.session_tasks[session_id]
+
+            if tasks_to_remove:
+                self._persist()
+
+
+    # ---- JSON Persistence ----
+
+    @staticmethod
+    def _resolve_persist_path() -> Optional[Path]:
+        """Resolve path for JSON persistence file."""
+        try:
+            from backend.shared.utils.prompt.config import PROJECT_ROOT
+            data_dir = PROJECT_ROOT / "data"
+            data_dir.mkdir(parents=True, exist_ok=True)
+            return data_dir / PfcTaskManager.PERSIST_FILENAME
+        except Exception:
+            return None
+
+    def _persist(self) -> None:
+        """Write task metadata to JSON (best-effort, called under _lock).
+
+        Persists: task_id, status, git_commit, timestamps, etc.
+        NOT persisted: output_lines (re-synced from pfc-mcp on demand).
+        """
+        if not self._persist_path:
+            return
+        try:
+            records = []
+            for t in self.tasks.values():
+                records.append({
+                    "task_id": t.task_id,
+                    "session_id": t.session_id,
+                    "script_path": t.script_path,
+                    "description": t.description,
+                    "status": t.status,
+                    "start_time": t.start_time.isoformat(),
+                    "end_time": t.end_time.isoformat() if t.end_time else None,
+                    "git_commit": t.git_commit,
+                    "source": t.source,
+                    "result": str(t.result) if t.result is not None else None,
+                    "error": t.error,
+                    "completion_notified": t.completion_notified,
+                })
+            self._persist_path.write_text(json.dumps(records, ensure_ascii=False, indent=2))
+        except Exception as exc:
+            logger.debug(f"PfcTaskManager persist failed: {exc}")
+
+    def _load_persisted(self) -> None:
+        """Load tasks from JSON on startup (best-effort).
+
+        Restored tasks have empty output_lines; polling will re-sync from pfc-mcp.
+        Tasks older than TASK_TIMEOUT_HOURS are skipped.
+        """
+        if not self._persist_path or not self._persist_path.exists():
+            return
+        try:
+            records = json.loads(self._persist_path.read_text())
+            cutoff = datetime.now() - timedelta(hours=self.TASK_TIMEOUT_HOURS)
+            for r in records:
+                start_time = datetime.fromisoformat(r["start_time"])
+                if start_time < cutoff:
+                    continue
+                task = PfcTask(
+                    task_id=r["task_id"],
+                    session_id=r["session_id"],
+                    script_path=r["script_path"],
+                    description=r.get("description"),
+                    status=r["status"],
+                    start_time=start_time,
+                    end_time=datetime.fromisoformat(r["end_time"]) if r.get("end_time") else None,
+                    git_commit=r.get("git_commit"),
+                    source=r.get("source", "agent"),
+                    result=r.get("result"),
+                    error=r.get("error"),
+                    completion_notified=r.get("completion_notified", False),
+                )
+                self.tasks[task.task_id] = task
+                sid = task.session_id
+                if sid not in self.session_tasks:
+                    self.session_tasks[sid] = set()
+                self.session_tasks[sid].add(task.task_id)
+            if self.tasks:
+                logger.info(f"Restored {len(self.tasks)} PFC task(s) from disk")
+        except Exception as exc:
+            logger.debug(f"PfcTaskManager load failed: {exc}")
 
 
 # Singleton instance

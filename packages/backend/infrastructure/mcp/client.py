@@ -7,6 +7,7 @@ This module provides a client for connecting to MCP servers
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any, TYPE_CHECKING
@@ -34,6 +35,7 @@ class MCPServerConfig:
                  If False, users must enable via /mcps command.
                  Note: Server is always connected regardless of this flag.
         description: Human-readable description
+        missing_env_vars: Missing env vars required by args/env templates
     """
 
     name: str
@@ -42,6 +44,7 @@ class MCPServerConfig:
     env: dict[str, str] | None = None
     enabled: bool = True
     description: str = ""
+    missing_env_vars: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -112,36 +115,47 @@ class MCPClient:
             logger.warning(f"[{self.name}] Already connected")
             return True
 
-        try:
-            server_params = StdioServerParameters(
-                command=self.config.command,
-                args=self.config.args,
-                env=self.config.env,
-            )
+        last_error: Exception | None = None
+        max_attempts = 2
 
-            # Create stdio client connection
-            # Note: We need to manage the context manually for long-lived connections
-            self._stdio_context = stdio_client(server_params)
-            self._read_stream, self._write_stream = await self._stdio_context.__aenter__()
+        for attempt in range(1, max_attempts + 1):
+            try:
+                server_params = StdioServerParameters(
+                    command=self.config.command,
+                    args=self.config.args,
+                    env=self.config.env,
+                    encoding="utf-8",
+                    encoding_error_handler="replace",
+                )
 
-            # Create session
-            self._session_context = ClientSession(self._read_stream, self._write_stream)
-            self._session = await self._session_context.__aenter__()
+                # Create stdio client connection
+                # Note: We need to manage the context manually for long-lived connections
+                self._stdio_context = stdio_client(server_params)
+                self._read_stream, self._write_stream = await self._stdio_context.__aenter__()
 
-            # Initialize the connection
-            await self._session.initialize()
+                # Create session
+                self._session_context = ClientSession(self._read_stream, self._write_stream)
+                self._session = await self._session_context.__aenter__()
 
-            # Load available tools
-            await self._load_tools()
+                # Initialize the connection
+                await self._session.initialize()
 
-            self._connected = True
-            logger.info(f"[{self.name}] Connected successfully, {len(self._tools)} tools available")
-            return True
+                # Load available tools
+                await self._load_tools()
 
-        except Exception as e:
-            logger.error(f"[{self.name}] Connection failed: {e}")
-            await self.disconnect()
-            return False
+                self._connected = True
+                logger.info(f"[{self.name}] Connected successfully, {len(self._tools)} tools available")
+                return True
+
+            except Exception as e:
+                last_error = e
+                logger.warning(f"[{self.name}] Connection attempt {attempt}/{max_attempts} failed: {e}")
+                await self.disconnect()
+                if attempt < max_attempts:
+                    await asyncio.sleep(0.3)
+
+        logger.error(f"[{self.name}] Connection failed: {last_error}")
+        return False
 
     async def disconnect(self) -> None:
         """Disconnect from the MCP server."""
@@ -215,6 +229,7 @@ class MCPClient:
 
         try:
             result = await self._session.call_tool(tool_name, arguments)
+            is_error = bool(getattr(result, "isError", False))
 
             # Extract content from result
             content_parts = []
@@ -237,10 +252,21 @@ class MCPClient:
                         }
                     )
 
+            error_message = None
+            if is_error:
+                for part in content_parts:
+                    if part.get("type") == "text":
+                        error_message = part.get("text", "")
+                        if error_message:
+                            break
+                if not error_message:
+                    error_message = f"MCP tool '{tool_name}' returned error"
+
             return {
-                "status": "success",
+                "status": "error" if is_error else "success",
                 "server": self.name,
                 "tool": tool_name,
+                "message": error_message,
                 "content": content_parts,
                 "structuredContent": result.structuredContent if hasattr(result, "structuredContent") else None,
             }
@@ -394,6 +420,12 @@ async def initialize_mcp_clients(configs: list[MCPServerConfig]) -> None:
     """
     manager = get_mcp_client_manager()
     for config in configs:
+        if config.missing_env_vars:
+            missing_vars = ", ".join(config.missing_env_vars)
+            logger.warning(
+                f"[{config.name}] Skipping MCP server initialization due to missing environment variables: {missing_vars}"
+            )
+            continue
         await manager.add_server(config)
 
 
@@ -436,15 +468,24 @@ def load_mcp_configs_from_yaml(yaml_path: str | None = None) -> list[MCPServerCo
     if not config_data or "servers" not in config_data:
         return []
 
+    pattern = re.compile(r"\$\{([^}]+)\}")
+
+    def find_missing_env_vars(value: str) -> set[str]:
+        """Find env vars referenced by ${VAR_NAME} that are unset or empty."""
+        missing_vars: set[str] = set()
+        for match in pattern.finditer(value):
+            var_name = match.group(1)
+            if not os.getenv(var_name):
+                missing_vars.add(var_name)
+        return missing_vars
+
     def expand_env_vars(value: str) -> str:
         """Expand ${VAR_NAME} patterns with environment variables."""
-        pattern = r"\$\{([^}]+)\}"
-
         def replace(match: re.Match) -> str:
             var_name = match.group(1)
             return os.getenv(var_name, "")
 
-        return re.sub(pattern, replace, value)
+        return pattern.sub(replace, value)
 
     def expand_in_list(items: list) -> list:
         """Expand env vars in a list of strings."""
@@ -462,13 +503,24 @@ def load_mcp_configs_from_yaml(yaml_path: str | None = None) -> list[MCPServerCo
 
         # Expand environment variables in args
         args = server.get("args", [])
+        missing_env_vars: set[str] = set()
+
+        for arg in args:
+            if isinstance(arg, str):
+                missing_env_vars.update(find_missing_env_vars(arg))
+
+        env = server.get("env")
+        if isinstance(env, dict):
+            for value in env.values():
+                if isinstance(value, str):
+                    missing_env_vars.update(find_missing_env_vars(value))
+
         if args:
             args = expand_in_list(args)
             # Filter out empty args (from missing env vars)
             args = [arg for arg in args if arg]
 
         # Expand environment variables in env dict
-        env = server.get("env")
         if env:
             env = expand_in_dict(env)
 
@@ -479,6 +531,7 @@ def load_mcp_configs_from_yaml(yaml_path: str | None = None) -> list[MCPServerCo
             env=env,
             enabled=server.get("enabled", True),
             description=server.get("description", ""),
+            missing_env_vars=sorted(missing_env_vars),
         )
         configs.append(config)
 

@@ -177,17 +177,17 @@ providers:
         thinking:
           mode: always_on
 
-      - id: claude-opus-4-5-thinking-low
-        name: Claude Opus 4.5 Thinking Low (Antigravity)
-        description: Claude Opus 4.5 thinking low tier via Antigravity OAuth
+      - id: claude-opus-4-6-thinking-low
+        name: Claude Opus 4.6 Thinking Low (Antigravity)
+        description: Claude Opus 4.6 thinking low tier via Antigravity OAuth
         context_window: 200000
         multimodal: true
         thinking:
           mode: always_on
 
-      - id: claude-opus-4-5-thinking-high
-        name: Claude Opus 4.5 Thinking High (Antigravity)
-        description: Claude Opus 4.5 thinking high tier via Antigravity OAuth
+      - id: claude-opus-4-6-thinking-high
+        name: Claude Opus 4.6 Thinking High (Antigravity)
+        description: Claude Opus 4.6 thinking high tier via Antigravity OAuth
         context_window: 200000
         multimodal: true
         thinking:

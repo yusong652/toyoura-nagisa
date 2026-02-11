@@ -54,7 +54,7 @@ const DEFAULT_OPTIONS: ConnectionOptions = {
   reconnectInterval: 2000,
   maxReconnectInterval: 60000,
   heartbeatInterval: 60000,
-  heartbeatTimeout: 30000,
+  heartbeatTimeout: 90000,
   enableHeartbeat: true,
   enableAutoReconnect: true
 };
@@ -295,10 +295,22 @@ export class WebSocketManager extends EventEmitter {
   private resetHeartbeatTimeout(): void {
     this.clearHeartbeatTimeout();
 
-    // If server doesn't send heartbeat within timeout period, connection may be stale
-    // Server sends heartbeat every 20s, so we use a longer timeout (e.g., 60s)
+    // If server doesn't send heartbeat within timeout period, connection may be stale.
+    // Server sends heartbeat every ~20s, so default timeout uses a generous buffer.
     this.heartbeatTimeoutTimer = setTimeout(() => {
-      this.handleError(new Error('Heartbeat timeout - no heartbeat from server'));
+      const timeoutError = new Error('Heartbeat timeout - no heartbeat from server');
+      this.handleError(timeoutError);
+
+      // Heartbeat timeout indicates stale connection. Force-close to trigger
+      // normal onClose -> auto-reconnect flow.
+      if (!this.isIntentionalClose && this.options.enableAutoReconnect) {
+        try {
+          this.adapter.close(4000, 'Heartbeat timeout');
+        } catch {
+          // If close fails, fallback to direct reconnect scheduling.
+          this.scheduleReconnect();
+        }
+      }
     }, this.options.heartbeatTimeout!);
   }
 

@@ -39,7 +39,7 @@ class AgentService:
             instruction=user_message,
         )
 
-        # With custom configuration (from global default_llm.json)
+        # With custom per-session configuration (from session metadata)
         result = await service.process_chat(
             session_id=session_id,
             instruction=user_message,

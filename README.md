@@ -77,7 +77,7 @@ Deep exploration risks context exhaustion and hallucination. SubAgents isolate t
 
 *Teach once, reuse forever.*
 
-Skills are structured guides that encode domain expertise. The agent follows them step-by-step, handling complex workflows you'd otherwise explain repeatedly. Don't know how to set up pfc-server? The `pfc-server-setup` skill walks the agent through environment verification, dependency installation, and server launch.
+Skills are structured guides that encode domain expertise. The agent follows them step-by-step, handling complex workflows you'd otherwise explain repeatedly. Don't know how to set up pfc-bridge? The `pfc-bridge-setup` skill walks the agent through environment verification, dependency installation, and bridge launch.
 
 Define your own skills to capture simulation workflows, analysis pipelines, or project-specific conventions. Your expertise becomes reusable agent knowledge.
 
@@ -134,10 +134,10 @@ For ITASCA PFC simulations:
 
 2. **Manual start**: In PFC GUI IPython console:
    ```python
-   %run /path/to/toyoura-nagisa/services/pfc-server/start_server.py
+   %run /path/to/pfc-mcp/pfc-bridge/start_bridge.py
    ```
 
-See `services/pfc-server/README.md` for detailed setup.
+See `pfc-mcp/pfc-bridge/README.md` for detailed setup.
 
 ## 🤝 Contributing
 

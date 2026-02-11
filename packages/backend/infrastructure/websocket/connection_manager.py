@@ -63,43 +63,44 @@ class ConnectionManager:
         Returns:
             bool: Whether connection was successful
         """
-        async with self._lock:
-            try:
+        try:
+            async with self._lock:
                 # Close existing connection if present
                 if session_id in self.connections:
                     await self._close_connection(session_id)
-                
+
                 # Accept new connection
                 await websocket.accept()
-                
+
                 # Create connection info
                 conn_info = ConnectionInfo(websocket, session_id)
                 conn_info.state = ConnectionState.CONNECTED
                 self.connections[session_id] = conn_info
-                
+
                 # Start heartbeat task (using standard 20-second interval)
                 self._heartbeat_tasks[session_id] = asyncio.create_task(
                     self._heartbeat_loop(session_id)
                 )
-                
-                # Send connection success message
-                await self._send_system_message(session_id, {
-                    "type": "CONNECTION_ESTABLISHED",
-                    "session_id": session_id,
-                    "timestamp": datetime.now().isoformat()
-                })
-                
-                # Send any pending messages
-                await self._flush_pending_messages(session_id)
-                
-                logger.info(f"WebSocket connected for session: {session_id}")
-                return True
-                
-            except Exception as e:
-                logger.error(f"Failed to establish connection for session {session_id}: {e}")
-                if session_id in self.connections:
-                    self.connections[session_id].state = ConnectionState.ERROR
-                return False
+
+            # Send messages outside lock to avoid lock re-entry deadlocks
+            # when send_json() fails and needs to disconnect.
+            await self._send_system_message(session_id, {
+                "type": "CONNECTION_ESTABLISHED",
+                "session_id": session_id,
+                "timestamp": datetime.now().isoformat()
+            })
+
+            # Send any pending messages
+            await self._flush_pending_messages(session_id)
+
+            logger.info(f"WebSocket connected for session: {session_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to establish connection for session {session_id}: {e}")
+            if session_id in self.connections:
+                self.connections[session_id].state = ConnectionState.ERROR
+            return False
 
     async def disconnect(self, session_id: str, code: int = 1000, reason: str = ""):
         """Disconnect WebSocket connection
@@ -122,7 +123,10 @@ class ConnectionManager:
         
         # Cancel heartbeat task
         if session_id in self._heartbeat_tasks:
-            self._heartbeat_tasks[session_id].cancel()
+            heartbeat_task = self._heartbeat_tasks[session_id]
+            # Avoid cancelling current task (can happen when heartbeat loop triggers disconnect)
+            if heartbeat_task is not asyncio.current_task():
+                heartbeat_task.cancel()
             del self._heartbeat_tasks[session_id]
         
         # Close WebSocket if not already closed
@@ -208,6 +212,7 @@ class ConnectionManager:
                 if not await self._send_heartbeat(session_id):
                     logger.info(f"Heartbeat send failed for {session_id}, stopping heartbeat")
                     print(f"[HEARTBEAT] Stopping heartbeat for session {session_id} due to send failure", flush=True)
+                    await self.disconnect(session_id, code=1001, reason="Heartbeat send failed")
                     break
                 
                 # Wait for next heartbeat

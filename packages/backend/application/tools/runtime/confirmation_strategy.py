@@ -5,6 +5,7 @@ Extracted confirmation logic for extensibility.
 Used by Agent to request user confirmation before executing tools.
 Supports different confirmation types: exec, edit, info.
 """
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -13,6 +14,7 @@ from typing import Any, Dict, Optional, Tuple
 @dataclass
 class ConfirmationInfo:
     """Information needed for tool confirmation request."""
+
     tool_name: str
     tool_id: str
     command: str
@@ -46,10 +48,7 @@ class ConfirmationStrategy:
         """Check if tool requires user confirmation."""
         return self.tool_manager._requires_user_confirmation(tool_name, tool_args)
 
-    async def build_confirmation_info(
-        self,
-        tool_call: Dict
-    ) -> ConfirmationInfo:
+    async def build_confirmation_info(self, tool_call: Dict) -> ConfirmationInfo:
         """
         Build confirmation information for a tool call.
 
@@ -59,9 +58,9 @@ class ConfirmationStrategy:
         Returns:
             ConfirmationInfo with all required confirmation data
         """
-        tool_name = tool_call.get('name', '')
-        tool_args = tool_call.get('arguments', {})
-        tool_id = tool_call.get('id', '')
+        tool_name = tool_call.get("name", "")
+        tool_args = tool_call.get("arguments", {})
+        tool_id = tool_call.get("id", "")
 
         # Dispatch to specific handler based on tool type
         if tool_name == "bash":
@@ -77,12 +76,7 @@ class ConfirmationStrategy:
         else:
             return self._build_generic_confirmation(tool_id, tool_name, tool_args)
 
-    def _build_bash_confirmation(
-        self,
-        tool_id: str,
-        tool_name: str,
-        tool_args: Dict
-    ) -> ConfirmationInfo:
+    def _build_bash_confirmation(self, tool_id: str, tool_name: str, tool_args: Dict) -> ConfirmationInfo:
         """Build confirmation info for bash command."""
         command = tool_args.get("command", "")
         description = tool_args.get("description")
@@ -90,19 +84,10 @@ class ConfirmationStrategy:
             description = f"Execute bash command: {command}"
 
         return ConfirmationInfo(
-            tool_name=tool_name,
-            tool_id=tool_id,
-            command=command,
-            description=description,
-            confirmation_type="exec"
+            tool_name=tool_name, tool_id=tool_id, command=command, description=description, confirmation_type="exec"
         )
 
-    async def _build_edit_confirmation(
-        self,
-        tool_id: str,
-        tool_name: str,
-        tool_args: Dict
-    ) -> ConfirmationInfo:
+    async def _build_edit_confirmation(self, tool_id: str, tool_name: str, tool_args: Dict) -> ConfirmationInfo:
         """Build confirmation info for file edit."""
         file_path = tool_args.get("path", "unknown")
         command = f"Edit file: {file_path}"
@@ -129,15 +114,10 @@ class ConfirmationStrategy:
             file_path=file_path,
             file_diff=file_diff,
             original_content=original_content,
-            new_content=new_content
+            new_content=new_content,
         )
 
-    async def _build_write_confirmation(
-        self,
-        tool_id: str,
-        tool_name: str,
-        tool_args: Dict
-    ) -> ConfirmationInfo:
+    async def _build_write_confirmation(self, tool_id: str, tool_name: str, tool_args: Dict) -> ConfirmationInfo:
         """Build confirmation info for file write."""
         file_path = tool_args.get("path", "unknown")
         command = f"Write file: {file_path}"
@@ -164,36 +144,20 @@ class ConfirmationStrategy:
             file_path=file_path,
             file_diff=file_diff,
             original_content=original_content,
-            new_content=new_content
+            new_content=new_content,
         )
 
-    def _build_pfc_confirmation(
-        self,
-        tool_id: str,
-        tool_name: str,
-        tool_args: Dict
-    ) -> ConfirmationInfo:
+    def _build_pfc_confirmation(self, tool_id: str, tool_name: str, tool_args: Dict) -> ConfirmationInfo:
         """Build confirmation info for PFC task execution."""
         entry_script = tool_args.get("entry_script", "unknown")
-        run_in_background = tool_args.get("run_in_background", True)
-        bg_info = " (background)" if run_in_background else " (foreground)"
-        command = f"Execute PFC task{bg_info}: {entry_script}"
+        command = f"Execute PFC task: {entry_script}"
         description = tool_args.get("description")
 
         return ConfirmationInfo(
-            tool_name=tool_name,
-            tool_id=tool_id,
-            command=command,
-            description=description,
-            confirmation_type="exec"
+            tool_name=tool_name, tool_id=tool_id, command=command, description=description, confirmation_type="exec"
         )
 
-    def _build_invoke_agent_confirmation(
-        self,
-        tool_id: str,
-        tool_name: str,
-        tool_args: Dict
-    ) -> ConfirmationInfo:
+    def _build_invoke_agent_confirmation(self, tool_id: str, tool_name: str, tool_args: Dict) -> ConfirmationInfo:
         """Build confirmation info for SubAgent invocation."""
         # Parameter names match invoke_agent tool definition
         subagent_type = tool_args.get("subagent_type", "unknown")
@@ -207,37 +171,19 @@ class ConfirmationStrategy:
         description = f"Task: {task_description}" if task_description else (f"Prompt: {prompt}" if prompt else None)
 
         return ConfirmationInfo(
-            tool_name=tool_name,
-            tool_id=tool_id,
-            command=command,
-            description=description,
-            confirmation_type="info"
+            tool_name=tool_name, tool_id=tool_id, command=command, description=description, confirmation_type="info"
         )
 
-    def _build_generic_confirmation(
-        self,
-        tool_id: str,
-        tool_name: str,
-        tool_args: Dict
-    ) -> ConfirmationInfo:
+    def _build_generic_confirmation(self, tool_id: str, tool_name: str, tool_args: Dict) -> ConfirmationInfo:
         """Build confirmation info for generic tool."""
         command = f"{tool_name} operation"
         description = tool_args.get("description")
 
         return ConfirmationInfo(
-            tool_name=tool_name,
-            tool_id=tool_id,
-            command=command,
-            description=description,
-            confirmation_type="info"
+            tool_name=tool_name, tool_id=tool_id, command=command, description=description, confirmation_type="info"
         )
 
-    async def request_confirmation(
-        self,
-        info: ConfirmationInfo,
-        session_id: str,
-        message_id: str
-    ):
+    async def request_confirmation(self, info: ConfirmationInfo, session_id: str, message_id: str):
         """
         Request user confirmation for tool execution.
 
@@ -272,7 +218,7 @@ class ConfirmationStrategy:
                 file_path=info.file_path,
                 file_diff=info.file_diff,
                 original_content=info.original_content,
-                new_content=info.new_content
+                new_content=info.new_content,
             )
             return result
 

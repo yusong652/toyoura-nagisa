@@ -6,7 +6,6 @@ Defines core methods that all Tool Managers must implement to ensure consistency
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 import inspect
 from typing import Any, Dict, Optional
 
@@ -185,10 +184,7 @@ class BaseToolManager(ABC):
                     # Track this tool as MCP for execution routing
                     self._mcp_tool_mapping[tool_schema.name] = server_name
                 elif get_dev_config().debug_mode:
-                    print(
-                        f"[DEBUG] MCP tool '{tool_schema.name}' from {server_name} "
-                        f"skipped (internal tool exists)"
-                    )
+                    print(f"[DEBUG] MCP tool '{tool_schema.name}' from {server_name} skipped (internal tool exists)")
 
         except Exception as e:
             # Always log MCP errors for debugging
@@ -244,8 +240,6 @@ class BaseToolManager(ABC):
         Returns:
             Dict[str, Any]: ToolResult dictionary
         """
-        from backend.shared.utils.tool_result import error_response
-
         # Check if this is an MCP tool
         if tool_name in self._mcp_tool_mapping:
             return await self._execute_mcp_tool(tool_name, tool_args)
@@ -309,29 +303,81 @@ class BaseToolManager(ABC):
             mcp_manager = get_mcp_client_manager()
             result = await mcp_manager.call_tool(tool_name, tool_args)
 
-            if result.get("status") == "success":
-                # Convert MCP result to internal ToolResult format
-                content_parts = result.get("content", [])
+            content_parts = result.get("content", [])
+            structured = result.get("structuredContent")
+            structured_payload = structured if isinstance(structured, dict) else None
+            nested_result_payload = (
+                structured.get("result")
+                if isinstance(structured, dict) and isinstance(structured.get("result"), dict)
+                else None
+            )
 
-                # Extract text content for llm_content
-                text_parts = []
-                for part in content_parts:
-                    if part.get("type") == "text":
-                        text_parts.append({"type": "text", "text": part.get("text", "")})
+            structured_message = None
+            structured_display = None
+
+            if isinstance(structured_payload, dict):
+                raw_message = structured_payload.get("message")
+                if not (isinstance(raw_message, str) and raw_message.strip()) and isinstance(
+                    nested_result_payload, dict
+                ):
+                    raw_message = nested_result_payload.get("message")
+                if isinstance(raw_message, str) and raw_message.strip():
+                    structured_message = raw_message.strip()
+
+                raw_display = structured_payload.get("display")
+                if not (isinstance(raw_display, str) and raw_display.strip()) and isinstance(
+                    nested_result_payload, dict
+                ):
+                    raw_display = nested_result_payload.get("display")
+                if isinstance(raw_display, str) and raw_display.strip():
+                    structured_display = raw_display.strip()
+
+            if result.get("status") == "success":
+                # Convert MCP result to internal ToolResult format.
+                # Tool-level error semantics are decided by MCP call status (isError),
+                # not by domain-specific fields inside structured payloads.
+                llm_content = (
+                    {"parts": [{"type": "text", "text": structured_display}]}
+                    if structured_display
+                    else (
+                        {"parts": content_parts}
+                        if content_parts
+                        else {
+                            "parts": [
+                                {
+                                    "type": "text",
+                                    "text": f"MCP tool '{tool_name}' executed successfully",
+                                }
+                            ]
+                        }
+                    )
+                )
 
                 return success_response(
                     message=f"MCP tool '{tool_name}' executed successfully",
-                    llm_content={"parts": text_parts} if text_parts else None,
-                    data={
-                        "server": result.get("server"),
-                        "content": content_parts,
-                        "structuredContent": result.get("structuredContent"),
-                    },
+                    llm_content=llm_content,
+                    server=result.get("server"),
+                    content=content_parts,
+                    structuredContent=structured,
                 )
             else:
+                message = (
+                    result.get("message")
+                    or structured_message
+                    or structured_display
+                    or f"MCP tool '{tool_name}' failed"
+                )
+                llm_content = (
+                    {"parts": [{"type": "text", "text": structured_display}]}
+                    if structured_display
+                    else ({"parts": content_parts} if content_parts else {"parts": [{"type": "text", "text": message}]})
+                )
                 return error_response(
-                    result.get("message", f"MCP tool '{tool_name}' failed"),
-                    llm_content={"parts": [{"type": "text", "text": result.get("message", "Unknown error")}]},
+                    message,
+                    llm_content=llm_content,
+                    server=result.get("server"),
+                    content=content_parts,
+                    structuredContent=structured,
                 )
 
         except Exception as e:

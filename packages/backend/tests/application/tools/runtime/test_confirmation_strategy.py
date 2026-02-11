@@ -19,11 +19,7 @@ class TestConfirmationInfo:
         """Test creating ConfirmationInfo with required fields."""
         # Arrange & Act
         info = ConfirmationInfo(
-            tool_name="bash",
-            tool_id="call_123",
-            command="ls -la",
-            description="List files",
-            confirmation_type="exec"
+            tool_name="bash", tool_id="call_123", command="ls -la", description="List files", confirmation_type="exec"
         )
 
         # Assert
@@ -46,7 +42,7 @@ class TestConfirmationInfo:
             confirmation_type="edit",
             file_name="test.py",
             file_path="/path/to/test.py",
-            file_diff="--- old\n+++ new"
+            file_diff="--- old\n+++ new",
         )
 
         # Assert
@@ -64,10 +60,12 @@ class TestConfirmationStrategy:
     def mock_tool_manager(self):
         """Create mock tool manager for testing."""
         manager = Mock()
+
         # Mock confirmation check
         def mock_requires_confirmation(tool_name: str, tool_args: dict) -> bool:
             CONFIRMATION_REQUIRED = {"bash", "edit", "write", "pfc_execute_task", "invoke_agent"}
             return tool_name in CONFIRMATION_REQUIRED
+
         manager._requires_user_confirmation = Mock(side_effect=mock_requires_confirmation)
         manager._generate_edit_diff = AsyncMock(return_value=None)
         manager._generate_write_diff = AsyncMock(return_value=None)
@@ -124,18 +122,11 @@ class TestConfirmationStrategy:
         tool_call = {
             "id": "call_123",
             "name": "bash",
-            "arguments": {
-                "command": "rm -rf /tmp/test",
-                "description": "Clean test directory"
-            }
+            "arguments": {"command": "rm -rf /tmp/test", "description": "Clean test directory"},
         }
 
         # Act
-        info = strategy._build_bash_confirmation(
-            tool_call["id"],
-            tool_call["name"],
-            tool_call["arguments"]
-        )
+        info = strategy._build_bash_confirmation(tool_call["id"], tool_call["name"], tool_call["arguments"])
 
         # Assert
         assert info.tool_name == "bash"
@@ -150,11 +141,7 @@ class TestConfirmationStrategy:
         strategy = ConfirmationStrategy(mock_tool_manager)
 
         # Act
-        info = strategy._build_bash_confirmation(
-            "call_123",
-            "bash",
-            {"command": "ls -la"}
-        )
+        info = strategy._build_bash_confirmation("call_123", "bash", {"command": "ls -la"})
 
         # Assert
         assert info.description == "Execute bash command: ls -la"
@@ -167,23 +154,16 @@ class TestConfirmationStrategy:
         mock_tool_manager._generate_edit_diff.return_value = {
             "diff": "--- a\n+++ b\n@@ content",
             "original": "old content",
-            "new": "new content"
+            "new": "new content",
         }
         tool_call = {
             "id": "call_456",
             "name": "edit",
-            "arguments": {
-                "path": "/path/to/file.py",
-                "description": "Fix bug"
-            }
+            "arguments": {"path": "/path/to/file.py", "description": "Fix bug"},
         }
 
         # Act
-        info = await strategy._build_edit_confirmation(
-            tool_call["id"],
-            tool_call["name"],
-            tool_call["arguments"]
-        )
+        info = await strategy._build_edit_confirmation(tool_call["id"], tool_call["name"], tool_call["arguments"])
 
         # Assert
         assert info.tool_name == "edit"
@@ -205,23 +185,16 @@ class TestConfirmationStrategy:
         mock_tool_manager._generate_write_diff.return_value = {
             "diff": "+++ new file\n@@ content",
             "original": "",
-            "new": "file content"
+            "new": "file content",
         }
         tool_call = {
             "id": "call_789",
             "name": "write",
-            "arguments": {
-                "path": "/path/to/new.py",
-                "description": "Create new file"
-            }
+            "arguments": {"path": "/path/to/new.py", "description": "Create new file"},
         }
 
         # Act
-        info = await strategy._build_write_confirmation(
-            tool_call["id"],
-            tool_call["name"],
-            tool_call["arguments"]
-        )
+        info = await strategy._build_write_confirmation(tool_call["id"], tool_call["name"], tool_call["arguments"])
 
         # Assert
         assert info.tool_name == "write"
@@ -230,7 +203,7 @@ class TestConfirmationStrategy:
         assert info.file_name == "new.py"
 
     def test_build_pfc_confirmation_background(self, mock_tool_manager):
-        """Test building confirmation for PFC background task."""
+        """Test building confirmation for PFC task execution."""
         # Arrange
         strategy = ConfirmationStrategy(mock_tool_manager)
         tool_call = {
@@ -239,40 +212,30 @@ class TestConfirmationStrategy:
             "arguments": {
                 "entry_script": "simulation.py",
                 "description": "Run DEM simulation",
-                "run_in_background": True
-            }
+            },
         }
 
         # Act
-        info = strategy._build_pfc_confirmation(
-            tool_call["id"],
-            tool_call["name"],
-            tool_call["arguments"]
-        )
+        info = strategy._build_pfc_confirmation(tool_call["id"], tool_call["name"], tool_call["arguments"])
 
         # Assert
         assert info.tool_name == "pfc_execute_task"
-        assert info.command == "Execute PFC task (background): simulation.py"
+        assert info.command == "Execute PFC task: simulation.py"
         assert info.description == "Run DEM simulation"
         assert info.confirmation_type == "exec"
 
-    def test_build_pfc_confirmation_foreground(self, mock_tool_manager):
-        """Test building confirmation for PFC foreground task."""
+    def test_build_pfc_confirmation_ignores_legacy_foreground_arg(self, mock_tool_manager):
+        """Legacy foreground arg should not affect confirmation text."""
         # Arrange
         strategy = ConfirmationStrategy(mock_tool_manager)
 
         # Act
         info = strategy._build_pfc_confirmation(
-            "call_pfc",
-            "pfc_execute_task",
-            {
-                "entry_script": "test.py",
-                "run_in_background": False
-            }
+            "call_pfc", "pfc_execute_task", {"entry_script": "test.py", "run_in_background": False}
         )
 
         # Assert
-        assert info.command == "Execute PFC task (foreground): test.py"
+        assert info.command == "Execute PFC task: test.py"
 
     def test_build_invoke_agent_confirmation(self, mock_tool_manager):
         """Test building confirmation for SubAgent invocation."""
@@ -284,16 +247,12 @@ class TestConfirmationStrategy:
             "arguments": {
                 "subagent_type": "pfc_explorer",
                 "prompt": "Search for command documentation",
-                "description": "Find PFC command examples"
-            }
+                "description": "Find PFC command examples",
+            },
         }
 
         # Act
-        info = strategy._build_invoke_agent_confirmation(
-            tool_call["id"],
-            tool_call["name"],
-            tool_call["arguments"]
-        )
+        info = strategy._build_invoke_agent_confirmation(tool_call["id"], tool_call["name"], tool_call["arguments"])
 
         # Assert
         assert info.tool_name == "invoke_agent"
@@ -309,18 +268,14 @@ class TestConfirmationStrategy:
 
         # Act
         info = strategy._build_invoke_agent_confirmation(
-            "call_agent",
-            "invoke_agent",
-            {
-                "subagent_type": "pfc_explorer",
-                "prompt": long_prompt
-            }
+            "call_agent", "invoke_agent", {"subagent_type": "pfc_explorer", "prompt": long_prompt}
         )
 
         # Assert - should be truncated to 100 chars + "..." (+ "Prompt: " prefix = 111 total)
-        assert len(info.description) <= 115  # Allow some margin
-        assert "..." in info.description
-        assert info.description.startswith("Prompt: ")
+        desc = info.description or ""
+        assert len(desc) <= 115  # Allow some margin
+        assert "..." in desc
+        assert desc.startswith("Prompt: ")
 
     def test_build_generic_confirmation(self, mock_tool_manager):
         """Test building confirmation for generic tool."""
@@ -328,11 +283,7 @@ class TestConfirmationStrategy:
         strategy = ConfirmationStrategy(mock_tool_manager)
 
         # Act
-        info = strategy._build_generic_confirmation(
-            "call_123",
-            "custom_tool",
-            {"description": "Custom operation"}
-        )
+        info = strategy._build_generic_confirmation("call_123", "custom_tool", {"description": "Custom operation"})
 
         # Assert
         assert info.tool_name == "custom_tool"

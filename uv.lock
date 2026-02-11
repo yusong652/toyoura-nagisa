@@ -10,6 +10,7 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "pfc-mcp",
     "toyoura-nagisa",
     "toyoura-nagisa-backend",
 ]
@@ -4394,6 +4395,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/fa/2a/52a8da6fe965dea6192eb716b357558e103aea0a1e9a8352ad575a8406ca/pathvalidate-3.3.1.tar.gz", hash = "sha256:b18c07212bfead624345bb8e1d6141cdcf15a39736994ea0b94035ad2b1ba177", size = 63262 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9a/70/875f4a23bfc4731703a5835487d0d2fb999031bd415e7d17c0ae615c18b7/pathvalidate-3.3.1-py3-none-any.whl", hash = "sha256:5263baab691f8e1af96092fa5137ee17df5bdfbd6cff1fcac4d6ef4bc2e1735f", size = 24305 },
+]
+
+[[package]]
+name = "pfc-mcp"
+version = "0.1.0"
+source = { editable = "pfc-mcp" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "pydantic" },
+    { name = "websockets" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp", specifier = ">=2.14.0" },
+    { name = "pydantic", specifier = ">=2.12.0" },
+    { name = "websockets", specifier = ">=15.0.1" },
 ]
 
 [[package]]

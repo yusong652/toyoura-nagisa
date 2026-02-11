@@ -91,8 +91,9 @@ dev-dependencies = [
 [tool.uv.workspace]
 members = [
     "packages/backend",
+    "pfc-mcp",
 ]
-# Note: services/pfc-server is NOT a workspace member
+# Note: pfc-mcp/pfc-bridge is NOT a workspace member
 # It runs in PFC's embedded Python environment with its own dependencies
 # Install in PFC environment: pip install websockets==9.1
 
@@ -120,7 +121,8 @@ exclude = [
     "dist",
     "node_modules",
     "_third_party",
-    "services/pfc-server",  # Separate service with different deps
+    "pfc-mcp/pfc-bridge",  # Separate bridge runtime with different deps
+    "pfc-mcp",  # Standalone MCP server (separate linting)
 ]
 
 [tool.ruff.lint]

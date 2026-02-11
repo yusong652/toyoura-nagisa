@@ -45,9 +45,7 @@ class ToolNotificationService:
                 print(f"[ToolNotificationService] Failed to send todo update: {exc}")
 
         if tool_name == "pfc_execute_task":
-            tool_args = tool_call.get("arguments", {})
-            run_in_background = tool_args.get("run_in_background", True)
-            if run_in_background and result.get("status") == "success":
+            if result.get("status") == "success":
                 try:
                     from backend.application.notifications.pfc_task_notification_service import (
                         get_pfc_task_notification_service,

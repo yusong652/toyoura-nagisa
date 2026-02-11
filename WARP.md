@@ -19,13 +19,13 @@ This file provides guidance to Agent when working with code in this repository.
 ### Clean Architecture Pattern
 
 ```
-Presentation Layer (API, WebSocket, Handlers)
-    ↓ depends on
-Application Layer (Use Cases, Tooling, Orchestration)
-    ↓ depends on
-Domain Layer (Models, Business Rules)
-    ↓ depends on
-Infrastructure Layer (LLM, External MCP Gateway, Memory, PFC, Storage)
+Presentation Layer (API, WebSocket, Request Handlers)
+    ↓ orchestrates through
+Application Layer (Use Cases, Tooling, Agent Runtime)
+    ↓ uses
+Domain Layer (Models, Business Rules, Contracts)
+    ↑ implemented by adapters in
+Infrastructure Layer (LLM, MCP Gateway, Memory, OAuth, PFC, Storage, WebSocket)
 ```
 
 **Key Principles**:
@@ -39,13 +39,13 @@ Infrastructure Layer (LLM, External MCP Gateway, Memory, PFC, Storage)
 - **Domain**: Core models and business rules (StreamingChunk, BaseMessage)
 - **Infrastructure**: External integrations (LLM providers, optional MCP gateway, storage)
 
-**Example**: Swapping LLM providers requires zero application/domain layer changes (`backend/infrastructure/llm/base/client.py`)
+**Example**: Swapping LLM providers requires zero application/domain layer changes (`packages/backend/infrastructure/llm/base/client.py`)
 
 ### LLM Providers
 
-Located in `backend/infrastructure/llm/providers/`: google (primary), anthropic, openai, moonshot, zhipu, openrouter, local (vLLM/Ollama).
+Located in `packages/backend/infrastructure/llm/providers/`: google (primary), anthropic, moonshot, openai, openai_codex, openrouter, zhipu, google_antigravity, google_gemini_cli, web_search.
 
-**Configuration**: `backend/infrastructure/storage/llm_config_manager.py` (runtime provider/model selection)
+**Configuration**: `packages/backend/infrastructure/storage/llm_config_manager.py` (runtime provider/model selection)
 
 ### SubAgent System
 
@@ -55,7 +55,7 @@ MainAgent can delegate specialized tasks to lightweight SubAgents via the `invok
 
 | SubAgent | Tools | Max Iterations | Purpose |
 |----------|-------|----------------|---------|
-| **PFC Explorer** | 14 read-only | 20 | Documentation search, codebase exploration |
+| **PFC Explorer** | 14 read-only | 64 | Documentation search, codebase exploration |
 | **PFC Diagnostic** | 9 read-only | 64 | Multimodal visual analysis, task status inspection |
 
 **PFC Explorer Tools**: `read`, `glob`, `grep`, `bash`, `bash_output`, `pfc_browse_commands`, `pfc_browse_python_api`, `pfc_query_python_api`, `pfc_query_command`, `pfc_browse_reference`, `pfc_list_tasks`, `pfc_check_task_status`, `web_search`, `todo_write`
@@ -73,21 +73,21 @@ MainAgent can delegate specialized tasks to lightweight SubAgents via the `invok
 - SubAgent (`pfc_explorer`, `pfc_diagnostic`): `persistent=False` → in-memory storage
 
 **Implementation**:
-- Tool: `backend/application/tools/agent/invoke_agent.py`
-- Config: `backend/domain/models/agent_profiles.py` (`MAIN_AGENT_CONFIG`, `PFC_EXPLORER`, `PFC_DIAGNOSTIC`)
-- Prompts: `backend/config/prompts/pfc_explorer.md`, `backend/config/prompts/pfc_diagnostic.md`
+- Tool: `packages/backend/application/tools/agent/invoke_agent.py`
+- Config loader: `packages/backend/domain/models/agent_profiles.py` (source data in `config/agents.yaml`)
+- Prompts: `packages/backend/config/prompts/pfc_explorer.md`, `packages/backend/config/prompts/pfc_diagnostic.md`
 
 ### Tool System
 
-**In-process Tool Categories** (`backend/application/tools/`):
-- `coding/`: write, read, edit, bash, glob, grep
-- `pfc/`: pfc_execute_task, pfc_check_task_status, pfc_list_tasks, pfc_capture_plot, pfc_query_*, pfc_browse_*
+**In-process Tool Categories** (`packages/backend/application/tools/`):
+- `coding/`: write, read, edit, bash, bash_output, kill_shell, glob, grep
+- `pfc/`: pfc_execute_task, pfc_interrupt_task, pfc_check_task_status, pfc_list_tasks, pfc_capture_plot, pfc_query_*, pfc_browse_*
 - `planning/`: todo_write
-- `agent/`: invoke_agent
+- `agent/`: invoke_agent, trigger_skill
 - `builtin/`: web_search, web_fetch
 
 **Optional MCP Gateway**:
-- `backend/infrastructure/mcp/` can expose internal tools to external MCP clients
+- `packages/backend/infrastructure/mcp/` can expose internal tools to external MCP clients
 - Internal tool execution does not require an MCP server
 
 ### PFC Integration Overview
@@ -107,11 +107,11 @@ Query Tools      Small-Scale Test   Full Simulation
 ```
 
 **Key Components**:
-- **Main Thread Executor**: Queue-based execution ensuring thread safety (`services/pfc-server/server/execution/main_thread.py`)
-- **Task Manager**: Non-blocking lifecycle tracking (`services/pfc-server/server/tasks/manager.py`)
-- **Script Executor**: Real-time output capture for progress monitoring (`services/pfc-server/server/execution/script.py`)
-- **Interrupt/Diagnostic Signals**: Callback-based execution for non-blocking diagnostics during simulation cycles (`services/pfc-server/server/signals/`)
-- **Documentation System**: Command syntax + Python usage examples (`backend/infrastructure/pfc/commands/`)
+- **Main Thread Executor**: Queue-based execution ensuring thread safety (`pfc-mcp/pfc-bridge/server/execution/main_thread.py`)
+- **Task Manager**: Non-blocking lifecycle tracking (`pfc-mcp/pfc-bridge/server/tasks/manager.py`)
+- **Script Executor**: Real-time output capture for progress monitoring (`pfc-mcp/pfc-bridge/server/execution/script.py`)
+- **Interrupt/Diagnostic Signals**: Callback-based execution for non-blocking diagnostics during simulation cycles (`pfc-mcp/pfc-bridge/server/signals/`)
+- **Documentation System**: Command syntax + Python usage examples (`packages/backend/infrastructure/pfc/commands/`)
 
 **PFC Tools Workflow (Script-Only)**:
 1. **Query**: `pfc_query_command` / `pfc_query_python_api` - Get command syntax and Python examples
@@ -128,9 +128,9 @@ Query Tools      Small-Scale Test   Full Simulation
 - This branch is automatically managed; working on it will break git snapshot creation
 - If accidentally on this branch, switch back: `git checkout master`
 
-**Detailed Documentation**: See `services/pfc-server/README.md` for implementation details, thread-safety architecture, and usage examples.
+**Detailed Documentation**: See `pfc-mcp/pfc-bridge/README.md` for implementation details, thread-safety architecture, and usage examples.
 
-**Backend Integration**: `backend/application/tools/pfc/` + `backend/infrastructure/pfc/websocket_client.py`
+**Backend Integration**: `config/mcp_servers.yaml` + `packages/backend/infrastructure/mcp/client.py`
 
 ## Development Commands
 
@@ -189,22 +189,22 @@ npm run preview
 
 ### PFC Integration Development
 
-**Important**: pfc-server is NOT a UV workspace member. It runs in PFC's embedded Python environment with separate dependencies.
+**Important**: pfc-bridge is NOT a UV workspace member. It runs in PFC's embedded Python environment with separate dependencies.
 
 ```bash
-# 1. Install pfc-server dependencies in PFC's Python environment
+# 1. Install pfc-bridge dependencies in PFC's Python environment
 #    (Run in PFC GUI IPython console)
 pip install websockets==9.1
 
 # 2. Start PFC WebSocket server (in PFC GUI Python console)
-exec(open(r'C:\Dev\Han\toyoura-nagisa\services\pfc-server\start_server.py', encoding='utf-8').read())
+exec(open(r'C:\Dev\Han\toyoura-nagisa\pfc-mcp\pfc-bridge\start_bridge.py', encoding='utf-8').read())
 
-# 3. Test integration from toyoura-nagisa environment (with PFC server running)
-uv run python examples/pfc_integration/DEMo.py
+# 3. Verify integration from toyoura-nagisa (with PFC server running)
+#    Use PFC tools in app/backend (e.g., pfc_list_tasks, then a small pfc_execute_task)
 ```
 
 **Why separate?**
-- pfc-server requires `websockets==9.1` (PFC Python environment constraint)
+- pfc-bridge requires `websockets==9.1` (PFC Python environment constraint)
 - toyoura-nagisa requires `websockets>=15.0.1` (modern features)
 - Different runtime environments → separate dependency management
 
@@ -212,130 +212,101 @@ uv run python examples/pfc_integration/DEMo.py
 
 ```
 toyoura-nagisa/
+├── config/
+│   └── agents.yaml                  # Main + SubAgent definitions
 ├── packages/
 │   ├── backend/
-│   │   ├── app.py                      # Main FastAPI application
-│   │   ├── presentation/               # API routes and WebSocket handlers
-│   │   │   ├── api/                   # RESTful API endpoints
-│   │   │   │   ├── file_search.py     # File mention search API
-│   │   │   │   ├── pfc_console.py     # PFC console API
-│   │   │   │   └── shell.py           # Shell execution API
-│   │   │   ├── websocket/             # WebSocket endpoints & message handling
-│   │   │   │   ├── message_handler.py # Message routing (Chat, Heartbeat, etc.)
-│   │   │   │   └── routes.py          # WebSocket route definitions
-│   │   │   └── handlers/              # Request handlers
-│   │   │       └── chat_request_handler.py  # Chat request processing
-│   │   ├── application/                # Application use cases and orchestration
-│   │   │   ├── agent/                 # Agent orchestration and streaming
-│   │   │   ├── chat/                  # Chat request preparation
-│   │   │   ├── contents/              # Content processing + web fetch/search
-│   │   │   ├── memory/                # Memory persistence helpers
-│   │   │   ├── notifications/         # WebSocket status notifications
-│   │   │   ├── pfc/                   # PFC execution services
-│   │   │   ├── reminder/              # Reminder injection
-│   │   │   ├── session/               # Session + message services
-│   │   │   ├── shell/                 # Shell execution services
-│   │   │   ├── todo/                  # Todo service
-│   │   │   └── tools/                 # Tool registry, runtime, implementations
-│   │   │       └── pfc/
-│   │   │           ├── scripts/           # Script generation templates
-│   │   │           └── utils/             # Tool utilities
-│   │   ├── domain/                     # Core business logic
-│   │   │   └── models/                # Domain models
-│   │   │       ├── streaming.py       # StreamingChunk unified format
-│   │   │       ├── messages.py        # BaseMessage, AssistantMessage
-│   │   │       └── message_factory.py # Message factory functions
-│   │   ├── infrastructure/             # External system integrations
-│   │   │   ├── llm/                   # LLM provider integrations
-│   │   │   │   ├── base/              # Common abstractions
-│   │   │   │   │   ├── client.py      # LLMClientBase ABC
-│   │   │   │   │   └── response_processor.py  # BaseStreamingProcessor
-│   │   │   │   ├── providers/         # Provider implementations
-│   │   │   │   │   ├── google/
-│   │   │   │   │   ├── anthropic/
-│   │   │   │   │   ├── openai/
-│   │   │   │   │   ├── moonshot/
-│   │   │   │   │   ├── zhipu/
-│   │   │   │   │   ├── openrouter/
-│   │   │   │   │   └── local/
-│   │   │   │   └── shared/
-│   │   │   ├── mcp/                   # Optional MCP gateway (external tools)
-│   │   │   │   └── mcp_server.py      # Main MCP server
-│   │   │   ├── monitoring/            # Status monitoring system
-│   │   │   │   ├── status_monitor.py  # Unified coordinator
-│   │   │   │   └── monitors/          # Specialized monitors
-│   │   │   │       ├── iteration_monitor.py  # Iteration limit warnings
-│   │   │   │       ├── todo_monitor.py       # Todo reminders
-│   │   │   │       ├── bash_monitor.py       # Background bash processes
-│   │   │   │       └── pfc_monitor.py        # PFC task tracking
-│   │   │   ├── file_mention/          # File mention processing
-│   │   │   │   └── file_mention_processor.py  # Safe file reading and injection
+│   │   ├── app.py                   # Main FastAPI application
+│   │   ├── presentation/            # API + WebSocket entry layer
+│   │   │   ├── api/
+│   │   │   ├── websocket/
+│   │   │   ├── handlers/
+│   │   │   ├── models/
+│   │   │   └── exceptions/
+│   │   ├── application/             # Use cases and orchestration
+│   │   │   ├── agent/
+│   │   │   ├── chat/
+│   │   │   ├── contents/
+│   │   │   ├── memory/
+│   │   │   ├── notifications/
+│   │   │   ├── oauth/
 │   │   │   ├── pfc/
-│   │   │   │   └── websocket_client.py # PFC WebSocket client
-│   │   │   ├── memory/                # ChromaDB memory system
-│   │   │   ├── storage/               # File and session storage
-│   │   │   ├── websocket/             # WebSocket infrastructure
-│   │   │   │   ├── connection_manager.py     # Connection management
-│   │   │   │   └── notification_service.py   # WebSocket notifications
-│   │   │   ├── shell/                 # Shell execution infrastructure
-│   │   │   │   ├── executor.py        # ShellExecutor (foreground/background)
-│   │   │   │   ├── shell_config.py    # Cross-platform shell detection
-│   │   │   │   └── background_process_manager.py  # Background process lifecycle
-│   │   │   ├── messaging/             # Message queue management
-│   │   ├── config/                     # Configuration management
-│   │   │   └── prompts/               # Agent system prompts
-│   │   │       ├── pfc_explorer.md    # PFC Explorer SubAgent prompt
-│   │   │       └── pfc_diagnostic.md  # PFC Diagnostic SubAgent prompt
-│   │   ├── shared/                     # Common utilities and exceptions
-│   │   │   ├── utils/                  # Tool result, path normalization, shell helpers
-│   │   │   ├── memory_db/              # ChromaDB persistence
-│   │   │   └── workspace/              # Development workspace
-│   ├── web/                        # React Web frontend
-│   │   ├── src/
-│   │   │   ├── components/            # React components
-│   │   │   ├── contexts/              # React contexts
-│   │   │   └── App.tsx               # Main application
-│   │   └── package.json              # Frontend dependencies
-│   ├── cli/                        # Terminal CLI frontend (React/Ink)
-│   │   └── src/
-│   │       └── ui/
-│   │           ├── hooks/             # Hook-driven architecture (chat, session, agent)
-│   │           ├── components/        # Terminal UI components
-│   │           └── commands/          # Slash command system
-│   └── core/                       # Shared TypeScript core
-├── services/
-│   └── pfc-server/                 # PFC WebSocket server (independent service)
-│       ├── server/                    # Server implementation
-│       │   ├── server.py              # WebSocket server + routing
-│       │   ├── execution/             # Execution engines
-│       │   ├── tasks/                 # Task lifecycle management
-│       │   ├── signals/               # Interrupt + diagnostic callbacks
-│       │   ├── services/              # Git version, user console
-│       │   ├── handlers/              # WebSocket message handlers
-│       │   └── utils/                 # Common utilities
-│       ├── start_server.py            # Startup script
-│       ├── pyproject.toml             # Server dependencies
-│       └── README.md                  # Independent server documentation
-├── workspace/                      # UV workspace
-├── memory_db/                      # ChromaDB storage
-├── package.json                   # Root package.json (npm workspaces)
-└── pyproject.toml                # Root Python configuration (uv workspace)
+│   │   │   ├── reminder/
+│   │   │   ├── session/
+│   │   │   ├── shell/
+│   │   │   ├── skills/
+│   │   │   ├── todo/
+│   │   │   └── tools/               # coding/pfc/planning/agent/builtin/runtime
+│   │   ├── domain/
+│   │   │   ├── models/
+│   │   │   └── utils/
+│   │   ├── infrastructure/          # External integrations
+│   │   │   ├── llm/
+│   │   │   │   ├── base/
+│   │   │   │   ├── providers/       # google, anthropic, openai, openai_codex, moonshot, openrouter, zhipu, ...
+│   │   │   │   └── shared/
+│   │   │   ├── file_mention/
+│   │   │   ├── mcp/
+│   │   │   ├── memory/
+│   │   │   ├── messaging/
+│   │   │   ├── monitoring/
+│   │   │   ├── oauth/
+│   │   │   ├── pfc/
+│   │   │   ├── shell/
+│   │   │   ├── skills/
+│   │   │   ├── storage/
+│   │   │   ├── web_fetch/
+│   │   │   └── websocket/
+│   │   ├── config/
+│   │   │   └── prompts/
+│   │   ├── config_example/
+│   │   ├── shared/                  # constants/exceptions/utils
+│   │   └── workspace/
+│   ├── web/                         # React web frontend
+│   ├── cli/                         # React/Ink terminal frontend
+│   ├── core/                        # Shared TypeScript core
+│   ├── credentials/
+│   ├── memory_db/
+│   ├── pfc_workspace/
+│   └── workspace/
+├── pfc-mcp/
+│   ├── src/pfc_mcp/                 # MCP server package
+│   ├── pfc-bridge/                  # Independent PFC WebSocket bridge runtime
+│   │   ├── server/
+│   │   │   ├── execution/
+│   │   │   ├── handlers/
+│   │   │   ├── services/
+│   │   │   ├── signals/
+│   │   │   ├── tasks/
+│   │   │   ├── utils/
+│   │   │   └── server.py
+│   │   ├── workspace_template/
+│   │   ├── start_bridge.py
+│   │   └── README.md
+│   └── README.md
+├── data/                            # Session data + oauth tokens
+├── memory_db/                       # ChromaDB storage
+├── tests/                           # Root test suite
+├── workspace/                       # Runtime workspace
+├── package.json                     # Root package.json (npm workspaces)
+└── pyproject.toml                   # Root Python configuration (uv workspace)
 ```
 
 ## Configuration
 
 ### Environment Setup
 - Copy configuration examples from `packages/backend/config_example/` to `packages/backend/config/`
-- Main config files: `base.py`, `llm.py`
+- Main config files: `cors.py`, `dev.py`, `memory.py`, `pfc.py`
+- Agent definitions: `config/agents.yaml`
 - Database locations:
   - Memory DB: `memory_db/` (root level)
   - Session data: `data/` (root level)
 
 ### Google Services Integration
 Many tools integrate with Google services via OAuth:
-- Authentication tokens stored in `packages/backend/infrastructure/mcp/tools/google_auth/tokens/`
+- Authentication tokens stored in `data/oauth_tokens/google/`
 - Supports Gmail, Google Calendar, and Google Contacts
-- Use `packages/backend/infrastructure/mcp/tools/google_auth/init_google_token.py` to set up authentication
+- OAuth flow is managed through backend API endpoints in `packages/backend/presentation/api/oauth.py`
 
 ## CLI Commands
 
@@ -355,19 +326,19 @@ The frontend uses standard React testing practices with Vite.
 
 ### PFC Integration Testing
 ```bash
-# Comprehensive integration test (with PFC server running)
-uv run python examples/pfc_integration/DEMo.py
-
-# Tests: normal tasks, long tasks, status queries, WebSocket
-#        responsiveness, task completion, main thread execution
+# Start PFC server first, then verify with tool calls:
+# 1) pfc_list_tasks        (connectivity and task store)
+# 2) pfc_execute_task      (small foreground/background script)
+# 3) pfc_check_task_status (progress and completion states)
 ```
 
 ## Common Issues & Quick Fixes
 
 ### LLM Provider Selection
-- Configure preferred provider in `packages/backend/config/llm.py`
+- Configure runtime provider/model via `packages/backend/infrastructure/storage/llm_config_manager.py`
+- Provider config API: `packages/backend/presentation/api/llm_config.py`
+- Frontend session-level updates are persisted to `chat/data/<session_id>/metadata.json` under `llm_config`; new session defaults come from `config/models.yaml`
 - All providers support tool calling and streaming
-- Local models supported via vLLM and Ollama
 
 ### Tool Loading
 - Tools are loaded dynamically based on agent name (main agent or SubAgent)
@@ -380,12 +351,12 @@ uv run python examples/pfc_integration/DEMo.py
 - Memory cleanup on session deletion
 
 ### PFC Integration
-- **Not a workspace member**: pfc-server runs in PFC's Python environment
+- **Not a workspace member**: pfc-bridge runs in PFC's Python environment
 - **Dependency installation**: Run `pip install websockets==9.1` in PFC GUI
 - **Server port**: Runs on port 9001 (WebSocket)
 - **Startup**: Must be started in PFC GUI before using PFC tools
 - **Long tasks**: Return task_id immediately for non-blocking operation
-- **Troubleshooting**: Check `services/pfc-server/README.md`
+- **Troubleshooting**: Check `pfc-mcp/pfc-bridge/README.md`
 
 ## Code Modification Guidelines
 
@@ -398,7 +369,7 @@ When using batch commands (sed, find, etc.):
 
 - `.claude/guides/typescript-guide.md` - TypeScript/React patterns
 - `.claude/guides/code-standards.md` - Code quality standards
-- `services/pfc-server/README.md` - PFC integration details
+- `pfc-mcp/pfc-bridge/README.md` - PFC integration details
 
 ## Git Commit Format
 

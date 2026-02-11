@@ -92,10 +92,10 @@ packages/web/.vite/
 frontend/node_modules/
 frontend/.vite/
 
-# PFC server examples (user-specific test files)
-services/pfc-server/examples/
+# PFC bridge examples (user-specific test files)
+pfc-mcp/pfc-bridge/examples/
 # Legacy path (kept for backwards compatibility)
-pfc-server/examples/
+pfc-bridge/examples/
 
 # Test coverage
 .coverage

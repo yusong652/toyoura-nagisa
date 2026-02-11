@@ -205,8 +205,9 @@ toyoura-nagisa/
 │       ├── config/          # Configuration management
 │       ├── shared/          # Shared utilities
 │       └── tests/           # Test suite
-├── services/
-│   └── pfc-server/          # PFC WebSocket server
+├── pfc-mcp/
+│   ├── src/pfc_mcp/         # MCP server package
+│   └── pfc-bridge/          # PFC WebSocket bridge runtime
 ├── .github/
 │   └── workflows/           # CI/CD workflows
 ├── pytest.ini               # Pytest configuration

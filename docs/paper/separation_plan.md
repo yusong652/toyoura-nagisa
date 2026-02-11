@@ -87,11 +87,12 @@ tools/builtin/
 └── web_fetch.py
 ```
 
-#### 6. PFC Server (`services/pfc-server/`)
+#### 6. PFC Bridge (`pfc-mcp/pfc-bridge/`)
 ```
-services/pfc-server/
-├── server/              # WebSocket server
-├── examples/            # Example scripts
+pfc-mcp/pfc-bridge/
+├── server/              # WebSocket bridge runtime
+├── workspace_template/  # Workspace bootstrap assets
+├── start_bridge.py      # PFC GUI startup entry
 └── README.md
 ```
 

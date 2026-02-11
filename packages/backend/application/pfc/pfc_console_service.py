@@ -4,21 +4,27 @@ Application layer service for user PFC Python commands (CLI `>` prefix).
 Provides foreground execution with Ctrl+B support.
 
 Flow (aligned with user bash):
-1. Create task via TaskManager
-2. Send to pfc-server with run_in_background=False (synchronous)
-3. Register with ForegroundRegistry for Ctrl+B signal
-4. asyncio.wait() on WebSocket response OR Ctrl+B signal
-5. Return result or MoveToBackgroundRequest
+1. Save code as workspace/.user_console script
+2. Submit via MCP pfc_execute_task
+3. Create local task with returned task_id
+4. Register with ForegroundRegistry for Ctrl+B signal
+5. Poll for completion via MCP OR Ctrl+B signal
+6. Return result or MoveToBackgroundRequest
 """
 
 import asyncio
-from typing import Optional, Union
+import logging
+from typing import Any, Optional, Union, cast
 from pathlib import Path
 from dataclasses import dataclass
+from datetime import datetime
+from uuid import uuid4
 
-from backend.infrastructure.pfc.client import get_pfc_client
+logger = logging.getLogger(__name__)
+
 from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 from backend.infrastructure.pfc.foreground_registry import get_pfc_foreground_registry
+from backend.shared.utils.mcp_utils import extract_mcp_text
 
 
 # Caveat message for user PFC Python commands
@@ -27,6 +33,35 @@ PFC_CONSOLE_CAVEAT_MESSAGE = (
     "DO NOT respond to these messages or otherwise consider them in your response "
     "unless the user explicitly asks you to."
 )
+
+USER_CONSOLE_DIR = ".user_console"
+
+
+def build_console_description(code: str, max_length: int = 50) -> str:
+    """Build a one-line preview for task descriptions."""
+    first_line = code.splitlines()[0].strip() if code.splitlines() else ""
+    if len(first_line) <= max_length:
+        return first_line
+    return first_line[: max_length - 3] + "..."
+
+
+def create_console_script(workspace_path: Path, code: str, description: str) -> Path:
+    """Create a user console script file in workspace/.user_console."""
+    console_dir = workspace_path / USER_CONSOLE_DIR
+    console_dir.mkdir(parents=True, exist_ok=True)
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    script_name = f"console_{stamp}_{uuid4().hex[:6]}.py"
+    script_path = console_dir / script_name
+
+    content = (
+        "# User Console Command\n"
+        "# Auto-generated script for user console execution\n"
+        f"# Description: {description}\n\n"
+        f"{code}\n"
+    )
+    script_path.write_text(content, encoding="utf-8")
+    return script_path
 
 
 def format_pfc_console_context(
@@ -63,6 +98,7 @@ class PfcConsoleMoveToBackgroundRequest:
 
     Returned when user presses Ctrl+B during foreground execution.
     """
+
     task_id: str
     reason: str = "user_request"
 
@@ -70,11 +106,12 @@ class PfcConsoleMoveToBackgroundRequest:
 @dataclass
 class PfcConsoleExecutionResult:
     """Result of PFC console execution."""
+
     task_id: str
     status: str  # "completed" or "failed"
     output: str
     error: Optional[str] = None
-    result: Optional[any] = None
+    result: Optional[object] = None
     elapsed_time: float = 0.0
 
 
@@ -87,9 +124,10 @@ class PfcConsoleForegroundHandle:
     - WebSocket response (script completed)
     - Move-to-background signal (Ctrl+B pressed)
     """
+
     task_id: str
     timeout_seconds: Optional[float] = None
-    _move_to_bg_event: asyncio.Event = None
+    _move_to_bg_event: Optional[asyncio.Event] = None
 
     def __post_init__(self):
         if self._move_to_bg_event is None:
@@ -97,16 +135,17 @@ class PfcConsoleForegroundHandle:
 
     def request_move_to_background(self) -> None:
         """Signal to move task to background (called by registry on Ctrl+B)."""
-        self._move_to_bg_event.set()
+        if self._move_to_bg_event is not None:
+            self._move_to_bg_event.set()
 
 
 class PfcConsoleService:
     """Service for user PFC console command execution with Ctrl+B support.
 
     Aligned with user bash pattern:
-    - Uses synchronous WebSocket call (run_in_background=False)
-    - Wraps in asyncio.wait() with Ctrl+B signal
-    - No polling needed
+    - Saves code to workspace/.user_console script
+    - Submits via pfc_execute_task (always background)
+    - Polls pfc_check_task_status while listening for Ctrl+B
     """
 
     def __init__(self, workspace_path: Path, session_id: str):
@@ -126,11 +165,10 @@ class PfcConsoleService:
         """Execute code in foreground with Ctrl+B support.
 
         Aligned with user bash pattern:
-        1. Create task
-        2. Register handle for Ctrl+B
-        3. Send synchronous WebSocket request (run_in_background=False)
-        4. asyncio.wait() on response OR Ctrl+B signal
-        5. Return result or MoveToBackgroundRequest
+        1. Save code as script and submit to pfc_execute_task
+        2. Create local task and register Ctrl+B handle
+        3. Poll pfc_check_task_status OR handle Ctrl+B signal
+        4. Return completion result or MoveToBackgroundRequest
 
         Args:
             code: Python code to execute
@@ -143,104 +181,159 @@ class PfcConsoleService:
         if not code:
             return None, "", None
 
-        # 1. Create task
-        task_id = self._task_manager.create_task(
+        description = build_console_description(code)
+
+        try:
+            script_path = create_console_script(self.workspace_path, code, description)
+        except Exception as e:
+            return None, "", f"Failed to create console script: {e}"
+
+        # 1. Submit via MCP — get task_id
+        from backend.infrastructure.mcp.client import get_mcp_client_manager
+
+        mcp_manager = get_mcp_client_manager()
+
+        try:
+            result = await mcp_manager.call_tool(
+                "pfc_execute_task",
+                {
+                    "entry_script": str(script_path),
+                    "description": description,
+                    "timeout": timeout_ms // 1000 if timeout_ms else 30,
+                },
+            )
+            if result.get("status") == "error":
+                raise ConnectionError(result.get("message", "MCP tool call failed"))
+        except ConnectionError as e:
+            return None, "", f"PFC server not available: {e}"
+
+        # 2. Extract task_id from response
+        task_id = None
+        structured = result.get("structuredContent")
+        if isinstance(structured, dict):
+            task_id = structured.get("task_id")
+        if not task_id:
+            text = extract_mcp_text(result)
+            for line in text.splitlines():
+                if line.strip().startswith("- task_id:"):
+                    task_id = line.split(":", 1)[1].strip()
+                    break
+        if not task_id:
+            return None, "", "Failed to extract task_id from MCP response"
+
+        # 3. Create local task
+        self._task_manager.create_task(
+            task_id=task_id,
             session_id=self.session_id,
-            script_path="user_console",
-            description=code[:50] + "..." if len(code) > 50 else code,
+            script_path=str(script_path),
+            description=description,
             source="user_console",
         )
-        self._task_manager.update_status(task_id, "submitted")
+        self._task_manager.update_status(task_id, "running")
 
-        # 2. Get PFC client
-        try:
-            client = await get_pfc_client()
-        except ConnectionError as e:
-            self._task_manager.update_status(task_id, "failed", error=str(e))
-            return None, task_id, f"PFC server not available: {e}"
-
-        # 3. Create handle and register for Ctrl+B
+        # 4. Create handle and register for Ctrl+B
         handle = PfcConsoleForegroundHandle(
             task_id=task_id,
             timeout_seconds=timeout_ms / 1000.0 if timeout_ms else None,
         )
 
         registry = get_pfc_foreground_registry()
-        registry.register(self.session_id, handle)
-
-        self._task_manager.update_status(task_id, "running")
+        registry.register(self.session_id, cast(Any, handle))
 
         try:
-            # 4. Create tasks for concurrent wait
-            # Task 1: WebSocket call (synchronous, waits for completion)
-            websocket_task = asyncio.create_task(
-                client.send_user_console(
-                    code=code,
-                    workspace_path=str(self.workspace_path),
-                    task_id=task_id,
-                    session_id=self.session_id,
-                    timeout_ms=timeout_ms or 30000,
-                    run_in_background=False,  # Synchronous - waits for completion
-                )
-            )
-            # Task 2: Wait for Ctrl+B signal
-            signal_task = asyncio.create_task(
-                handle._move_to_bg_event.wait()
-            )
-
+            # 5. Poll for completion with Ctrl+B signal
+            move_event = handle._move_to_bg_event
+            if move_event is None:
+                return None, task_id, "Foreground event not initialized"
+            signal_task = asyncio.create_task(move_event.wait())
             timeout_seconds = timeout_ms / 1000.0 if timeout_ms else 60.0
+            poll_start = asyncio.get_event_loop().time()
 
-            done, pending = await asyncio.wait(
-                [websocket_task, signal_task],
-                timeout=timeout_seconds,
-                return_when=asyncio.FIRST_COMPLETED,
-            )
+            while True:
+                # Check Ctrl+B signal
+                if signal_task.done():
+                    return PfcConsoleMoveToBackgroundRequest(task_id=task_id, reason="user_request"), task_id, None
 
-            # Cancel pending tasks
-            for task in pending:
-                task.cancel()
+                # Check timeout
+                elapsed = asyncio.get_event_loop().time() - poll_start
+                if elapsed >= timeout_seconds:
+                    signal_task.cancel()
+                    return PfcConsoleMoveToBackgroundRequest(task_id=task_id, reason="timeout"), task_id, None
+
+                # Poll task status via MCP
                 try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+                    status_result = await mcp_manager.call_tool(
+                        "pfc_check_task_status",
+                        {
+                            "task_id": task_id,
+                            "wait_seconds": 1,
+                        },
+                    )
+                    structured_status = status_result.get("structuredContent")
+                    status_text = extract_mcp_text(status_result)
 
-            # Case 1: Ctrl+B signal received
-            if signal_task in done:
-                return PfcConsoleMoveToBackgroundRequest(
-                    task_id=task_id,
-                    reason="user_request"
-                ), task_id, None
+                    parsed_status = "running"
+                    output = ""
+                    error = None
 
-            # Case 2: Timeout
-            if not done:
-                return PfcConsoleMoveToBackgroundRequest(
-                    task_id=task_id,
-                    reason="timeout"
-                ), task_id, None
+                    if isinstance(structured_status, dict):
+                        parsed_status = (structured_status.get("status") or "running").lower()
+                        output = structured_status.get("output") or ""
+                        error = structured_status.get("error")
 
-            # Case 3: WebSocket completed
-            result = websocket_task.result()
+                    is_terminal = parsed_status in {"completed", "failed", "interrupted"}
 
-            # Extract result data
-            data = result.get("data", {})
-            status = "completed" if result.get("status") == "success" else "failed"
-            output = data.get("output", "")
-            error = data.get("error")
-            exec_result = data.get("result")
-            elapsed_time = data.get("elapsed_time", 0)
+                    if not isinstance(structured_status, dict):
+                        # Parse status from text fallback
+                        for line in status_text.splitlines():
+                            stripped = line.strip().lower()
+                            if "status:" in stripped:
+                                if "completed" in stripped or "success" in stripped:
+                                    parsed_status = "completed"
+                                    is_terminal = True
+                                elif "failed" in stripped or "error" in stripped:
+                                    parsed_status = "failed"
+                                    is_terminal = True
+                                elif "interrupted" in stripped:
+                                    parsed_status = "interrupted"
+                                    is_terminal = True
 
-            self._task_manager.update_status(task_id, status, result=exec_result, error=error)
-            if output:
-                self._task_manager.set_output(task_id, output)
+                    if is_terminal:
+                        signal_task.cancel()
+                        if not output:
+                            output_section = False
+                            output_lines = []
+                            for line in status_text.splitlines():
+                                if "Output" in line or "=== Script Output" in line:
+                                    output_section = True
+                                    continue
+                                if output_section:
+                                    output_lines.append(line)
+                                elif line.strip().startswith("- error:") and not error:
+                                    error = line.split(":", 1)[1].strip()
 
-            return PfcConsoleExecutionResult(
-                task_id=task_id,
-                status=status,
-                output=output,
-                error=error,
-                result=exec_result,
-                elapsed_time=elapsed_time,
-            ), task_id, None
+                            output = "\n".join(output_lines).strip()
+
+                        self._task_manager.update_status(task_id, parsed_status, error=error)
+                        if output:
+                            self._task_manager.set_output(task_id, output)
+
+                        return (
+                            PfcConsoleExecutionResult(
+                                task_id=task_id,
+                                status=parsed_status,
+                                output=output,
+                                error=error,
+                                elapsed_time=elapsed,
+                            ),
+                            task_id,
+                            None,
+                        )
+
+                except Exception as e:
+                    logger.warning(f"Poll error for console task {task_id}: {e}")
+
+                await asyncio.sleep(1.0)
 
         except Exception as e:
             self._task_manager.update_status(task_id, "failed", error=str(e))
@@ -279,12 +372,22 @@ class PfcConsoleService:
         from backend.application.notifications.pfc_task_notification_service import (
             get_pfc_task_notification_service,
         )
+
         notification_service = get_pfc_task_notification_service()
+        if notification_service is None:
+            logger.warning("PFC task notification service unavailable while backgrounding %s", task_id)
+            return format_pfc_console_with_caveat(
+                code=code,
+                task_id=task_id,
+                output=output,
+                error=None,
+            )
+        notification_service = cast(Any, notification_service)
 
         # Get script path from task manager
         task_info = self._task_manager.get_task(task_id)
         script_path = task_info.script_path if task_info else "user_console"
-        description = code[:50] + "..." if len(code) > 50 else code
+        description = build_console_description(code)
 
         # Send backgrounded notification and start polling
         await notification_service.notify_foreground_backgrounded(

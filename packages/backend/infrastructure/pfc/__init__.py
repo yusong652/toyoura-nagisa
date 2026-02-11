@@ -1,15 +1,19 @@
 """
 PFC Infrastructure Module - Core integration with ITASCA PFC simulation.
 
-This module provides the foundational infrastructure for toyoura-nagisa's PFC agent capabilities,
-one of the project's key differentiating features.
-
 Provides:
-- WebSocket communication with PFC server
-- Command execution (native PFC commands)
-- Script execution (Python SDK scripts)
+- MCP-based communication with PFC server (via pfc-mcp)
+- Local task lifecycle management
+- Git version tracking for execution snapshots
+- Foreground execution registry (Ctrl+B support)
 """
 
-from .client import PFCWebSocketClient, get_pfc_client
+from .task_manager import PfcTaskManager, get_pfc_task_manager
+from .foreground_registry import PfcForegroundTaskRegistry, get_pfc_foreground_registry
 
-__all__ = ["PFCWebSocketClient", "get_pfc_client"]
+__all__ = [
+    "PfcTaskManager",
+    "get_pfc_task_manager",
+    "PfcForegroundTaskRegistry",
+    "get_pfc_foreground_registry",
+]

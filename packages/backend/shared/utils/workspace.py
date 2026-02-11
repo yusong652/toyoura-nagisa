@@ -30,11 +30,8 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
     All components (system prompts, coding tools, etc.) must use this function.
 
     Workspace Strategy:
-        - PFC profile with PFC server connected: PFC server's actual working directory
-          → Ensures agent can access files saved by PFC (e.g., checkpoints, data)
-        - All other cases (PFC without server, or other profiles): Fallback priority:
-          1. Configured PFC workspace (PFC_WORKSPACE in config/pfc.py)
-          2. Local pfc_workspace (toyoura-nagisa/pfc_workspace)
+        - Configured PFC workspace (PFC_WORKSPACE in config/pfc.py)
+        - Local pfc_workspace fallback (toyoura-nagisa/pfc_workspace)
 
     Args:
         agent_profile: Agent profile type ("pfc_expert", "disabled", etc.)
@@ -44,8 +41,7 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
         Path object for the workspace directory
 
     Note:
-        For PFC profile, session_id is currently not used for workspace isolation
-        because PFC server's working directory is determined by the PFC project itself.
+        session_id is currently reserved for future use (workspace isolation).
     """
     # Check memory cache first
     current_time = time.time()
@@ -54,40 +50,9 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
         if current_time - timestamp < WORKSPACE_CACHE_TTL:
             return cached_path
 
-    # 1. For PFC profiles, try to sync with running PFC server first
-    if agent_profile.startswith("pfc"):
-        from backend.config.pfc import get_pfc_settings
-        
-        settings = get_pfc_settings()
-        
-        # Only attempt connection if server is explicitly enabled in config
-        if settings.server_enabled:
-            # Try to get PFC server's actual working directory
-            try:
-                from backend.infrastructure.pfc.client import get_pfc_client
+    # Workspace resolution: use configured PFC workspace path
 
-                try:
-                    # Query PFC server's working directory
-                    client = await get_pfc_client()
-                    pfc_working_dir = await client.get_working_directory()
-
-                    if pfc_working_dir:
-                        workspace = Path(pfc_working_dir)
-                        logger.info(f"✓ Using PFC server's working directory: {workspace}")
-                        # Update cache
-                        _workspace_cache[agent_profile] = (current_time, workspace)
-                        return workspace
-                    else:
-                        logger.warning("PFC server returned no working directory, using fallback")
-                except Exception as e:
-                    logger.warning(f"Failed to connect to PFC server for workspace sync: {e}")
-
-            except Exception as e:
-                logger.warning(f"Failed to query PFC working directory: {e}")
-
-    # 2. Unified Fallback Strategy (for all profiles if server sync failed or not applicable)
-
-    # Fallback 1: Use configured PFC workspace if available
+    # Primary: Use configured PFC workspace if available
     try:
         from backend.config.pfc import get_pfc_workspace
 
@@ -104,7 +69,7 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
     except Exception as e:
         logger.warning(f"Failed to get configured PFC workspace: {e}")
 
-    # Fallback 2: Local pfc_workspace (development/testing)
+    # Fallback: Local pfc_workspace (development/testing)
     try:
         from backend.shared.utils.prompt.config import BASE_DIR
 

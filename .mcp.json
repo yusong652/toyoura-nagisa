@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "pfc-mcp": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "pfc-mcp",
+        "pfc-mcp"
+      ],
+      "env": {}
+    }
+  }
+}

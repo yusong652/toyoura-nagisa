@@ -27,11 +27,11 @@ pip.main(['install', '--user', 'package_name'])
 
 ## Critical: Restart After Install
 
-Installed packages won't be available until pfc-server restarts. Python caches loaded modules.
+Installed packages won't be available until pfc-bridge restarts. Python caches loaded modules.
 
 **Workflow**:
 1. Install package with `pip.main()`
-2. Restart pfc-server
+2. Restart pfc-bridge
 3. Verify with `import package_name`
 
 ---
@@ -82,7 +82,7 @@ If path shows `C:\Program Files\Itasca\...`, it's PFC's bundled version.
 ## Troubleshooting
 
 ### Module still not found after install
-First, restart pfc-server to reload Python modules.
+First, restart pfc-bridge to reload Python modules.
 
 ### "Ghost install": pip says installed but ModuleNotFoundError persists
 Pip metadata may be corrupted (files missing but records remain). Force reinstall:
@@ -90,14 +90,14 @@ Pip metadata may be corrupted (files missing but records remain). Force reinstal
 import pip
 pip.main(['install', '--user', '--force-reinstall', '--no-cache-dir', 'package_name'])
 ```
-Then restart pfc-server.
+Then restart pfc-bridge.
 
 ### Package overrides PFC's bundled package
 If you accidentally installed a newer numpy:
 ```python
 import pip
 pip.main(['uninstall', 'numpy', '-y'])
-# Then restart pfc-server
+# Then restart pfc-bridge
 ```
 
 ### Permission denied

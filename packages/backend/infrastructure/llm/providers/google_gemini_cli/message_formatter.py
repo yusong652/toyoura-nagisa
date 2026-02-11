@@ -75,14 +75,24 @@ class GoogleGeminiCliMessageFormatter(GoogleMessageFormatter):
     ) -> Dict[str, Any]:
         from google.genai import types
 
-        llm_content = result["llm_content"]
-        content_parts = llm_content["parts"]
+        llm_content = result.get("llm_content")
+        if not isinstance(llm_content, dict):
+            fallback_text = result.get("message") or "Tool execution completed"
+            llm_content = {"parts": [{"type": "text", "text": str(fallback_text)}]}
+
+        content_parts = llm_content.get("parts")
+        if not isinstance(content_parts, list):
+            fallback_text = result.get("message") or "Tool execution completed"
+            content_parts = [{"type": "text", "text": str(fallback_text)}]
 
         text_parts = []
         inline_data_parts = []
 
         for part in content_parts:
-            part_type = part["type"]
+            if not isinstance(part, dict):
+                continue
+
+            part_type = part.get("type")
 
             if part_type == "inline_data":
                 blob = GoogleMessageFormatter._process_inline_data(part)
@@ -94,9 +104,10 @@ class GoogleGeminiCliMessageFormatter(GoogleMessageFormatter):
                     text_parts.append(text_content)
 
         if result.get("status") == "error":
+            error_text = "\n".join(text_parts).strip()
             response_data: Dict[str, Any] = {
                 "error": {
-                    "message": result.get("message") or "Tool execution failed",
+                    "message": error_text or result.get("message") or "Tool execution failed",
                     "isError": True,
                 }
             }
