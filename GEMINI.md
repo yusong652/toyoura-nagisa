@@ -130,7 +130,7 @@ Query Tools      Small-Scale Test   Full Simulation
 
 **Detailed Documentation**: See `https://github.com/yusong652/pfc-mcp/tree/main/pfc-bridge` for implementation details, thread-safety architecture, and usage examples.
 
-**Backend Integration**: `config/mcp_servers.yaml` + `packages/backend/infrastructure/mcp/client.py`
+**Backend Integration**: `config/mcp_servers.json` + `packages/backend/infrastructure/mcp/client.py`
 
 ## Development Commands
 

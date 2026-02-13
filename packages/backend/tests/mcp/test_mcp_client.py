@@ -22,19 +22,19 @@ from packages.backend.infrastructure.mcp.client import (
     MCPClient,
     MCPClientManager,
     MCPServerConfig,
-    load_mcp_configs_from_yaml,
+    load_mcp_configs,
 )
 
 
 def get_context7_config() -> MCPServerConfig:
-    """Get context7 server configuration from YAML config."""
-    configs = load_mcp_configs_from_yaml()
+    """Get context7 server configuration from MCP config."""
+    configs = load_mcp_configs()
     for config in configs:
         if config.name == "context7":
             return config
 
     # Fallback if not in config
-    raise ValueError("context7 not found in mcp_servers.yaml")
+    raise ValueError("context7 not found in MCP config")
 
 
 async def test_context7_connection():

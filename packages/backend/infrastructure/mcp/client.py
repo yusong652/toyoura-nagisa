@@ -8,8 +8,12 @@ This module provides a client for connecting to MCP servers
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
+import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -19,6 +23,7 @@ from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
 
 logger = logging.getLogger(__name__)
+ENV_VAR_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
 
 @dataclass
@@ -123,7 +128,7 @@ class MCPClient:
                 server_params = StdioServerParameters(
                     command=self.config.command,
                     args=self.config.args,
-                    env=self.config.env,
+                    env={**os.environ, **self.config.env} if self.config.env else None,
                     encoding="utf-8",
                     encoding_error_handler="replace",
                 )
@@ -437,103 +442,122 @@ async def shutdown_mcp_clients() -> None:
         _mcp_client_manager = None
 
 
-def load_mcp_configs_from_yaml(yaml_path: str | None = None) -> list[MCPServerConfig]:
+def _find_missing_env_vars(value: str) -> set[str]:
+    """Find env vars referenced by ${VAR_NAME} that are unset or empty."""
+    missing_vars: set[str] = set()
+    for match in ENV_VAR_PATTERN.finditer(value):
+        var_name = match.group(1)
+        if not os.getenv(var_name):
+            missing_vars.add(var_name)
+    return missing_vars
+
+
+def _expand_env_vars(value: str) -> str:
+    """Expand ${VAR_NAME} patterns with environment variables."""
+
+    def replace(match: re.Match[str]) -> str:
+        var_name = match.group(1)
+        return os.getenv(var_name, "")
+
+    return ENV_VAR_PATTERN.sub(replace, value)
+
+
+def _parse_args(args_raw: Any) -> tuple[list[str], set[str]]:
+    """Parse and expand args from raw config value."""
+    args_list = args_raw if isinstance(args_raw, list) else []
+    missing_env_vars: set[str] = set()
+
+    for arg in args_list:
+        if isinstance(arg, str):
+            missing_env_vars.update(_find_missing_env_vars(arg))
+
+    args = [_expand_env_vars(arg) for arg in args_list if isinstance(arg, str)]
+    args = [arg for arg in args if arg]
+    return args, missing_env_vars
+
+
+def _parse_env(env_raw: Any) -> tuple[dict[str, str] | None, set[str]]:
+    """Parse and expand env map from raw config value."""
+    env_dict = env_raw if isinstance(env_raw, dict) else {}
+    missing_env_vars: set[str] = set()
+    env: dict[str, str] = {}
+
+    for key, value in env_dict.items():
+        if isinstance(value, str):
+            missing_env_vars.update(_find_missing_env_vars(value))
+            rendered = _expand_env_vars(value)
+            if rendered:
+                env[key] = rendered
+
+    return (env or None), missing_env_vars
+
+
+def _parse_mcp_server(server_name: str, server_data: dict[str, Any]) -> MCPServerConfig:
+    """Parse one MCP server entry from JSON mapping format."""
+    args, missing_in_args = _parse_args(server_data.get("args", []))
+    env, missing_in_env = _parse_env(server_data.get("env", {}))
+    missing_env_vars = sorted(missing_in_args | missing_in_env)
+
+    return MCPServerConfig(
+        name=server_name,
+        command=server_data.get("command", ""),
+        args=args,
+        env=env,
+        enabled=server_data.get("enabled", True),
+        description=server_data.get("description", ""),
+        missing_env_vars=missing_env_vars,
+    )
+
+
+def load_mcp_configs(config_path: str | None = None) -> list[MCPServerConfig]:
     """
-    Load MCP server configurations from YAML file.
+    Load MCP server configurations from JSON config file.
+
+    Supported schema:
+
+    {
+      "mcpServers": {
+        "server-name": {
+          "type": "stdio",
+          "command": "uvx",
+          "args": ["package-name"],
+          "env": {}
+        }
+      }
+    }
 
     Args:
-        yaml_path: Path to YAML config file. Defaults to config/mcp_servers.yaml
+        config_path: Path to JSON config file. Defaults to config/mcp_servers.json.
 
     Returns:
         List of MCPServerConfig objects
     """
-    import os
-    import re
-    from pathlib import Path
-
-    import yaml
-
-    if yaml_path is None:
-        # Default to project root config/mcp_servers.yaml
+    if config_path is None:
         project_root = Path(__file__).parent.parent.parent.parent.parent
-        yaml_path = str(project_root / "config" / "mcp_servers.yaml")
+        config_file_path = project_root / "config" / "mcp_servers.json"
+    else:
+        config_file_path = Path(config_path)
 
-    if not os.path.exists(yaml_path):
-        logger.warning(f"MCP config file not found: {yaml_path}")
+    if not config_file_path.exists():
+        logger.warning(f"MCP config file not found: {config_file_path}")
         return []
 
-    with open(yaml_path, encoding="utf-8") as f:
-        config_data = yaml.safe_load(f)
+    with config_file_path.open(encoding="utf-8") as f:
+        config_data = json.load(f)
 
-    if not config_data or "servers" not in config_data:
+    mcp_servers = config_data.get("mcpServers", {}) if isinstance(config_data, dict) else {}
+    if not isinstance(mcp_servers, dict):
+        logger.warning(f"Invalid MCP config format in {config_file_path}: 'mcpServers' must be an object")
         return []
-
-    pattern = re.compile(r"\$\{([^}]+)\}")
-
-    def find_missing_env_vars(value: str) -> set[str]:
-        """Find env vars referenced by ${VAR_NAME} that are unset or empty."""
-        missing_vars: set[str] = set()
-        for match in pattern.finditer(value):
-            var_name = match.group(1)
-            if not os.getenv(var_name):
-                missing_vars.add(var_name)
-        return missing_vars
-
-    def expand_env_vars(value: str) -> str:
-        """Expand ${VAR_NAME} patterns with environment variables."""
-        def replace(match: re.Match) -> str:
-            var_name = match.group(1)
-            return os.getenv(var_name, "")
-
-        return pattern.sub(replace, value)
-
-    def expand_in_list(items: list) -> list:
-        """Expand env vars in a list of strings."""
-        return [expand_env_vars(item) if isinstance(item, str) else item for item in items]
-
-    def expand_in_dict(d: dict) -> dict:
-        """Expand env vars in a dict of strings."""
-        return {k: expand_env_vars(v) if isinstance(v, str) else v for k, v in d.items()}
 
     configs = []
-    for server in config_data["servers"]:
-        # Skip if not a dict (could be a comment placeholder)
-        if not isinstance(server, dict):
+    for server_name, server_data in mcp_servers.items():
+        if not isinstance(server_data, dict):
             continue
+        if server_data.get("type", "stdio") != "stdio":
+            logger.warning(f"[{server_name}] Unsupported MCP transport type: {server_data.get('type')}")
+            continue
+        configs.append(_parse_mcp_server(server_name, server_data))
 
-        # Expand environment variables in args
-        args = server.get("args", [])
-        missing_env_vars: set[str] = set()
-
-        for arg in args:
-            if isinstance(arg, str):
-                missing_env_vars.update(find_missing_env_vars(arg))
-
-        env = server.get("env")
-        if isinstance(env, dict):
-            for value in env.values():
-                if isinstance(value, str):
-                    missing_env_vars.update(find_missing_env_vars(value))
-
-        if args:
-            args = expand_in_list(args)
-            # Filter out empty args (from missing env vars)
-            args = [arg for arg in args if arg]
-
-        # Expand environment variables in env dict
-        if env:
-            env = expand_in_dict(env)
-
-        config = MCPServerConfig(
-            name=server.get("name", ""),
-            command=server.get("command", ""),
-            args=args,
-            env=env,
-            enabled=server.get("enabled", True),
-            description=server.get("description", ""),
-            missing_env_vars=sorted(missing_env_vars),
-        )
-        configs.append(config)
-
-    logger.info(f"Loaded {len(configs)} MCP server configs from {yaml_path}")
+    logger.info(f"Loaded {len(configs)} MCP server configs from {config_file_path}")
     return configs

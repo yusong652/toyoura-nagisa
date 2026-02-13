@@ -2,7 +2,7 @@
 MCP Configuration API.
 
 Provides endpoints for managing MCP server configuration per session.
-Global defaults are defined in config/mcp_servers.yaml.
+Global defaults are defined in config/mcp_servers.json.
 Session overrides are stored in session metadata.
 
 Routes:
@@ -24,7 +24,7 @@ from backend.infrastructure.storage.session_manager import (
 )
 from backend.infrastructure.mcp.client import (
     get_mcp_client_manager,
-    load_mcp_configs_from_yaml,
+    load_mcp_configs,
 )
 
 router = APIRouter(prefix="/api/mcp-config", tags=["mcp-config"])
@@ -77,7 +77,7 @@ async def get_mcp_config(
             raise BadRequestError(message=f"Session not found: {session_id}")
 
         # Get global configs (includes all servers)
-        global_configs = load_mcp_configs_from_yaml()
+        global_configs = load_mcp_configs()
 
         # Get session-specific overrides
         session_mcp_config = get_session_mcp_config(session_id) or {"servers": {}}
@@ -141,7 +141,7 @@ async def update_mcp_server(
             raise BadRequestError(message=f"Session not found: {session_id}")
 
         # Verify server exists
-        global_configs = load_mcp_configs_from_yaml()
+        global_configs = load_mcp_configs()
         server_config = None
         for config in global_configs:
             if config.name == request.server_name:
@@ -188,7 +188,7 @@ async def get_available_servers() -> ApiResponse[MCPConfigData]:
     Useful for admin views or when no session context is available.
     """
     try:
-        global_configs = load_mcp_configs_from_yaml()
+        global_configs = load_mcp_configs()
         mcp_manager = get_mcp_client_manager()
         connected_info = {info["name"]: info for info in mcp_manager.get_server_info()}
 

@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp",
+        "--api-key",
+        "${CONTEXT7_API_KEY}"
+      ],
+      "env": {},
+      "enabled": false,
+      "description": "Up-to-date documentation and code examples for libraries"
+    },
+    "pfc-mcp": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "pfc-mcp"
+      ],
+      "env": {},
+      "enabled": true,
+      "description": "Control ITASCA PFC simulations via MCP"
+    }
+  }
+}

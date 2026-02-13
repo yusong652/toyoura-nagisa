@@ -43,12 +43,12 @@ async def test_tool_manager_integration():
     # to ensure singleton pattern works correctly
     from backend.infrastructure.mcp.client import (
         initialize_mcp_clients,
-        load_mcp_configs_from_yaml,
+        load_mcp_configs,
         get_mcp_client_manager,
         shutdown_mcp_clients,
     )
 
-    configs = load_mcp_configs_from_yaml()
+    configs = load_mcp_configs()
     enabled_configs = [c for c in configs if c.enabled]
     print(f"    Enabled MCP servers: {[c.name for c in enabled_configs]}")
 

@@ -937,16 +937,16 @@ def build_initial_mcp_config() -> Dict[str, Any]:
     """
     Build initial MCP configuration from global defaults.
 
-    Reads mcp_servers.yaml and creates a session-level config dictionary
+    Reads mcp_servers.json and creates a session-level config dictionary
     with each server's default enabled state.
 
     Returns:
         Dict with structure: {"servers": {"server_name": {"enabled": bool}, ...}}
     """
     try:
-        from backend.infrastructure.mcp.client import load_mcp_configs_from_yaml
+        from backend.infrastructure.mcp.client import load_mcp_configs
 
-        configs = load_mcp_configs_from_yaml()
+        configs = load_mcp_configs()
         return {"servers": {c.name: {"enabled": c.enabled} for c in configs}}
     except Exception as e:
         print(f"[WARNING] Failed to build initial MCP config: {e}")
@@ -1008,7 +1008,7 @@ def is_mcp_server_enabled_for_session(session_id: str, server_name: str) -> bool
 
     Priority:
     1. Session-specific override in mcp_config
-    2. Global default from mcp_servers.yaml
+    2. Global default from mcp_servers.json
 
     Args:
         session_id: Session identifier
@@ -1023,11 +1023,11 @@ def is_mcp_server_enabled_for_session(session_id: str, server_name: str) -> bool
         if server_cfg is not None:
             return server_cfg.get("enabled", False)
 
-    # Fallback to global default from yaml config
+    # Fallback to global default from config file
     try:
-        from backend.infrastructure.mcp.client import load_mcp_configs_from_yaml
+        from backend.infrastructure.mcp.client import load_mcp_configs
 
-        for config in load_mcp_configs_from_yaml():
+        for config in load_mcp_configs():
             if config.name == server_name:
                 return config.enabled
     except Exception as e:
