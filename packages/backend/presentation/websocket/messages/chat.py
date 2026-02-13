@@ -7,6 +7,7 @@ streaming, and message creation in the toyoura-nagisa conversation system.
 from typing import Optional, Dict, Any, List
 from backend.presentation.websocket.messages.base import BaseWebSocketMessage
 from backend.presentation.websocket.messages.types import MessageType
+from backend.domain.models.agent_types import AgentProfileLiteral, DEFAULT_AGENT_PROFILE
 
 
 class ChatMessageRequest(BaseWebSocketMessage):
@@ -20,7 +21,7 @@ class ChatMessageRequest(BaseWebSocketMessage):
         message: User's input text
         context: Additional context for message processing
         stream_response: Whether to stream the response in real-time
-        agent_profile: Agent profile to use (pfc_expert, disabled)
+        agent_profile: Agent profile to use
         enable_memory: Whether to use long-term memory for this message
         files: Attached files (images, documents, etc.)
         mentioned_files: File paths mentioned via @ syntax (for content injection)
@@ -29,7 +30,7 @@ class ChatMessageRequest(BaseWebSocketMessage):
     message: str
     context: Optional[Dict[str, Any]] = None
     stream_response: bool = True
-    agent_profile: str = "pfc_expert"
+    agent_profile: AgentProfileLiteral = DEFAULT_AGENT_PROFILE
     enable_memory: bool = True
     files: List[Dict[str, Any]] = []
     mentioned_files: List[str] = []

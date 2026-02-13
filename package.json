@@ -10,6 +10,7 @@
     "packages/cli"
   ],
   "scripts": {
+    "predev:backend": "npm run kill:backend",
     "dev:backend": "cd packages/backend && uv run python run.py",
     "dev:web": "npm -w @toyoura-nagisa/web run dev",
     "dev:cli": "npm -w @toyoura-nagisa/cli run dev",
@@ -24,8 +25,8 @@
     "test:web": "npm -w @toyoura-nagisa/web run test",
     "lint:web": "npm -w @toyoura-nagisa/web run lint",
     "test": "npm run test:backend && npm run test:web",
-    "kill:backend": "pkill -9 -f 'python.*run.py' 2>/dev/null; pkill -9 -f 'uvicorn' 2>/dev/null; lsof -ti:9000 | xargs kill -9 2>/dev/null; echo '✅ Backend processes killed'",
-    "kill:web": "lsof -ti:5173 | xargs kill -9 2>/dev/null; echo '✅ Web processes killed'",
+    "kill:backend": "node scripts/kill-ports.mjs backend",
+    "kill:web": "node scripts/kill-ports.mjs web",
     "kill:all": "npm run kill:backend && npm run kill:web"
   },
   "repository": {

@@ -13,7 +13,25 @@ BACKEND_DIR = PROJECT_ROOT / "packages" / "backend"  # Backend directory for con
 CHAT_DIR = PROJECT_ROOT / "chat"
 TOOL_DB_PATH = BACKEND_DIR / "tool_db"  # Legacy, may not exist
 LOCATION_DB_PATH = BACKEND_DIR / "location_data"  # Legacy, may not exist
-PROMPTS_DIR = BACKEND_DIR / "config" / "prompts"
+
+
+def get_prompt_directories() -> list[Path]:
+    """Return prompt directory candidates in resolution order."""
+    return [
+        PROJECT_ROOT / "config" / "prompts",
+        BACKEND_DIR / "config" / "prompts",
+    ]
+
+
+def get_prompts_dir() -> Path:
+    """Return the first existing prompt directory, or the primary target path."""
+    for candidate in get_prompt_directories():
+        if candidate.exists():
+            return candidate
+    return get_prompt_directories()[0]
+
+
+PROMPTS_DIR = get_prompts_dir()
 
 # Environment variable overrides
 ENV_BASE_PROMPT = "NAGISA_BASE_PROMPT"

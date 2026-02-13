@@ -14,15 +14,16 @@ from pydantic import BaseModel, Field
 
 from backend.presentation.models.api_models import ApiResponse
 from backend.application.shell.shell_service import ShellService
+from backend.domain.models.agent_types import AgentProfileLiteral, DEFAULT_AGENT_PROFILE
 from backend.shared.utils.workspace import get_workspace_for_profile
 
 router = APIRouter(prefix="/api/shell", tags=["shell"])
 
 # Service instances per session+profile (simple in-memory cache)
-_shell_services: dict[tuple[str, str], ShellService] = {}
+_shell_services: dict[tuple[str, AgentProfileLiteral], ShellService] = {}
 
 
-async def _get_shell_service(session_id: str, agent_profile: str) -> ShellService:
+async def _get_shell_service(session_id: str, agent_profile: AgentProfileLiteral) -> ShellService:
     """Get or create ShellService for a session and profile."""
     cache_key = (session_id, agent_profile)
     if cache_key not in _shell_services:
@@ -45,7 +46,7 @@ class CwdData(BaseModel):
 class SetCwdRequest(BaseModel):
     """Request body for setting current working directory."""
     session_id: str = Field(..., description="Session ID")
-    agent_profile: str = Field(default="pfc_expert", description="Agent profile")
+    agent_profile: AgentProfileLiteral = Field(default=DEFAULT_AGENT_PROFILE, description="Agent profile")
     path: str = Field(..., description="New working directory path")
 
 
@@ -55,7 +56,7 @@ class SetCwdRequest(BaseModel):
 @router.get("/cwd", response_model=ApiResponse[CwdData])
 async def get_current_directory(
     session_id: str = Query(..., description="Session ID"),
-    agent_profile = "pfc_expert", description="Agent profile"
+    agent_profile: AgentProfileLiteral = Query(default=DEFAULT_AGENT_PROFILE, description="Agent profile"),
 ) -> ApiResponse[CwdData]:
     """Get the current working directory for a session."""
     try:
@@ -108,7 +109,7 @@ async def set_current_directory(request: SetCwdRequest) -> ApiResponse[CwdData]:
 @router.get("/cwd/{session_id}", response_model=ApiResponse[CwdData], deprecated=True)
 async def get_current_directory_legacy(
     session_id: str,
-    agent_profile = "pfc_expert"
+    agent_profile: AgentProfileLiteral = DEFAULT_AGENT_PROFILE,
 ) -> ApiResponse[CwdData]:
     """[DEPRECATED] Use GET /api/shell/cwd with query params instead."""
     return await get_current_directory(session_id, agent_profile)
@@ -118,7 +119,7 @@ async def get_current_directory_legacy(
 async def set_current_directory_legacy(
     session_id: str,
     path: str,
-    agent_profile = "pfc_expert"
+    agent_profile: AgentProfileLiteral = DEFAULT_AGENT_PROFILE,
 ) -> ApiResponse[CwdData]:
     """[DEPRECATED] Use PUT /api/shell/cwd instead."""
     request = SetCwdRequest(session_id=session_id, agent_profile=agent_profile, path=path)

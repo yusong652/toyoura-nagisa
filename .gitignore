@@ -65,8 +65,9 @@ packages/backend/.venv/
 packages/backend/__pycache__/
 packages/backend/workspace/
 packages/backend/infrastructure/tts/data/
-# Configuration files with sensitive information
-packages/backend/config/
+# Backend local-only configuration overrides
+packages/backend/config/local/*
+!packages/backend/config/local/.gitkeep
 *.bak
 # Legacy paths (kept for backwards compatibility)
 backend/.env

@@ -4,16 +4,18 @@ Core prompt loading and management functions.
 
 import os
 
-from .config import PROMPTS_DIR, BASE_DIR
+from .config import get_prompt_directories
 
 
 def _load_prompt_file(filename: str) -> str:
-    """Load specified prompt file from config/prompts directory"""
-    prompt_path = PROMPTS_DIR / filename
-    try:
-        return prompt_path.read_text(encoding="utf-8").strip()
-    except FileNotFoundError:
-        return ""
+    """Load a prompt file from the first directory that contains it."""
+    for prompt_dir in get_prompt_directories():
+        prompt_path = prompt_dir / filename
+        try:
+            return prompt_path.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            continue
+    return ""
 
 
 def get_base_prompt(profile: str = "pfc_expert") -> str:

@@ -19,7 +19,7 @@ class DevelopmentConfig:
         self.port: int = int(os.getenv("DEV_PORT", "8000"))
 
         # Debug settings
-        self.debug_mode: bool = self._get_bool_env("DEV_DEBUG", False)
+        self.debug_mode: bool = self._get_bool_env("DEV_DEBUG", True)
         self.log_level: str = os.getenv("DEV_LOG_LEVEL", "INFO")
 
     def _get_bool_env(self, key: str, default: bool) -> bool:

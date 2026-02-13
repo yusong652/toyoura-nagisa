@@ -16,6 +16,7 @@ from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import InternalServerError
 from backend.shared.utils.workspace import get_workspace_for_profile
 from backend.shared.utils.path_normalization import path_to_llm_format
+from backend.domain.models.agent_types import AgentProfileLiteral, DEFAULT_AGENT_PROFILE
 
 logger = logging.getLogger(__name__)
 
@@ -133,8 +134,8 @@ async def _search_files_in_workspace(
 async def search_files(
     query: str = Query(..., description="Search query for file names/paths"),
     session_id: Optional[str] = Query(default=None, description="Session ID"),
-    agent_profile = "pfc_expert",
-    limit: int = Query(default=50, ge=1, le=200, description="Maximum results")
+    agent_profile: AgentProfileLiteral = Query(default=DEFAULT_AGENT_PROFILE, description="Agent profile"),
+    limit: int = Query(default=50, ge=1, le=200, description="Maximum results"),
 ) -> ApiResponse[FileSearchData]:
     """Search files in workspace with fuzzy matching.
 

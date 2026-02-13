@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import InternalServerError
+from backend.domain.models.agent_types import AgentProfileLiteral, DEFAULT_AGENT_PROFILE
 from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 from backend.infrastructure.monitoring.status_monitor import get_status_monitor
 from backend.shared.utils.workspace import get_workspace_for_profile
@@ -113,7 +114,7 @@ class ExecuteRequest(BaseModel):
 
     code: str = Field(..., description="Python code to execute")
     session_id: str = Field(..., description="Session ID for task isolation")
-    agent_profile: str = Field(default="pfc_expert", description="Agent profile for workspace resolution")
+    agent_profile: AgentProfileLiteral = Field(default=DEFAULT_AGENT_PROFILE, description="Agent profile for workspace resolution")
     timeout_ms: Optional[int] = Field(default=30000, description="Execution timeout in milliseconds")
 
 
@@ -121,7 +122,7 @@ class ResetRequest(BaseModel):
     """Request body for workspace reset."""
 
     session_id: str = Field(..., description="Session ID for workspace resolution")
-    agent_profile: str = Field(default="pfc_expert", description="Agent profile for workspace resolution")
+    agent_profile: AgentProfileLiteral = Field(default=DEFAULT_AGENT_PROFILE, description="Agent profile for workspace resolution")
 
 
 # =====================

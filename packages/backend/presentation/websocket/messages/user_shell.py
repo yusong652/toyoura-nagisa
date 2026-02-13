@@ -8,6 +8,7 @@ command execution via WebSocket instead of REST API.
 from typing import Optional
 from backend.presentation.websocket.messages.base import BaseWebSocketMessage
 from backend.presentation.websocket.messages.types import MessageType
+from backend.domain.models.agent_types import AgentProfileLiteral, DEFAULT_AGENT_PROFILE
 
 
 class UserShellExecuteMessage(BaseWebSocketMessage):
@@ -24,7 +25,7 @@ class UserShellExecuteMessage(BaseWebSocketMessage):
     """
     type: MessageType = MessageType.USER_SHELL_EXECUTE
     command: str
-    agent_profile: str = "pfc_expert"
+    agent_profile: AgentProfileLiteral = DEFAULT_AGENT_PROFILE
     timeout_ms: Optional[int] = None
 
 

@@ -1,11 +1,4 @@
-"""
-CORS (Cross-Origin Resource Sharing) configuration example
-Security-focused CORS settings for different environments
-
-⚠️ SECURITY NOTICE:
-This is an EXAMPLE configuration. Copy this file to backend/config/cors.py
-and customize the allowed_origins for your production environment.
-"""
+"""CORS (Cross-Origin Resource Sharing) configuration."""
 
 import os
 from typing import List

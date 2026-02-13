@@ -117,9 +117,8 @@ uv sync               # Python backend
 npm run build:all
 
 # Configure
-# Copy example configs (optional - has defaults)
-cp -r packages/backend/config_example/ packages/backend/config/
-# Add your API keys to .env file (see config_example/README.md)
+# Backend config is version-controlled (packages/backend/config)
+# Add your API keys to .env file
 
 # Start
 npm run dev:backend   # Backend API (localhost:8000)

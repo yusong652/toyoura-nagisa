@@ -10,6 +10,7 @@ Supports Ctrl+B backgrounding similar to user shell commands.
 from typing import Optional, Any
 from backend.presentation.websocket.messages.base import BaseWebSocketMessage
 from backend.presentation.websocket.messages.types import MessageType
+from backend.domain.models.agent_types import AgentProfileLiteral, DEFAULT_AGENT_PROFILE
 
 
 class UserPfcConsoleExecuteMessage(BaseWebSocketMessage):
@@ -27,7 +28,7 @@ class UserPfcConsoleExecuteMessage(BaseWebSocketMessage):
     """
     type: MessageType = MessageType.USER_PFC_CONSOLE_EXECUTE
     code: str
-    agent_profile: str = "pfc_expert"
+    agent_profile: AgentProfileLiteral = DEFAULT_AGENT_PROFILE
     timeout_ms: Optional[int] = None
 
 

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import InternalServerError
 from backend.application.todo.service import get_todo_service
+from backend.domain.models.agent_types import AgentProfileLiteral
 
 router = APIRouter(prefix="/api/todos", tags=["todos"])
 
@@ -51,7 +52,7 @@ class TodoListData(BaseModel):
 # =====================
 @router.get("/current", response_model=ApiResponse[CurrentTodoData])
 async def get_current_todo(
-    agent_profile: str = Query(..., description="Agent profile for workspace resolution"),
+    agent_profile: AgentProfileLiteral = Query(..., description="Agent profile for workspace resolution"),
     session_id: Optional[str] = Query(default=None, description="Session identifier")
 ) -> ApiResponse[CurrentTodoData]:
     """Get the currently in-progress todo for display.
@@ -78,7 +79,7 @@ async def get_current_todo(
 
 @router.get("", response_model=ApiResponse[TodoListData])
 async def get_all_todos(
-    agent_profile: str = Query(..., description="Agent profile for workspace resolution"),
+    agent_profile: AgentProfileLiteral = Query(..., description="Agent profile for workspace resolution"),
     session_id: Optional[str] = Query(default=None, description="Session identifier")
 ) -> ApiResponse[TodoListData]:
     """Get all todos for the workspace."""
@@ -101,7 +102,7 @@ async def get_all_todos(
 
 @router.get("/pending", response_model=ApiResponse[TodoListData])
 async def get_pending_todos(
-    agent_profile: str = Query(..., description="Agent profile for workspace resolution"),
+    agent_profile: AgentProfileLiteral = Query(..., description="Agent profile for workspace resolution"),
     session_id: Optional[str] = Query(default=None, description="Session identifier"),
     limit: Optional[int] = Query(default=None, description="Maximum number of todos")
 ) -> ApiResponse[TodoListData]:
@@ -128,7 +129,7 @@ async def get_pending_todos(
 # =====================
 @router.get("/all", response_model=ApiResponse[TodoListData], deprecated=True)
 async def get_all_todos_legacy(
-    agent_profile: str = Query(..., description="Agent profile"),
+    agent_profile: AgentProfileLiteral = Query(..., description="Agent profile"),
     session_id: Optional[str] = Query(default=None, description="Session identifier")
 ) -> ApiResponse[TodoListData]:
     """[DEPRECATED] Use GET /api/todos instead."""

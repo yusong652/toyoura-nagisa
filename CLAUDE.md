@@ -262,7 +262,6 @@ toyoura-nagisa/
 │   │   │   └── websocket/
 │   │   ├── config/
 │   │   │   └── prompts/
-│   │   ├── config_example/
 │   │   ├── shared/                  # constants/exceptions/utils
 │   │   └── workspace/
 │   ├── web/                         # React web frontend
@@ -286,7 +285,7 @@ Standalone dependency:
 ## Configuration
 
 ### Environment Setup
-- Copy configuration examples from `packages/backend/config_example/` to `packages/backend/config/`
+- Backend configuration lives in `packages/backend/config/` (version-controlled)
 - Main config files: `cors.py`, `dev.py`, `memory.py`, `pfc.py`
 - Agent definitions: `config/agents.yaml`
 - Database locations:

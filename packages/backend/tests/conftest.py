@@ -6,10 +6,8 @@ Fixtures provide reusable test data and mock objects.
 """
 
 import importlib
-import sys
 import uuid
 from datetime import datetime
-from types import ModuleType
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock, Mock
 
@@ -19,40 +17,10 @@ import pytest
 def _ensure_backend_config_available() -> None:
     try:
         importlib.import_module("backend.config")
-        return
     except ModuleNotFoundError:
-        config_module = importlib.import_module("backend.config_example")
-        sys.modules.setdefault("backend.config", config_module)
-        for name in ("cors", "pfc"):
-            sys.modules.setdefault(
-                f"backend.config.{name}",
-                importlib.import_module(f"backend.config_example.{name}"),
-            )
-
-        if "backend.config.dev" not in sys.modules:
-            dev_module = ModuleType("backend.config.dev")
-            dev_config = importlib.import_module("backend.config_example.dev")
-
-            def get_dev_config() -> Any:
-                return dev_config.DevelopmentConfig()
-
-            setattr(dev_module, "DevelopmentConfig", dev_config.DevelopmentConfig)
-            setattr(dev_module, "get_dev_config", get_dev_config)
-            sys.modules["backend.config.dev"] = dev_module
-
-        if "backend.config.memory" not in sys.modules:
-            memory_module = ModuleType("backend.config.memory")
-
-            class MemoryConfig:
-                def __init__(self, **kwargs: Any) -> None:
-                    for key, value in kwargs.items():
-                        setattr(self, key, value)
-
-                def model_dump(self) -> Dict[str, Any]:
-                    return dict(self.__dict__)
-
-            setattr(memory_module, "MemoryConfig", MemoryConfig)
-            sys.modules["backend.config.memory"] = memory_module
+        raise RuntimeError(
+            "backend.config is required for tests. Ensure packages/backend/config is present and importable."
+        )
 
 
 _ensure_backend_config_available()
