@@ -70,7 +70,6 @@ class AgentService:
         self,
         session_id: str,
         instruction: UserMessage,
-        enable_memory: bool = True,
         llm_config: dict[str, Any] | None = None,
     ) -> AgentResult:
         """
@@ -85,7 +84,6 @@ class AgentService:
         Args:
             session_id: Session ID for the conversation
             instruction: UserMessage object containing user input
-            enable_memory: Whether to enable memory persistence (default: True)
             llm_config: Optional LLM configuration with keys:
                        - provider: LLM provider name (e.g., "google", "anthropic")
                        - model: Model identifier (e.g., "gemini-2.0-flash-exp")
@@ -119,7 +117,6 @@ class AgentService:
             config=config,
             llm_client=llm_client,
             session_id=session_id,
-            enable_memory=enable_memory,
         )
         return await agent.execute(instruction=instruction)
 

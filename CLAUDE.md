@@ -230,7 +230,6 @@ toyoura-nagisa/
 │   │   │   ├── agent/
 │   │   │   ├── chat/
 │   │   │   ├── contents/
-│   │   │   ├── memory/
 │   │   │   ├── notifications/
 │   │   │   ├── oauth/
 │   │   │   ├── pfc/
@@ -250,7 +249,6 @@ toyoura-nagisa/
 │   │   │   │   └── shared/
 │   │   │   ├── file_mention/
 │   │   │   ├── mcp/
-│   │   │   ├── memory/
 │   │   │   ├── messaging/
 │   │   │   ├── monitoring/
 │   │   │   ├── oauth/
@@ -268,11 +266,9 @@ toyoura-nagisa/
 │   ├── cli/                         # React/Ink terminal frontend
 │   ├── core/                        # Shared TypeScript core
 │   ├── credentials/
-│   ├── memory_db/
 │   ├── pfc_workspace/
 │   └── workspace/
 ├── data/                            # Session data + oauth tokens
-├── memory_db/                       # ChromaDB storage
 ├── tests/                           # Root test suite
 ├── workspace/                       # Runtime workspace
 ├── package.json                     # Root package.json (npm workspaces)
@@ -286,10 +282,9 @@ Standalone dependency:
 
 ### Environment Setup
 - Backend configuration lives in `packages/backend/config/` (version-controlled)
-- Main config files: `cors.py`, `dev.py`, `memory.py`, `pfc.py`
+- Main config files: `cors.py`, `dev.py`, `pfc.py`
 - Agent definitions: `config/agents.yaml`
 - Database locations:
-  - Memory DB: `memory_db/` (root level)
   - Session data: `data/` (root level)
 
 ### Google Services Integration
@@ -334,11 +329,6 @@ The frontend uses standard React testing practices with Vite.
 - Tools are loaded dynamically based on agent name (main agent or SubAgent)
 - Main agent uses a single configuration; SubAgents are invoked explicitly
 - Internal tools run in-process; MCP gateway is optional for external MCP clients (port 9000 if enabled)
-
-### Memory Management
-- ChromaDB handles conversation memory and long-term context
-- Session-based memory isolation
-- Memory cleanup on session deletion
 
 ### PFC Integration
 - **Not a workspace member**: pfc-bridge runs in PFC's Python environment

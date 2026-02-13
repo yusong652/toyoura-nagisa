@@ -90,18 +90,10 @@ export interface QuitActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'memory' | 'session' | 'settings' | 'theme' | 'pfc_reset' | 'pfc_tasks' |
+  dialog: 'help' | 'session' | 'settings' | 'theme' | 'pfc_reset' | 'pfc_tasks' |
     'models_provider' | 'models_primary' | 'models_secondary' | 'mcp_servers' | 'skills' |
     'connects_providers' | 'connects_google_menu' | 'quota_display';
   props?: Record<string, unknown>;
-}
-
-/**
- * Return type for memory toggle action
- */
-export interface MemoryToggleActionReturn {
-  type: 'memory_toggle';
-  enabled: boolean;
 }
 
 /**
@@ -135,7 +127,6 @@ export type SlashCommandActionReturn =
   | MessageActionReturn
   | QuitActionReturn
   | OpenDialogActionReturn
-  | MemoryToggleActionReturn
   | LoadHistoryActionReturn
   | SubmitPromptActionReturn
   | OpenCustomDialogActionReturn;

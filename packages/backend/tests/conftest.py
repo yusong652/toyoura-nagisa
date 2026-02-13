@@ -108,7 +108,6 @@ def mock_context_manager():
     """Mock context manager for LLM client."""
     ctx = Mock()
     ctx.agent_profile = "pfc_expert"
-    ctx.enable_memory = True
     ctx.add_user_message = AsyncMock()
     ctx.add_assistant_message = AsyncMock()
     ctx.add_tool_result = AsyncMock()

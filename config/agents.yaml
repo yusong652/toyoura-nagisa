@@ -28,7 +28,6 @@ main_agent:
     - trigger_skill
   max_iterations: 64
   streaming_enabled: true
-  enable_memory: false
   color: "#9C27B0"
   icon: "⚛️"
   skills:
@@ -61,7 +60,6 @@ subagents:
       - todo_write
     max_iterations: 64
     streaming_enabled: false
-    enable_memory: false
     color: "#9E9E9E"
     icon: "🤖"
     skills: []  # SubAgents currently have no skills
@@ -82,7 +80,6 @@ subagents:
       - todo_write
     max_iterations: 64
     streaming_enabled: false
-    enable_memory: false
     color: "#9E9E9E"
     icon: "🤖"
     skills: []  # SubAgents currently have no skills

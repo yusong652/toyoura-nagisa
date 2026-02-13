@@ -4,7 +4,7 @@ This directory is version-controlled.
 
 ## What belongs here
 
-- Non-secret defaults used by the backend runtime (`dev.py`, `memory.py`, `pfc.py`, `cors.py`, `__init__.py`)
+- Non-secret defaults used by the backend runtime (`dev.py`, `pfc.py`, `cors.py`, `__init__.py`)
 - Prompt files for backend behavior (optional location, see prompt resolution below)
 
 ## What should NOT be committed

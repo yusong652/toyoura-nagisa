@@ -49,7 +49,6 @@ class BaseAgent(ABC):
         config: AgentConfig,
         llm_client: LLMClientBase,
         session_id: str,
-        enable_memory: bool | None = None,
     ):
         """
         Initialize base agent.
@@ -58,13 +57,10 @@ class BaseAgent(ABC):
             config: Agent configuration
             llm_client: LLM client for API calls
             session_id: Session ID for context management
-            enable_memory: Whether to enable memory persistence.
-                          If None, uses config.enable_memory as default.
         """
         self.config = config
         self.llm_client = llm_client
         self.session_id = session_id
-        self._enable_memory = enable_memory if enable_memory is not None else config.enable_memory
         self._system_prompt: str = ""
         # Default notification session is self (MainAgent uses this)
         self._notification_session_id = session_id
@@ -131,7 +127,6 @@ class BaseAgent(ABC):
         from backend.shared.utils.prompt.builder import build_system_prompt
 
         self.context_manager.agent_profile = self.config.name
-        self.context_manager.enable_memory = self._enable_memory
 
         self._system_prompt = await build_system_prompt(
             agent_profile=self.config.name,
@@ -421,7 +416,6 @@ class SubAgent(BaseAgent):
         config: AgentConfig,
         llm_client: LLMClientBase,
         session_id: str,
-        enable_memory: bool | None = None,
         notification_session_id: str | None = None,
         parent_tool_call_id: str | None = None,
     ):
@@ -432,11 +426,10 @@ class SubAgent(BaseAgent):
             config: SubAgent configuration
             llm_client: LLM client for API calls
             session_id: Temporary session ID for this SubAgent
-            enable_memory: Whether to enable memory persistence
             notification_session_id: Parent MainAgent's session ID for WebSocket routing
             parent_tool_call_id: ID of invoke_agent tool call for frontend association
         """
-        super().__init__(config, llm_client, session_id, enable_memory)
+        super().__init__(config, llm_client, session_id)
         self._notification_session_id = notification_session_id or session_id
         self._parent_tool_call_id = parent_tool_call_id
 

@@ -52,7 +52,6 @@ class BaseContextManager(ABC):
 
         # Request configuration storage
         self.agent_profile = "pfc_expert"
-        self.enable_memory = True
 
         # Tool call tracking
         self._has_tool_calls = False

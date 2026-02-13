@@ -27,7 +27,6 @@ export interface UseChatMessageOptions {
   currentSessionId: string | null
   sessionRefreshSessions: () => Promise<any>
   sessionSwitchSession: (sessionId: string) => Promise<void>
-  memoryEnabled?: boolean
   setIsLLMThinking?: (thinking: boolean) => void  // Callback to update global LLM thinking status
 }
 
@@ -51,7 +50,6 @@ export const useChatMessage = ({
   currentSessionId,
   sessionRefreshSessions,
   sessionSwitchSession,
-  memoryEnabled = true,
   setIsLLMThinking
 }: UseChatMessageOptions): UseChatMessageReturn => {
   const [messages, setMessages] = useState<Message[]>([])
@@ -345,7 +343,6 @@ export const useChatMessage = ({
       // Send message via ChatManager
       const result = await chatManager.sendMessage(text, files, {
         sessionId,
-        memoryEnabled,
         mentionedFiles
       })
 
@@ -354,7 +351,7 @@ export const useChatMessage = ({
       console.error('Failed to send message:', error)
       throw error
     }
-  }, [currentSessionId, memoryEnabled, chatManager])
+  }, [currentSessionId, chatManager])
 
   return {
     messages,

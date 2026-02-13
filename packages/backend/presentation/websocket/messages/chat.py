@@ -22,7 +22,6 @@ class ChatMessageRequest(BaseWebSocketMessage):
         context: Additional context for message processing
         stream_response: Whether to stream the response in real-time
         agent_profile: Agent profile to use
-        enable_memory: Whether to use long-term memory for this message
         files: Attached files (images, documents, etc.)
         mentioned_files: File paths mentioned via @ syntax (for content injection)
     """
@@ -31,7 +30,6 @@ class ChatMessageRequest(BaseWebSocketMessage):
     context: Optional[Dict[str, Any]] = None
     stream_response: bool = True
     agent_profile: AgentProfileLiteral = DEFAULT_AGENT_PROFILE
-    enable_memory: bool = True
     files: List[Dict[str, Any]] = []
     mentioned_files: List[str] = []
 

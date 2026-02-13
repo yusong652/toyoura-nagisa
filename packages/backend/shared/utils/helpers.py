@@ -2,10 +2,6 @@ import uuid
 from datetime import datetime
 from typing import Any, List, Dict, Optional, TypedDict
 
-# Memory manager initialization removed - preparing for memory system refactoring
-# memory_manager = MemoryManager()
-
-
 class _MessageParseResultRequired(TypedDict):
     """Required fields in message parsing result"""
 
@@ -13,7 +9,6 @@ class _MessageParseResultRequired(TypedDict):
     session_id: str
     message: str
     request_id: str
-    enable_memory: bool
 
 
 class MessageParseResult(_MessageParseResultRequired, total=False):
@@ -30,7 +25,6 @@ def parse_message_data(data: dict) -> MessageParseResult:
     text = data.get("message", "")
     files = data.get("files", [])
     msg_id = data.get("message_id")
-    enable_memory = data.get("enable_memory", True)  # Default to True, simplified
     mentioned_files = data.get("mentioned_files", [])  # File mentions from frontend
 
     # Convert ISO timestamp to milliseconds if present
@@ -61,7 +55,6 @@ def parse_message_data(data: dict) -> MessageParseResult:
         "session_id": session_id,
         "message": text,  # Add text message for streaming handler
         "request_id": str(uuid.uuid4()),  # Generate unique request ID
-        "enable_memory": enable_memory,  # Add memory setting
     }
 
     # Add mentioned_files only if non-empty (optional field)

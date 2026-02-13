@@ -28,7 +28,6 @@ class TestInvokeAgentTool:
         config = PFC_EXPLORER
         assert config.name == "pfc_explorer"
         assert config.streaming_enabled is False
-        assert config.enable_memory is False
         assert config.max_iterations == 64
         assert "pfc_browse_commands" in config.tools
         assert "pfc_browse_python_api" in config.tools

@@ -67,7 +67,6 @@ dependencies = [
     "psutil>=7.1.0",
     "vllm>=0.11.0; sys_platform != 'win32'",
     "ollama>=0.6.0",
-    "mem0ai>=1.0.0",
     "matplotlib>=3.10.7",
 ]
 

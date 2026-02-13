@@ -137,10 +137,6 @@ async def build_system_prompt(
     - Base identity and instructions (profile-specific)
     - Expression/Live2D instructions (MainAgent only)
 
-    Note: Memory context is now injected into user messages via ReminderInjector,
-    not in the system prompt. This follows modern LLM best practices where dynamic
-    context should be closer to the user's query.
-
     Note: Tool schemas are handled by native LLM API (tools parameter), not embedded
     in the system prompt. This follows 2025 Anthropic best practices.
 

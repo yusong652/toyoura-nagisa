@@ -94,10 +94,6 @@ export const Header: React.FC<HeaderProps> = ({ isShellMode = false, isShellExec
             </Text>
           </>
         )}
-        {separator}
-        <Text color={appState.memoryEnabled ? '#3fb950' : theme.text.muted}>
-          {appState.memoryEnabled ? 'Memory ON' : 'Memory OFF'}
-        </Text>
         {(isShellMode || isShellExecuting) && (
           <>
             {separator}

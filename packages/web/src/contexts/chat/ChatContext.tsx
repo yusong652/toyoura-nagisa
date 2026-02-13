@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { FileData, ChatContextType} from '@toyoura-nagisa/core'
 import { useSession } from '../session/SessionContext'
-import { useMemory } from '../MemoryContext'
 import { useChatMessage } from './useChatMessage'
 import { useStreamHandler } from './useStreamHandler'
 import { useStreamingUpdateHandler } from './useStreamingUpdateHandler'
@@ -23,7 +22,6 @@ interface ChatProviderProps {
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false)
   const [isLLMThinking, setIsLLMThinking] = useState(false)  // Global LLM thinking status
-  const { memoryEnabled } = useMemory()
   
   // 从SessionContext获取会话相关状态和方法
   const {
@@ -44,7 +42,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     currentSessionId,
     sessionRefreshSessions,
     sessionSwitchSession,
-    memoryEnabled,
     setIsLLMThinking  // Pass LLM thinking status setter
   })
 

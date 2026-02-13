@@ -2,7 +2,7 @@
 ReminderInjector - Unified service for injecting system status reminders.
 
 This service centralizes the logic for collecting and injecting reminders into:
-1. User messages (with file mentions, memory context, without queue messages)
+1. User messages (with file mentions, without queue messages)
 2. Tool results (without file mentions, with queue messages)
 
 Replaces scattered injection logic in ChatService and BaseContextManager.
@@ -18,63 +18,53 @@ class ReminderInjector:
     Unified service for collecting and injecting system status reminders.
 
     Provides two main injection points:
-    - User messages: Includes memory context, file mentions, excludes queue messages
+    - User messages: Includes file mentions, excludes queue messages
     - Tool results: Excludes file mentions, includes queue messages
 
     Usage:
         injector = ReminderInjector(session_id, agent_profile)
 
-        # For user messages (with optional memory injection)
-        await injector.inject_to_user_message(content, mentioned_files, enable_memory=True)
+        # For user messages
+        await injector.inject_to_user_message(content, mentioned_files)
 
         # For tool results
         await injector.inject_to_tool_result(result)
     """
 
-    def __init__(self, session_id: str, agent_profile = "pfc_expert", user_id: Optional[str] = None):
+    def __init__(self, session_id: str, agent_profile = "pfc_expert"):
         """
         Initialize ReminderInjector with session context.
 
         Args:
             session_id: Session identifier for status monitor lookup
             agent_profile: Agent profile type for workspace-dependent monitors
-            user_id: User ID for memory operations (uses config default if None)
         """
         self.session_id = session_id
         self.agent_profile = agent_profile
-        self.user_id = user_id
 
     async def inject_to_user_message(
         self,
         content: List[Dict[str, Any]],
         mentioned_files: Optional[List[str]] = None,
-        enable_memory: bool = False
     ) -> None:
         """
         Inject reminders into user message content.
 
-        Collects memory context, file mentions and status reminders (without queue messages),
+        Collects file mentions and status reminders (without queue messages),
         then injects them into the content list in-place.
 
         Args:
             content: User message content list (modified in-place)
             mentioned_files: List of file paths mentioned with @ syntax
-            enable_memory: Whether to inject memory context (controlled by frontend)
 
         Note:
-            - Memory context is injected first (highest priority)
-            - File mentions are processed second
+            - File mentions are processed first
             - Queue messages are NOT checked (user is initiating, not responding)
             - Supports multimodal content (text + inline_data for images)
         """
-        # Extract current user text from content for memory search
-        current_user_text = self._extract_text_from_content(content)
-
         reminders = await self._collect_reminders(
             check_queue=False,
             mentioned_files=mentioned_files,
-            enable_memory=enable_memory,
-            current_user_text=current_user_text
         )
 
         if not reminders:
@@ -108,34 +98,23 @@ class ReminderInjector:
         self,
         check_queue: bool,
         mentioned_files: Optional[List[str]] = None,
-        enable_memory: bool = False,
-        current_user_text: Optional[str] = None
     ) -> List[Union[str, Dict[str, Any]]]:
         """
         Collect all reminders from various sources.
 
         Collection order (for user messages):
-        1. Memory context (highest priority, injected first)
-        2. Rejection context
-        3. File mentions
-        4. Status reminders (lowest priority)
+        1. Rejection context
+        2. File mentions
+        3. Status reminders
 
         Args:
             check_queue: Whether to check queue for user messages during tool execution
             mentioned_files: List of file paths to process (only for user messages)
-            enable_memory: Whether to include memory context (only for user messages)
-            current_user_text: Current user message text for memory search (only for user messages)
 
         Returns:
             List of reminders (strings or multimodal dicts)
         """
         reminders = []
-
-        # 0. Memory context (only for user messages, highest priority)
-        if enable_memory and not check_queue and current_user_text:
-            memory_reminder = await self._get_memory_context_reminder(current_user_text)
-            if memory_reminder:
-                reminders.append(memory_reminder)
 
         # 1. Check for rejection context (only for user messages, not tool results)
         if not check_queue:
@@ -160,64 +139,6 @@ class ReminderInjector:
         reminders.extend(status_reminders)
 
         return reminders
-
-    async def _get_memory_context_reminder(self, query_text: str) -> Optional[str]:
-        """
-        Get memory context reminder based on query text.
-
-        Retrieves relevant memories based on the provided query text and formats
-        them for injection into the user message content.
-
-        Args:
-            query_text: The current user message text to use as search query
-
-        Returns:
-            Formatted memory context string wrapped in <memory-context> tags,
-            or None if no relevant memories found.
-        """
-        try:
-            from backend.shared.utils.memory_factory import get_memory_middleware
-            from backend.config.memory import MemoryConfig
-            from backend.domain.models.memory_context import MemoryContext
-
-            # Get memory configuration
-            memory_config = MemoryConfig()
-
-            # Determine effective user_id (Mem0 requires user or agent id)
-            effective_user_id = self.user_id or memory_config.mem0_user_id
-
-            # Initialize/reuse singleton memory middleware
-            memory_middleware = get_memory_middleware()
-
-            # Create memory context
-            memory_context = MemoryContext(
-                query=query_text,
-                top_k=memory_config.max_memories_to_inject,
-                relevance_threshold=memory_config.memory_relevance_threshold
-            )
-
-            # Search for relevant memories (always cross-session)
-            memories = await memory_middleware.memory_manager.get_relevant_memories_for_context(
-                query_text=query_text,
-                top_k=memory_context.top_k,
-                user_id=effective_user_id
-            )
-
-            # Format memories for injection
-            memory_context.memories = memories
-            formatted_context = memory_context.format_for_injection()
-
-            if not formatted_context or not formatted_context.strip():
-                return None
-
-            # Wrap in <memory-context> tags
-            reminder = f"<memory-context>\n{formatted_context}\n</memory-context>"
-            logger.info(f"Injecting {len(memories)} memories into user message for session {self.session_id[:8]}")
-            return reminder
-
-        except Exception as e:
-            logger.error(f"Failed to get memory context reminder: {e}")
-            return None
 
     async def _get_rejection_context_reminder(self) -> Optional[str]:
         """
@@ -369,27 +290,3 @@ class ReminderInjector:
                 part['text'] += reminder_text
                 break
 
-    def _extract_text_from_content(self, content: List[Dict[str, Any]]) -> Optional[str]:
-        """
-        Extract text from user message content list.
-
-        Combines all text parts from the content list into a single string.
-
-        Args:
-            content: User message content list (list of dicts with type/text)
-
-        Returns:
-            Combined text string, or None if no text found
-        """
-        if not content or not isinstance(content, list):
-            return None
-
-        text_parts = []
-        for part in content:
-            if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
-                text_parts.append(part['text'])
-
-        if not text_parts:
-            return None
-
-        return ' '.join(text_parts)

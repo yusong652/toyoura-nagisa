@@ -31,7 +31,6 @@ export interface UseChatStreamOptions {
   connectionManager: ConnectionManager;
   historyManager: UseHistoryManagerReturn;
   currentSessionId: string | null;
-  memoryEnabled: boolean;
 }
 
 export interface UseChatStreamReturn {
@@ -63,7 +62,6 @@ export function useChatStream({
   connectionManager,
   historyManager,
   currentSessionId,
-  memoryEnabled,
 }: UseChatStreamOptions): UseChatStreamReturn {
   // Core state
   const [streamingState, setStreamingState] = useState<StreamingState>(StreamingState.Idle);
@@ -163,7 +161,6 @@ export function useChatStream({
         session_id: currentSessionId,
         timestamp: new Date().toISOString(),
         stream_response: true,
-        enable_memory: memoryEnabled,
         files: [],
         mentioned_files: mentionedFiles || [],
       });
@@ -184,7 +181,6 @@ export function useChatStream({
     },
     [
       currentSessionId,
-      memoryEnabled,
       historyManager,
       isStreaming,
       connectionManager,

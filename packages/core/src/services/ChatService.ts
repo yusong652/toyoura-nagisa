@@ -25,7 +25,6 @@ export interface MessageRequest {
 export interface ChatStreamRequest {
   messageData: string
   session_id: string
-  enable_memory?: boolean
   mentioned_files?: string[]  // File paths from @ mentions (frontend-confirmed)
 }
 
@@ -51,7 +50,6 @@ export class ChatService {
    * @param sessionId - Current session identifier
    * @param userMessageId - Unique identifier for the user message
    * @param agentProfile - Agent profile for tool selection
-   * @param memoryEnabled - Whether memory injection is enabled (default: true)
    * @param mentionedFiles - Optional file paths from @ mentions (frontend-confirmed)
    * @returns Promise resolving to mock Response for compatibility (WebSocket doesn't return Response)
    */
@@ -60,7 +58,6 @@ export class ChatService {
     files: FileData[] = [],
     sessionId: string,
     userMessageId: string,
-    memoryEnabled: boolean = true,
     mentionedFiles: string[] = []
   ): Promise<Response> {
     // Get WebSocket connection
@@ -81,7 +78,6 @@ export class ChatService {
       session_id: sessionId,
       message_id: userMessageId,
       message: text,
-      enable_memory: memoryEnabled,
       files: files.map(file => ({
         name: file.name,
         type: file.type,

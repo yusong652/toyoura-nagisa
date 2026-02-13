@@ -46,7 +46,6 @@ class DummyContextManager(BaseContextManager):
         self.working_contents = working_contents or []
         self._status_monitor = status_monitor or DummyStatusMonitor()
         self.agent_profile = "pfc_expert"
-        self.enable_memory = True
 
     def add_response(self, response: Any) -> None:
         self.last_response = response

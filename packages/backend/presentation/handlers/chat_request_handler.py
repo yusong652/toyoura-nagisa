@@ -5,7 +5,7 @@ This handler serves as the primary entry point for WebSocket chat requests,
 coordinating the complete request lifecycle:
 - Request initialization and deduplication
 - WebSocket status notifications (sent/read/error)
-- Application service orchestration (Agent.execute(), ContentProcessor, Memory)
+- Application service orchestration (Agent.execute(), ContentProcessor)
 - Error handling and user interruption management
 
 As a presentation layer component, it bridges WebSocket-specific concerns
@@ -16,7 +16,6 @@ import uuid
 import logging
 from backend.application.chat.service import PreparedUserMessage
 from backend.application.contents.content_processor import process_content_pipeline
-from backend.application.memory.service import save_session_conversation_memory
 from backend.application.notifications import get_message_status_service
 from backend.application.session.request_manager import request_manager
 from backend.shared.exceptions import UserRejectionInterruption
@@ -32,8 +31,7 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
     1. Status notifications (sent/read/error)
     2. Agent execution with explicit instruction passing
     3. Content processing pipeline
-    4. Memory persistence after successful completion
-    5. Comprehensive error handling
+    4. Comprehensive error handling
 
     Args:
         prepared_message: PreparedUserMessage containing instruction and configuration
@@ -77,18 +75,12 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
             result = await agent_service.process_chat(
                 session_id=session_id,
                 instruction=prepared_message.instruction,
-                enable_memory=prepared_message.enable_memory,
                 llm_config=None,  # Client is already configured correctly
             )
 
             # ========== PHASE 3: Content processing pipeline ==========
             if result.status == "success" and result.message:
                 await process_content_pipeline(result.message, session_id, message_id=result.message_id)
-
-            # ========== PHASE 4: Memory persistence ==========
-            # Note: Title generation happens in Agent.execute() (Application layer)
-            if prepared_message.enable_memory:
-                await save_session_conversation_memory(session_id)
 
         except UserRejectionInterruption as interruption:
             # User rejected tool execution - this is NOT an error

@@ -101,7 +101,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const [llmConfig, setLlmConfig] = useState<ChatSession['llm_config'] | null>(null);
   const [contextWindow, setContextWindow] = useState<number | null>(null);
   const [isQuitting, setIsQuitting] = useState(false);
-  const [memoryEnabled, setMemoryEnabled] = useState(false);
   const [thinkingLevel, setThinkingLevel] = useState<string>('default');
   const [thinkingLevelOptions, setThinkingLevelOptions] = useState<string[]>(['default', 'low', 'high']);
   const [sessionTokenUsage, setSessionTokenUsage] = useState<TokenUsage | null>(null);
@@ -150,7 +149,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     connectionManager,
     historyManager,
     currentSessionId,
-    memoryEnabled,
   });
 
   // Session management (switch, create, history loading)
@@ -562,7 +560,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     sessionMode,
     llmConfig,
     contextWindow,
-    memoryEnabled,
     thinkingLevel,
     thinkingLevelOptions,
     history: historyManager.history,
@@ -592,7 +589,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     sessionMode,
     llmConfig,
     contextWindow,
-    memoryEnabled,
     thinkingLevel,
     thinkingLevelOptions,
     historyManager.history,
@@ -622,7 +618,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     createSession,
     setSessionMode: updateSessionMode,
     cycleSessionMode,
-    setMemoryEnabled,
     cycleThinkingLevel,
     sendMessage,
     cancelRequest,
@@ -643,7 +638,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     createSession,
     updateSessionMode,
     cycleSessionMode,
-    setMemoryEnabled,
     cycleThinkingLevel,
     sendMessage,
     cancelRequest,

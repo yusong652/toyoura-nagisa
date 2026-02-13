@@ -56,7 +56,6 @@ const MemoizedAppHeader = memo(AppHeader);
 type ActiveDialog =
   | 'help'
   | 'help_detail'
-  | 'memory'
   | 'session'
   | 'session_restore'
   | 'session_delete'
@@ -147,12 +146,6 @@ interface GoogleQuotaInfo {
   project_id?: string | null;
   windows: QuotaWindowInfo[];
 }
-
-// Memory options for SelectDialog
-const MEMORY_OPTIONS: SelectOption<boolean>[] = [
-  { key: 'on', value: true, label: 'On', description: 'AI can recall previous conversations' },
-  { key: 'off', value: false, label: 'Off', description: 'No long-term memory' },
-];
 
 // Session action options for SelectDialog
 const SESSION_ACTION_OPTIONS: SelectOption<SessionAction>[] = [
@@ -1443,23 +1436,13 @@ export const MainLayout: React.FC = () => {
     setActiveDialog('help_detail');
   }, []);
 
-  // Handle memory selection from dialog
-  const handleMemorySelect = useCallback((enabled: boolean) => {
-    appActions.setMemoryEnabled(enabled);
-    appActions.showNotification(
-      `Memory ${enabled ? 'enabled' : 'disabled'}`,
-      'info'
-    );
-    setActiveDialog(null);
-  }, []);
-
   // Handle theme selection from dialog
   const handleThemeSelect = useCallback((themeName: ThemeName) => {
     themeManager.setTheme(themeName);
     setThemePreviewBase(null);
     setActiveDialog(null);
     // In alternate buffer mode, Ink handles re-rendering automatically
-  }, [appActions]);
+  }, []);
 
   const handleThemeHighlight = useCallback((themeName: ThemeName) => {
     themeManager.setTheme(themeName, false);
@@ -1925,14 +1908,6 @@ export const MainLayout: React.FC = () => {
         });
         break;
 
-      case 'memory_toggle':
-        appActions.setMemoryEnabled(result.enabled);
-        appActions.showNotification(
-          `Memory ${result.enabled ? 'enabled' : 'disabled'}`,
-          'info'
-        );
-        break;
-
       case 'quit':
         appActions.quit();
         break;
@@ -1941,8 +1916,6 @@ export const MainLayout: React.FC = () => {
         // Open the appropriate dialog
         if (result.dialog === 'help') {
           setActiveDialog('help');
-        } else if (result.dialog === 'memory') {
-          setActiveDialog('memory');
         } else if (result.dialog === 'session') {
           setActiveDialog('session');
         } else if (result.dialog === 'theme') {
@@ -2111,19 +2084,6 @@ export const MainLayout: React.FC = () => {
             }}
             onCancel={() => setActiveDialog('help')}
             showNumbers={false}
-          />
-        )}
-
-        {/* Memory selection dialog */}
-        {activeDialog === 'memory' && (
-          <SelectDialog
-            title="Toggle Memory"
-            description="Enable or disable long-term conversation memory:"
-            options={MEMORY_OPTIONS}
-            currentValue={appState.memoryEnabled}
-            onSelect={handleMemorySelect}
-            onCancel={handleDialogCancel}
-            showDescriptions={true}
           />
         )}
 

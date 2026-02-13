@@ -27,7 +27,6 @@ class PreparedUserMessage:
     session_id: str
     message_id: str
     instruction: UserMessage
-    enable_memory: bool
 
 
 def get_chat_service() -> "ChatService":
@@ -48,23 +47,21 @@ class ChatService:
     managing conversation history, and generating streaming responses.
     """
 
-    async def parse_request(self, request: Request) -> tuple[MessageParseResult, bool]:
+    async def parse_request(self, request: Request) -> MessageParseResult:
         """
-        Parse FastAPI request and extract message data with memory configuration.
+        Parse FastAPI request and extract message data.
 
-        Combines JSON parsing, message data validation, and memory setting extraction
-        into a single operation, using configuration defaults.
+        Combines JSON parsing and message data validation into a single operation.
 
         Args:
             request: FastAPI Request object
 
         Returns:
-            tuple[MessageParseResult, bool]: Parsed message data and enable_memory flag
+            MessageParseResult: Parsed message data
 
         Raises:
             HTTPException: If request data is invalid or malformed
         """
-        from backend.config import get_memory_config
         from fastapi import HTTPException
 
         try:
@@ -74,11 +71,7 @@ class ChatService:
             if not result["content"]:
                 raise HTTPException(status_code=400, detail="Invalid message data format")
 
-            # Get enable_memory from request or use config default
-            memory_config = get_memory_config()
-            enable_memory = data.get("enable_memory", memory_config.save_conversations)
-
-            return result, enable_memory
+            return result
         except Exception as e:
             if isinstance(e, HTTPException):
                 raise
@@ -124,7 +117,6 @@ class ChatService:
             request_data: Dictionary containing WebSocket message data with structure:
                 - message: str - The chat message content
                 - session_id: str - Session identifier
-                - enable_memory: bool - Memory injection setting
                 - files: List - Attached files (if any)
 
         Returns:
@@ -132,7 +124,6 @@ class ChatService:
                 - session_id: Session identifier
                 - message_id: Message unique identifier
                 - instruction: UserMessage object ready for Agent
-                - enable_memory: Memory persistence setting
 
         Raises:
             ValueError: If message data is invalid or missing required fields
@@ -178,12 +169,11 @@ class ChatService:
             session_id=session_id,
             message_id=message_id,
             instruction=instruction,
-            enable_memory=parsed_data.get("enable_memory", True),
         )
 
     async def _inject_status_reminders(self, session_id: str, parsed_data: MessageParseResult) -> None:
         """
-        Inject system status reminders, memory context, and file mentions into user message content.
+        Inject system status reminders and file mentions into user message content.
 
         Delegates to ReminderInjector for unified reminder collection and injection.
 
@@ -199,10 +189,8 @@ class ChatService:
             agent_profile = get_agent_config().name
             mentioned_files = parsed_data.get("mentioned_files", [])
             content = parsed_data.get("content", [])
-            enable_memory = parsed_data.get("enable_memory", False)
-
             injector = ReminderInjector(session_id, agent_profile)
-            await injector.inject_to_user_message(content, mentioned_files or None, enable_memory=enable_memory)
+            await injector.inject_to_user_message(content, mentioned_files or None)
 
         except Exception as e:
             # Non-critical: Log and continue without reminders

@@ -10,7 +10,6 @@ import ConnectionError from './components/ConnectionError'
 import { ConnectionProvider } from './contexts/connection/ConnectionContext'
 import { SessionProvider } from './contexts/session/SessionContext'
 import { ChatProvider } from './contexts/chat/ChatContext'
-import { MemoryProvider } from './contexts/MemoryContext'
 import { ThinkingProvider, useThinking } from './contexts/ThinkingContext'
 import { useConnection } from './contexts/connection/ConnectionContext'
 import { ConnectionStatus } from './types/connection'
@@ -92,11 +91,9 @@ function App(): React.ReactElement {
       <ConnectionProvider>
         <SessionProvider>
           <ThinkingProvider>
-            <MemoryProvider>
-              <ChatProvider>
-                <AppContent />
-              </ChatProvider>
-            </MemoryProvider>
+            <ChatProvider>
+              <AppContent />
+            </ChatProvider>
           </ThinkingProvider>
         </SessionProvider>
       </ConnectionProvider>

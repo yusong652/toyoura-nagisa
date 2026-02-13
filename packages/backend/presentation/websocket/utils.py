@@ -26,7 +26,6 @@ def convert_websocket_message_to_request(session_id: str, message: BaseWebSocket
         "agent_profile": getattr(message, 'agent_profile', DEFAULT_AGENT_PROFILE),
         "type": getattr(message, 'type', 'text'),
         "message_id": message.message_id,
-        "enable_memory": getattr(message, 'enable_memory', True),
         "files": getattr(message, 'files', []),
         "mentioned_files": getattr(message, 'mentioned_files', [])
     }

@@ -49,7 +49,6 @@ class AgentConfig:
     # Runtime behavior
     max_iterations: int = 32
     streaming_enabled: bool = False
-    enable_memory: bool = False
     is_main_agent: bool = False
 
     # Display metadata (for frontend)
@@ -212,7 +211,6 @@ def _build_agent_config(
         tools = ()
     max_iterations = _require_int(data, "max_iterations", context)
     streaming_enabled = _require_bool(data, "streaming_enabled", context)
-    enable_memory = _require_bool(data, "enable_memory", context)
     color = _require_str(data, "color", context)
     icon = _require_str(data, "icon", context)
     skills = tuple(_parse_skills_config(data, "skills", context))
@@ -224,7 +222,6 @@ def _build_agent_config(
         tools=tools,
         max_iterations=max_iterations,
         streaming_enabled=streaming_enabled,
-        enable_memory=enable_memory,
         is_main_agent=is_main_agent,
         color=color,
         icon=icon,

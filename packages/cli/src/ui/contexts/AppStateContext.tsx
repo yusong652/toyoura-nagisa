@@ -39,9 +39,6 @@ export interface AppState {
   llmConfig: ChatSession['llm_config'] | null;
   contextWindow: number | null;
 
-  // Memory
-  memoryEnabled: boolean;
-
   // Thinking Level ("default" | "low" | "high")
   thinkingLevel: string;
   // Available thinking level options (for UI hint)
@@ -108,9 +105,6 @@ export interface AppActions {
   setSessionMode: (mode: SessionMode) => void;
   cycleSessionMode: (direction: 1 | -1) => void;
 
-  // Memory
-  setMemoryEnabled: (enabled: boolean) => void;
-
   // Thinking Level
   cycleThinkingLevel: () => Promise<void>;
 
@@ -147,7 +141,6 @@ const defaultState: AppState = {
   sessionMode: 'build',
   llmConfig: null,
   contextWindow: null,
-  memoryEnabled: false,
   thinkingLevel: 'default',
   thinkingLevelOptions: [],
   history: [],
@@ -179,7 +172,6 @@ const defaultActions: AppActions = {
   createSession: async () => '',
   setSessionMode: () => {},
   cycleSessionMode: () => {},
-  setMemoryEnabled: () => {},
   cycleThinkingLevel: async () => {},
   sendMessage: () => {},
   cancelRequest: () => {},

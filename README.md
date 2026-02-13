@@ -98,7 +98,6 @@ The agent sees what you did, no explanation needed.
 Beyond the core PFC integration, toyoura-nagisa includes:
 
 - **Multi-Provider LLM Support** - Gemini, Claude, GPT, GLM, Moonshot, OpenRouter, vLLM, Ollama
-- **Long-Term Memory** (ChromaDB) - Learns user preferences across sessions
 
 ## 🚀 Quick Start
 
