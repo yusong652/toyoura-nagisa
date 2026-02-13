@@ -24,6 +24,8 @@ from mcp.client.stdio import stdio_client
 
 logger = logging.getLogger(__name__)
 ENV_VAR_PATTERN = re.compile(r"\$\{([^}]+)\}")
+NAGISA_CONFIG_DIR = ".nagisa"
+MCP_CONFIG_FILENAME = "mcp_servers.json"
 
 
 @dataclass
@@ -509,7 +511,51 @@ def _parse_mcp_server(server_name: str, server_data: dict[str, Any]) -> MCPServe
     )
 
 
-def load_mcp_configs(config_path: str | None = None) -> list[MCPServerConfig]:
+def _load_mcp_servers_mapping_from_file(config_file_path: Path) -> dict[str, dict[str, Any]]:
+    """Load and validate mcpServers mapping from a JSON config file."""
+    with config_file_path.open(encoding="utf-8") as f:
+        config_data = json.load(f)
+
+    if not isinstance(config_data, dict):
+        logger.warning(f"Invalid MCP config format in {config_file_path}: root must be an object")
+        return {}
+
+    mcp_servers = config_data.get("mcpServers", {})
+    if not isinstance(mcp_servers, dict):
+        logger.warning(f"Invalid MCP config format in {config_file_path}: 'mcpServers' must be an object")
+        return {}
+
+    normalized: dict[str, dict[str, Any]] = {}
+    for server_name, server_data in mcp_servers.items():
+        if isinstance(server_name, str) and isinstance(server_data, dict):
+            normalized[server_name] = server_data
+    return normalized
+
+
+def _build_default_mcp_config_paths(workspace_root: str | None = None) -> list[Path]:
+    """Build MCP config lookup paths in low -> high priority order."""
+    project_root = Path(__file__).parent.parent.parent.parent.parent
+    builtin_config = project_root / "config" / MCP_CONFIG_FILENAME
+    user_config = Path.home() / NAGISA_CONFIG_DIR / MCP_CONFIG_FILENAME
+
+    config_paths = [builtin_config, user_config]
+
+    if workspace_root:
+        workspace_path = Path(workspace_root).expanduser()
+        if not workspace_path.is_absolute():
+            workspace_path = (Path.cwd() / workspace_path).resolve()
+        else:
+            workspace_path = workspace_path.resolve()
+        workspace_config = workspace_path / NAGISA_CONFIG_DIR / MCP_CONFIG_FILENAME
+        config_paths.append(workspace_config)
+
+    return config_paths
+
+
+def load_mcp_configs(
+    config_path: str | None = None,
+    workspace_root: str | None = None,
+) -> list[MCPServerConfig]:
     """
     Load MCP server configurations from JSON config file.
 
@@ -526,32 +572,45 @@ def load_mcp_configs(config_path: str | None = None) -> list[MCPServerConfig]:
       }
     }
 
+    Config priority (low -> high):
+        1. Builtin: project/config/mcp_servers.json
+        2. User: ~/.nagisa/mcp_servers.json
+        3. Workspace: <workspace>/.nagisa/mcp_servers.json
+
     Args:
-        config_path: Path to JSON config file. Defaults to config/mcp_servers.json.
+        config_path: Optional explicit config path. If provided, only this file is loaded.
+        workspace_root: Optional workspace root used to resolve workspace-level config.
 
     Returns:
         List of MCPServerConfig objects
     """
-    if config_path is None:
-        project_root = Path(__file__).parent.parent.parent.parent.parent
-        config_file_path = project_root / "config" / "mcp_servers.json"
-    else:
-        config_file_path = Path(config_path)
+    config_paths = [Path(config_path)] if config_path else _build_default_mcp_config_paths(workspace_root)
 
-    if not config_file_path.exists():
-        logger.warning(f"MCP config file not found: {config_file_path}")
+    merged_servers: dict[str, dict[str, Any]] = {}
+    loaded_paths: list[Path] = []
+
+    for path in config_paths:
+        if not path.exists():
+            continue
+        try:
+            server_mapping = _load_mcp_servers_mapping_from_file(path)
+        except Exception as e:
+            logger.warning(f"Failed to load MCP config file {path}: {e}")
+            continue
+
+        for server_name, server_data in server_mapping.items():
+            if server_name in merged_servers:
+                logger.info(f"MCP server '{server_name}' overridden by config: {path}")
+            merged_servers[server_name] = server_data
+
+        loaded_paths.append(path)
+
+    if not loaded_paths:
+        logger.warning("No MCP config files found (checked builtin/user/workspace paths)")
         return []
 
-    with config_file_path.open(encoding="utf-8") as f:
-        config_data = json.load(f)
-
-    mcp_servers = config_data.get("mcpServers", {}) if isinstance(config_data, dict) else {}
-    if not isinstance(mcp_servers, dict):
-        logger.warning(f"Invalid MCP config format in {config_file_path}: 'mcpServers' must be an object")
-        return []
-
-    configs = []
-    for server_name, server_data in mcp_servers.items():
+    configs: list[MCPServerConfig] = []
+    for server_name, server_data in merged_servers.items():
         if not isinstance(server_data, dict):
             continue
         if server_data.get("type", "stdio") != "stdio":
@@ -559,5 +618,27 @@ def load_mcp_configs(config_path: str | None = None) -> list[MCPServerConfig]:
             continue
         configs.append(_parse_mcp_server(server_name, server_data))
 
-    logger.info(f"Loaded {len(configs)} MCP server configs from {config_file_path}")
+    loaded_path_text = ", ".join(str(path) for path in loaded_paths)
+    logger.info(f"Loaded {len(configs)} MCP server configs from: {loaded_path_text}")
     return configs
+
+
+async def ensure_mcp_clients_for_workspace(workspace_root: str | None) -> None:
+    """Ensure MCP clients are connected for merged config of a workspace."""
+    manager = get_mcp_client_manager()
+    loaded_configs = load_mcp_configs(workspace_root=workspace_root)
+    connected = set(manager.get_connected_servers())
+
+    for config in loaded_configs:
+        if config.name in connected:
+            continue
+        if config.missing_env_vars:
+            missing_vars = ", ".join(config.missing_env_vars)
+            logger.warning(
+                f"[{config.name}] Skipping MCP server initialization due to missing environment variables: {missing_vars}"
+            )
+            continue
+
+        success = await manager.add_server(config)
+        if success:
+            connected.add(config.name)

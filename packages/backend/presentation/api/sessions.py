@@ -25,7 +25,9 @@ from backend.presentation.exceptions import (
     InternalServerError,
 )
 from backend.application.session.session_service import SessionService
+from backend.infrastructure.mcp.client import ensure_mcp_clients_for_workspace
 from backend.infrastructure.llm.base.client import LLMClientBase
+from backend.infrastructure.storage.session_manager import get_session_metadata
 from backend.shared.utils.app_context import get_llm_client as get_global_llm_client
 
 router = APIRouter(tags=["sessions"])
@@ -138,9 +140,14 @@ async def create_session(
             session_name=session_name,
             workspace_root=request.workspace_root,
         )
-        
-        # Get details of the newly created session to return initial config
+
         session_id = result["session_id"]
+        session_metadata = get_session_metadata(session_id) or {}
+        workspace_root = session_metadata.get("workspace_root")
+        if isinstance(workspace_root, str) and workspace_root.strip():
+            await ensure_mcp_clients_for_workspace(workspace_root)
+
+        # Get details of the newly created session to return initial config
         session_details = await service.get_session_details(session_id)
         llm_config = session_details["session"].get("llm_config") if session_details else None
         
@@ -271,6 +278,11 @@ async def switch_session(
         )
         if not result:
             raise SessionNotFoundError(request.session_id)
+
+        session_metadata = get_session_metadata(request.session_id) or {}
+        workspace_root = session_metadata.get("workspace_root")
+        if isinstance(workspace_root, str) and workspace_root.strip():
+            await ensure_mcp_clients_for_workspace(workspace_root)
 
         return ApiResponse(
             success=True,

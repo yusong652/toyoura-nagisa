@@ -14,10 +14,12 @@ load_dotenv(_PROJECT_ROOT / ".env")
 from backend.config.cors import get_cors_config, get_cors_middleware_kwargs
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.mcp.client import (
+    ensure_mcp_clients_for_workspace,
     initialize_mcp_clients,
     load_mcp_configs,
     shutdown_mcp_clients,
 )
+from backend.infrastructure.storage.session_manager import get_all_sessions
 from backend.application.tools.loader import load_tool_registry
 from backend.presentation.api import (
     content,
@@ -64,6 +66,16 @@ async def lifespan(app: FastAPI):
         try:
             mcp_configs = load_mcp_configs()
             await initialize_mcp_clients(mcp_configs)
+
+            # Refresh workspace-level MCP clients for existing sessions
+            workspace_roots: set[str] = set()
+            for session in get_all_sessions():
+                workspace_root = session.get("workspace_root")
+                if isinstance(workspace_root, str) and workspace_root.strip():
+                    workspace_roots.add(workspace_root)
+
+            for workspace_root in workspace_roots:
+                await ensure_mcp_clients_for_workspace(workspace_root)
         except Exception as e:
             log_warning(f"MCP client initialization failed: {e}")
 

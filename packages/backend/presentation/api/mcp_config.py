@@ -2,7 +2,7 @@
 MCP Configuration API.
 
 Provides endpoints for managing MCP server configuration per session.
-Global defaults are defined in config/mcp_servers.json.
+MCP servers are loaded from layered configs (builtin + ~/.nagisa + workspace/.nagisa).
 Session overrides are stored in session metadata.
 
 Routes:
@@ -11,7 +11,7 @@ Routes:
     GET /api/mcp-config/servers - Get available MCP servers (global view)
 """
 
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
@@ -23,11 +23,21 @@ from backend.infrastructure.storage.session_manager import (
     get_session_metadata,
 )
 from backend.infrastructure.mcp.client import (
+    ensure_mcp_clients_for_workspace,
     get_mcp_client_manager,
     load_mcp_configs,
 )
 
 router = APIRouter(prefix="/api/mcp-config", tags=["mcp-config"])
+
+
+def _get_workspace_root_from_session_metadata(session_id: str) -> Optional[str]:
+    """Extract workspace_root from session metadata if present."""
+    session_metadata = get_session_metadata(session_id) or {}
+    workspace_root = session_metadata.get("workspace_root")
+    if isinstance(workspace_root, str) and workspace_root.strip():
+        return workspace_root
+    return None
 
 
 # =====================
@@ -76,8 +86,11 @@ async def get_mcp_config(
         if not get_session_metadata(session_id):
             raise BadRequestError(message=f"Session not found: {session_id}")
 
+        workspace_root = _get_workspace_root_from_session_metadata(session_id)
+        await ensure_mcp_clients_for_workspace(workspace_root)
+
         # Get global configs (includes all servers)
-        global_configs = load_mcp_configs()
+        global_configs = load_mcp_configs(workspace_root=workspace_root)
 
         # Get session-specific overrides
         session_mcp_config = get_session_mcp_config(session_id) or {"servers": {}}
@@ -140,8 +153,11 @@ async def update_mcp_server(
         if not get_session_metadata(session_id):
             raise BadRequestError(message=f"Session not found: {session_id}")
 
+        workspace_root = _get_workspace_root_from_session_metadata(session_id)
+        await ensure_mcp_clients_for_workspace(workspace_root)
+
         # Verify server exists
-        global_configs = load_mcp_configs()
+        global_configs = load_mcp_configs(workspace_root=workspace_root)
         server_config = None
         for config in global_configs:
             if config.name == request.server_name:

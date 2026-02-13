@@ -201,7 +201,7 @@ def create_new_history(name: Optional[str] = None, workspace_root: Optional[str]
         session_metadata["llm_config"] = cast(Any, default_llm_config)
 
     # Initialize MCP config from global defaults
-    mcp_config = build_initial_mcp_config()
+    mcp_config = build_initial_mcp_config(workspace_root=workspace_root)
     if mcp_config.get("servers"):
         session_metadata["mcp_config"] = mcp_config
 
@@ -936,12 +936,15 @@ def update_session_thinking_level(session_id: str, thinking_level: str) -> bool:
 # ========== MCP Configuration Management ==========
 
 
-def build_initial_mcp_config() -> Dict[str, Any]:
+def build_initial_mcp_config(workspace_root: Optional[str] = None) -> Dict[str, Any]:
     """
     Build initial MCP configuration from global defaults.
 
-    Reads mcp_servers.json and creates a session-level config dictionary
+    Reads merged MCP config (builtin + user + workspace) and creates a session-level config dictionary
     with each server's default enabled state.
+
+    Args:
+        workspace_root: Optional workspace root to include workspace-level MCP config.
 
     Returns:
         Dict with structure: {"servers": {"server_name": {"enabled": bool}, ...}}
@@ -949,7 +952,7 @@ def build_initial_mcp_config() -> Dict[str, Any]:
     try:
         from backend.infrastructure.mcp.client import load_mcp_configs
 
-        configs = load_mcp_configs()
+        configs = load_mcp_configs(workspace_root=workspace_root)
         return {"servers": {c.name: {"enabled": c.enabled} for c in configs}}
     except Exception as e:
         print(f"[WARNING] Failed to build initial MCP config: {e}")
@@ -1030,7 +1033,12 @@ def is_mcp_server_enabled_for_session(session_id: str, server_name: str) -> bool
     try:
         from backend.infrastructure.mcp.client import load_mcp_configs
 
-        for config in load_mcp_configs():
+        workspace_root = None
+        session_metadata = get_session_metadata(session_id)
+        if session_metadata:
+            workspace_root = session_metadata.get("workspace_root")
+
+        for config in load_mcp_configs(workspace_root=workspace_root):
             if config.name == server_name:
                 return config.enabled
     except Exception as e:
