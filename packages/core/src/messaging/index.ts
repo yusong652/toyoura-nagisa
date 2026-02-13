@@ -16,7 +16,7 @@ export {
   AssistantMessageConverter,
   MessageConverterManager,
   messageConverterManager
-} from './MessageConverters';
+} from './MessageConverters.js';
 
 // Stream processor
 export {
@@ -24,7 +24,7 @@ export {
   StreamEvent,
   StreamEventHandlers,
   StreamProcessorOptions
-} from './StreamProcessor';
+} from './StreamProcessor.js';
 
 // Chunk processor
 export {
@@ -32,7 +32,7 @@ export {
   ChunkData,
   MessageUpdateOptions,
   ChunkEventHandlers
-} from './ChunkProcessor';
+} from './ChunkProcessor.js';
 
 // Chat manager
 export {
@@ -47,4 +47,4 @@ export {
   ErrorPayload,
   SendMessageOptions,
   SendMessageResult
-} from './managers/ChatManager';
+} from './managers/ChatManager.js';

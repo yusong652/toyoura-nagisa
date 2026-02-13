@@ -32,6 +32,7 @@ const getArg = (name: string, defaultValue?: string): string | undefined => {
 const sessionId = getArg('session');
 const host = getArg('host', 'localhost');
 const port = parseInt(getArg('port', '8000') || '8000', 10);
+const launchWorkspaceRoot = process.cwd();
 
 // Build config from arguments
 const config: Config = {
@@ -53,7 +54,11 @@ render(
     <KeypressProvider>
       <MouseProvider mouseEventsEnabled={false}>
         <ScrollProvider>
-          <AppContainer config={config} initialSessionId={sessionId} />
+          <AppContainer
+            config={config}
+            initialSessionId={sessionId}
+            launchWorkspaceRoot={launchWorkspaceRoot}
+          />
         </ScrollProvider>
       </MouseProvider>
     </KeypressProvider>

@@ -3,7 +3,7 @@
  * Mirrors the Python backend WebSocket message models for type consistency
  */
 
-import { ChatSession } from './session';
+import { ChatSession } from './session.js';
 
 export enum MessageType {
   // System messages

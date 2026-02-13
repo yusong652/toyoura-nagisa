@@ -38,13 +38,8 @@ async def get_workspace_root_async(context=None) -> Path:
         # Architecture guarantee: tool_manager.py always injects _meta.client_id
         session_id = context.session_id if context else None
         if session_id:
-            # Get agent profile from session's context manager
-            # (set by chat_service before tool execution)
-            from backend.shared.utils.app_context import get_llm_client
-            from backend.shared.utils.workspace import get_workspace_for_profile
-            agent_profile = 'pfc_expert'
-            # Use unified workspace resolution for all profiles
-            workspace_path = await get_workspace_for_profile(agent_profile, session_id)
+            from backend.shared.utils.workspace import resolve_workspace_root
+            workspace_path = await resolve_workspace_root(session_id)
             return Path(workspace_path)
 
     except Exception as e:

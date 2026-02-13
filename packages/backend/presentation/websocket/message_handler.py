@@ -490,11 +490,11 @@ class UserShellHandler(MessageHandler):
     async def _get_shell_service(self, session_id: str, agent_profile: str):
         """Get or create ShellService for a session and profile."""
         from backend.application.shell.shell_service import ShellService
-        from backend.shared.utils.workspace import get_workspace_for_profile
+        from backend.shared.utils.workspace import resolve_workspace_root
 
         cache_key = (session_id, agent_profile)
         if cache_key not in self._shell_services:
-            workspace_root = await get_workspace_for_profile(agent_profile, session_id)
+            workspace_root = await resolve_workspace_root(session_id)
             self._shell_services[cache_key] = ShellService(workspace_root=workspace_root)
         return self._shell_services[cache_key]
 
@@ -733,8 +733,8 @@ class UserPfcConsoleHandler(MessageHandler):
 
         try:
             # Get workspace for profile
-            from backend.shared.utils.workspace import get_workspace_for_profile
-            workspace_path = await get_workspace_for_profile(agent_profile, session_id)
+            from backend.shared.utils.workspace import resolve_workspace_root
+            workspace_path = await resolve_workspace_root(session_id)
 
             # Get console service
             service = get_pfc_console_service(workspace_path, session_id)

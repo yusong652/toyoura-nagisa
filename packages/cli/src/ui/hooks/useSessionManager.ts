@@ -51,7 +51,7 @@ export function useSessionManager(): UseSessionManagerReturn {
   const createSession = useCallback(async (name?: string): Promise<string | null> => {
     setError(null);
     try {
-      const result = await sessionService.createSession(name);
+      const result = await sessionService.createSession(name, process.cwd());
       return result.session_id;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create session');

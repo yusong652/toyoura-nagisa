@@ -21,7 +21,7 @@ from backend.presentation.exceptions import InternalServerError
 from backend.domain.models.agent_types import AgentProfileLiteral, DEFAULT_AGENT_PROFILE
 from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 from backend.infrastructure.monitoring.status_monitor import get_status_monitor
-from backend.shared.utils.workspace import get_workspace_for_profile
+from backend.shared.utils.workspace import resolve_workspace_root
 from backend.application.pfc.pfc_console_service import (
     PfcConsoleExecutionResult,
     PfcConsoleMoveToBackgroundRequest,
@@ -166,10 +166,7 @@ async def execute_pfc_python(request: ExecuteRequest) -> ApiResponse[ExecuteData
                 data=ExecuteData(connected=True, context=""),
             )
 
-        workspace_path = await get_workspace_for_profile(
-            request.agent_profile,
-            request.session_id,
-        )
+        workspace_path = await resolve_workspace_root(request.session_id)
         service = get_pfc_console_service(workspace_path, request.session_id)
 
         wait_result, task_id, error = await service.execute_foreground(

@@ -16,8 +16,8 @@ export {
   SessionsLoadedPayload,
   TitleUpdatedPayload,
   TokenUsageUpdatedPayload
-} from './SessionManager';
+} from './SessionManager.js';
 
 // Storage adapters
-export { LocalStorageAdapter } from './adapters/LocalStorageAdapter';
-export { FileStorageAdapter } from './adapters/FileStorageAdapter';
+export { LocalStorageAdapter } from './adapters/LocalStorageAdapter.js';
+export { FileStorageAdapter } from './adapters/FileStorageAdapter.js';

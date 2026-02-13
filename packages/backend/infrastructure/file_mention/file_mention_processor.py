@@ -21,7 +21,7 @@ from backend.application.tools.coding.utils.path_security import (
     is_safe_symlink,
     check_parent_symlinks
 )
-from backend.shared.utils.workspace import get_workspace_for_profile
+from backend.shared.utils.workspace import resolve_workspace_root
 from backend.shared.utils.path_normalization import (
     normalize_path_separators,
     path_to_llm_format
@@ -159,7 +159,7 @@ class FileMentionProcessor:
             normalized_path = normalize_path_separators(file_path.strip())
 
             # Get workspace root based on agent profile
-            workspace_root = await get_workspace_for_profile(self.agent_profile, self.session_id)
+            workspace_root = await resolve_workspace_root(self.session_id)
 
             # Validate path and get absolute path
             abs_file_path = validate_path_in_workspace(normalized_path, workspace_root)

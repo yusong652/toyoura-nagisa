@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from backend.presentation.models.api_models import ApiResponse
 from backend.application.shell.shell_service import ShellService
 from backend.domain.models.agent_types import AgentProfileLiteral, DEFAULT_AGENT_PROFILE
-from backend.shared.utils.workspace import get_workspace_for_profile
+from backend.shared.utils.workspace import resolve_workspace_root
 
 router = APIRouter(prefix="/api/shell", tags=["shell"])
 
@@ -27,7 +27,7 @@ async def _get_shell_service(session_id: str, agent_profile: AgentProfileLiteral
     """Get or create ShellService for a session and profile."""
     cache_key = (session_id, agent_profile)
     if cache_key not in _shell_services:
-        workspace_root = await get_workspace_for_profile(agent_profile, session_id)
+        workspace_root = await resolve_workspace_root(session_id)
         _shell_services[cache_key] = ShellService(workspace_root=workspace_root)
     return _shell_services[cache_key]
 

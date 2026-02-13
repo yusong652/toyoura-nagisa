@@ -6,22 +6,22 @@
  */
 
 // WebSocket Manager
-export { WebSocketManager, ConnectionState } from './WebSocketManager';
+export { WebSocketManager, ConnectionState } from './WebSocketManager.js';
 export type {
   WebSocketManagerMessage,
   ConnectionOptions,
   ConnectionStats
-} from './WebSocketManager';
+} from './WebSocketManager.js';
 
 // Connection Manager (toyoura-nagisa-specific)
-export { ConnectionManager } from './ConnectionManager';
+export { ConnectionManager } from './ConnectionManager.js';
 export type {
   ToolConfirmationData,
   LocationData,
   ConnectionManagerOptions
-} from './ConnectionManager';
+} from './ConnectionManager.js';
 
 // Adapters
-export { WebSocketAdapter, ReadyState } from './adapters/WebSocketAdapter';
-export { BrowserWebSocketAdapter } from './adapters/BrowserWebSocketAdapter';
-export { NodeWebSocketAdapter } from './adapters/NodeWebSocketAdapter';
+export { WebSocketAdapter, ReadyState } from './adapters/WebSocketAdapter.js';
+export { BrowserWebSocketAdapter } from './adapters/BrowserWebSocketAdapter.js';
+export { NodeWebSocketAdapter } from './adapters/NodeWebSocketAdapter.js';

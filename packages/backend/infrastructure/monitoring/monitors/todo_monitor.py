@@ -13,7 +13,7 @@ import logging
 from typing import List, Dict
 
 from backend.infrastructure.storage.todo_storage import get_todo_storage
-from backend.shared.utils.workspace import get_workspace_for_profile
+from backend.shared.utils.workspace import resolve_workspace_root
 
 from .base_monitor import BaseMonitor
 
@@ -117,7 +117,7 @@ class TodoMonitor(BaseMonitor):
             List[str]: Todo list reminder blocks
         """
         try:
-            workspace = await get_workspace_for_profile(agent_profile, self.session_id)
+            workspace = await resolve_workspace_root(self.session_id)
         except Exception as e:
             logger.debug(f"Unable to resolve workspace for todo reminders: {e}")
             return []

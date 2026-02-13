@@ -51,11 +51,13 @@ import type { Config } from '../config/settings.js';
 interface AppContainerProps {
   config: Config;
   initialSessionId?: string;
+  launchWorkspaceRoot: string;
 }
 
 export const AppContainer: React.FC<AppContainerProps> = ({
   config,
   initialSessionId,
+  launchWorkspaceRoot,
 }) => {
   const { exit } = useApp();
 
@@ -89,7 +91,11 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   if (!sessionManagerRef.current) {
     const storageAdapter = new FileStorageAdapter('.toyoura-nagisa');
     const sessionService = new SessionService();
-    sessionManagerRef.current = new SessionManager(sessionService, storageAdapter);
+    sessionManagerRef.current = new SessionManager(
+      sessionService,
+      storageAdapter,
+      launchWorkspaceRoot,
+    );
   }
 
   const connectionManager = connectionManagerRef.current;
@@ -159,6 +165,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   } = useSessionManagement({
     connectionManager,
     sessionManager,
+    launchWorkspaceRoot,
     historyManager,
     setCurrentSessionId,
     setSessionMode,
@@ -245,7 +252,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
         // Create new session if none exists
         if (!sessionId) {
-          sessionId = await sessionManager.createSession();
+          sessionId = await sessionManager.createSession(undefined, launchWorkspaceRoot);
           setSessionMode('build');
           
           const sessions = sessionManager.getSessions();

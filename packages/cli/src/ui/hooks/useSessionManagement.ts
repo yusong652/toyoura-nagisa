@@ -13,6 +13,7 @@ import type { useHistoryManager } from './useHistoryManager.js';
 interface UseSessionManagementParams {
   connectionManager: ConnectionManager;
   sessionManager: SessionManager;
+  launchWorkspaceRoot?: string;
   historyManager: ReturnType<typeof useHistoryManager>;
   setCurrentSessionId: (sessionId: string) => void;
   setSessionMode?: (mode: SessionMode) => void;
@@ -183,6 +184,7 @@ function convertBackendHistory(
 export function useSessionManagement({
   connectionManager,
   sessionManager,
+  launchWorkspaceRoot,
   historyManager,
   setCurrentSessionId,
   setSessionMode,
@@ -227,7 +229,7 @@ export function useSessionManagement({
   }, [connectionManager, sessionManager, historyManager, setCurrentSessionId, loadHistory]);
 
   const createSession = useCallback(async (name?: string) => {
-    const sessionId = await sessionManager.createSession(name);
+    const sessionId = await sessionManager.createSession(name, launchWorkspaceRoot);
     
     // Update local state with new session's config
     if (setLlmConfig) {
@@ -240,7 +242,7 @@ export function useSessionManagement({
     
     await switchSession(sessionId);
     return sessionId;
-  }, [sessionManager, switchSession, setLlmConfig]);
+  }, [sessionManager, launchWorkspaceRoot, switchSession, setLlmConfig]);
 
   return {
     switchSession,

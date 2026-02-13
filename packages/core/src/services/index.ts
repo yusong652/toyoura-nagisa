@@ -6,20 +6,20 @@
  */
 
 // HTTP Client
-export { HttpClient, apiClient } from './HttpClient';
-export type { ApiError } from './HttpClient';
+export { HttpClient, apiClient } from './HttpClient.js';
+export type { ApiError } from './HttpClient.js';
 
 // Chat Service
-export { ChatService, chatService } from './ChatService';
+export { ChatService, chatService } from './ChatService.js';
 export type {
   MessageRequest,
   ChatStreamRequest,
   MessageDeleteRequest,
   MessageDeleteData
-} from './ChatService';
+} from './ChatService.js';
 
 // Session Service
-export { SessionService, sessionService } from './SessionService';
+export { SessionService, sessionService } from './SessionService.js';
 export type {
   CreateSessionRequest,
   CreateSessionResponse,
@@ -30,13 +30,13 @@ export type {
   TokenUsageResponse,
   UpdateSessionModeRequest,
   UpdateSessionModeResponse,
-} from './SessionService';
+} from './SessionService.js';
 
 // LLM Config Service
-export { LlmConfigService, llmConfigService } from './LlmConfigService';
+export { LlmConfigService, llmConfigService } from './LlmConfigService.js';
 export type {
   ModelDetails,
   ProviderInfo,
   ProviderListResponse,
   LlmConfigUpdateData,
-} from './LlmConfigService';
+} from './LlmConfigService.js';

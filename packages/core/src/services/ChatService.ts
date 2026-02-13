@@ -8,8 +8,8 @@
  * better real-time performance and unified architecture.
  */
 
-import { apiClient } from './HttpClient'
-import type { FileData } from '../types'
+import { apiClient } from './HttpClient.js'
+import type { FileData } from '../types/index.js'
 
 export interface MessageRequest {
   id: string

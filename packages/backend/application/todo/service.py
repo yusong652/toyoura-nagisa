@@ -2,7 +2,6 @@
 Todo Service - Application layer service for todo management.
 
 Provides business logic for retrieving and managing todo items across sessions.
-All methods require explicit agent_profile parameter for workspace resolution.
 """
 
 import logging
@@ -10,7 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from backend.infrastructure.storage.todo_storage import get_todo_storage
-from backend.shared.utils.workspace import get_workspace_for_profile
+from backend.shared.utils.workspace import resolve_workspace_root
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +39,8 @@ class TodoService:
         This is used for frontend display to show what the agent is currently working on.
 
         Args:
-            agent_profile: Agent profile type (e.g., "pfc_expert", "disabled").
-                          Determines which workspace to use.
-            session_id: Optional session identifier (for PFC profile workspace sync).
+            agent_profile: Reserved for backward compatibility.
+            session_id: Optional session identifier.
 
         Returns:
             Dict containing todo information if found, None otherwise
@@ -58,7 +56,7 @@ class TodoService:
             }
         """
         try:
-            workspace = await get_workspace_for_profile(agent_profile, session_id)
+            workspace = await resolve_workspace_root(session_id)
 
             # Load all todos from workspace
             todos = self.storage.load_todos(workspace)
@@ -85,14 +83,14 @@ class TodoService:
         Get all todos for a workspace.
 
         Args:
-            agent_profile: Agent profile type (e.g., "pfc_expert", "disabled").
-            session_id: Optional session identifier (for PFC profile workspace sync).
+            agent_profile: Reserved for backward compatibility.
+            session_id: Optional session identifier.
 
         Returns:
             List of all todos (sorted by update time, most recent first)
         """
         try:
-            workspace = await get_workspace_for_profile(agent_profile, session_id)
+            workspace = await resolve_workspace_root(session_id)
             todos = self.storage.load_all_session_todos(workspace)
             return todos
         except Exception as e:
@@ -109,15 +107,15 @@ class TodoService:
         Get pending and in_progress todos for a workspace.
 
         Args:
-            agent_profile: Agent profile type (e.g., "pfc_expert", "disabled").
-            session_id: Optional session identifier (for PFC profile workspace sync).
+            agent_profile: Reserved for backward compatibility.
+            session_id: Optional session identifier.
             limit: Maximum number of todos to return
 
         Returns:
             List of pending/in_progress todos
         """
         try:
-            workspace = await get_workspace_for_profile(agent_profile, session_id)
+            workspace = await resolve_workspace_root(session_id)
             todos = self.storage.get_pending_todos(workspace, limit)
             return todos
         except Exception as e:

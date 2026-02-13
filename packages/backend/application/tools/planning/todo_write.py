@@ -19,7 +19,7 @@ from backend.application.tools.context import ToolContext
 
 from backend.shared.utils.tool_result import ToolResult, success_response, error_response
 from backend.infrastructure.storage.todo_storage import get_todo_storage
-from backend.shared.utils.workspace import get_workspace_for_profile
+from backend.shared.utils.workspace import resolve_workspace_root
 
 logger = logging.getLogger(__name__)
 
@@ -271,7 +271,7 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
         persistent = agent_profile != 'pfc_explorer'
 
         # Get workspace directory based on agent profile
-        workspace = await get_workspace_for_profile(agent_profile, session_id)
+        workspace = await resolve_workspace_root(session_id)
 
         # Validate in_progress rule (enforced at runtime)
         # - At most one in_progress

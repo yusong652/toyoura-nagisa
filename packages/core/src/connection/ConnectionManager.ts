@@ -5,8 +5,8 @@
  * and business logic for chat sessions, tool confirmations, and notifications.
  */
 
-import { WebSocketManager, ConnectionState, WebSocketManagerMessage } from './WebSocketManager';
-import { WebSocketAdapter } from './adapters/WebSocketAdapter';
+import { WebSocketManager, ConnectionState, WebSocketManagerMessage } from './WebSocketManager.js';
+import { WebSocketAdapter } from './adapters/WebSocketAdapter.js';
 
 export interface ToolConfirmationData {
   message_id: string;

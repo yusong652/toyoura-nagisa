@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import (
+    BadRequestError,
     SessionNotFoundError,
     InternalServerError,
 )
@@ -89,6 +90,10 @@ class TokenUsageData(BaseModel):
 class CreateSessionRequest(BaseModel):
     """Request body for creating a new session."""
     name: Optional[str] = Field(None, description="Session display name (defaults to 'New Session')")
+    workspace_root: Optional[str] = Field(
+        None,
+        description="Optional workspace root path for this session (CLI startup directory)",
+    )
 
 
 class SwitchSessionRequest(BaseModel):
@@ -129,7 +134,10 @@ async def create_session(
     """
     try:
         session_name = request.name or "New Session"
-        result = await service.create_session(session_name=session_name)
+        result = await service.create_session(
+            session_name=session_name,
+            workspace_root=request.workspace_root,
+        )
         
         # Get details of the newly created session to return initial config
         session_id = result["session_id"]
@@ -144,6 +152,8 @@ async def create_session(
                 llm_config=llm_config
             )
         )
+    except ValueError as e:
+        raise BadRequestError(message=str(e))
     except Exception as e:
         raise InternalServerError(
             message=f"Failed to create session: {str(e)}"

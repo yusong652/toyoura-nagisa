@@ -13,12 +13,12 @@
  * - Event-driven architecture for UI updates
  */
 
-import { EventEmitter } from '../../utils/EventEmitter'
-import { ChatService } from '../../services/ChatService'
-import { SessionService } from '../../services/SessionService'
-import { MessageConverterManager, BackendMessage } from '../MessageConverters'
-import { StreamProcessor, StreamEventHandlers } from '../StreamProcessor'
-import { Message, FileData } from '../../types/messages'
+import { EventEmitter } from '../../utils/EventEmitter.js'
+import { ChatService } from '../../services/ChatService.js'
+import { SessionService } from '../../services/SessionService.js'
+import { MessageConverterManager, BackendMessage } from '../MessageConverters.js'
+import { StreamProcessor, StreamEventHandlers } from '../StreamProcessor.js'
+import { Message, FileData } from '../../types/messages.js'
 
 /**
  * Event types emitted by ChatManager

@@ -13,9 +13,9 @@
  * - Storage abstraction for platform independence
  */
 
-import { EventEmitter } from '../utils/EventEmitter'
-import { SessionService } from '../services/SessionService'
-import { ChatSession, TokenUsage } from '../types/session'
+import { EventEmitter } from '../utils/EventEmitter.js'
+import { SessionService } from '../services/SessionService.js'
+import { ChatSession, TokenUsage } from '../types/session.js'
 
 /**
  * Storage adapter interface for platform-independent storage
@@ -105,6 +105,7 @@ export interface TokenUsageUpdatedPayload {
 export class SessionManager extends EventEmitter {
   private sessionService: SessionService
   private storage: StorageAdapter
+  private defaultWorkspaceRoot?: string
   private currentSessionId: string | null = null
   private sessions: ChatSession[] = []
   private tokenUsage: Map<string, TokenUsage> = new Map()
@@ -114,11 +115,17 @@ export class SessionManager extends EventEmitter {
    *
    * @param sessionService - Session API service
    * @param storage - Storage adapter for persistence
+   * @param defaultWorkspaceRoot - Default workspace root for newly created sessions
    */
-  constructor(sessionService: SessionService, storage: StorageAdapter) {
+  constructor(
+    sessionService: SessionService,
+    storage: StorageAdapter,
+    defaultWorkspaceRoot?: string,
+  ) {
     super()
     this.sessionService = sessionService
     this.storage = storage
+    this.defaultWorkspaceRoot = defaultWorkspaceRoot
   }
 
   /**
@@ -163,11 +170,13 @@ export class SessionManager extends EventEmitter {
    * Creates session via backend API, updates storage, and emits sessionCreated event.
    *
    * @param name - Optional session name
+   * @param workspaceRoot - Optional workspace root for the created session
    * @returns Promise resolving to new session ID
    */
-  async createSession(name?: string): Promise<string> {
+  async createSession(name?: string, workspaceRoot?: string): Promise<string> {
     try {
-      const data = await this.sessionService.createSession(name)
+      const effectiveWorkspaceRoot = workspaceRoot ?? this.defaultWorkspaceRoot
+      const data = await this.sessionService.createSession(name, effectiveWorkspaceRoot)
       const sessionId = data.session_id
 
       // Update current session

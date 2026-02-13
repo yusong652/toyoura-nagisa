@@ -7,7 +7,7 @@
  * Automatically unwraps ApiResponse format (2025 Standard) for seamless migration.
  */
 
-import { unwrapApiResponse } from '../types'
+import { unwrapApiResponse } from '../types/index.js'
 
 export interface ApiError extends Error {
   status: number

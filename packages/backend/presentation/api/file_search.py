@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from backend.presentation.models.api_models import ApiResponse
 from backend.presentation.exceptions import InternalServerError
-from backend.shared.utils.workspace import get_workspace_for_profile
+from backend.shared.utils.workspace import resolve_workspace_root
 from backend.shared.utils.path_normalization import path_to_llm_format
 from backend.domain.models.agent_types import AgentProfileLiteral, DEFAULT_AGENT_PROFILE
 
@@ -143,7 +143,7 @@ async def search_files(
     based on partial input.
     """
     try:
-        workspace_root = await get_workspace_for_profile(agent_profile, session_id)
+        workspace_root = await resolve_workspace_root(session_id)
         results = await _search_files_in_workspace(workspace_root, query, limit)
         workspace_display = path_to_llm_format(workspace_root)
 

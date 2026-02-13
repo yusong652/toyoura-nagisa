@@ -5,16 +5,16 @@
  */
 
 // API response types (2025 Standard)
-export * from './api';
+export * from './api.js';
 
 // WebSocket types
-export * from './websocket';
+export * from './websocket.js';
 
 // Message and chat types
-export * from './messages';
+export * from './messages.js';
 
 // Session types
-export * from './session';
+export * from './session.js';
 
 // Agent profile types
-export * from './agent';
+export * from './agent.js';

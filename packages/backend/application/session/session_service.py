@@ -6,6 +6,7 @@ separating it from the presentation layer (API routes) and
 infrastructure layer (storage, LLM clients).
 """
 from typing import List, Dict, Any, Optional
+from pathlib import Path
 from backend.infrastructure.storage.session_manager import (
     get_all_sessions,
     delete_session_data,
@@ -29,7 +30,29 @@ class SessionService:
     chat sessions, abstracting away infrastructure details.
     """
     
-    async def create_session(self, session_name: str) -> Dict[str, Any]:
+    def _normalize_workspace_root(self, workspace_root: Optional[str]) -> Optional[str]:
+        """Normalize and validate session workspace root path."""
+        if not workspace_root:
+            return None
+
+        raw_value = workspace_root.strip()
+        if not raw_value:
+            return None
+
+        candidate = Path(raw_value).expanduser()
+        if not candidate.is_absolute():
+            candidate = (Path.cwd() / candidate).resolve()
+        else:
+            candidate = candidate.resolve()
+
+        if not candidate.exists():
+            raise ValueError(f"Workspace does not exist: {candidate}")
+        if not candidate.is_dir():
+            raise ValueError(f"Workspace is not a directory: {candidate}")
+
+        return str(candidate)
+
+    async def create_session(self, session_name: str, workspace_root: Optional[str] = None) -> Dict[str, Any]:
         """
         Create a new chat session.
         
@@ -40,13 +63,18 @@ class SessionService:
         
         Args:
             session_name: Display name for the new session
+            workspace_root: Optional absolute/relative path used as session workspace root
             
         Returns:
             Dict[str, Any]: Creation result:
                 - session_id: str - UUID of the newly created session
                 - success: bool - Always True if successful
         """
-        session_id = create_new_history(session_name)
+        normalized_workspace_root = self._normalize_workspace_root(workspace_root)
+        session_id = create_new_history(
+            session_name,
+            workspace_root=normalized_workspace_root,
+        )
         
         return {
             "session_id": session_id,

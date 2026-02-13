@@ -5,7 +5,7 @@
  * Wraps the browser WebSocket to conform to WebSocketAdapter interface.
  */
 
-import { WebSocketAdapter } from './WebSocketAdapter';
+import { WebSocketAdapter } from './WebSocketAdapter.js';
 
 export class BrowserWebSocketAdapter implements WebSocketAdapter {
   private ws: WebSocket | null = null;

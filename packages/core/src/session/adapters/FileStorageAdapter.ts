@@ -8,7 +8,7 @@
  * Will not work in browser environments.
  */
 
-import { StorageAdapter } from '../SessionManager'
+import { StorageAdapter } from '../SessionManager.js'
 
 // Module-level cache for Node.js modules
 let fs: typeof import('fs/promises') | null = null

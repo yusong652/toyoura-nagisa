@@ -5,7 +5,7 @@
  * Implements the StorageAdapter interface for SessionManager.
  */
 
-import { StorageAdapter } from '../SessionManager'
+import { StorageAdapter } from '../SessionManager.js'
 
 /**
  * LocalStorageAdapter - Browser localStorage implementation

@@ -5,11 +5,12 @@
  * session-related functionality in the toyoura-nagisa application.
  */
 
-import { apiClient } from './HttpClient'
-import type { ChatSession, SessionMode } from '../types'
+import { apiClient } from './HttpClient.js'
+import type { ChatSession, SessionMode } from '../types/index.js'
 
 export interface CreateSessionRequest {
   name?: string
+  workspace_root?: string
 }
 
 export interface CreateSessionResponse {
@@ -76,10 +77,17 @@ export class SessionService {
    * Create a new chat session with optional name.
    * 
    * @param name - Optional session name
+   * @param workspaceRoot - Optional session workspace root path
    * @returns Promise resolving to new session details
    */
-  async createSession(name?: string): Promise<CreateSessionResponse> {
-    const request: CreateSessionRequest = name ? { name } : {}
+  async createSession(name?: string, workspaceRoot?: string): Promise<CreateSessionResponse> {
+    const request: CreateSessionRequest = {}
+    if (name) {
+      request.name = name
+    }
+    if (workspaceRoot) {
+      request.workspace_root = workspaceRoot
+    }
     return await apiClient.post<CreateSessionResponse>('/api/history/create', request)
   }
 

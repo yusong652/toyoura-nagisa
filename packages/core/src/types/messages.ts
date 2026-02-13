@@ -5,7 +5,7 @@
  * now unified with backend role naming conventions.
  */
 
-import type { TokenUsage } from './session';
+import type { TokenUsage } from './session.js';
 
 // =====================
 // Message Role Types

@@ -4,8 +4,8 @@
  * Provides methods for managing LLM provider and model configuration.
  */
 
-import { apiClient } from './HttpClient'
-import type { ChatSession } from '../types'
+import { apiClient } from './HttpClient.js'
+import type { ChatSession } from '../types/index.js'
 
 export interface ModelDetails {
   id: string

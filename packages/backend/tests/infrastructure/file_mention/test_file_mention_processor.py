@@ -50,7 +50,7 @@ async def test_read_file_safe_rejects_outside_workspace(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         processor_module,
-        "get_workspace_for_profile",
+        "resolve_workspace_root",
         AsyncMock(return_value=tmp_path),
     )
     monkeypatch.setattr(
@@ -72,7 +72,7 @@ async def test_read_file_safe_handles_missing_file(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         processor_module,
-        "get_workspace_for_profile",
+        "resolve_workspace_root",
         AsyncMock(return_value=tmp_path),
     )
     monkeypatch.setattr(
@@ -100,7 +100,7 @@ async def test_read_file_safe_rejects_unsafe_symlink(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         processor_module,
-        "get_workspace_for_profile",
+        "resolve_workspace_root",
         AsyncMock(return_value=tmp_path),
     )
     monkeypatch.setattr(

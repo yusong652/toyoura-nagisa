@@ -7,7 +7,7 @@
  */
 
 import { EventEmitter } from 'eventemitter3';
-import { WebSocketAdapter, ReadyState } from './adapters/WebSocketAdapter';
+import { WebSocketAdapter, ReadyState } from './adapters/WebSocketAdapter.js';
 
 export enum ConnectionState {
   CONNECTING = 'connecting',

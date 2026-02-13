@@ -19,23 +19,22 @@ logger = logging.getLogger(__name__)
 SKILLS_PLACEHOLDER = "{available_skills}"
 
 
-async def _get_workspace_root(agent_profile: str, session_id: Optional[str] = None) -> str:
+async def _get_workspace_root(session_id: Optional[str] = None) -> str:
     """
-    Determine workspace root based on agent profile and session context.
+    Determine workspace root based on session context.
 
     DEPRECATED: This function now delegates to the unified workspace module.
-    New code should use backend.shared.utils.workspace.get_workspace_for_profile directly.
+    New code should use backend.shared.utils.workspace.resolve_workspace_root directly.
 
     Args:
-        agent_profile: Agent profile type ("pfc_expert", "disabled", etc.)
         session_id: Optional session ID (reserved for future use)
 
     Returns:
         Absolute workspace root path as string
     """
-    from backend.shared.utils.workspace import get_workspace_for_profile
+    from backend.shared.utils.workspace import resolve_workspace_root
 
-    workspace_path = await get_workspace_for_profile(agent_profile, session_id)
+    workspace_path = await resolve_workspace_root(session_id)
     return str(workspace_path)
 
 
@@ -159,7 +158,7 @@ async def build_system_prompt(
         base = ""
 
     # 2. Get workspace root for path substitution (dynamic based on profile and session)
-    workspace_root = await _get_workspace_root(agent_profile, session_id)
+    workspace_root = await _get_workspace_root(session_id)
 
     # Normalize workspace_root to forward slashes for LLM consistency
     # This ensures LLM always sees paths in the same format (like Claude Code)

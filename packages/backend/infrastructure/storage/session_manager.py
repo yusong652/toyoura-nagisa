@@ -168,7 +168,7 @@ def _normalize_session_metadata_entry(session_metadata: Dict[str, Any]) -> bool:
 
 # ========== Session CRUD Operations ==========
 
-def create_new_history(name: Optional[str] = None) -> str:
+def create_new_history(name: Optional[str] = None, workspace_root: Optional[str] = None) -> str:
     """
     Create a new chat history record
     Args:
@@ -191,6 +191,9 @@ def create_new_history(name: Optional[str] = None) -> str:
         "updated_at": datetime.now().isoformat(),
         "mode": DEFAULT_SESSION_MODE,
     }
+
+    if workspace_root:
+        session_metadata["workspace_root"] = workspace_root
 
     from backend.infrastructure.storage.llm_config_manager import build_initial_llm_config
     default_llm_config = build_initial_llm_config()

@@ -10,22 +10,22 @@
 export const version = '0.1.0';
 
 // Export all type definitions
-export * from './types';
+export * from './types/index.js';
 
 // Export connection management
-export * from './connection';
+export * from './connection/index.js';
 
 // Export services
-export * from './services';
+export * from './services/index.js';
 
 // Export messaging utilities
-export * from './messaging';
+export * from './messaging/index.js';
 
 // Export session management
-export * from './session';
+export * from './session/index.js';
 
 // Export LLM config service
-export * from './services/LlmConfigService';
+export * from './services/LlmConfigService.js';
 
 // Export utilities
-export * from './utils';
+export * from './utils/index.js';

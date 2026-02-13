@@ -8,7 +8,7 @@
  * Install with: npm install ws @types/ws
  */
 
-import { WebSocketAdapter, ReadyState } from './WebSocketAdapter';
+import { WebSocketAdapter, ReadyState } from './WebSocketAdapter.js';
 
 // Import WebSocket from 'ws' package (will be available in Node.js environment)
 type WebSocketConstructor = new (
