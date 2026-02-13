@@ -4,8 +4,6 @@
       "type": "stdio",
       "command": "uvx",
       "args": [
-        "--from",
-        "git+ssh://git@github.com/yusong652/pfc-mcp.git",
         "pfc-mcp"
       ],
       "env": {}
