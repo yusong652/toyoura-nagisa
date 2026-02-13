@@ -4,6 +4,9 @@
   "description": "Toyoura Nagisa - LLM-Driven PFC Simulation Assistant",
   "private": true,
   "type": "module",
+  "bin": {
+    "nagisa": "./scripts/nagisa.mjs"
+  },
   "workspaces": [
     "packages/core",
     "packages/web",
