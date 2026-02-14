@@ -10,18 +10,28 @@ description: >
 
 Manage packages in PFC's embedded Python environment (Python 3.6.1, pip 9.x, numpy 1.13.0).
 
+**Key variable** (from `<env>`):
+- `{pfc_path}` - PFC installation directory
+
 ---
 
 ## Install Pattern
 
-PFC uses embedded Python—subprocess calls won't work. Use pip's Python API:
+Preferred path: run pip through PFC's embedded interpreter from shell.
+
+```bash
+"{pfc_path}/exe64/python36/python.exe" -m pip show package_name
+"{pfc_path}/exe64/python36/python.exe" -m pip install --user package_name
+```
+
+Fallback path (if shell install fails): run in PFC GUI IPython console.
 
 ```python
 import pip
 pip.main(['install', '--user', 'package_name'])
 ```
 
-**Always use `--user`**: Avoids permission issues with PFC installation directory.
+**Always use `--user`** to avoid permission issues with PFC installation directory.
 
 ---
 
@@ -71,11 +81,12 @@ If path shows `C:\Program Files\Itasca\...`, it's PFC's bundled version.
 
 | Operation | Command |
 |-----------|---------|
-| Install | `pip.main(['install', '--user', 'pkg'])` |
-| Uninstall | `pip.main(['uninstall', 'pkg', '-y'])` |
-| List all | `pip.main(['list'])` |
-| Show info | `pip.main(['show', 'pkg'])` |
-| Force reinstall | `pip.main(['install', '--user', '--force-reinstall', '--no-cache-dir', 'pkg'])` |
+| Install | `"{pfc_path}/exe64/python36/python.exe" -m pip install --user pkg` |
+| Upgrade | `"{pfc_path}/exe64/python36/python.exe" -m pip install --user --upgrade pkg` |
+| Uninstall | `"{pfc_path}/exe64/python36/python.exe" -m pip uninstall -y pkg` |
+| List all | `"{pfc_path}/exe64/python36/python.exe" -m pip list` |
+| Show info | `"{pfc_path}/exe64/python36/python.exe" -m pip show pkg` |
+| Force reinstall | `"{pfc_path}/exe64/python36/python.exe" -m pip install --user --force-reinstall --no-cache-dir pkg` |
 
 ---
 
@@ -83,6 +94,11 @@ If path shows `C:\Program Files\Itasca\...`, it's PFC's bundled version.
 
 ### Module still not found after install
 First, restart pfc-bridge to reload Python modules.
+
+If still failing, verify install target is PFC Python (not system Python):
+```bash
+"{pfc_path}/exe64/python36/python.exe" -c "import sys; print(sys.executable)"
+```
 
 ### "Ghost install": pip says installed but ModuleNotFoundError persists
 Pip metadata may be corrupted (files missing but records remain). Force reinstall:
@@ -102,6 +118,12 @@ pip.main(['uninstall', 'numpy', '-y'])
 
 ### Permission denied
 Always use `--user` flag.
+
+If shell command still fails, run install from PFC GUI IPython console:
+```python
+import pip
+pip.main(['install', '--user', 'package_name'])
+```
 
 ### Import error after install (version conflict)
 Check which version is loaded:
