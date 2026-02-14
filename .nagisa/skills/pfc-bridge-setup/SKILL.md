@@ -1,16 +1,17 @@
 ---
 name: pfc-bridge-setup
 description: >
-  Complete PFC integration lifecycle: (1) Verify PFC installation from config,
-  (2) Check/install websockets==9.1 in PFC's Python 3.6 environment,
-  (3) Generate startup.dat and launch PFC GUI with user's project workspace,
-  (4) Auto-start pfc-bridge. Triggers: "open PFC", "start PFC", "connect to PFC",
-  "pfc-bridge connection failed", first-time PFC setup.
+  Set up or repair the PFC bridge connection used by Nagisa execution tools.
+  PFC commands must run on the PFC GUI main thread, so `pfc-mcp-bridge` must run
+  inside PFC to accept WebSocket requests (port 9001) and forward them safely.
+  Use this skill when users ask to open/start/connect PFC GUI, when PFC execution
+  tools fail to connect (connection refused / bridge not running), or during first-time
+  PFC integration setup.
 ---
 
 # PFC Bridge Setup
 
-Complete guide for PFC integration: environment setup, GUI launch, and pfc-bridge start.
+Complete guide for PFC integration using the published `pfc-mcp-bridge` package.
 
 ---
 
@@ -28,7 +29,6 @@ Complete guide for PFC integration: environment setup, GUI launch, and pfc-bridg
 
 **Key Variables** (from `<env>`):
 - `{workspace}` - working directory
-- `{pfc_mcp_path}` - standalone pfc-mcp path (recommended: `{workspace}/.nagisa/pfc-mcp`)
 - `{pfc_path}` - PFC installation directory
 - `{project_name}` - .prj filename (from Step 3)
 
@@ -42,31 +42,57 @@ powershell -Command "Test-Path '{pfc_path}/exe64/pfc3d700_gui.exe'"
 
 **Success**: `True` → **Continue to Step 2**
 
-**Failure**: `False` or `pfc_path` unavailable → Search drives:
+**Failure**: `False` or `pfc_path` unavailable → use a fast, staged lookup (avoid full-drive recursive scan):
+
+1) Check Windows uninstall registry (fastest):
 ```bash
-powershell -Command "Get-ChildItem -Path 'C:\','D:\' -Filter 'pfc*_gui.exe' -Recurse -Depth 4 -ErrorAction SilentlyContinue | Select-Object -First 3 DirectoryName"
+powershell -Command "$keys=@('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'); $hits=@(); foreach($k in $keys){ Get-ItemProperty $k -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match 'PFC|Itasca' } | ForEach-Object { if($_.InstallLocation){ $exe=Join-Path $_.InstallLocation 'exe64\pfc3d700_gui.exe'; if(Test-Path $exe){ $hits+=$exe } } } }; $hits | Select-Object -Unique | Select-Object -First 3"
 ```
-If still not found, ask user for PFC installation path.
+
+2) Check common install roots (bounded search):
+```bash
+powershell -Command "$roots=@('C:\Program Files\Itasca','D:\Program Files\Itasca','C:\Itasca','D:\Itasca'); $hits=@(); foreach($r in $roots){ if(Test-Path $r){ Get-ChildItem $r -Directory -ErrorAction SilentlyContinue | ForEach-Object { $exe=Join-Path $_.FullName 'exe64\pfc3d700_gui.exe'; if(Test-Path $exe){ $hits+=$exe } } } }; $hits | Select-Object -Unique | Select-Object -First 3"
+```
+
+3) If still not found, ask user for exact `pfc_path` (do not run full-drive recursive scan by default).
 
 ---
 
-## Step 2: Ensure websockets Installed
+## Step 2: Ensure `pfc-mcp-bridge` Installed in PFC Python
+
+**Required version**: `pfc-mcp-bridge >= 0.1.2`
 
 **Check**:
 ```bash
-"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['show', 'websockets'])"
+"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['show', 'pfc-mcp-bridge'])"
 ```
 
-- `Version: 9.1` → **Continue to Step 3**
+- Installed (`Name: pfc-mcp-bridge`) and version is `>= 0.1.2` → **Continue to Step 3**
 - `Package(s) not found` → Install (see below)
-- Other version → Reinstall with `pip.main(['install', '--user', 'websockets==9.1', '--force-reinstall'])`
+- If installed but version is `< 0.1.2` or import fails, upgrade/reinstall package
 
 **Install**:
 ```bash
-"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['install', '--user', 'websockets==9.1'])"
+"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['install', '--user', 'pfc-mcp-bridge'])"
+```
+
+**Upgrade**:
+```bash
+"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['install', '--user', '--upgrade', 'pfc-mcp-bridge'])"
+```
+
+**Verify import**:
+```bash
+"{pfc_path}/exe64/python36/python.exe" -c "import pfc_mcp_bridge; print(getattr(pfc_mcp_bridge, '__version__', 'unknown'))"
 ```
 
 **Failure**: Permission error → Instruct user to run in PFC GUI IPython console:
+```python
+import pip
+pip.main(['install', '--user', 'pfc-mcp-bridge'])
+```
+
+If bridge starts but reports websocket import issues, install dependency explicitly:
 ```python
 import pip
 pip.main(['install', '--user', 'websockets==9.1'])
@@ -76,47 +102,40 @@ pip.main(['install', '--user', 'websockets==9.1'])
 
 ## Step 3: Prepare Startup Script
 
-**Ensure standalone `pfc-mcp` repository exists locally**:
-```bash
-powershell -Command "if (-not (Test-Path '{workspace}/.nagisa/pfc-mcp/.git')) { git clone https://github.com/yusong652/pfc-mcp.git '{workspace}/.nagisa/pfc-mcp' } else { git -C '{workspace}/.nagisa/pfc-mcp' pull --ff-only }"
+Create a tiny launcher script that imports the installed package.
+
+1) Write `{workspace}/.nagisa/start_pfc_mcp_bridge.py`:
+
+```python
+import pfc_mcp_bridge
+
+pfc_mcp_bridge.start()
 ```
 
-**First, check if startup.dat already exists**:
-```bash
-powershell -Command "Test-Path '{workspace}/.nagisa/startup.dat'"
-```
+2) Check for `.prj` files:
+`powershell -Command "Get-ChildItem '{workspace}' -Filter '*.prj' -Name"`
 
-**If `True`**: Go directly to Step 4.
+3) If multiple `.prj` files found, ask user which to open.
 
-**If `False`**: Create startup.dat using Write tool:
-
-1. Check for .prj files: `powershell -Command "Get-ChildItem '{workspace}' -Filter '*.prj' -Name"`
-2. If multiple .prj found, ask user which to open
-3. Write `{workspace}/.nagisa/startup.dat`:
+4) Write `{workspace}/.nagisa/startup.dat`:
 
 **With .prj file**:
 ```
 ; PFC Auto-start Bridge Script (Generated by Nagisa)
 project restore '{workspace}/{project_name}.prj'
-
-fish define _set_bridge_path
-    global _pfc_bridge_path = '{workspace}/.nagisa/pfc-mcp/pfc-bridge'
-end
-@_set_bridge_path
-program call "{workspace}/.nagisa/pfc-mcp/pfc-bridge/start_bridge.py"
+program call "{workspace}/.nagisa/start_pfc_mcp_bridge.py"
 ```
 
 **Without .prj file**:
 ```
 ; PFC Auto-start Bridge Script (Generated by Nagisa)
-fish define _set_bridge_path
-    global _pfc_bridge_path = '{workspace}/.nagisa/pfc-mcp/pfc-bridge'
-end
-@_set_bridge_path
-program call "{workspace}/.nagisa/pfc-mcp/pfc-bridge/start_bridge.py"
+program call "{workspace}/.nagisa/start_pfc_mcp_bridge.py"
 ```
 
-**Verify**: `powershell -Command "Test-Path '{workspace}/.nagisa/startup.dat'"` returns `True`
+5) Verify files exist:
+```bash
+powershell -Command "(Test-Path '{workspace}/.nagisa/startup.dat') -and (Test-Path '{workspace}/.nagisa/start_pfc_mcp_bridge.py')"
+```
 
 ---
 
@@ -126,7 +145,7 @@ program call "{workspace}/.nagisa/pfc-mcp/pfc-bridge/start_bridge.py"
 powershell -Command "Start-Process '{pfc_path}/exe64/pfc3d700_gui.exe' -ArgumentList '{workspace}/.nagisa/startup.dat' -WorkingDirectory '{workspace}'"
 ```
 
-`[USER_ACTION_REQUIRED]` Inform user: "Please click **Execute** button in PFC Editor pane, then confirm when you see 'PFC Bridge Server' (or port 9001 startup message) in the console"
+`[USER_ACTION_REQUIRED]` Inform user: "Please click **Execute** button in PFC Editor pane, then confirm when you see 'PFC Bridge Server' (or port 9001 startup message) in the console."
 
 **Success**: User confirms server started → **Continue to Step 5**
 
@@ -145,8 +164,11 @@ If successful, PFC integration is ready.
 
 ## Troubleshooting
 
+### "No module named pfc_mcp_bridge"
+Install in PFC Python environment (Step 2), then relaunch PFC.
+
 ### "No module named websockets"
-Try automated install (Step 2). If permission error, use manual install in PFC GUI IPython console.
+Bridge dependency missing in PFC Python. Install `websockets==9.1` in PFC GUI IPython console.
 
 ### "Connection refused" on port 9001
 pfc-bridge not running. Execute startup script in PFC GUI (Step 4).
@@ -157,7 +179,8 @@ Another pfc-bridge process may be running. Close PFC and restart.
 ### Manual start fallback
 If auto-start fails, run in PFC GUI IPython console:
 ```python
-%run {workspace}/.nagisa/pfc-mcp/pfc-bridge/start_bridge.py
+import pfc_mcp_bridge
+pfc_mcp_bridge.start()
 ```
 
 ---
@@ -166,7 +189,9 @@ If auto-start fails, run in PFC GUI IPython console:
 
 | Step | Command | Expected Output |
 |------|---------|-----------------|
-| Check websockets | `"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['show', 'websockets'])"` | `Version: 9.1` |
-| Install websockets | `"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['install', '--user', 'websockets==9.1'])"` | `Successfully installed` |
+| Check bridge package | `"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['show', 'pfc-mcp-bridge'])"` | package metadata shown |
+| Upgrade bridge package | `"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['install', '--user', '--upgrade', 'pfc-mcp-bridge'])"` | upgraded to `>= 0.1.2` |
+| Install bridge package | `"{pfc_path}/exe64/python36/python.exe" -c "import pip; pip.main(['install', '--user', 'pfc-mcp-bridge'])"` | `Successfully installed` |
+| Verify import | `"{pfc_path}/exe64/python36/python.exe" -c "import pfc_mcp_bridge; print(pfc_mcp_bridge.__version__)"` | version string |
 | Launch PFC | `powershell Start-Process '{pfc_path}/exe64/pfc3d700_gui.exe' -ArgumentList '{workspace}/.nagisa/startup.dat' -WorkingDirectory '{workspace}'` | PFC GUI opens |
 | Verify connection | `pfc_list_tasks()` | `tasks: [...]` |
