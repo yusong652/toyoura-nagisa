@@ -13,6 +13,7 @@ from backend.application.tools.registrar import ToolRegistrar
 from backend.application.tools.context import ToolContext
 # from fastmcp.server.context import Context  # type: ignore
 
+from .utils.path_security import get_workspace_root_async
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
@@ -94,6 +95,9 @@ async def glob(
 
     # pattern is pre-validated by Pydantic (min_length=1)
 
+    # Determine workspace root dynamically for current session
+    workspace_root = await get_workspace_root_async(context)
+
     # Determine search directory (no workspace restriction for read operations)
     if path != ".":
         # Normalize path separators for cross-platform compatibility
@@ -103,7 +107,8 @@ async def glob(
         # Resolve path to absolute
         search_dir = Path(path).expanduser()
         if not search_dir.is_absolute():
-            search_dir = Path.cwd() / search_dir
+            # Relative paths are resolved from workspace root
+            search_dir = workspace_root / search_dir
         search_dir = search_dir.resolve()
 
         if not search_dir.exists():
@@ -111,8 +116,8 @@ async def glob(
         if not search_dir.is_dir():
             return error_response(f"Path is not a directory: {original_path_for_display}")
     else:
-        # Default to current working directory
-        search_dir = Path.cwd()
+        # Default to workspace root
+        search_dir = workspace_root.resolve()
 
     try:
         # Expand brace patterns {a,b,c}
@@ -124,14 +129,14 @@ async def glob(
         for expanded_pattern in expanded_patterns:
             # Use Python's glob with recursive support
             # glob.glob returns strings, convert to Path
+            search_pattern = str(search_dir / expanded_pattern)
             matches = glob_module.glob(
-                expanded_pattern,
-                root_dir=str(search_dir),
+                search_pattern,
                 recursive=True
             )
 
             for match in matches:
-                file_path = (search_dir / match).resolve()
+                file_path = Path(match).resolve()
 
                 # No workspace restriction for read operations
                 # Symlinks are followed normally
