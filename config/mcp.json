@@ -1,9 +1,21 @@
 {
   "mcpServers": {
     "context7": {
-      "command": "npx -y @upstash/context7-mcp --api-key ${CONTEXT7_API_KEY}",
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp",
+        "--api-key",
+        "${CONTEXT7_API_KEY}"
+      ],
       "enabled": false
     },
-    "pfc-mcp": "uvx pfc-mcp"
+    "pfc-mcp": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["pfc-mcp"],
+      "enabled": true
+    }
   }
 }
