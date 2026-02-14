@@ -130,7 +130,7 @@ Query Tools      Small-Scale Test   Full Simulation
 
 **Detailed Documentation**: See `https://github.com/yusong652/pfc-mcp/tree/main/pfc-bridge` for implementation details, thread-safety architecture, and usage examples.
 
-**Backend Integration**: `config/mcp_servers.json` + `packages/backend/infrastructure/mcp/client.py`
+**Backend Integration**: `config/mcp.json` + `packages/backend/infrastructure/mcp/client.py`
 
 ## Development Commands
 
@@ -157,8 +157,8 @@ npm run dev:backend
 # OR manually:
 cd packages/backend && uv run python run.py
 
-# Optional: run MCP gateway for external MCP clients
-uv run python packages/backend/infrastructure/mcp/mcp_server.py
+# Internal MCP server module has been removed.
+# Use external MCP servers via config/mcp.json (for example: uvx pfc-mcp).
 
 # Run tests
 uv run pytest

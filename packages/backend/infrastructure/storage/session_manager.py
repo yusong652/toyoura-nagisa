@@ -1014,7 +1014,7 @@ def is_mcp_server_enabled_for_session(session_id: str, server_name: str) -> bool
 
     Priority:
     1. Session-specific override in mcp_config
-    2. Global default from mcp_servers.json
+    2. Global default from mcp.json
 
     Args:
         session_id: Session identifier

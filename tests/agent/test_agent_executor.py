@@ -21,10 +21,7 @@ async def init_app_context():
     """Initialize app context similar to FastAPI lifespan."""
     from fastapi import FastAPI
     from backend.infrastructure.llm.base.factory import initialize_factory
-    from backend.infrastructure.mcp.mcp_server import mcp
-    from fastmcp import Client
     from backend.shared.utils.app_context import set_app
-    import threading
 
     print("[INIT] Initializing test environment...")
 
@@ -38,19 +35,9 @@ async def init_app_context():
     app.state.llm_factory = llm_factory
     print(f"[INIT] LLM Client: {type(llm_client).__name__}")
 
-    # Initialize MCP server and client
-    app.state.mcp = mcp
-    mcp.app = app  # type: ignore
-    mcp_client = Client(mcp)
-    app.state.mcp_client = mcp_client
-
-    # Start MCP server in background thread
-    mcp_thread = threading.Thread(target=lambda: mcp.run(transport="sse", port=9001), daemon=True)
-    mcp_thread.start()
-    print("[INIT] MCP Server started on port 9001")
-
-    # Wait a bit for MCP server to start
-    await asyncio.sleep(0.5)
+    # Internal MCP server was removed from backend infrastructure.
+    app.state.mcp = None
+    app.state.mcp_client = None
 
     print("[INIT] Test environment ready\n")
     return app

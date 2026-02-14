@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx -y @upstash/context7-mcp --api-key ${CONTEXT7_API_KEY}",
+      "enabled": false
+    },
+    "pfc-mcp": "uvx pfc-mcp"
+  }
+}
