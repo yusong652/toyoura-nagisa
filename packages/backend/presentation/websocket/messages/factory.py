@@ -16,7 +16,6 @@ from backend.presentation.websocket.messages.location import (
     LocationRequestMessage,
     LocationResponseMessage
 )
-from backend.presentation.websocket.messages.emotion import EmotionKeywordMessage
 from backend.presentation.websocket.messages.system import (
     ErrorMessage,
     StatusUpdate,
@@ -67,8 +66,6 @@ INCOMING_MESSAGE_SCHEMAS = {
 # Outgoing message schemas (backend creates these messages to send to frontend)
 # Only includes message types that are actually used in the codebase
 OUTGOING_MESSAGE_SCHEMAS = {
-    # Used via create_message()
-    MessageType.EMOTION_KEYWORD: EmotionKeywordMessage,
     MessageType.ERROR: ErrorMessage,
     MessageType.MESSAGE_CREATE: MessageCreateMessage,
     MessageType.STATUS_UPDATE: StatusUpdate,

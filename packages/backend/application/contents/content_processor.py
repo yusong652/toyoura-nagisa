@@ -55,10 +55,6 @@ async def process_content_pipeline(
         if isinstance(item, dict) and item.get('type') == 'text':
             text_content += item.get('text', '')
 
-    # Extract emotional keywords from text content
-    from backend.shared.utils.text_parser import parse_llm_output
-    parsed_result = parse_llm_output(text_content)
-    extracted_keyword = parsed_result['keyword']
 
     # Save or update message in conversation history
     if message_id:
@@ -72,12 +68,6 @@ async def process_content_pipeline(
             session_id
         )
     
-    # Send emotional keywords via WebSocket if available
-    if extracted_keyword:
-        from backend.application.notifications import get_emotion_notification_service
-        emotion_service = get_emotion_notification_service()
-        if emotion_service:
-            await emotion_service.notify_emotion_keyword(session_id, extracted_keyword, ai_msg_id)
     
     # Send MESSAGE_CREATE only if message was not created during streaming
     if not message_id:

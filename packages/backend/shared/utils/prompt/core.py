@@ -58,3 +58,5 @@ def get_base_prompt(profile: str = "pfc_expert") -> str:
 def get_expression_prompt() -> str:
     """Load expression/keyword instruction prompt"""
     return _load_prompt_file("expression_prompt.md")
+
+

@@ -9,7 +9,7 @@ This file provides guidance to Agent when working with code in this repository.
 ### Technology Stack
 
 - **Backend**: Python 3.10+, FastAPI, uvicorn, ChromaDB
-- **Frontend**: React 19, TypeScript, Material-UI, Vite, Live2D (PIXI.js)
+- **Frontend**: React 19, TypeScript, Material-UI, Vite
 - **AI Infrastructure**: Multi-provider LLM support, real-time streaming, in-process tool orchestration (optional MCP gateway)
 - **Scientific Computing**: WebSocket integration with ITASCA PFC Python SDK
 - **Communication**: WebSocket for real-time updates, RESTful API for state management

@@ -9,69 +9,27 @@ from typing import List, Optional
 from pathlib import Path
 
 
-# Keywords cache
-_allowed_keywords_cache: Optional[List[str]] = None
-
-
-def get_allowed_keywords_from_prompt_file() -> List[str]:
-    """
-    Parse allowed keywords list from prompt file.
-    Results are cached.
-    """
-    global _allowed_keywords_cache
-    if _allowed_keywords_cache is not None:
-        return _allowed_keywords_cache
-
-    # Use the new location in config/prompts
-    project_root = Path(__file__).parent.parent.parent
-    file_path = project_root / "config" / "prompts" / "expression_prompt.md"
-    keywords = []
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        matches = re.findall(r'\[\[(\w+)\]\]', content)
-        if matches:
-            keywords = [keyword.lower() for keyword in matches]
-        else:
-            print(f"Warning: No keywords found in {file_path}.")
-    except FileNotFoundError:
-        print(f"Error: Keywords file '{file_path}' not found.")
-    
-    _allowed_keywords_cache = keywords
-    return _allowed_keywords_cache
-
-
 def parse_llm_output(llm_full_response: str) -> dict:
     """
-    Parse LLM output to extract reply text and keywords.
+    Parse LLM output to extract reply text.
+    Strips [[keyword]] tags from the end of the message to keep the UI clean,
+    even though Live2D animations are no longer triggered.
+
     Args:
         llm_full_response: Complete response text from LLM
     Returns:
         Dictionary with 'text' and 'keyword' keys
     """
-    allowed_keywords = get_allowed_keywords_from_prompt_file()
-
-    keyword = "neutral"  # Default keyword
-    text_with_no_keyword = llm_full_response.strip()
-
-    match = re.search(r'\[\[(\w+)\]\]\s*$', llm_full_response.strip())
+    text = llm_full_response.strip()
+    keyword = "neutral"
+    
+    # Strip [[keyword]] from the end if present
+    match = re.search(r'\[\[(\w+)\]\]\s*$', text)
     if match:
-        extracted_keyword = match.group(1).lower()
-        if extracted_keyword in allowed_keywords:
-            keyword = extracted_keyword
-            text_with_no_keyword = llm_full_response[:match.start()].strip()
-        else:
-            print(f"Warning: LLM returned undefined keyword '{extracted_keyword}'")
-            text_with_no_keyword = llm_full_response[:match.start()].strip()
+        text = text[:match.start()].strip()
+        keyword = match.group(1).lower()
 
     return {
-        'text': text_with_no_keyword,
+        'text': text,
         'keyword': keyword
     }
-
-
-def clear_keywords_cache() -> None:
-    """Clear keywords cache, force re-reading file"""
-    global _allowed_keywords_cache
-    _allowed_keywords_cache = None

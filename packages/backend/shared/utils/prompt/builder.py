@@ -192,11 +192,12 @@ async def build_system_prompt(
     if base:
         components.append(base)
 
-    # 5. Expression/Live2D instructions (MainAgent only)
+    # 5. Expression instructions
     if include_expression:
         expression = get_expression_prompt()
         if expression:
             components.append(expression)
+
 
     # Join all components with separators
     return "\n\n---\n\n".join(filter(None, components))

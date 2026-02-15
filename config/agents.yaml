@@ -26,7 +26,7 @@ main_agent:
     - pfc_capture_plot
     - invoke_agent
     - trigger_skill
-  max_iterations: 64
+  max_iterations: 128
   streaming_enabled: true
   color: "#9C27B0"
   icon: "⚛️"
@@ -58,7 +58,7 @@ subagents:
       - pfc_check_task_status
       - web_search
       - todo_write
-    max_iterations: 64
+    max_iterations: 128
     streaming_enabled: false
     color: "#9E9E9E"
     icon: "🤖"
@@ -78,7 +78,7 @@ subagents:
       - bash
       - bash_output
       - todo_write
-    max_iterations: 64
+    max_iterations: 128
     streaming_enabled: false
     color: "#9E9E9E"
     icon: "🤖"

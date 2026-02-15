@@ -36,8 +36,6 @@ class MessageType(str, Enum):
     # Message management
     MESSAGE_CREATE = "MESSAGE_CREATE"
 
-    # Emotion and animation
-    EMOTION_KEYWORD = "EMOTION_KEYWORD"
 
     # Session management
     TITLE_UPDATE = "TITLE_UPDATE"

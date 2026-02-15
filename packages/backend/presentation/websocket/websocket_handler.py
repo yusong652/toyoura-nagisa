@@ -60,12 +60,10 @@ class WebSocketHandler:
         # Initialize application services
         from backend.application.notifications.message_status_service import MessageStatusService
         from backend.application.notifications.tool_confirmation_service import ToolConfirmationService
-        from backend.application.notifications.emotion_notification_service import EmotionNotificationService
         from backend.application.notifications.background_process_notification_service import BackgroundProcessNotificationService
         from backend.application.notifications.pfc_task_notification_service import PfcTaskNotificationService
         self.status_service = MessageStatusService(self.connection_manager)
         self.tool_confirmation_service = ToolConfirmationService(self.connection_manager)
-        self.emotion_service = EmotionNotificationService(self.connection_manager)
         self.background_process_notification_service = BackgroundProcessNotificationService(self.connection_manager)
         self.pfc_task_notification_service = PfcTaskNotificationService(self.connection_manager)
 
