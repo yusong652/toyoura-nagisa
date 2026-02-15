@@ -57,10 +57,13 @@ class TestParseStructuredResponse:
     def test_parses_direct_payload(self, service):
         result = {
             "structuredContent": {
-                "status": "completed",
-                "output": "Cycle 1000 done",
-                "error": None,
-                "result": "max_force=0.01",
+                "ok": True,
+                "data": {
+                    "task_status": "completed",
+                    "output": "Cycle 1000 done",
+                    "error": None,
+                    "result": "max_force=0.01",
+                },
             }
         }
         parsed = service._parse_task_status_structured(result)
@@ -69,20 +72,33 @@ class TestParseStructuredResponse:
         assert parsed["output"] == "Cycle 1000 done"
         assert parsed["error"] is None
 
-    def test_parses_nested_result(self, service):
+    def test_parses_running_payload(self, service):
         result = {
             "structuredContent": {
-                "result": {
-                    "status": "running",
+                "ok": True,
+                "data": {
+                    "task_status": "running",
                     "output": "line1\nline2",
                     "error": None,
-                }
+                },
             }
         }
         parsed = service._parse_task_status_structured(result)
         assert parsed is not None
         assert parsed["status"] == "running"
         assert "line1" in parsed["output"]
+
+    def test_parses_error_envelope(self, service):
+        result = {
+            "structuredContent": {
+                "ok": False,
+                "error": {"code": "not_found", "message": "Task not found"},
+            }
+        }
+        parsed = service._parse_task_status_structured(result)
+        assert parsed is not None
+        assert parsed["status"] == "failed"
+        assert parsed["error"] == "Task not found"
 
     def test_returns_none_without_structured_content(self, service):
         assert service._parse_task_status_structured({}) is None
@@ -91,9 +107,12 @@ class TestParseStructuredResponse:
     def test_filters_none_error(self, service):
         result = {
             "structuredContent": {
-                "status": "completed",
-                "output": "",
-                "error": "None",
+                "ok": True,
+                "data": {
+                    "task_status": "completed",
+                    "output": "",
+                    "error": "None",
+                },
             }
         }
         parsed = service._parse_task_status_structured(result)
@@ -102,9 +121,12 @@ class TestParseStructuredResponse:
     def test_filters_na_error(self, service):
         result = {
             "structuredContent": {
-                "status": "completed",
-                "output": "",
-                "error": "n/a",
+                "ok": True,
+                "data": {
+                    "task_status": "completed",
+                    "output": "",
+                    "error": "n/a",
+                },
             }
         }
         parsed = service._parse_task_status_structured(result)

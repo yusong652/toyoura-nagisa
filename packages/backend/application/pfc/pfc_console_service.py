@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
 from backend.infrastructure.pfc.foreground_registry import get_pfc_foreground_registry
-from backend.shared.utils.mcp_utils import extract_mcp_text
 
 
 # Caveat message for user PFC Python commands
@@ -207,19 +206,28 @@ class PfcConsoleService:
         except ConnectionError as e:
             return None, "", f"PFC server not available: {e}"
 
-        # 2. Extract task_id from response
-        task_id = None
-        structured = result.get("structuredContent")
-        if isinstance(structured, dict):
-            task_id = structured.get("task_id")
+        # 2. Extract task_id from MCP envelope
+        envelope = result.get("structuredContent")
+        if not isinstance(envelope, dict):
+            return None, "", "Invalid MCP response: missing structuredContent"
+
+        if envelope.get("ok") is not True:
+            error_payload = envelope.get("error") if isinstance(envelope.get("error"), dict) else {}
+            error_message = (
+                error_payload.get("message")
+                if isinstance(error_payload.get("message"), str)
+                else "pfc_execute_task failed"
+            )
+            return None, "", f"PFC server rejected task: {error_message}"
+
+        payload = envelope.get("data")
+        if not isinstance(payload, dict):
+            return None, "", "Invalid MCP response: missing envelope data"
+
+        task_id_value = payload.get("task_id")
+        task_id = task_id_value.strip() if isinstance(task_id_value, str) else ""
         if not task_id:
-            text = extract_mcp_text(result)
-            for line in text.splitlines():
-                if line.strip().startswith("- task_id:"):
-                    task_id = line.split(":", 1)[1].strip()
-                    break
-        if not task_id:
-            return None, "", "Failed to extract task_id from MCP response"
+            return None, "", "Invalid MCP response: missing task_id"
 
         # 3. Create local task
         self._task_manager.create_task(
@@ -269,50 +277,41 @@ class PfcConsoleService:
                             "wait_seconds": 1,
                         },
                     )
-                    structured_status = status_result.get("structuredContent")
-                    status_text = extract_mcp_text(status_result)
+                    envelope_status = status_result.get("structuredContent")
+                    if not isinstance(envelope_status, dict):
+                        raise RuntimeError("Invalid MCP response: missing structuredContent")
 
                     parsed_status = "running"
                     output = ""
                     error = None
 
-                    if isinstance(structured_status, dict):
-                        parsed_status = (structured_status.get("status") or "running").lower()
-                        output = structured_status.get("output") or ""
-                        error = structured_status.get("error")
+                    if envelope_status.get("ok") is True:
+                        payload = envelope_status.get("data")
+                        if not isinstance(payload, dict):
+                            raise RuntimeError("Invalid MCP response: missing envelope data")
+
+                        raw_status = payload.get("task_status")
+                        parsed_status = (raw_status or "running").lower() if isinstance(raw_status, str) else "running"
+
+                        output_value = payload.get("output")
+                        output = output_value if isinstance(output_value, str) else ""
+
+                        error_value = payload.get("error")
+                        error = error_value if isinstance(error_value, str) else None
+                    else:
+                        parsed_status = "failed"
+                        error_payload = (
+                            envelope_status.get("error")
+                            if isinstance(envelope_status.get("error"), dict)
+                            else {}
+                        )
+                        error_message = error_payload.get("message")
+                        error = error_message if isinstance(error_message, str) else "pfc_check_task_status failed"
 
                     is_terminal = parsed_status in {"completed", "failed", "interrupted"}
 
-                    if not isinstance(structured_status, dict):
-                        # Parse status from text fallback
-                        for line in status_text.splitlines():
-                            stripped = line.strip().lower()
-                            if "status:" in stripped:
-                                if "completed" in stripped or "success" in stripped:
-                                    parsed_status = "completed"
-                                    is_terminal = True
-                                elif "failed" in stripped or "error" in stripped:
-                                    parsed_status = "failed"
-                                    is_terminal = True
-                                elif "interrupted" in stripped:
-                                    parsed_status = "interrupted"
-                                    is_terminal = True
-
                     if is_terminal:
                         signal_task.cancel()
-                        if not output:
-                            output_section = False
-                            output_lines = []
-                            for line in status_text.splitlines():
-                                if "Output" in line or "=== Script Output" in line:
-                                    output_section = True
-                                    continue
-                                if output_section:
-                                    output_lines.append(line)
-                                elif line.strip().startswith("- error:") and not error:
-                                    error = line.split(":", 1)[1].strip()
-
-                            output = "\n".join(output_lines).strip()
 
                         self._task_manager.update_status(task_id, parsed_status, error=error)
                         if output:

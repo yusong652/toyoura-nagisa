@@ -10,6 +10,7 @@ Responsibilities:
 - Handle foreground→background transition notifications (Ctrl+B / timeout)
 """
 import asyncio
+import json
 import logging
 import os
 import re
@@ -303,7 +304,6 @@ class PfcTaskNotificationService:
         try:
             from backend.infrastructure.mcp.config import get_mcp_client_manager
             from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
-            from backend.shared.utils.mcp_utils import extract_mcp_text
 
             mcp_manager = get_mcp_client_manager()
             status_result = await mcp_manager.call_tool(
@@ -326,8 +326,7 @@ class PfcTaskNotificationService:
 
             parsed = self._parse_task_status_structured(status_result)
             if not parsed:
-                parsed = self._parse_task_status_text(extract_mcp_text(status_result))
-            if not parsed:
+                logger.warning("Invalid structured pfc_check_task_status payload for task=%s", task_id)
                 return None
 
             normalized_status = parsed["status"]
@@ -361,28 +360,41 @@ class PfcTaskNotificationService:
             return None
 
     def _parse_task_status_structured(self, result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Parse structuredContent from pfc_check_task_status when available."""
+        """Parse MCP envelope structuredContent from pfc_check_task_status."""
         structured = result.get("structuredContent")
         if not isinstance(structured, dict):
             return None
 
-        payload: Dict[str, Any] | None
-        nested_result = structured.get("result")
-        if isinstance(nested_result, dict):
-            payload = nested_result
-        else:
-            payload = structured
+        ok = structured.get("ok")
 
+        if ok is False:
+            error_payload = structured.get("error") if isinstance(structured.get("error"), dict) else {}
+            message = error_payload.get("message")
+            return {
+                "status": "failed",
+                "error": message if isinstance(message, str) else "pfc_check_task_status failed",
+                "result": None,
+                "output": "",
+            }
+
+        if ok is not True:
+            return None
+
+        payload = structured.get("data")
         if not isinstance(payload, dict):
             return None
 
-        raw_status = payload.get("status")
+        raw_status = payload.get("task_status")
         if not isinstance(raw_status, str) or not raw_status.strip():
             return None
 
         output = payload.get("output")
         if output is None:
-            output = ""
+            output_text = ""
+        elif isinstance(output, str):
+            output_text = output
+        else:
+            output_text = str(output)
 
         error = payload.get("error")
         if isinstance(error, str) and error.strip().lower() in {"none", "n/a"}:
@@ -392,13 +404,36 @@ class PfcTaskNotificationService:
             "status": self._normalize_status(raw_status),
             "error": error if isinstance(error, str) else None,
             "result": payload.get("result"),
-            "output": str(output),
+            "output": output_text,
         }
 
     def _parse_task_status_text(self, text: str) -> Optional[Dict[str, Any]]:
         """Parse pfc_check_task_status textual response."""
         if not text:
             return None
+
+        stripped_text = text.strip()
+        if stripped_text.startswith("{"):
+            try:
+                payload = json.loads(stripped_text)
+                if isinstance(payload, dict):
+                    data = payload.get("data")
+                    if isinstance(data, dict):
+                        raw_status = data.get("task_status")
+                        if isinstance(raw_status, str) and raw_status.strip():
+                            output = data.get("output")
+                            output_text = output if isinstance(output, str) else ("" if output is None else str(output))
+                            error = data.get("error")
+                            if isinstance(error, str) and error.strip().lower() in {"none", "n/a"}:
+                                error = None
+                            return {
+                                "status": self._normalize_status(raw_status),
+                                "error": error if isinstance(error, str) else None,
+                                "result": data.get("result"),
+                                "output": output_text,
+                            }
+            except json.JSONDecodeError:
+                pass
 
         status = "running"
         error: Optional[str] = None
