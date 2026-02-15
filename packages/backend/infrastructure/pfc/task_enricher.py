@@ -10,8 +10,7 @@ Used as a transparent post-hook in ToolExecutor — the executor only calls
 
 from __future__ import annotations
 
-import re
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from backend.infrastructure.pfc.task_manager import PfcTaskManager
@@ -52,7 +51,6 @@ def _enrich_check_status(result: Dict[str, Any], tm: "PfcTaskManager") -> None:
     short_hash = local.git_commit[:7]
     if structured:
         structured["git_commit"] = short_hash
-    _append_display_line(result, f"- git_commit: {short_hash}", after_pattern=r"^- checked:")
 
 
 # ---- list_tasks ----
@@ -63,59 +61,13 @@ def _enrich_list_tasks(result: Dict[str, Any], tm: "PfcTaskManager") -> None:
     tasks = structured.get("tasks") if structured else None
     if not isinstance(tasks, list):
         return
-    additions: List[Tuple[str, str]] = []
     for task in tasks:
         tid = task.get("task_id")
         if not tid:
             continue
         local = tm.get_task(tid)
         if local and local.git_commit:
-            short_hash = local.git_commit[:7]
-            task["git_commit"] = short_hash
-            additions.append((tid, short_hash))
-    if additions:
-        _enrich_list_display(result, additions)
-
-
-# ---- display helpers ----
-
-
-def _append_display_line(result: Dict[str, Any], line: str, after_pattern: str) -> None:
-    """Insert *line* after the first display line matching *after_pattern*."""
-    text = _get_display_text(result)
-    if not text:
-        return
-    lines = text.split("\n")
-    for i, existing in enumerate(lines):
-        if re.match(after_pattern, existing.strip()):
-            lines.insert(i + 1, line)
-            _set_display_text(result, "\n".join(lines))
-            return
-    lines.append(line)
-    _set_display_text(result, "\n".join(lines))
-
-
-def _enrich_list_display(result: Dict[str, Any], additions: List[Tuple[str, str]]) -> None:
-    """Append git_commit line after each matching task's description line."""
-    text = _get_display_text(result)
-    if not text:
-        return
-    tid_to_hash = dict(additions)
-    lines = text.split("\n")
-    enriched: List[str] = []
-    pending_hash: Optional[str] = None
-    for line in lines:
-        enriched.append(line)
-        # Detect task header line: "- task_id=xxx ..."
-        stripped = line.strip()
-        if stripped.startswith("- task_id="):
-            tid = stripped.split()[0].split("=", 1)[1] if "=" in stripped else None
-            pending_hash = tid_to_hash.get(tid) if tid else None
-        # Insert after description= line
-        elif pending_hash and stripped.startswith("description="):
-            enriched.append(f"  git_commit={pending_hash}")
-            pending_hash = None
-    _set_display_text(result, "\n".join(enriched))
+            task["git_commit"] = local.git_commit[:7]
 
 
 # ---- structured content navigation ----
@@ -135,37 +87,3 @@ def _find_structured_content(result: Dict[str, Any]) -> Optional[Dict[str, Any]]
         if isinstance(sc, dict):
             return sc
     return None
-
-
-def _get_display_text(result: Dict[str, Any]) -> Optional[str]:
-    """Get display text, preferring structured display over llm_content."""
-    structured = _find_structured_content(result)
-    if isinstance(structured, dict):
-        display = structured.get("display")
-        if isinstance(display, str) and display:
-            return display
-
-    llm = result.get("llm_content")
-    if isinstance(llm, dict):
-        parts = llm.get("parts")
-        if isinstance(parts, list) and parts:
-            return parts[0].get("text")
-    return None
-
-
-def _set_display_text(result: Dict[str, Any], text: str) -> None:
-    """Set display text in structured payload and mirror it to llm_content."""
-    structured = _find_structured_content(result)
-    if isinstance(structured, dict):
-        structured["display"] = text
-
-    llm = result.get("llm_content")
-    if isinstance(llm, dict):
-        parts = llm.get("parts")
-        if isinstance(parts, list):
-            if parts:
-                parts[0]["text"] = text
-            else:
-                parts.append({"type": "text", "text": text})
-    else:
-        result["llm_content"] = {"parts": [{"type": "text", "text": text}]}
