@@ -51,6 +51,7 @@ class MCPClient:
                     command=self.config.command,
                     args=self.config.args,
                     env={**os.environ, **self.config.env} if self.config.env else None,
+                    cwd=self.config.cwd,
                     encoding="utf-8",
                     encoding_error_handler="replace",
                 )
@@ -70,7 +71,11 @@ class MCPClient:
 
             except Exception as e:
                 last_error = e
-                logger.warning(f"[{self.name}] Connection attempt {attempt}/{max_attempts} failed: {e}")
+                rendered_cmd = " ".join([self.config.command, *self.config.args]).strip()
+                logger.warning(
+                    f"[{self.name}] Connection attempt {attempt}/{max_attempts} failed: {e} "
+                    f"(command='{rendered_cmd}', cwd='{self.config.cwd or ''}')"
+                )
                 await self.disconnect()
                 if attempt < max_attempts:
                     await asyncio.sleep(0.3)

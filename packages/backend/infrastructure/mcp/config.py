@@ -114,7 +114,30 @@ def _parse_env(env_raw: Any) -> tuple[dict[str, str] | None, set[str]]:
     return (env or None), missing_env_vars
 
 
-def _parse_mcp_server(server_name: str, server_data: Any) -> MCPServerConfig:
+def _parse_cwd(cwd_raw: Any, base_dir: Path) -> tuple[str | None, set[str]]:
+    """Parse and resolve cwd from raw config value."""
+    if not isinstance(cwd_raw, str):
+        return None, set()
+
+    missing_env_vars = _find_missing_env_vars(cwd_raw)
+    rendered_cwd = _expand_env_vars(cwd_raw).strip()
+    if not rendered_cwd:
+        return None, missing_env_vars
+
+    cwd_path = Path(rendered_cwd).expanduser()
+    if not cwd_path.is_absolute():
+        cwd_path = (base_dir / cwd_path).resolve()
+    else:
+        cwd_path = cwd_path.resolve()
+
+    return str(cwd_path), missing_env_vars
+
+
+def _parse_mcp_server(
+    server_name: str,
+    server_data: Any,
+    config_file_path: Path | None = None,
+) -> MCPServerConfig:
     """Parse one MCP server entry from JSON mapping format.
 
     Supports both full object and shorthand command string:
@@ -132,13 +155,16 @@ def _parse_mcp_server(server_name: str, server_data: Any) -> MCPServerConfig:
         normalized.get("command", ""),
         normalized["args"] if "args" in normalized else None,
     )
+    base_dir = config_file_path.parent if config_file_path else Path.cwd()
+    cwd, missing_in_cwd = _parse_cwd(normalized.get("cwd"), base_dir)
     env, missing_in_env = _parse_env(normalized.get("env", {}))
-    missing_env_vars = sorted(missing_in_command_args | missing_in_env)
+    missing_env_vars = sorted(missing_in_command_args | missing_in_env | missing_in_cwd)
 
     return MCPServerConfig(
         name=server_name,
         command=command,
         args=args,
+        cwd=cwd,
         env=env,
         enabled=normalized.get("enabled", True),
         description=normalized.get("description", ""),
@@ -200,7 +226,8 @@ def load_mcp_configs(
       "mcpServers": {
         "server-name": {
           "command": "uvx",
-          "args": ["package-name"]
+          "args": ["package-name"],
+          "cwd": "/optional/working/directory"
         }
       }
     }
@@ -227,7 +254,7 @@ def load_mcp_configs(
     """
     config_paths = [Path(config_path)] if config_path else _build_default_mcp_config_paths(workspace_root)
 
-    merged_servers: dict[str, Any] = {}
+    merged_servers: dict[str, tuple[Any, Path]] = {}
     loaded_paths: list[Path] = []
 
     for path in config_paths:
@@ -242,7 +269,7 @@ def load_mcp_configs(
         for server_name, server_data in server_mapping.items():
             if server_name in merged_servers:
                 logger.info(f"MCP server '{server_name}' overridden by config: {path}")
-            merged_servers[server_name] = server_data
+            merged_servers[server_name] = (server_data, path)
 
         loaded_paths.append(path)
 
@@ -251,11 +278,11 @@ def load_mcp_configs(
         return []
 
     configs: list[MCPServerConfig] = []
-    for server_name, server_data in merged_servers.items():
+    for server_name, (server_data, source_path) in merged_servers.items():
         if isinstance(server_data, dict) and server_data.get("type", "stdio") != "stdio":
             logger.warning(f"[{server_name}] Unsupported MCP transport type: {server_data.get('type')}")
             continue
-        configs.append(_parse_mcp_server(server_name, server_data))
+        configs.append(_parse_mcp_server(server_name, server_data, source_path))
 
     loaded_path_text = ", ".join(str(path) for path in loaded_paths)
     logger.info(f"Loaded {len(configs)} MCP server configs from: {loaded_path_text}")

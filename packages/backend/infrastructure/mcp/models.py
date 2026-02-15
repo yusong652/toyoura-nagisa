@@ -16,6 +16,7 @@ class MCPServerConfig:
     name: str
     command: str
     args: list[str] = field(default_factory=list)
+    cwd: str | None = None
     env: dict[str, str] | None = None
     enabled: bool = True
     description: str = ""
