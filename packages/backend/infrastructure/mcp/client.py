@@ -1,283 +1,165 @@
-"""
-MCP Client for connecting to MCP servers.
-
-This module provides a client for connecting to MCP servers
-(like context7, blender-mcp, pfc-mcp, etc.) via stdio transport.
-"""
+"""Single MCP server client."""
 
 from __future__ import annotations
 
-import json
+import asyncio
 import logging
 import os
-import re
-import shlex
-from pathlib import Path
 from typing import Any
 
-from .manager import (
-    MCPClientManager,
-    get_mcp_client_manager,
-    initialize_mcp_clients,
-    shutdown_mcp_clients,
-)
-from .mcp_client import MCPClient
+from mcp import ClientSession, StdioServerParameters, types
+from mcp.client.stdio import stdio_client
+
 from .models import MCPServerConfig, MCPTool
 
 logger = logging.getLogger(__name__)
-ENV_VAR_PATTERN = re.compile(r"\$\{([^}]+)\}")
-NAGISA_CONFIG_DIR = ".nagisa"
-MCP_CONFIG_FILENAME = "mcp.json"
 
 
-def _find_missing_env_vars(value: str) -> set[str]:
-    """Find env vars referenced by ${VAR_NAME} that are unset or empty."""
-    missing_vars: set[str] = set()
-    for match in ENV_VAR_PATTERN.finditer(value):
-        var_name = match.group(1)
-        if not os.getenv(var_name):
-            missing_vars.add(var_name)
-    return missing_vars
+class MCPClient:
+    """Client for connecting to and interacting with one MCP server."""
 
+    def __init__(self, config: MCPServerConfig):
+        self.config = config
+        self._session: ClientSession | None = None
+        self._read_stream: Any = None
+        self._write_stream: Any = None
+        self._tools: dict[str, MCPTool] = {}
+        self._connected = False
+        self._stdio_context: Any = None
+        self._session_context: Any = None
 
-def _expand_env_vars(value: str) -> str:
-    """Expand ${VAR_NAME} patterns with environment variables."""
+    @property
+    def name(self) -> str:
+        return self.config.name
 
-    def replace(match: re.Match[str]) -> str:
-        var_name = match.group(1)
-        return os.getenv(var_name, "")
+    @property
+    def is_connected(self) -> bool:
+        return self._connected
 
-    return ENV_VAR_PATTERN.sub(replace, value)
+    async def connect(self) -> bool:
+        """Connect to the MCP server."""
+        if self._connected:
+            logger.warning(f"[{self.name}] Already connected")
+            return True
 
+        last_error: Exception | None = None
+        max_attempts = 2
 
-def _parse_args(args_raw: Any) -> tuple[list[str], set[str]]:
-    """Parse and expand args from raw config value."""
-    args_list = args_raw if isinstance(args_raw, list) else []
-    missing_env_vars: set[str] = set()
+        for attempt in range(1, max_attempts + 1):
+            try:
+                server_params = StdioServerParameters(
+                    command=self.config.command,
+                    args=self.config.args,
+                    env={**os.environ, **self.config.env} if self.config.env else None,
+                    encoding="utf-8",
+                    encoding_error_handler="replace",
+                )
 
-    for arg in args_list:
-        if isinstance(arg, str):
-            missing_env_vars.update(_find_missing_env_vars(arg))
+                self._stdio_context = stdio_client(server_params)
+                self._read_stream, self._write_stream = await self._stdio_context.__aenter__()
 
-    args = [_expand_env_vars(arg) for arg in args_list if isinstance(arg, str)]
-    args = [arg for arg in args if arg]
-    return args, missing_env_vars
+                self._session_context = ClientSession(self._read_stream, self._write_stream)
+                self._session = await self._session_context.__aenter__()
 
+                await self._session.initialize()
+                await self._load_tools()
 
-def _parse_command_and_args(command_raw: Any, args_raw: Any) -> tuple[str, list[str], set[str]]:
-    """Parse command and args.
+                self._connected = True
+                logger.info(f"[{self.name}] Connected successfully, {len(self._tools)} tools available")
+                return True
 
-    Supported forms:
-    - command: "uvx", args: ["pfc-mcp"]
-    - command: "uvx pfc-mcp" (args omitted, split by whitespace)
-    - server value shorthand: "uvx pfc-mcp"
-    """
-    missing_env_vars: set[str] = set()
+            except Exception as e:
+                last_error = e
+                logger.warning(f"[{self.name}] Connection attempt {attempt}/{max_attempts} failed: {e}")
+                await self.disconnect()
+                if attempt < max_attempts:
+                    await asyncio.sleep(0.3)
 
-    parsed_args, missing_in_args = _parse_args(args_raw)
-    missing_env_vars.update(missing_in_args)
+        logger.error(f"[{self.name}] Connection failed: {last_error}")
+        return False
 
-    if not isinstance(command_raw, str):
-        return "", parsed_args, missing_env_vars
-
-    missing_env_vars.update(_find_missing_env_vars(command_raw))
-    rendered_command = _expand_env_vars(command_raw).strip()
-    if not rendered_command:
-        return "", parsed_args, missing_env_vars
-
-    if isinstance(args_raw, list):
-        return rendered_command, parsed_args, missing_env_vars
-
-    try:
-        tokens = shlex.split(rendered_command, posix=(os.name != "nt"))
-    except Exception:
-        tokens = rendered_command.split()
-    if not tokens:
-        return "", parsed_args, missing_env_vars
-
-    return tokens[0], tokens[1:] + parsed_args, missing_env_vars
-
-
-def _parse_env(env_raw: Any) -> tuple[dict[str, str] | None, set[str]]:
-    """Parse and expand env map from raw config value."""
-    env_dict = env_raw if isinstance(env_raw, dict) else {}
-    missing_env_vars: set[str] = set()
-    env: dict[str, str] = {}
-
-    for key, value in env_dict.items():
-        if isinstance(value, str):
-            missing_env_vars.update(_find_missing_env_vars(value))
-            rendered = _expand_env_vars(value)
-            if rendered:
-                env[key] = rendered
-
-    return (env or None), missing_env_vars
-
-
-def _parse_mcp_server(server_name: str, server_data: Any) -> MCPServerConfig:
-    """Parse one MCP server entry from JSON mapping format.
-
-    Supports both full object and shorthand command string:
-    - "pfc-mcp": {"command": "uvx", "args": ["pfc-mcp"]}
-    - "pfc-mcp": "uvx pfc-mcp"
-    """
-    if isinstance(server_data, str):
-        normalized: dict[str, Any] = {"command": server_data}
-    elif isinstance(server_data, dict):
-        normalized = server_data
-    else:
-        normalized = {}
-
-    command, args, missing_in_command_args = _parse_command_and_args(
-        normalized.get("command", ""),
-        normalized["args"] if "args" in normalized else None,
-    )
-    env, missing_in_env = _parse_env(normalized.get("env", {}))
-    missing_env_vars = sorted(missing_in_command_args | missing_in_env)
-
-    return MCPServerConfig(
-        name=server_name,
-        command=command,
-        args=args,
-        env=env,
-        enabled=normalized.get("enabled", True),
-        description=normalized.get("description", ""),
-        missing_env_vars=missing_env_vars,
-    )
-
-
-def _load_mcp_servers_mapping_from_file(config_file_path: Path) -> dict[str, Any]:
-    """Load and validate mcpServers mapping from a JSON config file."""
-    with config_file_path.open(encoding="utf-8") as f:
-        config_data = json.load(f)
-
-    if not isinstance(config_data, dict):
-        logger.warning(f"Invalid MCP config format in {config_file_path}: root must be an object")
-        return {}
-
-    mcp_servers = config_data.get("mcpServers", {})
-    if not isinstance(mcp_servers, dict):
-        logger.warning(f"Invalid MCP config format in {config_file_path}: 'mcpServers' must be an object")
-        return {}
-
-    normalized: dict[str, Any] = {}
-    for server_name, server_data in mcp_servers.items():
-        if isinstance(server_name, str) and isinstance(server_data, (dict, str)):
-            normalized[server_name] = server_data
-    return normalized
-
-
-def _build_default_mcp_config_paths(workspace_root: str | None = None) -> list[Path]:
-    """Build MCP config lookup paths in low -> high priority order."""
-    project_root = Path(__file__).parent.parent.parent.parent.parent
-    builtin_config = project_root / "config" / MCP_CONFIG_FILENAME
-    user_config = Path.home() / NAGISA_CONFIG_DIR / MCP_CONFIG_FILENAME
-
-    config_paths = [builtin_config, user_config]
-
-    if workspace_root:
-        workspace_path = Path(workspace_root).expanduser()
-        if not workspace_path.is_absolute():
-            workspace_path = (Path.cwd() / workspace_path).resolve()
-        else:
-            workspace_path = workspace_path.resolve()
-        workspace_config = workspace_path / NAGISA_CONFIG_DIR / MCP_CONFIG_FILENAME
-        config_paths.append(workspace_config)
-
-    return config_paths
-
-
-def load_mcp_configs(
-    config_path: str | None = None,
-    workspace_root: str | None = None,
-) -> list[MCPServerConfig]:
-    """
-    Load MCP server configurations from JSON config file.
-
-    Supported schema:
-
-    {
-      "mcpServers": {
-        "server-name": {
-          "command": "uvx",
-          "args": ["package-name"]
-        }
-      }
-    }
-
-    Minimal shorthand is also supported:
-
-    {
-      "mcpServers": {
-        "server-name": "uvx package-name"
-      }
-    }
-
-    Config priority (low -> high):
-        1. Builtin: project/config/mcp.json
-        2. User: ~/.nagisa/mcp.json
-        3. Workspace: <workspace>/.nagisa/mcp.json
-
-    Args:
-        config_path: Optional explicit config path. If provided, only this file is loaded.
-        workspace_root: Optional workspace root used to resolve workspace-level config.
-
-    Returns:
-        List of MCPServerConfig objects
-    """
-    config_paths = [Path(config_path)] if config_path else _build_default_mcp_config_paths(workspace_root)
-
-    merged_servers: dict[str, Any] = {}
-    loaded_paths: list[Path] = []
-
-    for path in config_paths:
-        if not path.exists():
-            continue
+    async def disconnect(self) -> None:
+        """Disconnect from the MCP server."""
         try:
-            server_mapping = _load_mcp_servers_mapping_from_file(path)
+            if self._session_context:
+                await self._session_context.__aexit__(None, None, None)
+            if self._stdio_context:
+                await self._stdio_context.__aexit__(None, None, None)
         except Exception as e:
-            logger.warning(f"Failed to load MCP config file {path}: {e}")
-            continue
+            logger.warning(f"[{self.name}] Disconnect error: {e}")
+        finally:
+            self._session = None
+            self._read_stream = None
+            self._write_stream = None
+            self._connected = False
+            self._tools.clear()
 
-        for server_name, server_data in server_mapping.items():
-            if server_name in merged_servers:
-                logger.info(f"MCP server '{server_name}' overridden by config: {path}")
-            merged_servers[server_name] = server_data
+    async def _load_tools(self) -> None:
+        """Load available tools from the MCP server."""
+        if not self._session:
+            return
 
-        loaded_paths.append(path)
+        try:
+            result = await self._session.list_tools()
+            self._tools.clear()
 
-    if not loaded_paths:
-        logger.warning("No MCP config files found (checked builtin/user/workspace paths)")
-        return []
+            for tool in result.tools:
+                mcp_tool = MCPTool(
+                    name=tool.name,
+                    description=tool.description or "",
+                    input_schema=tool.inputSchema if hasattr(tool, "inputSchema") else {},
+                    server_name=self.name,
+                )
+                self._tools[tool.name] = mcp_tool
 
-    configs: list[MCPServerConfig] = []
-    for server_name, server_data in merged_servers.items():
-        if isinstance(server_data, dict) and server_data.get("type", "stdio") != "stdio":
-            logger.warning(f"[{server_name}] Unsupported MCP transport type: {server_data.get('type')}")
-            continue
-        configs.append(_parse_mcp_server(server_name, server_data))
+            logger.debug(f"[{self.name}] Loaded tools: {list(self._tools.keys())}")
+        except Exception as e:
+            logger.error(f"[{self.name}] Failed to load tools: {e}")
 
-    loaded_path_text = ", ".join(str(path) for path in loaded_paths)
-    logger.info(f"Loaded {len(configs)} MCP server configs from: {loaded_path_text}")
-    return configs
+    def get_tools(self) -> dict[str, MCPTool]:
+        return self._tools.copy()
 
+    def get_tool(self, name: str) -> MCPTool | None:
+        return self._tools.get(name)
 
-async def ensure_mcp_clients_for_workspace(workspace_root: str | None) -> None:
-    """Ensure MCP clients are connected for merged config of a workspace."""
-    manager = get_mcp_client_manager()
-    loaded_configs = load_mcp_configs(workspace_root=workspace_root)
-    connected = set(manager.get_connected_servers())
+    async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        if not self._connected or not self._session:
+            return {"status": "error", "message": f"Not connected to {self.name}"}
 
-    for config in loaded_configs:
-        if config.name in connected:
-            continue
-        if config.missing_env_vars:
-            missing_vars = ", ".join(config.missing_env_vars)
-            logger.warning(
-                f"[{config.name}] Skipping MCP server initialization due to missing environment variables: {missing_vars}"
-            )
-            continue
+        if tool_name not in self._tools:
+            return {"status": "error", "message": f"Tool '{tool_name}' not found on {self.name}"}
 
-        success = await manager.add_server(config)
-        if success:
-            connected.add(config.name)
+        try:
+            result = await self._session.call_tool(tool_name, arguments)
+            is_error = bool(getattr(result, "isError", False))
+
+            content_parts = []
+            for content in result.content:
+                if isinstance(content, types.TextContent):
+                    content_parts.append({"type": "text", "text": content.text})
+                elif isinstance(content, types.ImageContent):
+                    content_parts.append({"type": "image", "data": content.data, "mimeType": content.mimeType})
+                elif isinstance(content, types.EmbeddedResource):
+                    content_parts.append({"type": "resource", "uri": str(content.resource.uri)})
+
+            error_message = None
+            if is_error:
+                for part in content_parts:
+                    if part.get("type") == "text":
+                        error_message = part.get("text", "")
+                        if error_message:
+                            break
+                if not error_message:
+                    error_message = f"MCP tool '{tool_name}' returned error"
+
+            return {
+                "status": "error" if is_error else "success",
+                "server": self.name,
+                "tool": tool_name,
+                "message": error_message,
+                "content": content_parts,
+                "structuredContent": result.structuredContent if hasattr(result, "structuredContent") else None,
+            }
+        except Exception as e:
+            logger.error(f"[{self.name}] Tool call failed: {tool_name} - {e}")
+            return {"status": "error", "message": f"Tool execution failed: {e}"}

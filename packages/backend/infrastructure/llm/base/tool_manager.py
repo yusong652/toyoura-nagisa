@@ -154,7 +154,7 @@ class BaseToolManager(ABC):
 
         # Step 2: Load MCP tools from connected servers (filtered by session config)
         try:
-            from backend.infrastructure.mcp.client import get_mcp_client_manager
+            from backend.infrastructure.mcp.config import get_mcp_client_manager
             from backend.infrastructure.storage.session_manager import is_mcp_server_enabled_for_session
 
             mcp_manager = get_mcp_client_manager()
@@ -296,7 +296,7 @@ class BaseToolManager(ABC):
         Returns:
             Dict[str, Any]: ToolResult dictionary (converted from MCP result)
         """
-        from backend.infrastructure.mcp.client import get_mcp_client_manager
+        from backend.infrastructure.mcp.config import get_mcp_client_manager
         from backend.shared.utils.tool_result import error_response, success_response
 
         try:

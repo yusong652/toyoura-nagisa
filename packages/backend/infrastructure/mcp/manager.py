@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from .mcp_client import MCPClient
+from .client import MCPClient
 from .models import MCPServerConfig, MCPTool
 
 logger = logging.getLogger(__name__)

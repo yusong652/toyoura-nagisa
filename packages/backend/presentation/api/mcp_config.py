@@ -22,7 +22,7 @@ from backend.infrastructure.storage.session_manager import (
     update_session_mcp_server,
     get_session_metadata,
 )
-from backend.infrastructure.mcp.client import (
+from backend.infrastructure.mcp.config import (
     ensure_mcp_clients_for_workspace,
     get_mcp_client_manager,
     load_mcp_configs,

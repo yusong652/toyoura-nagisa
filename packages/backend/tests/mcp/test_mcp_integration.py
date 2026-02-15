@@ -41,7 +41,7 @@ async def test_tool_manager_integration():
     print("\n[2] Initializing MCP connections...")
     # IMPORTANT: Use consistent import path (backend.* not packages.backend.*)
     # to ensure singleton pattern works correctly
-    from backend.infrastructure.mcp.client import (
+    from backend.infrastructure.mcp.config import (
         initialize_mcp_clients,
         load_mcp_configs,
         get_mcp_client_manager,

@@ -13,7 +13,7 @@ load_dotenv(_PROJECT_ROOT / ".env")
 
 from backend.config.cors import get_cors_config, get_cors_middleware_kwargs
 from backend.infrastructure.llm.base.factory import initialize_factory
-from backend.infrastructure.mcp.client import (
+from backend.infrastructure.mcp.config import (
     ensure_mcp_clients_for_workspace,
     initialize_mcp_clients,
     load_mcp_configs,

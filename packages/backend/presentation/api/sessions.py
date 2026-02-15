@@ -25,7 +25,7 @@ from backend.presentation.exceptions import (
     InternalServerError,
 )
 from backend.application.session.session_service import SessionService
-from backend.infrastructure.mcp.client import ensure_mcp_clients_for_workspace
+from backend.infrastructure.mcp.config import ensure_mcp_clients_for_workspace
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.storage.session_manager import get_session_metadata
 from backend.shared.utils.app_context import get_llm_client as get_global_llm_client

@@ -132,7 +132,7 @@ class ResetRequest(BaseModel):
 async def check_connection_status() -> ApiResponse[ConnectionStatusData]:
     """Check PFC server connection status via MCP."""
     try:
-        from backend.infrastructure.mcp.client import get_mcp_client_manager
+        from backend.infrastructure.mcp.config import get_mcp_client_manager
 
         mcp_manager = get_mcp_client_manager()
         result = await mcp_manager.call_tool("pfc_list_tasks", {"limit": 1})

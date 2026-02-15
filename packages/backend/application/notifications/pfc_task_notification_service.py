@@ -301,7 +301,7 @@ class PfcTaskNotificationService:
             return None
 
         try:
-            from backend.infrastructure.mcp.client import get_mcp_client_manager
+            from backend.infrastructure.mcp.config import get_mcp_client_manager
             from backend.infrastructure.pfc.task_manager import get_pfc_task_manager
             from backend.shared.utils.mcp_utils import extract_mcp_text
 

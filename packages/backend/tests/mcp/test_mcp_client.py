@@ -18,8 +18,8 @@ from dotenv import load_dotenv
 
 load_dotenv(project_root / ".env")
 
-from packages.backend.infrastructure.mcp.client import (
-    MCPClient,
+from packages.backend.infrastructure.mcp.client import MCPClient
+from packages.backend.infrastructure.mcp.config import (
     MCPClientManager,
     MCPServerConfig,
     load_mcp_configs,

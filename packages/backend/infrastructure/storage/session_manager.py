@@ -950,7 +950,7 @@ def build_initial_mcp_config(workspace_root: Optional[str] = None) -> Dict[str, 
         Dict with structure: {"servers": {"server_name": {"enabled": bool}, ...}}
     """
     try:
-        from backend.infrastructure.mcp.client import load_mcp_configs
+        from backend.infrastructure.mcp.config import load_mcp_configs
 
         configs = load_mcp_configs(workspace_root=workspace_root)
         return {"servers": {c.name: {"enabled": c.enabled} for c in configs}}
@@ -1031,7 +1031,7 @@ def is_mcp_server_enabled_for_session(session_id: str, server_name: str) -> bool
 
     # Fallback to global default from config file
     try:
-        from backend.infrastructure.mcp.client import load_mcp_configs
+        from backend.infrastructure.mcp.config import load_mcp_configs
 
         workspace_root = None
         session_metadata = get_session_metadata(session_id)

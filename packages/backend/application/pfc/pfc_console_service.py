@@ -189,7 +189,7 @@ class PfcConsoleService:
             return None, "", f"Failed to create console script: {e}"
 
         # 1. Submit via MCP — get task_id
-        from backend.infrastructure.mcp.client import get_mcp_client_manager
+        from backend.infrastructure.mcp.config import get_mcp_client_manager
 
         mcp_manager = get_mcp_client_manager()
 
