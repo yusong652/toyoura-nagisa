@@ -44,6 +44,9 @@ build/
 .claude/settings.local.json
 .claude/CLAUDE.local.md
 
+# Codex local settings (contains local MCP/API keys)
+.codex/config.toml
+
 # OS
 .DS_Store
 .DS_Store?
