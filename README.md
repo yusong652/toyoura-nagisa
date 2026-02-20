@@ -24,10 +24,6 @@
 
 `pfc3d>model solve ;llm solves.`
 
-<p align="center">
-  <img src="./docs/assets/HelloNagisa.gif" alt="Demo: Drop 50 balls into a box" width="640"/>
-</p>
-
 ---
 
 ## 🎯 Core Features
@@ -63,10 +59,6 @@ The agent captures visual output during simulation cycles—particle configurati
 ### 🤖 **SubAgent Delegation**
 
 *Delegate depth, preserve clarity.*
-
-<p align="center">
-  <img src="./docs/assets/Diagnostic.gif" alt="Demo: Multi-view diagnostic analysis of drum washer simulation" width="720"/>
-</p>
 
 Deep exploration risks context exhaustion and hallucination. SubAgents isolate that complexity—exploring extensively, returning only verified findings.
 
