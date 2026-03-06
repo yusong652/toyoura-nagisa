@@ -162,6 +162,8 @@ IMAGE_EXTENSIONS = {
     '.psd', '.ai',
 }
 
+PDF_EXTENSIONS = {'.pdf'}
+
 # Encoding detection order
 ENCODING_CANDIDATES = [
     'utf-8', 'ascii', 'latin-1', 'cp1252', 'iso-8859-1', 'gbk', 'shift_jis'
@@ -176,6 +178,7 @@ class FileType(str, Enum):
     """File type categories."""
     TEXT = "text"
     IMAGE = "image"
+    PDF = "pdf"
     BINARY = "binary"
 
 
@@ -228,6 +231,8 @@ def _detect_file_type(file_path: Path) -> FileType:
 
     if ext in TEXT_EXTENSIONS:
         return FileType.TEXT
+    elif ext in PDF_EXTENSIONS:
+        return FileType.PDF
     elif ext in IMAGE_EXTENSIONS:
         return FileType.IMAGE
     else:
@@ -570,6 +575,100 @@ def _read_binary_content(file_path: Path) -> ProcessingResult:
         )
 
 
+def _read_pdf_content(
+    file_path: Path,
+    offset: Optional[int] = None,
+    limit: Optional[int] = None
+) -> ProcessingResult:
+    """Extract text from PDF using pymupdf.
+
+    Text is extracted page by page and formatted with line numbers.
+    offset/limit operate on the extracted text lines (same as text files).
+    """
+    try:
+        import pymupdf
+    except ImportError:
+        return ProcessingResult(
+            content="PDF reading requires pymupdf: pip install pymupdf",
+            content_format=ContentFormat.METADATA,
+            truncated=False,
+            truncation_reason=None,
+            original_size=file_path.stat().st_size,
+            processed_size=0,
+            lines_shown=(0, 0),
+            file_type=FileType.PDF,
+            encoding=None
+        )
+
+    try:
+        doc = pymupdf.open(str(file_path))
+        page_texts = []
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            text = page.get_text()
+            if text.strip():
+                page_texts.append(f"--- Page {page_num + 1} ---")
+                page_texts.append(text)
+        doc.close()
+
+        if not page_texts:
+            return ProcessingResult(
+                content=f"PDF has no extractable text: {file_path.name} (may be scanned/image-only)",
+                content_format=ContentFormat.METADATA,
+                truncated=False,
+                truncation_reason=None,
+                original_size=file_path.stat().st_size,
+                processed_size=0,
+                lines_shown=(0, 0),
+                file_type=FileType.PDF,
+                encoding=None
+            )
+
+        full_text = '\n'.join(page_texts)
+        lines = full_text.splitlines()
+        total_lines = len(lines)
+
+        start_line = offset or 0
+        max_lines = limit if limit is not None else DEFAULT_MAX_LINES
+        end_line = min(start_line + max_lines, total_lines)
+
+        selected_lines = lines[start_line:end_line]
+
+        processed_lines = []
+        for i, line in enumerate(selected_lines, start=start_line + 1):
+            if len(line) > MAX_LINE_LENGTH:
+                line = line[:MAX_LINE_LENGTH] + "... [line truncated]"
+            processed_lines.append(f"{i:6}→{line}")
+
+        result_content = '\n'.join(processed_lines)
+        truncated = end_line < total_lines
+
+        return ProcessingResult(
+            content=result_content,
+            content_format=ContentFormat.TEXT,
+            truncated=truncated,
+            truncation_reason="lines" if truncated else None,
+            original_size=file_path.stat().st_size,
+            processed_size=len(result_content),
+            lines_shown=(start_line + 1, end_line),
+            file_type=FileType.PDF,
+            encoding="utf-8"
+        )
+
+    except Exception as e:
+        return ProcessingResult(
+            content=f"Error reading PDF: {e}",
+            content_format=ContentFormat.METADATA,
+            truncated=False,
+            truncation_reason=None,
+            original_size=file_path.stat().st_size,
+            processed_size=0,
+            lines_shown=(0, 0),
+            file_type=FileType.PDF,
+            encoding=None
+        )
+
+
 def read_file_safely(
     file_path: Path,
     offset: Optional[int] = None,
@@ -621,33 +720,10 @@ def read_file_safely(
         # For TEXT files, detect encoding or fallback to UTF-8
         encoding = detect_encoding(file_path) or 'utf-8'
         return _read_text_content(file_path, encoding, offset, limit)
+    elif file_type == FileType.PDF:
+        return _read_pdf_content(file_path, offset, limit)
     else:
         # For IMAGE and BINARY files, read as binary with base64 encoding
         return _read_binary_content(file_path)
 
 
-def read_text_file_with_line_numbers(
-    file_path: Path,
-    encoding: str,
-    offset: Optional[int] = None,
-    limit: Optional[int] = None
-) -> str:
-    """
-    Read text file with Claude Code style line numbering.
-
-    DEPRECATED: Use read_file_safely() instead for better type detection.
-    Kept for backward compatibility.
-
-    Format: "     1→content" (6-space padding + arrow separator)
-
-    Args:
-        file_path: Path to file
-        encoding: Text encoding
-        offset: Line number to start from (0-indexed)
-        limit: Maximum number of lines to read
-
-    Returns:
-        Formatted content with line numbers
-    """
-    result = _read_text_content(file_path, encoding, offset, limit)
-    return result.content if isinstance(result.content, str) else str(result.content)
