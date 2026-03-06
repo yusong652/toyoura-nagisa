@@ -218,7 +218,8 @@ class GoogleGeminiCliClient(LLMClientBase):
             kwargs_api["top_k"] = call_options.top_k
 
         if call_options.thinking_level == "default":
-            kwargs_api.pop("thinking_config", None)
+            # Keep thought summaries enabled while letting API choose default reasoning effort.
+            kwargs_api["thinking_config"] = types.ThinkingConfig(include_thoughts=True)
         elif call_options.thinking_level is not None:
             model = self.google_config.model
             if model.startswith("gemini-3"):
