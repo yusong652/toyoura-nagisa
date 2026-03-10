@@ -63,7 +63,7 @@ async def bash(
         description="Timeout in milliseconds (foreground mode only, ignored when run_in_background=true)"
     )
 ) -> Dict[str, Any]:
-    """Executes bash commands in a persistent shell session with timeout and security.
+    """Executes shell commands with timeout and security.
 
 IMPORTANT: This tool is for terminal operations like git, npm, docker, pytest, etc.
 DO NOT use it for file operations - use specialized tools instead.
@@ -90,7 +90,8 @@ Command chaining:
 
 Working directory:
   - cwd is fixed to workspace root (shown in <env> as `workspace:`)
-  - Always use absolute paths; cd commands do NOT change cwd for subsequent calls
+  - Relative paths are resolved from the workspace root
+  - Each call runs in a fresh shell process; cd commands do NOT change cwd for subsequent calls
   - Good: pytest /foo/bar/tests
   - Bad: cd /foo/bar && pytest tests
 """

@@ -1,7 +1,7 @@
 """write tool - atomic text file creation and modification.
 
-This tool provides atomic file writing functionality, focusing exclusively on 
-creating and modifying text files with comprehensive safety checks and encoding support.
+This tool provides atomic file writing functionality, focusing exclusively on
+creating and modifying text files with workspace-bound path validation and encoding support.
 It supports both overwrite and append modes with automatic directory creation.
 
 Modeled after gemini-cli's file management tools for consistency and interoperability.
@@ -23,8 +23,6 @@ from backend.shared.utils.path_normalization import normalize_path_separators, p
 from .utils.path_security import (
     validate_path_in_workspace,
     get_workspace_root_async,
-    is_safe_symlink,
-    check_parent_symlinks
 )
 
 __all__ = ["write", "register_write_tool"]
@@ -38,17 +36,18 @@ async def write(
     context: ToolContext,
     path: str = Field(
         ...,
-        description="The absolute path to the file to write"
+        description="Path to the file to write. Relative paths resolve from the workspace root.",
     ),
     content: str = Field(
         ...,
-        description="The content to write to the file"
+        description="Content to write.",
     ),
 ) -> Dict[str, Any]:
     """Writes a file to the local filesystem.
 
     Usage:
     - This tool will overwrite the existing file if there is one at the provided path.
+    - Relative paths are resolved from the workspace root.
     - If this is an existing file, you MUST use the Read tool first to read the file's contents. This tool will fail if you did not read the file first.
     - ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
     - NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
@@ -110,22 +109,8 @@ async def write(
                 # If we can't read original, just use empty string
                 original_content = ""
 
-        # Symlink security checks (use dynamic workspace root for consistency)
-        if file_existed:
-            # Check if target file itself is an unsafe symlink
-            if abs_p.is_symlink() and not is_safe_symlink(abs_p, workspace_root):
-                return error_response("Cannot write to symlink pointing outside workspace")
-
-        # Check if any parent directory is an unsafe symlink
-        if not check_parent_symlinks(abs_p, workspace_root):
-            return error_response("Cannot write to path with parent symlink pointing outside workspace")
-
         # Create parent directories if they don't exist
         abs_p.parent.mkdir(parents=True, exist_ok=True)
-
-        # Additional check after mkdir - ensure created directories are safe
-        if not check_parent_symlinks(abs_p, workspace_root):
-            return error_response("Parent directory creation resulted in unsafe symlink structure")
         
         # Write the content (always overwrite)
         with abs_p.open("w", encoding=encoding) as fh:
@@ -219,6 +204,6 @@ def register_write_tool(registrar: ToolRegistrar):
         annotations={
             "category": "coding", 
             "tags": ["coding", "filesystem", "write", "file", "create"],
-            "primary_use": "Create and modify text files with comprehensive safety checks",
+            "primary_use": "Create and modify text files within the workspace",
             "prompt_optimization": "Enhanced for LLM interaction with clear guidance and contextual feedback"
         })(write) 

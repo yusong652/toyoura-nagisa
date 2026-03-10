@@ -18,8 +18,6 @@ from backend.application.tools.context import ToolContext
 from .utils.path_security import (
     validate_path_in_workspace,
     get_workspace_root_async,
-    is_safe_symlink,
-    check_parent_symlinks
 )
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
@@ -133,25 +131,26 @@ async def edit(
     path: str = Field(
         ...,
         min_length=1,
-        description="The absolute path to the file to modify",
+        description="Path to the file to modify. Relative paths resolve from the workspace root.",
     ),
     old_string: str = Field(
         ...,
-        description="The text to replace",
+        description="Text to replace.",
     ),
     new_string: str = Field(
         ...,
-        description="The text to replace it with (must be different from old_string)",
+        description="Replacement text. Must differ from old_string.",
     ),
     replace_all: bool = Field(
         False,
-        description="Replace all occurrences of old_string (default: false - replaces only first occurrence).",
+        description="Replace all occurrences instead of only the first unique match.",
     ),
 ) -> Dict[str, Any]:
     """Performs exact string replacements in files.
 
 Usage:
 - You must use your `Read` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file.
+- Relative paths are resolved from the workspace root.
 - When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + arrow (→). Everything after that arrow is the actual file content to match. Never include any part of the line number prefix in the old_string or new_string.
 - IMPORTANT: When you see Read tool output like "     5→while i < 35:", the old_string should be "while i < 35:" (WITHOUT the "     5→" prefix). The line numbers and arrows are for reference only and are NOT part of the file content.
 - ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
@@ -195,14 +194,6 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
         return error_response(f"File path is outside workspace: {original_path_for_display}")
 
     target_file = Path(validated_path)
-
-    # Security checks for existing files (use dynamic workspace root for consistency)
-    if target_file.exists():
-        if target_file.is_symlink() and not is_safe_symlink(target_file, workspace_root):
-            return error_response(f"Unsafe symlink detected: {original_path_for_display}")
-
-        if not check_parent_symlinks(target_file, workspace_root):
-            return error_response(f"Unsafe parent symlinks detected: {original_path_for_display}")
 
     # ------------------------------------------------------------------
     # File validation and content analysis

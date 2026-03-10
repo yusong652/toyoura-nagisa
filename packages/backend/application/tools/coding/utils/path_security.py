@@ -1,8 +1,7 @@
-"""Path security utilities for filesystem tools.
+"""Workspace path utilities for filesystem tools.
 
-This module provides comprehensive path security functions and workspace management
-to ensure all filesystem operations stay within the workspace boundaries.
-It includes workspace root configuration, path validation, and symlink safety checks.
+This module resolves workspace roots and validates that filesystem operations
+stay within the workspace boundary.
 """
 
 from pathlib import Path
@@ -14,8 +13,6 @@ __all__ = [
     "get_workspace_root",
     "get_workspace_root_async",
     "validate_path_in_workspace",
-    "is_safe_symlink",
-    "check_parent_symlinks"
 ]
 
 # ---------------------------------------------------------------------------
@@ -126,94 +123,3 @@ def validate_path_in_workspace(path: Union[str, Path], workspace_root: Optional[
     except ValueError:
         return None
     return str(p)
-
-
-# ---------------------------------------------------------------------------
-# Symlink security functions
-# ---------------------------------------------------------------------------
-
-def is_safe_symlink(path: Path, workspace_root: Optional[Path] = None) -> bool:
-    """Check if a symlink is safe (points within workspace).
-
-    Args:
-        path: Path object to check
-        workspace_root: Optional workspace root to validate against.
-                       If None, uses static workspace root from config.
-
-    Returns:
-        True if the path is not a symlink or if it's a safe symlink.
-        False if it's a symlink pointing outside workspace.
-
-    Examples:
-        >>> from pathlib import Path
-        >>> safe_link = Path("workspace/safe_link.txt")  # points to workspace/file.txt
-        >>> is_safe_symlink(safe_link)
-        True
-
-        >>> unsafe_link = Path("workspace/unsafe_link.txt")  # points to /etc/passwd
-        >>> is_safe_symlink(unsafe_link)
-        False
-    """
-    if not path.is_symlink():
-        return True
-
-    # Use provided workspace root or fallback to static config
-    if workspace_root is None:
-        workspace_root = get_workspace_root()
-
-    try:
-        # Resolve the symlink and check if it's within workspace
-        real_path = path.resolve()
-        workspace_real = workspace_root.resolve()
-
-        # Check if the resolved path is within workspace
-        try:
-            real_path.relative_to(workspace_real)
-            return True
-        except ValueError:
-            # Path is outside workspace
-            return False
-    except (OSError, RuntimeError):
-        # Failed to resolve - consider unsafe
-        return False
-
-
-def check_parent_symlinks(path: Path, workspace_root: Optional[Path] = None) -> bool:
-    """Check if any parent directory is an unsafe symlink.
-
-    This function walks up the directory tree from the given path to the
-    workspace root, checking each parent directory to ensure none of them
-    are symlinks pointing outside the workspace.
-
-    Args:
-        path: Path object to check
-        workspace_root: Optional workspace root to validate against.
-                       If None, uses static workspace root from config.
-
-    Returns:
-        True if all parent directories are safe (not symlinks or safe symlinks).
-        False if any parent directory is an unsafe symlink.
-
-    Examples:
-        >>> from pathlib import Path
-        >>> safe_path = Path("workspace/safe_dir/file.txt")
-        >>> check_parent_symlinks(safe_path)
-        True
-
-        >>> unsafe_path = Path("workspace/unsafe_dir/file.txt")  # unsafe_dir -> /etc
-        >>> check_parent_symlinks(unsafe_path)
-        False
-    """
-    # Use provided workspace root or fallback to static config
-    if workspace_root is None:
-        workspace_root = get_workspace_root()
-
-    current = path.parent
-    workspace_real = workspace_root.resolve()
-
-    while current != workspace_real and current != current.parent:
-        if current.is_symlink() and not is_safe_symlink(current, workspace_root):
-            return False
-        current = current.parent
-
-    return True 

@@ -19,6 +19,7 @@ from backend.application.tools.context import ToolContext
 
 logger = logging.getLogger(__name__)
 
+from .utils.path_security import get_workspace_root_async
 from .utils.file_reader import (
     read_file_safely,
     MAX_FILE_SIZE_BYTES,
@@ -39,22 +40,22 @@ async def read(
     path: str = Field(
         ...,
         min_length=1,
-        description="The absolute path to the file to read",
+        description="Path to the file to read. Relative paths resolve from the workspace root.",
     ),
     offset: Optional[int] = Field(
         None,
-        description="The line number to start reading from. Only provide if the file is too large to read at once",
+        description="Starting line number.",
     ),
     limit: Optional[int] = Field(
         None,
-        description="The number of lines to read. Only provide if the file is too large to read at once.",
+        description="Maximum number of lines to read.",
     ),
 ) -> Dict[str, Any]:
     """Reads a file from the local filesystem. You can access any file directly by using this tool.
 Assume this tool is able to read all files on the machine. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.
 
 Usage:
-- The path parameter must be an absolute path, not a relative path
+- Relative paths are resolved from the workspace root
 - By default, it reads up to 2000 lines starting from the beginning of the file
 - You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters
 - Any lines longer than 2000 characters will be truncated
@@ -90,11 +91,12 @@ Usage:
     original_path_for_display = path_to_llm_format(path.strip())
     path = normalize_path_separators(path.strip())
 
+    workspace_root = await get_workspace_root_async(context)
+
     # Resolve path to absolute (no workspace restriction for read operations)
     file_path_obj = Path(path).expanduser()
     if not file_path_obj.is_absolute():
-        # Relative paths resolved against current working directory
-        file_path_obj = Path.cwd() / file_path_obj
+        file_path_obj = workspace_root / file_path_obj
     abs_file_path = str(file_path_obj.resolve())
 
     try:

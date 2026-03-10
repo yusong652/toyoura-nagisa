@@ -9,6 +9,7 @@ from backend.application.tools.registrar import ToolRegistrar
 from backend.application.tools.context import ToolContext
 # from fastmcp.server.context import Context  # type: ignore
 
+from .utils.path_security import get_workspace_root_async
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
@@ -225,51 +226,51 @@ async def grep(
     context: ToolContext,
     pattern: str = Field(
         ...,
-        description="The regular expression pattern to search for in file contents",
+        description="Regular expression to search for in file contents.",
     ),
     path: str = Field(
         ".",
         min_length=1,
-        description="File or directory to search in. If omitted, defaults to workspace root. Must be a non-empty string.",
+        description="File or directory to search. Relative paths resolve from the workspace root.",
     ),
     glob: Optional[str] = Field(
         None,
-        description="Glob pattern to filter files (e.g. \"*.js\", \"*.{ts,tsx}\")",
+        description="Optional glob filter for candidate files, for example \"*.js\" or \"*.{ts,tsx}\".",
     ),
     type: Optional[str] = Field(
         None,
-        description="File type to search. Common types: js, py, ts, rust, go, java, etc.",
+        description="Optional file type filter such as js, py, ts, rust, go, or java.",
     ),
     output_mode: str = Field(
         "files_with_matches",
-        description="Output mode: \"content\" shows matching lines, \"files_with_matches\" shows file paths (default), \"count\" shows match counts.",
+        description="\"content\" returns matching lines, \"files_with_matches\" returns file paths, \"count\" returns match counts.",
     ),
     case_insensitive: bool = Field(
         False,
-        description="Case insensitive search",
+        description="Enable case-insensitive matching.",
     ),
     show_line_numbers: bool = Field(
         False,
-        description="Show line numbers in output. Requires output_mode: \"content\".",
+        description="Show line numbers. Requires output_mode=\"content\".",
     ),
     context_after: Optional[int] = Field(
         None,
         ge=0,
-        description="Number of lines to show after each match. Requires output_mode: \"content\".",
+        description="Lines of trailing context after each match. Requires output_mode=\"content\".",
     ),
     context_before: Optional[int] = Field(
         None,
         ge=0,
-        description="Number of lines to show before each match. Requires output_mode: \"content\".",
+        description="Lines of leading context before each match. Requires output_mode=\"content\".",
     ),
     context_both: Optional[int] = Field(
         None,
         ge=0,
-        description="Number of lines to show before and after each match. Requires output_mode: \"content\".",
+        description="Lines of context before and after each match. Requires output_mode=\"content\".",
     ),
     head_limit: Optional[int] = Field(
         None,
-        description="Limit output to first N results.",
+        description="Maximum number of results to return.",
     ),
 ) -> Dict[str, Any]:
     """A powerful content search tool using Python regex.
@@ -314,6 +315,8 @@ async def grep(
     except re.error as e:
         return error_response(f"Invalid regex pattern: {e}")
 
+    workspace_root = await get_workspace_root_async(context)
+
     # Determine search path (no workspace restriction for read operations)
     if path != ".":
         original_path_for_display = path_to_llm_format(path.strip())
@@ -322,14 +325,14 @@ async def grep(
         # Resolve path to absolute
         search_path = Path(path).expanduser()
         if not search_path.is_absolute():
-            search_path = Path.cwd() / search_path
+            search_path = workspace_root / search_path
         search_path = search_path.resolve()
 
         if not search_path.exists():
             return error_response(f"Path does not exist: {original_path_for_display}")
     else:
-        # Default to current working directory
-        search_path = Path.cwd()
+        # Default to workspace root
+        search_path = workspace_root
 
     # Process context arguments
     ctx_before = context_both if context_both else (context_before or 0)

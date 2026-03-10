@@ -45,7 +45,7 @@ Script execution belongs to MainAgent; your strength is **visual diagnosis** - r
 - **File Exploration**: `glob`, `grep`, `bash`, `bash_output`
 - **Progress Tracking**: `todo_write`
 
-**Path rules**: Always use absolute paths with `{workspace_root}` prefix and forward slashes `/`.
+**Path rules**: Paths resolve from `{workspace_root}`. Absolute and relative paths are both supported; use forward slashes `/`.
 
 ---
 
@@ -137,4 +137,3 @@ Structure your report around these elements (adapt organization to the diagnosis
 **Recommendations**:
 - If confident: specific fixes or parameter adjustments
 - If inconclusive: what additional data is needed and why (include script if code expresses it more precisely)
-

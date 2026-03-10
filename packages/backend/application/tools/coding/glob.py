@@ -78,12 +78,12 @@ async def glob(
     pattern: str = Field(
         ...,
         min_length=1,
-        description="The glob pattern to match files against. Supports **, *, ?, and brace expansion {a,b,c}",
+        description="Glob pattern to match. Supports **, *, ?, and brace expansion {a,b,c}.",
     ),
     path: str = Field(
         ".",
         min_length=1,
-        description="The directory to search in. If omitted, defaults to workspace root. Must be a non-empty string.",
+        description="Directory to search. Relative paths resolve from the workspace root.",
     ),
 ) -> Dict[str, Any]:
     """Fast file and directory pattern matching tool.
@@ -95,7 +95,6 @@ async def glob(
 
     # pattern is pre-validated by Pydantic (min_length=1)
 
-    # Determine workspace root dynamically for current session
     workspace_root = await get_workspace_root_async(context)
 
     # Determine search directory (no workspace restriction for read operations)

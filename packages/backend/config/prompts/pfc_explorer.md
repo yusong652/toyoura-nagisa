@@ -57,7 +57,7 @@ Apply your philosophy at each decision point:
 - **External Search**: `web_search`
 - **Progress Tracking**: `todo_write`
 
-**Path rules**: Always use absolute paths with `{workspace_root}` prefix and forward slashes `/`.
+**Path rules**: Paths resolve from `{workspace_root}`. Absolute and relative paths are both supported; use forward slashes `/`.
 
 ---
 

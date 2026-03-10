@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 from typing import Optional, Dict, Any, cast
 from unittest.mock import AsyncMock, Mock, call
 
@@ -90,45 +89,6 @@ async def test_read_file_safe_handles_missing_file(monkeypatch, tmp_path):
 
     assert result.success is False
     assert result.error_message == f"File not found: {missing_path}"
-
-
-@pytest.mark.asyncio
-async def test_read_file_safe_rejects_unsafe_symlink(monkeypatch, tmp_path):
-    processor = FileMentionProcessor(session_id="session-1")
-    file_path = tmp_path / "target.txt"
-    file_path.write_text("data", encoding="utf-8")
-
-    monkeypatch.setattr(
-        processor_module,
-        "resolve_workspace_root",
-        AsyncMock(return_value=tmp_path),
-    )
-    monkeypatch.setattr(
-        processor_module,
-        "validate_path_in_workspace",
-        Mock(return_value=str(file_path)),
-    )
-    monkeypatch.setattr(
-        processor_module,
-        "path_to_llm_format",
-        Mock(side_effect=lambda path: str(path)),
-    )
-    monkeypatch.setattr(
-        processor_module,
-        "is_safe_symlink",
-        Mock(return_value=False),
-    )
-    monkeypatch.setattr(
-        processor_module,
-        "check_parent_symlinks",
-        Mock(return_value=True),
-    )
-    monkeypatch.setattr(Path, "is_symlink", Mock(return_value=True))
-
-    result = await processor._read_file_safe("target.txt")
-
-    assert result.success is False
-    assert result.error_message == "Unsafe symlink"
 
 
 def test_format_file_reminder_metadata_warning():

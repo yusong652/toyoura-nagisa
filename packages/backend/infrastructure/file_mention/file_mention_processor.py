@@ -18,8 +18,6 @@ from dataclasses import dataclass
 
 from backend.application.tools.coding.utils.path_security import (
     validate_path_in_workspace,
-    is_safe_symlink,
-    check_parent_symlinks
 )
 from backend.shared.utils.workspace import resolve_workspace_root
 from backend.shared.utils.path_normalization import (
@@ -202,23 +200,6 @@ class FileMentionProcessor:
                     processing_result=None,
                     success=False,
                     error_message=f"File too large: {file_size // 1024 // 1024}MB"
-                )
-
-            # Security checks
-            if file_path_obj.is_symlink() and not is_safe_symlink(file_path_obj, workspace_root):
-                return FileContent(
-                    path=abs_display,
-                    processing_result=None,
-                    success=False,
-                    error_message="Unsafe symlink"
-                )
-
-            if not check_parent_symlinks(file_path_obj, workspace_root):
-                return FileContent(
-                    path=abs_display,
-                    processing_result=None,
-                    success=False,
-                    error_message="Unsafe parent symlinks"
                 )
 
             # Read content with automatic type detection (text vs binary/image)
