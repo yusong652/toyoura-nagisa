@@ -73,10 +73,12 @@ async def test_grep_defaults_to_workspace_root(monkeypatch, tmp_path):
     result = await _run_grep(_make_context())
 
     assert result["status"] == "success"
-    assert result["data"]["files"] == [
+    # Compare as a set: rg (parallel) and the Python walker return files
+    # in different orders; grep has no ordering contract.
+    assert set(result["data"]["files"]) == {
         str(top_level.resolve()).replace("\\", "/"),
         str(nested.resolve()).replace("\\", "/"),
-    ]
+    }
 
 
 @pytest.mark.asyncio

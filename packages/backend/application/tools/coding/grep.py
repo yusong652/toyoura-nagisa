@@ -118,6 +118,13 @@ async def _grep_ripgrep(
         if ctx_after:
             args.extend(["-A", str(ctx_after)])
 
+    # Share the same prune list with the Python walker. Without .gitignore
+    # context (e.g. scanning $HOME), rg would otherwise walk Library/,
+    # Caches/, node_modules/, etc. — cutting those drops wall-time ~4x on
+    # home-directory scans.
+    for d in PRUNE_DIR_NAMES:
+        args.extend(["--glob", f"!{d}/"])
+
     for gp in glob_patterns:
         args.extend(["--glob", gp])
     if file_type:
@@ -136,15 +143,20 @@ async def _grep_ripgrep(
         # rg disappeared between detection and use; bail to fallback.
         return None
 
-    # rg exit codes: 0 match, 1 no match, 2 error.
+    # rg exit codes: 0 match, 1 no match, 2 error. On macOS, scanning $HOME
+    # almost always returns 2 because rg hits OS-protected paths like
+    # ~/Library/Caches/com.apple.* and ~/Pictures/Photos Library.photoslibrary
+    # — those are non-fatal per-file errors, not pattern/config problems. We
+    # keep any results we got; only fall back for real pattern errors.
     if proc.returncode not in (0, 1):
-        # Pattern error or similar — let caller decide to fall back.
         err = stderr.decode("utf-8", errors="replace").strip()
         if "regex parse error" in err or "unrecognized" in err:
-            # Probably a Python-regex-only feature (rg uses Rust regex).
-            # Fall back so we keep Python regex compatibility.
+            # Python-regex-only feature the Rust engine rejected — use Python walker.
             return None
-        raise RuntimeError(f"ripgrep failed (exit {proc.returncode}): {err[:500]}")
+        if not stdout:
+            # No results AND hard failure → let caller raise.
+            raise RuntimeError(f"ripgrep failed (exit {proc.returncode}): {err[:500]}")
+        # Had partial results despite exit 2 (typical macOS permission case).
 
     text = stdout.decode("utf-8", errors="replace")
     if not text:
@@ -153,9 +165,9 @@ async def _grep_ripgrep(
     results: List[Dict[str, Any]] = []
 
     if output_mode == "files_with_matches":
-        # Each entry: "<path>\0\n"  (rg emits NUL after path, then newline).
-        for rec in text.split("\n"):
-            rec = rec.rstrip("\0")
+        # With `-l -0`, rg separates paths by NUL bytes only (no newlines).
+        for rec in text.split("\0"):
+            rec = rec.strip()
             if rec:
                 results.append({"file": Path(rec), "count": 0})
                 if len(results) >= max_results:
