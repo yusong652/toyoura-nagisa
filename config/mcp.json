@@ -9,12 +9,28 @@
         "--api-key",
         "${CONTEXT7_API_KEY}"
       ],
-      "enabled": false
+      "enabled": true
     },
     "pfc-mcp": {
       "type": "stdio",
       "command": "uvx",
       "args": ["pfc-mcp"],
+      "enabled": true
+    },
+    "yade-mcp": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "/Users/hanyusong/yade-mcp", "yade-mcp"],
+      "enabled": true
+    },
+    "blender-mcp": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["blender-mcp"],
+      "env": {
+        "BLENDER_PORT": "9876",
+        "BLENDER_HOST": "127.0.0.1"
+      },
       "enabled": true
     }
   }

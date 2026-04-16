@@ -40,9 +40,9 @@ providers:
     name: OpenAI GPT
     description: OpenAI's GPT models
     models:
-      - id: gpt-5.2-2025-12-11
-        name: GPT-5.2
-        description: GPT-5.2 model 
+      - id: gpt-5.4
+        name: GPT-5.4
+        description: GPT-5.4 model 
         context_window: 400000
         multimodal: true
         thinking:
@@ -215,9 +215,9 @@ providers:
     description: OpenAI Codex via ChatGPT subscription (Pro/Plus)
     models:
 
-      - id: gpt-5.2
-        name: GPT-5.2 (Codex)
-        description: GPT-5.2 via Codex API
+      - id: gpt-5.4
+        name: GPT-5.4 (Codex)
+        description: GPT-5.4 via Codex API
         context_window: 400000
         multimodal: true
         thinking:
