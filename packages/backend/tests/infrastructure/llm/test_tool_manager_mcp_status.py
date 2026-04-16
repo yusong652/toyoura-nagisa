@@ -39,9 +39,9 @@ async def test_check_task_status_failed_task_is_not_tool_error(monkeypatch):
         },
     }
 
-    import backend.infrastructure.mcp.client as mcp_client_module
+    import backend.infrastructure.mcp.config as mcp_config_module
 
-    monkeypatch.setattr(mcp_client_module, "get_mcp_client_manager", lambda: _DummyMcpManager(mcp_result))
+    monkeypatch.setattr(mcp_config_module, "get_mcp_client_manager", lambda: _DummyMcpManager(mcp_result))
 
     result = await manager._execute_mcp_tool("pfc_check_task_status", {"task_id": "161c50"})
 
@@ -64,9 +64,9 @@ async def test_structured_failure_status_does_not_flip_tool_result_to_error(monk
         },
     }
 
-    import backend.infrastructure.mcp.client as mcp_client_module
+    import backend.infrastructure.mcp.config as mcp_config_module
 
-    monkeypatch.setattr(mcp_client_module, "get_mcp_client_manager", lambda: _DummyMcpManager(mcp_result))
+    monkeypatch.setattr(mcp_config_module, "get_mcp_client_manager", lambda: _DummyMcpManager(mcp_result))
 
     result = await manager._execute_mcp_tool("pfc_execute_task", {"entry_script": "x.py", "description": "x"})
 
@@ -85,9 +85,9 @@ async def test_mcp_call_error_status_is_reported_as_tool_error(monkeypatch):
         "structuredContent": None,
     }
 
-    import backend.infrastructure.mcp.client as mcp_client_module
+    import backend.infrastructure.mcp.config as mcp_config_module
 
-    monkeypatch.setattr(mcp_client_module, "get_mcp_client_manager", lambda: _DummyMcpManager(mcp_result))
+    monkeypatch.setattr(mcp_config_module, "get_mcp_client_manager", lambda: _DummyMcpManager(mcp_result))
 
     result = await manager._execute_mcp_tool("pfc_check_task_status", {"task_id": "161c50"})
 
@@ -110,9 +110,9 @@ async def test_top_level_display_is_used_even_when_result_field_is_dict(monkeypa
         },
     }
 
-    import backend.infrastructure.mcp.client as mcp_client_module
+    import backend.infrastructure.mcp.config as mcp_config_module
 
-    monkeypatch.setattr(mcp_client_module, "get_mcp_client_manager", lambda: _DummyMcpManager(mcp_result))
+    monkeypatch.setattr(mcp_config_module, "get_mcp_client_manager", lambda: _DummyMcpManager(mcp_result))
 
     result = await manager._execute_mcp_tool("pfc_check_task_status", {"task_id": "3786d3"})
 

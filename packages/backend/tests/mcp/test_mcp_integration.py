@@ -9,6 +9,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -19,6 +21,7 @@ from dotenv import load_dotenv
 load_dotenv(project_root / ".env")
 
 
+@pytest.mark.integration
 async def test_tool_manager_integration():
     """Test that ToolManager includes MCP tools."""
     print("\n" + "=" * 60)
