@@ -38,7 +38,7 @@ async def test_write_resolves_relative_paths_from_workspace_root(monkeypatch, tm
 
 
 @pytest.mark.asyncio
-async def test_write_rejects_paths_outside_workspace(monkeypatch, tmp_path):
+async def test_write_allows_absolute_paths_outside_workspace(monkeypatch, tmp_path):
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir(parents=True)
     outside = tmp_path / "outside.txt"
@@ -51,5 +51,6 @@ async def test_write_rejects_paths_outside_workspace(monkeypatch, tmp_path):
 
     result = await write(_make_context(), path=str(outside), content="hello\n")
 
-    assert result["status"] == "error"
-    assert result["message"] == f"Path is outside of workspace: {outside}"
+    assert result["status"] == "success"
+    assert outside.read_text(encoding="utf-8") == "hello\n"
+    assert result["data"]["file_path"] == str(outside.resolve()).replace("\\", "/")

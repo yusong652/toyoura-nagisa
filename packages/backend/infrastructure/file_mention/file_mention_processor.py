@@ -17,7 +17,7 @@ from typing import List, Set, Optional, Dict, Any, Union
 from dataclasses import dataclass
 
 from backend.application.tools.coding.utils.path_security import (
-    validate_path_in_workspace,
+    resolve_tool_path,
 )
 from backend.shared.utils.workspace import resolve_workspace_root
 from backend.shared.utils.path_normalization import (
@@ -159,17 +159,8 @@ class FileMentionProcessor:
             # Get workspace root based on agent profile
             workspace_root = await resolve_workspace_root(self.session_id)
 
-            # Validate path and get absolute path
-            abs_file_path = validate_path_in_workspace(normalized_path, workspace_root)
-            if abs_file_path is None:
-                return FileContent(
-                    path=file_path,
-                    processing_result=None,
-                    success=False,
-                    error_message=f"Path outside workspace: {file_path}"
-                )
-
-            file_path_obj = Path(abs_file_path)
+            # Resolve to an absolute path (relative → workspace root; absolute → as-is)
+            file_path_obj = resolve_tool_path(normalized_path, workspace_root)
 
             # Format absolute path for LLM (matches Claude Code)
             abs_display = path_to_llm_format(file_path_obj)

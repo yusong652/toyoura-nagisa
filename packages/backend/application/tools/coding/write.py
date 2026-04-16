@@ -1,7 +1,7 @@
 """write tool - atomic text file creation and modification.
 
 This tool provides atomic file writing functionality, focusing exclusively on
-creating and modifying text files with workspace-bound path validation and encoding support.
+creating and modifying text files with workspace-relative path resolution and encoding support.
 It supports both overwrite and append modes with automatic directory creation.
 
 Modeled after gemini-cli's file management tools for consistency and interoperability.
@@ -21,8 +21,8 @@ from backend.application.tools.context import ToolContext
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
 from .utils.path_security import (
-    validate_path_in_workspace,
     get_workspace_root_async,
+    resolve_tool_path,
 )
 
 __all__ = ["write", "register_write_tool"]
@@ -36,7 +36,7 @@ async def write(
     context: ToolContext,
     path: str = Field(
         ...,
-        description="Path to the file to write. Relative paths resolve from the workspace root.",
+        description="Path to the file to write. Relative paths resolve from the workspace root; absolute paths are allowed.",
     ),
     content: str = Field(
         ...,
@@ -78,10 +78,7 @@ async def write(
     # Get workspace root dynamically based on current session
     workspace_root = await get_workspace_root_async(context)
 
-    # Validate path security against dynamic workspace
-    abs_path = validate_path_in_workspace(path, workspace_root)
-    if abs_path is None:
-        return error_response(f"Path is outside of workspace: {original_path_for_display}")
+    abs_path = resolve_tool_path(path, workspace_root)
 
     # Validate content size to prevent disk exhaustion
     content_size_chars = len(content)
@@ -96,7 +93,7 @@ async def write(
         return error_response(f"Content exceeds maximum size limit (20 MB): {size_mb:.2f} MB")
 
     try:
-        abs_p = Path(abs_path)
+        abs_p = abs_path
 
         # Check if file already exists and read original content for diff
         file_existed = abs_p.exists()
@@ -204,6 +201,6 @@ def register_write_tool(registrar: ToolRegistrar):
         annotations={
             "category": "coding", 
             "tags": ["coding", "filesystem", "write", "file", "create"],
-            "primary_use": "Create and modify text files within the workspace",
+            "primary_use": "Create and modify text files on the local filesystem",
             "prompt_optimization": "Enhanced for LLM interaction with clear guidance and contextual feedback"
         })(write) 

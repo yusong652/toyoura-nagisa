@@ -1,7 +1,8 @@
 """Workspace path utilities for filesystem tools.
 
-This module resolves workspace roots and validates that filesystem operations
-stay within the workspace boundary.
+This module resolves the current workspace root and converts tool paths into
+absolute filesystem paths. Relative paths are anchored to the workspace root;
+absolute paths are used as-is.
 """
 
 from pathlib import Path
@@ -12,7 +13,7 @@ __all__ = [
     "WORKSPACE_ROOT",
     "get_workspace_root",
     "get_workspace_root_async",
-    "validate_path_in_workspace",
+    "resolve_tool_path",
 ]
 
 # ---------------------------------------------------------------------------
@@ -72,54 +73,38 @@ WORKSPACE_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 # ---------------------------------------------------------------------------
-# Core path validation
+# Core path resolution
 # ---------------------------------------------------------------------------
 
-def validate_path_in_workspace(path: Union[str, Path], workspace_root: Optional[Path] = None) -> str | None:
-    """Return absolute path *str* if *path* is located inside workspace root.
-
-    This is the primary security function that ensures all file operations
-    stay within the designated workspace directory.
+def resolve_tool_path(path: Union[str, Path], workspace_root: Optional[Path] = None) -> Path:
+    """Resolve a tool path to an absolute filesystem path.
 
     Args:
-        path: Path to validate (str or Path object)
-        workspace_root: Optional workspace root to validate against.
-                       If None, uses static workspace root from config.
+        path: Path to resolve (str or Path object)
+        workspace_root: Optional workspace root used for relative paths.
+            If None, uses the static workspace root from config.
 
     Returns:
-        Absolute path as string if valid, None if outside workspace
-
-    Security Rules:
-        1. Relative paths are resolved **against** workspace root
-        2. Absolute paths must point inside the workspace
-        3. Returns *None* when the path escapes the workspace boundary
+        Resolved absolute ``Path``.
 
     Examples:
-        >>> validate_path_in_workspace("file.txt")
-        "/workspace/file.txt"
+        >>> resolve_tool_path("file.txt")
+        PosixPath('/workspace/file.txt')
 
-        >>> validate_path_in_workspace("/etc/passwd")
-        None  # Outside workspace
+        >>> resolve_tool_path("/etc/passwd")
+        PosixPath('/etc/passwd')
 
-        >>> validate_path_in_workspace("../../../etc/passwd")
-        None  # Path traversal attempt blocked
+        >>> resolve_tool_path("../../../etc/passwd")
+        PosixPath('/etc/passwd')
     """
-    # Use provided workspace root or fallback to static config
     if workspace_root is None:
         workspace_root = get_workspace_root()
 
     p = Path(str(path)).expanduser()
 
     if not p.is_absolute():
-        # Relative paths are resolved against workspace root
         p = (workspace_root / p).resolve()
     else:
-        # Absolute paths are used as-is (after resolving)
         p = p.resolve()
 
-    try:
-        # Check if the resolved path is within workspace
-        p.relative_to(workspace_root.resolve())
-    except ValueError:
-        return None
-    return str(p)
+    return p

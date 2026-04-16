@@ -46,7 +46,7 @@ async def test_edit_resolves_relative_paths_from_workspace_root(monkeypatch, tmp
 
 
 @pytest.mark.asyncio
-async def test_edit_rejects_paths_outside_workspace(monkeypatch, tmp_path):
+async def test_edit_allows_absolute_paths_outside_workspace(monkeypatch, tmp_path):
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir(parents=True)
     outside = tmp_path / "outside.py"
@@ -66,5 +66,6 @@ async def test_edit_rejects_paths_outside_workspace(monkeypatch, tmp_path):
         replace_all=False,
     )
 
-    assert result["status"] == "error"
-    assert result["message"] == f"File path is outside workspace: {outside}"
+    assert result["status"] == "success"
+    assert outside.read_text(encoding="utf-8") == "value = 2\n"
+    assert result["data"]["diff"]["file_path"] == str(outside.resolve()).replace("\\", "/")

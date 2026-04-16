@@ -44,40 +44,39 @@ def test_deduplicate_paths_normalizes_and_preserves_order():
 
 
 @pytest.mark.asyncio
-async def test_read_file_safe_rejects_outside_workspace(monkeypatch, tmp_path):
+async def test_read_file_safe_resolves_absolute_path_outside_workspace(monkeypatch, tmp_path):
+    """Absolute @-mentions outside the workspace now resolve as-is (no rejection)."""
     processor = FileMentionProcessor(session_id="session-1")
+    outside = tmp_path / "outside.txt"
 
     monkeypatch.setattr(
         processor_module,
         "resolve_workspace_root",
-        AsyncMock(return_value=tmp_path),
+        AsyncMock(return_value=tmp_path / "workspace"),
     )
     monkeypatch.setattr(
         processor_module,
-        "validate_path_in_workspace",
-        Mock(return_value=None),
+        "path_to_llm_format",
+        Mock(side_effect=lambda path: str(path)),
     )
 
-    result = await processor._read_file_safe("outside.txt")
+    # File does not exist → should surface "File not found", not rejection.
+    result = await processor._read_file_safe(str(outside))
 
     assert result.success is False
-    assert result.error_message == "Path outside workspace: outside.txt"
+    assert result.error_message.startswith("File not found")
 
 
 @pytest.mark.asyncio
 async def test_read_file_safe_handles_missing_file(monkeypatch, tmp_path):
     processor = FileMentionProcessor(session_id="session-1")
-    missing_path = tmp_path / "missing.txt"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
 
     monkeypatch.setattr(
         processor_module,
         "resolve_workspace_root",
-        AsyncMock(return_value=tmp_path),
-    )
-    monkeypatch.setattr(
-        processor_module,
-        "validate_path_in_workspace",
-        Mock(return_value=str(missing_path)),
+        AsyncMock(return_value=workspace),
     )
     monkeypatch.setattr(
         processor_module,
@@ -88,7 +87,8 @@ async def test_read_file_safe_handles_missing_file(monkeypatch, tmp_path):
     result = await processor._read_file_safe("missing.txt")
 
     assert result.success is False
-    assert result.error_message == f"File not found: {missing_path}"
+    expected_path = (workspace / "missing.txt").resolve()
+    assert result.error_message == f"File not found: {expected_path}"
 
 
 def test_format_file_reminder_metadata_warning():

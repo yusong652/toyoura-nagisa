@@ -16,8 +16,8 @@ from backend.application.tools.context import ToolContext
 # from fastmcp.server.context import Context  # type: ignore
 
 from .utils.path_security import (
-    validate_path_in_workspace,
     get_workspace_root_async,
+    resolve_tool_path,
 )
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
@@ -131,7 +131,7 @@ async def edit(
     path: str = Field(
         ...,
         min_length=1,
-        description="Path to the file to modify. Relative paths resolve from the workspace root.",
+        description="Path to the file to modify. Relative paths resolve from the workspace root; absolute paths are allowed.",
     ),
     old_string: str = Field(
         ...,
@@ -188,12 +188,7 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
     # Get workspace root dynamically based on current session
     workspace_root = await get_workspace_root_async(context)
 
-    # Validate file path is within workspace
-    validated_path = validate_path_in_workspace(path, workspace_root)
-    if validated_path is None:
-        return error_response(f"File path is outside workspace: {original_path_for_display}")
-
-    target_file = Path(validated_path)
+    target_file = resolve_tool_path(path, workspace_root)
 
     # ------------------------------------------------------------------
     # File validation and content analysis
