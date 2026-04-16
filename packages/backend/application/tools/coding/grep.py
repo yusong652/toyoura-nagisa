@@ -1,5 +1,7 @@
 """grep tool – powerful content search using pure Python regex."""
 
+import asyncio
+import os
 import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set
@@ -10,6 +12,8 @@ from backend.application.tools.context import ToolContext
 # from fastmcp.server.context import Context  # type: ignore
 
 from .utils.path_security import get_workspace_root_async
+from .utils.constants import PRUNE_DIR_NAMES
+from .utils.fs_scan import RG_PATH
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
@@ -65,6 +69,137 @@ BINARY_EXTENSIONS = {
     ".ttf", ".otf", ".woff", ".woff2",
     ".sqlite", ".db",
 }
+
+# -----------------------------------------------------------------------------
+# ripgrep fast path
+# -----------------------------------------------------------------------------
+
+
+async def _grep_ripgrep(
+    pattern: str,
+    search_path: Path,
+    output_mode: str,
+    case_insensitive: bool,
+    show_line_numbers: bool,
+    ctx_before: int,
+    ctx_after: int,
+    glob_patterns: List[str],
+    file_type: Optional[str],
+    max_results: int,
+) -> Optional[List[Dict[str, Any]]]:
+    """Run ripgrep via subprocess and parse the output.
+
+    Returns a list of per-file result dicts matching the Python fallback's
+    shape (``{file, count[, lines]}``), or ``None`` to signal the caller
+    should fall back to the Python walker. Uses rg's ``-0`` so paths can
+    contain ``:`` (Windows drive letters) without ambiguity.
+    """
+    if not RG_PATH:
+        return None
+
+    args: List[str] = [
+        RG_PATH,
+        "--no-messages",      # ignore "permission denied" noise
+        "--color=never",
+        "--no-heading",       # one `file:...` record per line
+        "-0",                 # NUL between path and the rest (drive-letter safe)
+    ]
+    if case_insensitive:
+        args.append("-i")
+
+    if output_mode == "files_with_matches":
+        args.append("-l")
+    elif output_mode == "count":
+        args.append("-c")
+    else:  # content
+        args.append("-n" if show_line_numbers else "-N")
+        if ctx_before:
+            args.extend(["-B", str(ctx_before)])
+        if ctx_after:
+            args.extend(["-A", str(ctx_after)])
+
+    for gp in glob_patterns:
+        args.extend(["--glob", gp])
+    if file_type:
+        args.extend(["--type", file_type])
+
+    args.extend(["-e", pattern, "--", str(search_path)])
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+    except (OSError, FileNotFoundError):
+        # rg disappeared between detection and use; bail to fallback.
+        return None
+
+    # rg exit codes: 0 match, 1 no match, 2 error.
+    if proc.returncode not in (0, 1):
+        # Pattern error or similar — let caller decide to fall back.
+        err = stderr.decode("utf-8", errors="replace").strip()
+        if "regex parse error" in err or "unrecognized" in err:
+            # Probably a Python-regex-only feature (rg uses Rust regex).
+            # Fall back so we keep Python regex compatibility.
+            return None
+        raise RuntimeError(f"ripgrep failed (exit {proc.returncode}): {err[:500]}")
+
+    text = stdout.decode("utf-8", errors="replace")
+    if not text:
+        return []
+
+    results: List[Dict[str, Any]] = []
+
+    if output_mode == "files_with_matches":
+        # Each entry: "<path>\0\n"  (rg emits NUL after path, then newline).
+        for rec in text.split("\n"):
+            rec = rec.rstrip("\0")
+            if rec:
+                results.append({"file": Path(rec), "count": 0})
+                if len(results) >= max_results:
+                    break
+        return results
+
+    if output_mode == "count":
+        # Each entry: "<path>\0<count>\n"
+        for rec in text.splitlines():
+            if "\0" not in rec:
+                continue
+            fp, _, cnt = rec.partition("\0")
+            try:
+                results.append({"file": Path(fp), "count": int(cnt)})
+            except ValueError:
+                continue
+            if len(results) >= max_results:
+                break
+        return results
+
+    # Content mode: each record is "<path>\0<line>:<content>" (matches)
+    # or "<path>\0<line>-<content>" (context). Without -n it's just
+    # "<path>\0<content>". Group by path, preserving encounter order.
+    by_file: Dict[str, List[str]] = {}
+    order: List[str] = []
+    for rec in text.splitlines():
+        if rec == "--" or "\0" not in rec:
+            continue
+        fp, _, rest = rec.partition("\0")
+        if fp not in by_file:
+            if len(order) >= max_results:
+                break
+            by_file[fp] = []
+            order.append(fp)
+        by_file[fp].append(rest)
+
+    for fp in order:
+        results.append({
+            "file": Path(fp),
+            "count": len(by_file[fp]),  # approximate — context lines included
+            "lines": by_file[fp],
+        })
+    return results
+
 
 # -----------------------------------------------------------------------------
 # Helper functions
@@ -343,116 +478,127 @@ async def grep(
     if glob:
         glob_patterns = _expand_braces(glob)
 
+    max_results = head_limit or MAX_RESULTS_DEFAULT
+
+    # Fast path: delegate to ripgrep if available. Orders of magnitude
+    # faster, respects .gitignore/.ignore natively, handles binary detection
+    # properly. Falls back to the Python walker on any failure, missing
+    # binary, or regex feature rg's Rust engine doesn't support.
     try:
-        results = []
-        files_searched = 0
-        max_results = head_limit or MAX_RESULTS_DEFAULT
+        rg_results = await _grep_ripgrep(
+            pattern=pattern,
+            search_path=search_path,
+            output_mode=output_mode,
+            case_insensitive=case_insensitive,
+            show_line_numbers=show_line_numbers,
+            ctx_before=ctx_before,
+            ctx_after=ctx_after,
+            glob_patterns=glob_patterns,
+            file_type=type,
+            max_results=max_results,
+        )
+    except RuntimeError:
+        rg_results = None
+    if rg_results is not None:
+        results = rg_results
+        return _format_grep_response(results, output_mode, pattern)
 
-        # Get all files to search
+    def _walk_and_search() -> List[Dict[str, Any]]:
+        # Directory walk + per-file regex is heavy (seconds to minutes on
+        # large trees). Run in a thread so the event loop keeps pumping
+        # — otherwise long searches starve Codex's SSE stream and the
+        # whole agent turn stalls.
+        collected: List[Dict[str, Any]] = []
+
         if search_path.is_file():
-            files_to_search = [search_path]
+            file_iter: List[Path] = [search_path]
         else:
-            files_to_search = list(search_path.rglob("*"))
+            def _iter_files():
+                for dirpath, dirnames, filenames in os.walk(search_path, followlinks=False):
+                    # Prune heavy/noisy dirs in-place (affects os.walk traversal)
+                    dirnames[:] = [d for d in dirnames if d not in PRUNE_DIR_NAMES]
+                    for name in filenames:
+                        yield Path(dirpath) / name
+            file_iter = _iter_files()
 
-        for file_path in files_to_search:
-            # Skip directories
+        for file_path in file_iter:
             if not file_path.is_file():
                 continue
-
-            # No workspace restriction for read operations
-            # Symlinks are followed normally
-
-            # Skip binary/large files
             if _should_skip_file(file_path):
                 continue
-
-            # Filter by glob pattern
             if not _matches_glob_pattern(file_path, search_path, glob_patterns):
                 continue
-
-            # Filter by file type
             if not _matches_file_type(file_path, type):
                 continue
 
-            files_searched += 1
-
-            # Search the file
             result = _search_file(
                 file_path, regex, output_mode,
                 show_line_numbers, ctx_before, ctx_after
             )
-
             if result:
-                results.append(result)
-                if len(results) >= max_results:
+                collected.append(result)
+                if len(collected) >= max_results:
                     break
+        return collected
 
-        # Build response
-        if output_mode == "files_with_matches":
-            file_paths = [path_to_llm_format(r["file"]) for r in results]
-            total_files = len(file_paths)
-            message = f"Found {total_files} file{'s' if total_files != 1 else ''}"
-
-            if file_paths:
-                llm_content = "\n".join(file_paths)
-            else:
-                llm_content = f"No files found matching pattern '{pattern}'"
-
-            return success_response(
-                message,
-                llm_content={"parts": [{"type": "text", "text": llm_content}]},
-                files=file_paths,
-                total_files=total_files,
-                pattern=pattern,
-            )
-
-        elif output_mode == "count":
-            output_lines = []
-            total_matches = 0
-            for r in results:
-                file_display = path_to_llm_format(r["file"])
-                output_lines.append(f"{file_display}:{r['count']}")
-                total_matches += r["count"]
-
-            message = f"Found {total_matches} matches in {len(results)} files"
-
-            if output_lines:
-                llm_content = "\n".join(output_lines)
-            else:
-                llm_content = f"No matches found for pattern '{pattern}'"
-
-            return success_response(
-                message,
-                llm_content={"parts": [{"type": "text", "text": llm_content}]},
-                total_matches=total_matches,
-                total_files=len(results),
-                pattern=pattern,
-            )
-
-        else:  # content mode
-            output_lines = []
-            for r in results:
-                file_display = path_to_llm_format(r["file"])
-                for line in r["lines"]:
-                    output_lines.append(f"{file_display}:{line}")
-
-            message = f"Search results for pattern '{pattern}'"
-
-            if output_lines:
-                llm_content = "\n".join(output_lines)
-            else:
-                llm_content = f"No matches found for pattern '{pattern}'"
-
-            return success_response(
-                message,
-                llm_content={"parts": [{"type": "text", "text": llm_content}]},
-                content=output_lines,
-                total_lines=len(output_lines),
-                pattern=pattern,
-            )
-
+    try:
+        results = await asyncio.to_thread(_walk_and_search)
+        return _format_grep_response(results, output_mode, pattern)
     except Exception as exc:
         return error_response(f"Unexpected error during search: {exc}")
+
+
+def _format_grep_response(
+    results: List[Dict[str, Any]],
+    output_mode: str,
+    pattern: str,
+) -> Dict[str, Any]:
+    """Build the tool response envelope from a list of per-file results."""
+    if output_mode == "files_with_matches":
+        file_paths = [path_to_llm_format(r["file"]) for r in results]
+        total_files = len(file_paths)
+        message = f"Found {total_files} file{'s' if total_files != 1 else ''}"
+        llm_content = "\n".join(file_paths) if file_paths else f"No files found matching pattern '{pattern}'"
+        return success_response(
+            message,
+            llm_content={"parts": [{"type": "text", "text": llm_content}]},
+            files=file_paths,
+            total_files=total_files,
+            pattern=pattern,
+        )
+
+    if output_mode == "count":
+        output_lines = []
+        total_matches = 0
+        for r in results:
+            file_display = path_to_llm_format(r["file"])
+            output_lines.append(f"{file_display}:{r['count']}")
+            total_matches += r["count"]
+        message = f"Found {total_matches} matches in {len(results)} files"
+        llm_content = "\n".join(output_lines) if output_lines else f"No matches found for pattern '{pattern}'"
+        return success_response(
+            message,
+            llm_content={"parts": [{"type": "text", "text": llm_content}]},
+            total_matches=total_matches,
+            total_files=len(results),
+            pattern=pattern,
+        )
+
+    # content mode
+    output_lines = []
+    for r in results:
+        file_display = path_to_llm_format(r["file"])
+        for line in r.get("lines", []):
+            output_lines.append(f"{file_display}:{line}")
+    message = f"Search results for pattern '{pattern}'"
+    llm_content = "\n".join(output_lines) if output_lines else f"No matches found for pattern '{pattern}'"
+    return success_response(
+        message,
+        llm_content={"parts": [{"type": "text", "text": llm_content}]},
+        content=output_lines,
+        total_lines=len(output_lines),
+        pattern=pattern,
+    )
 
 # -----------------------------------------------------------------------------
 # Registration helper

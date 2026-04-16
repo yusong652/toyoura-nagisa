@@ -4,9 +4,11 @@ Supports glob patterns like "**/*.js", "src/**/*.ts", and brace expansion "**/*.
 Returns matching file and directory paths sorted by modification time.
 """
 
-import glob as glob_module
+import asyncio
+import os
+import re
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Pattern
 
 from pydantic import Field
 from backend.application.tools.registrar import ToolRegistrar
@@ -14,6 +16,8 @@ from backend.application.tools.context import ToolContext
 # from fastmcp.server.context import Context  # type: ignore
 
 from .utils.path_security import get_workspace_root_async
+from .utils.constants import PRUNE_DIR_NAMES
+from .utils.fs_scan import load_gitignore_spec
 from backend.shared.utils.tool_result import success_response, error_response
 from backend.shared.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
@@ -39,6 +43,43 @@ def _sort_by_modification_time(files: List[Path]) -> List[Path]:
             return 0.0
 
     return sorted(files, key=get_mtime, reverse=True)
+
+
+def _glob_to_regex(pattern: str) -> Pattern[str]:
+    """Translate a glob pattern into a regex that matches POSIX-style relative paths.
+
+    Supports ``**`` (any depth incl. zero), ``*`` (within one segment),
+    and ``?`` (single char within one segment). The pattern is anchored
+    (``^...$``) and uses ``/`` as separator.
+    """
+    out: List[str] = []
+    i = 0
+    n = len(pattern)
+    while i < n:
+        c = pattern[i]
+        if c == "*":
+            if i + 1 < n and pattern[i + 1] == "*":
+                # `**` — match any number of characters including `/`
+                i += 2
+                if i < n and pattern[i] == "/":
+                    # `**/` — allow zero or more directory levels
+                    out.append("(?:.*/)?")
+                    i += 1
+                else:
+                    out.append(".*")
+            else:
+                out.append("[^/]*")
+                i += 1
+        elif c == "?":
+            out.append("[^/]")
+            i += 1
+        elif c in r".+^$(){}|[]\\":
+            out.append("\\" + c)
+            i += 1
+        else:
+            out.append(re.escape(c) if not c.isalnum() and c != "/" else c)
+            i += 1
+    return re.compile("^" + "".join(out) + "$")
 
 
 def _expand_braces(pattern: str) -> List[str]:
@@ -121,42 +162,85 @@ async def glob(
     try:
         # Expand brace patterns {a,b,c}
         expanded_patterns = _expand_braces(pattern)
+        regexes = [_glob_to_regex(p) for p in expanded_patterns]
+        # Only recurse when the pattern actually spans directories (via `**`).
+        # Without `**`, a bare `*.py` must only match at the top level, matching
+        # the stdlib `glob.glob(..., recursive=True)` semantics.
+        recursive = any("**" in p for p in expanded_patterns)
+        gitignore = load_gitignore_spec(search_dir) if recursive else None
 
-        # Collect all matching files
-        all_matches: set[Path] = set()
+        def _scan() -> List[Path]:
+            # Walk ourselves so we can prune heavy dirs (node_modules, .git,
+            # Library, .Trash, etc.) that otherwise make scans of $HOME or
+            # large workspaces take minutes. Runs in a thread so the event
+            # loop stays responsive for Codex SSE keepalives either way.
+            matches: set[Path] = set()
+            root_str = str(search_dir)
 
-        for expanded_pattern in expanded_patterns:
-            # Use Python's glob with recursive support
-            # glob.glob returns strings, convert to Path
-            search_pattern = str(search_dir / expanded_pattern)
-            matches = glob_module.glob(
-                search_pattern,
-                recursive=True
-            )
+            def _match_any(rel: str, basename: str) -> bool:
+                for rx in regexes:
+                    if rx.match(rel) or rx.match(basename):
+                        return True
+                return False
 
-            for match in matches:
-                file_path = Path(match).resolve()
+            if not recursive:
+                # Top-level only scan
+                try:
+                    with os.scandir(root_str) as it:
+                        for entry in it:
+                            if _match_any(entry.name, entry.name):
+                                matches.add(Path(entry.path))
+                                if len(matches) >= MAX_FILES_DEFAULT:
+                                    break
+                except OSError:
+                    pass
+                return list(matches)
 
-                # No workspace restriction for read operations
-                # Symlinks are followed normally
-                all_matches.add(file_path)
+            for dirpath, dirnames, filenames in os.walk(root_str, followlinks=False):
+                rel_dir = os.path.relpath(dirpath, root_str)
+                rel_prefix = "" if rel_dir == "." else rel_dir.replace(os.sep, "/") + "/"
 
-                # Apply limit early to avoid processing too many files
-                if len(all_matches) >= MAX_FILES_DEFAULT:
-                    break
+                # In-place prune skips traversal into noisy/huge subtrees.
+                # Combines a hard-coded blocklist (build caches, OS dirs)
+                # with user .gitignore rules so scans of large trees stay
+                # bounded and match what `rg`/`fd` would see.
+                kept = []
+                for d in dirnames:
+                    if d in PRUNE_DIR_NAMES:
+                        continue
+                    if gitignore is not None and gitignore.match_file(rel_prefix + d + "/"):
+                        continue
+                    kept.append(d)
+                dirnames[:] = kept
 
-            if len(all_matches) >= MAX_FILES_DEFAULT:
-                break
+                # Match directories too (glob returns dirs by default)
+                for d in dirnames:
+                    rel = rel_prefix + d
+                    if _match_any(rel, d):
+                        matches.add(Path(dirpath, d))
+                        if len(matches) >= MAX_FILES_DEFAULT:
+                            return list(matches)
 
-        # Convert to list and sort by modification time (newest first)
-        safe_files = list(all_matches)
+                for f in filenames:
+                    rel = rel_prefix + f
+                    if gitignore is not None and gitignore.match_file(rel):
+                        continue
+                    if _match_any(rel, f):
+                        matches.add(Path(dirpath, f))
+                        if len(matches) >= MAX_FILES_DEFAULT:
+                            return list(matches)
+
+            return list(matches)
+
+        safe_files = await asyncio.to_thread(_scan)
+        all_matches_count = len(safe_files)
         sorted_files = _sort_by_modification_time(safe_files)[:MAX_FILES_DEFAULT]
 
         # Build response - use forward slashes for LLM consistency
         file_paths = [path_to_llm_format(file_path) for file_path in sorted_files]
 
         # Check if results were truncated
-        truncated = len(all_matches) >= MAX_FILES_DEFAULT
+        truncated = all_matches_count >= MAX_FILES_DEFAULT
 
         # User-facing message
         total_found = len(file_paths)

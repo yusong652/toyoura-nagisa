@@ -67,6 +67,20 @@ DEFAULT_EXCLUDE_PATTERNS: Set[str] = {
     "*~",
 }
 
+# Directory names pruned during recursive filesystem walks (glob/grep).
+# Keeps scans of large trees (e.g. $HOME) from drowning in build caches,
+# VCS metadata, OS Library dirs, etc.
+PRUNE_DIR_NAMES: Set[str] = {
+    ".git", ".hg", ".svn",
+    "node_modules", "bower_components",
+    ".venv", "venv", "env", "virtualenv", "__pycache__",
+    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox",
+    "dist", "build", "target", ".next", ".nuxt", ".turbo", ".parcel-cache",
+    ".cache", ".npm", ".yarn", ".pnpm-store",
+    ".cargo", ".rustup", ".gradle",
+    ".Trash", "Library", "Caches",
+}
+
 # -----------------------------------------------------------------------------
 # Performance and safety limits
 # -----------------------------------------------------------------------------
