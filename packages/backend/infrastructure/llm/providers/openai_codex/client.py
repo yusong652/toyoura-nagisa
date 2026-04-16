@@ -325,6 +325,27 @@ class OpenAICodexClient(LLMClientBase):
                     OpenAIDebugger.print_debug_request_payload(kwargs_api)
                 raise
 
+            # Codex endpoint sends `response.completed` with only {id, usage}
+            # and delivers output items via `response.output_item.done`. Merge
+            # those items into `final_response.output` so downstream tool-call
+            # extraction works. Dedupe by item id against any items the SDK
+            # already placed there (for standard OpenAI streams).
+            if final_response and streaming_processor.completed_output_items:
+                existing_ids = {
+                    getattr(item, "id", None)
+                    for item in (final_response.output or [])
+                    if getattr(item, "id", None)
+                }
+                merged_output = list(final_response.output or [])
+                for item in streaming_processor.completed_output_items:
+                    item_id = getattr(item, "id", None)
+                    if item_id and item_id in existing_ids:
+                        continue
+                    merged_output.append(item)
+                    if item_id:
+                        existing_ids.add(item_id)
+                final_response.output = merged_output
+
             if final_response:
                 # Extract usage metadata from final response
                 final_metadata: Dict[str, Any] = {"__openai_final_response": final_response}

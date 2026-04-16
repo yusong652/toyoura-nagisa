@@ -16,6 +16,7 @@ from openai.types.responses import (
     ResponseFunctionCallArgumentsDeltaEvent,
     ResponseFunctionCallArgumentsDoneEvent,
     ResponseOutputItemAddedEvent,
+    ResponseOutputItemDoneEvent,
     ResponseReasoningTextDeltaEvent,
     ResponseReasoningTextDoneEvent,
     ResponseReasoningSummaryPartAddedEvent,
@@ -40,6 +41,14 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
         """Initialize streaming processor with state tracking."""
         # Track tool calls being built (indexed by item_id)
         self.tool_call_index: Dict[str, Dict[str, Any]] = {}
+        # Output items delivered as complete via `response.output_item.done`.
+        # Codex endpoint delivers function_calls only through this event and
+        # sends `response.completed` with an empty output array, so we must
+        # accumulate items here to reconstruct the final response.
+        self.completed_output_items: List[Any] = []
+        # call_ids already emitted as final function_call chunks (dedupe guard
+        # between function_call_arguments.done and output_item.done).
+        self._finalized_call_ids: set[str] = set()
 
     def process_event(self, event: Any) -> List[StreamingChunk]:
         """
@@ -234,30 +243,84 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
             item_id = getattr(event, 'item_id', None)
             if item_id:
                 info = self.tool_call_index.get(item_id, {})
-                arguments_text = getattr(event, 'arguments', None) or ""
+                call_id = info.get("call_id")
 
-                if arguments_text:
-                    try:
-                        parsed_args = json.loads(arguments_text)
-                    except Exception:
-                        parsed_args = arguments_text
+                if not call_id or call_id not in self._finalized_call_ids:
+                    arguments_text = getattr(event, 'arguments', None) or ""
+
+                    if arguments_text:
+                        try:
+                            parsed_args = json.loads(arguments_text)
+                        except Exception:
+                            parsed_args = arguments_text
+                    else:
+                        parsed_args = getattr(event, 'arguments', None)
+
+                    if call_id:
+                        self._finalized_call_ids.add(call_id)
+
+                    result.append(StreamingChunk(
+                        chunk_type="function_call",
+                        content=info.get("name", ""),
+                        metadata={
+                            "tool_id": call_id,
+                            "is_final": True,
+                            **usage_info
+                        },
+                        function_call={
+                            "id": call_id,
+                            "name": info.get("name"),
+                            "args": parsed_args
+                        }
+                    ))
+
+        # Output item done - canonical event for Codex endpoint, which delivers
+        # complete function_call/message/reasoning items here and omits them
+        # from `response.completed`. Standard OpenAI may also fire this event;
+        # dedupe via `_finalized_call_ids` to avoid double-emitting tool chunks.
+        if isinstance(event, ResponseOutputItemDoneEvent) or event_type == "response.output_item.done":
+            item = getattr(event, 'item', None)
+            if item is None and isinstance(event, dict):
+                item = event.get("item")
+
+            if item is not None:
+                self.completed_output_items.append(item)
+
+                if hasattr(item, "type"):
+                    item_type = item.type
                 else:
-                    parsed_args = getattr(event, 'arguments', None)
+                    item_type = item.get("type") if isinstance(item, dict) else None
 
-                result.append(StreamingChunk(
-                    chunk_type="function_call",
-                    content=info.get("name", ""),
-                    metadata={
-                        "tool_id": info.get("call_id"),
-                        "is_final": True,
-                        **usage_info
-                    },
-                    function_call={
-                        "id": info.get("call_id"),
-                        "name": info.get("name"),
-                        "args": parsed_args
-                    }
-                ))
+                if item_type == "function_call":
+                    call_id = getattr(item, 'call_id', None) or (item.get("call_id") if isinstance(item, dict) else None)
+                    name = getattr(item, 'name', None) or (item.get("name") if isinstance(item, dict) else None)
+                    arguments_text = getattr(item, 'arguments', None) or (item.get("arguments") if isinstance(item, dict) else None) or ""
+
+                    if call_id and call_id not in self._finalized_call_ids:
+                        self._finalized_call_ids.add(call_id)
+
+                        if arguments_text:
+                            try:
+                                parsed_args = json.loads(arguments_text)
+                            except Exception:
+                                parsed_args = arguments_text
+                        else:
+                            parsed_args = {}
+
+                        result.append(StreamingChunk(
+                            chunk_type="function_call",
+                            content=name or "",
+                            metadata={
+                                "tool_id": call_id,
+                                "is_final": True,
+                                **usage_info
+                            },
+                            function_call={
+                                "id": call_id,
+                                "name": name,
+                                "args": parsed_args
+                            }
+                        ))
 
         # Note: Usage extraction is now handled in client.py by adding usage metadata
         # to the final __openai_final_response chunk. This ensures usage is in the
